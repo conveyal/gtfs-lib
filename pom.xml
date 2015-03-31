@@ -1,0 +1,109 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.conveyal</groupId>
+  <artifactId>gtfs-lib</artifactId>
+  <packaging>jar</packaging>
+  <version>0.1-SNAPSHOT</version>
+  <name>gtfs-lib</name>
+  <url>https://github.com/conveyal/gtfs-lib</url>
+
+  <!-- Define where the source code for this project lives -->
+  <scm>
+    <connection>scm:git:https://github.com/conveyal/gtfs-lib.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/conveyal/gtfs-lib.git</developerConnection>
+    <url>https://github.com/conveyal/gtfs-lib.git</url>
+  </scm>
+
+  <!-- Define where the artifacts produced by this build will be deployed -->
+  <distributionManagement>
+    <repository>
+      <!-- Also used as snapshotRepository by default -->
+      <id>conveyal-maven-repo</id>
+      <name>Conveyal Maven Repository</name>
+      <url>s3://maven.conveyal.com/</url>
+    </repository>
+  </distributionManagement>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.2</version>
+        <configuration>
+          <!-- Target Java versions -->
+          <source>1.7</source>
+          <target>1.7</target>
+        </configuration>
+      </plugin>
+    </plugins>
+    <!-- "Wagon" necessary for uploading/deploying artifacts to the Conveyal Maven repo on Amazon S3. -->
+    <extensions>
+      <extension>
+          <groupId>org.kuali.maven.wagons</groupId>
+          <artifactId>maven-s3-wagon</artifactId>
+          <version>1.2.1</version>
+      </extension>
+    </extensions>
+  </build>
+  <repositories>
+    <repository>
+      <id>conveyal</id>
+      <name>Conveyal Maven Repository</name>
+       <url>http://maven.conveyal.com/</url>
+    </repository>
+  </repositories>
+  <dependencies>
+    <!-- CSV parser -->
+    <dependency>
+      <groupId>net.sourceforge.javacsv</groupId>
+      <artifactId>javacsv</artifactId>
+      <version>2.0</version>
+    </dependency>
+    <!-- Joda Time is a widely used replacement for flaky Java time classes. -->
+    <dependency>
+      <groupId>joda-time</groupId>
+      <artifactId>joda-time</artifactId>
+      <version>2.1</version>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <version>3.8.1</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+    	<groupId>com.beust</groupId>
+    	<artifactId>jcommander</artifactId>
+    	<version>1.30</version>
+    </dependency>
+    <dependency>
+    	<groupId>com.google.guava</groupId>
+    	<artifactId>guava</artifactId>
+    	<version>18.0</version>
+    </dependency>
+    <dependency>
+    	<groupId>com.vividsolutions</groupId>
+    	<artifactId>jts</artifactId>
+    	<version>1.8</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.mapdb</groupId>
+    	<artifactId>mapdb</artifactId>
+    	<version>1.0.6</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.slf4j</groupId>
+    	<artifactId>slf4j-api</artifactId>
+    	<version>1.7.10</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.slf4j</groupId>
+    	<artifactId>slf4j-simple</artifactId>
+    	<version>1.7.10</version>
+    </dependency>
+  </dependencies>
+
+</project>
