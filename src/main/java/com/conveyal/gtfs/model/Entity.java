@@ -14,6 +14,8 @@ import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.util.Deduplicator;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
+
+import org.apache.commons.io.input.BOMInputStream;
 import org.joda.time.LocalDate;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
@@ -236,7 +238,10 @@ public abstract class Entity implements Serializable {
             }
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
             InputStream zis = zip.getInputStream(entry);
-            CsvReader reader = new CsvReader(zis, ',', Charset.forName("UTF8"));
+            // skip any byte order mark that may be present. Files must be UTF-8,
+            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable"
+            InputStream bis = new BOMInputStream(zis);
+            CsvReader reader = new CsvReader(bis, ',', Charset.forName("UTF8"));
             this.reader = reader;
             reader.readHeaders();
             while (reader.readRecord()) {
