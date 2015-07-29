@@ -50,10 +50,12 @@ public class GTFSFeed {
             .mmapFileEnable()
             .asyncWriteEnable()
             .compressionEnable()
-            .cacheSize(200 * 1024 * 1024)
+            // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
             .make(); // TODO db.close();
 
     public String feedId = null;
+
+    // TODO make all of these Maps MapDBs so the entire GTFSFeed is persistent and uses constant memory
 
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency>        agency         = Maps.newHashMap();
