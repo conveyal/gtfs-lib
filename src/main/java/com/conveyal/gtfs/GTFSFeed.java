@@ -166,6 +166,19 @@ public class GTFSFeed {
     }
 
     /**
+     * For the given trip ID, fetch all the stop times in order of increasing stop_sequence.
+     * This is an efficient iteration over a tree map.
+     */
+    public Iterable<StopTime> getOrderedStopTimesForTrip (String trip_id) {
+        Map<Fun.Tuple2, StopTime> tripStopTimes =
+                stop_times.subMap(
+                        Fun.t2(trip_id, null),
+                        Fun.t2(trip_id, Fun.HI)
+                );
+        return tripStopTimes.values();
+    }
+
+    /**
      *  Bin all trips by the sequence of stops they visit.
      * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
      */
@@ -177,14 +190,10 @@ public class GTFSFeed {
             if (++n % 100000 == 0) {
                 LOG.info("trip {}", human(n));
             }
-            Map<Fun.Tuple2, StopTime> tripStopTimes =
-                    stop_times.subMap(
-                            Fun.t2(trip_id, null),
-                            Fun.t2(trip_id, Fun.HI)
-                            );
+            Iterable<StopTime> orderedStopTimes = getOrderedStopTimesForTrip(trip_id);
             List<String> stops = Lists.newArrayList();
             // In-order traversal of StopTimes within this trip. The 2-tuple keys determine ordering.
-            for (StopTime stopTime : tripStopTimes.values()) {
+            for (StopTime stopTime : orderedStopTimes) {
                 stops.add(stopTime.stop_id);
             }
             // Fetch or create the tripId list for this stop pattern, then add the current trip to that list.
