@@ -94,14 +94,10 @@
     	<artifactId>mapdb</artifactId>
     	<version>1.0.6</version>
     </dependency>
+    <!-- Our logging API, no implementation specified as gtfs-lib is a library. -->
     <dependency>
     	<groupId>org.slf4j</groupId>
     	<artifactId>slf4j-api</artifactId>
-    	<version>1.7.10</version>
-    </dependency>
-    <dependency>
-    	<groupId>org.slf4j</groupId>
-    	<artifactId>slf4j-simple</artifactId>
     	<version>1.7.10</version>
     </dependency>
     <dependency>
