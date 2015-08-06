@@ -1,10 +1,9 @@
 package com.conveyal.gtfs.model;
 
 import com.google.common.collect.Maps;
-
-import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
 
+import java.io.Serializable;
 import java.util.Map;
 
 /**
@@ -12,7 +11,7 @@ import java.util.Map;
  * There should only be one Calendar per service_id. There should only be one calendar_date per tuple of
  * (service_id, date), which means there can be many calendar_dates per service_id.
  */
-public class Service {
+public class Service implements Serializable {
 
     public String   service_id;
     public Calendar calendar;

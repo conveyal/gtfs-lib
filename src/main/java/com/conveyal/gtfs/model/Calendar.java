@@ -20,10 +20,10 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.io.Serializable;
 import java.util.Iterator;
 
-public class Calendar extends Entity {
+public class Calendar extends Entity implements Serializable {
 
     public Service service;
     public int monday;

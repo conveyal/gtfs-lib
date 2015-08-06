@@ -17,15 +17,13 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterators;
-import com.sun.org.apache.xerces.internal.impl.dv.xs.DateTimeDV;
-
-import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Iterator;
 
-public class CalendarDate extends Entity {
+public class CalendarDate extends Entity implements Serializable {
 
     public Service   service;
     public LocalDate date;
