@@ -1,5 +1,8 @@
 package com.conveyal.gtfs.model;
 
+import org.mapdb.Fun;
+import org.mapdb.Fun.Tuple2;
+
 import java.util.AbstractMap;
 import java.util.Collection;
 import java.util.Collections;
@@ -7,9 +10,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
-
-import org.mapdb.Fun;
-import org.mapdb.Fun.Tuple2;
 
 /**
  * A map of a single shape_id with points indexed by shape_point_sequence.
@@ -20,9 +20,9 @@ public class ShapeMap implements Map<Integer, Shape> {
     private String shapeId;
     
     /** A map from (shape_id, shape_pt_sequence) to shapes */
-    private Map<Tuple2<String, Integer>, Shape> wrapped; 
+    private Map<Tuple2, Shape> wrapped;
 
-    public ShapeMap (ConcurrentNavigableMap<Tuple2<String, Integer>, Shape> allShapes, String shapeId) {
+    public ShapeMap (ConcurrentNavigableMap<Tuple2, Shape> allShapes, String shapeId) {
         this.wrapped = allShapes.subMap(
                 new Tuple2 (shapeId, 0),
                 new Tuple2 (shapeId, Fun.HI)
@@ -102,8 +102,8 @@ public class ShapeMap implements Map<Integer, Shape> {
 
         HashSet<Map.Entry<Integer, Shape>> ret = new HashSet<Map.Entry<Integer, Shape>>(size());
 
-        for (Map.Entry<Tuple2<String, Integer>, Shape> e : wrapped.entrySet()) {
-            ret.add(new AbstractMap.SimpleImmutableEntry<Integer, Shape>(e.getKey().b, e.getValue()));
+        for (Map.Entry<Tuple2, Shape> e : wrapped.entrySet()) {
+            ret.add(new AbstractMap.SimpleImmutableEntry(e.getKey().b, e.getValue()));
         }
 
         return Collections.unmodifiableSet(ret);

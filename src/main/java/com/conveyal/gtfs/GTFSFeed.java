@@ -41,7 +41,7 @@ import static com.conveyal.gtfs.util.Util.human;
  * All entities must be from a single feed namespace.
  * Composed of several GTFSTables.
  */
-public class GTFSFeed {
+public class GTFSFeed implements Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
 
@@ -67,7 +67,7 @@ public class GTFSFeed {
     public final Map<String, Trip>          trips          = Maps.newHashMap();
 
     /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
-    public final ConcurrentNavigableMap<Tuple2<String, Integer>, Shape> shapePoints = db.getTreeMap("shapes");
+    public final ConcurrentNavigableMap<Tuple2, Shape> shapePoints = db.getTreeMap("shapes");
 
     /* This represents a bunch of views of the previous, one for each shape */
     public final Map<String, Map<Integer, Shape>> shapes = Maps.newHashMap();
@@ -227,6 +227,20 @@ public class GTFSFeed {
             fares.put(fareId, fare);
         }
         return fare;
+    }
+
+    /**
+     * Cloning can be useful when you want to make only a few modifications to an existing feed.
+     * Keep in mind that this is a shallow copy, so you'll have to create new maps in the clone for tables you want
+     * to modify.
+     */
+    @Override
+    public GTFSFeed clone() {
+        try {
+            return (GTFSFeed) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     // TODO augment with unrolled calendar, patterns, etc. before validation
