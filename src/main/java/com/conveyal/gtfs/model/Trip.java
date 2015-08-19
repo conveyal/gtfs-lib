@@ -54,6 +54,18 @@ public class Trip extends Entity {
             t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed = feed;
+            if (t.route.agency.agency_id.equals("SNC")) {
+                System.out.println("Skipping SNCF trip.");
+                return;
+            }
+            if (t.route.agency.agency_id.equals("RAT")) {
+                System.out.println("Skipping RATP trip.");
+                return;
+            }
+            if (t.service == null) {
+                System.out.println("Not saving trip, service not found.");
+                return;
+            }
             feed.trips.put(t.trip_id, t);
         }
 
