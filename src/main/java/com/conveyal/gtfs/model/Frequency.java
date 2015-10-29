@@ -16,6 +16,7 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Iterator;
 
 public class Frequency extends Entity {
@@ -42,6 +43,12 @@ public class Frequency extends Entity {
             f.exact_times = getIntField("exact_times", false, 0, 1);
             f.feed = feed;
             feed.frequencies.put(f.trip.trip_id, f); // TODO this should be a multimap
+
+            if (f.trip.frequencies == null) {
+                f.trip.frequencies = new ArrayList<>();
+            }
+
+            f.trip.frequencies.add(f);
         }
 
     }
