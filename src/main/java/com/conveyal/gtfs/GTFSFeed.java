@@ -26,6 +26,7 @@ import org.mapdb.Fun.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
@@ -41,7 +42,7 @@ import static com.conveyal.gtfs.util.Util.human;
  * All entities must be from a single feed namespace.
  * Composed of several GTFSTables.
  */
-public class GTFSFeed implements Cloneable {
+public class GTFSFeed implements Cloneable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
 
@@ -49,6 +50,7 @@ public class GTFSFeed implements Cloneable {
             .transactionDisable()
             .mmapFileEnable()
             .asyncWriteEnable()
+            .deleteFilesAfterClose()
             .compressionEnable()
             // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
             .make(); // TODO db.close();
@@ -241,6 +243,10 @@ public class GTFSFeed implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void close () {
+        db.close();
     }
 
     // TODO augment with unrolled calendar, patterns, etc. before validation
