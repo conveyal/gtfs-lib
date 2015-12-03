@@ -16,9 +16,6 @@ import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
 
 import org.apache.commons.io.input.BOMInputStream;
-import org.joda.time.LocalDate;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +27,8 @@ import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
@@ -157,14 +156,13 @@ public abstract class Entity implements Serializable {
 
         /**
          * Fetch the given column of the current row, and interpret it as a date in the format YYYYMMDD.
-         * @return the date value as Joda LocalDate, or null if it could not be parsed.
+         * @return the date value as Java LocalDate, or null if it could not be parsed.
          */
         protected LocalDate getDateField(String column, boolean required) throws IOException {
             String str = getFieldCheckRequired(column, required);
             LocalDate dateTime = null;
             if (str != null) try {
-                DateTimeFormatter formatter = DateTimeFormat.forPattern("yyyyMMdd");
-                dateTime = formatter.parseLocalDate(str);
+                dateTime = LocalDate.parse(str, DateTimeFormatter.BASIC_ISO_DATE);
                 checkRangeInclusive(2000, 2100, dateTime.getYear());
             } catch (IllegalArgumentException iae) {
                 feed.errors.add(new DateParseError(tableName, row, column));
@@ -357,8 +355,11 @@ public abstract class Entity implements Serializable {
             writeStringField(obj != null ? obj.toString() : "");
         }
 
+        /**
+         * Writes date as YYYYMMDD
+         */
         protected void writeDateField (LocalDate d) throws IOException {
-            writeStringField(String.format("%04d%02d%02d", d.getYear(), d.getMonthOfYear(), d.getDayOfMonth()));
+            writeStringField(d.format(DateTimeFormatter.BASIC_ISO_DATE));
         }
 
         /**

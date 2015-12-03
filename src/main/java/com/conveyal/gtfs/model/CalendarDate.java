@@ -17,7 +17,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterators;
-import org.joda.time.LocalDate;
+import java.time.LocalDate;
 
 import java.io.IOException;
 import java.io.Serializable;

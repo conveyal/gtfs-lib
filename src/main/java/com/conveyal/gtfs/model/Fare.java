@@ -2,7 +2,6 @@ package com.conveyal.gtfs.model;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import org.joda.time.DateTime;
 
 import java.util.List;
 import java.util.Map;
