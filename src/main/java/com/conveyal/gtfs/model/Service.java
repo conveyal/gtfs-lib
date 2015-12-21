@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.google.common.collect.Maps;
-import org.joda.time.LocalDate;
+import java.time.LocalDate;
 
 import java.io.Serializable;
 import java.util.Map;
@@ -37,7 +37,7 @@ public class Service implements Serializable {
             return false;
 
         else {
-            int gtfsDate = date.getYear() * 10000 + date.getMonthOfYear() * 100 + date.getDayOfMonth(); 
+            int gtfsDate = date.getYear() * 10000 + date.getMonthValue() * 100 + date.getDayOfMonth();
             return calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
         }
     }
