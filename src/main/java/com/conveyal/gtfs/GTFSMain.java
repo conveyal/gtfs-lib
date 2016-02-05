@@ -16,7 +16,7 @@ public class GTFSMain {
             
         GTFSFeed feed = GTFSFeed.fromFile(inputFile);
         feed.findPatterns();
-        
+
         if (args.length == 2)
             feed.toFile(args[1]);
         

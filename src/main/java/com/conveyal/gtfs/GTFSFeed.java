@@ -1,24 +1,11 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.model.Agency;
-import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Fare;
-import com.conveyal.gtfs.model.FareAttribute;
-import com.conveyal.gtfs.model.FareRule;
-import com.conveyal.gtfs.model.FeedInfo;
-import com.conveyal.gtfs.model.Frequency;
-import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.Shape;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Transfer;
-import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.validator.GTFSValidator;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.vividsolutions.jts.geom.*;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
@@ -32,6 +19,7 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -85,6 +73,15 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     public List<GTFSError> errors = Lists.newArrayList();
+
+    /* Create geometry factory to produce LineString geometries. */
+    GeometryFactory gf = new GeometryFactory();
+
+    /* Map routes to associated trip patterns. */
+    // TODO: Hash Multimapping in guava (might need dependency).
+    public final Map<String, Pattern> patterns = Maps.newHashMap();
+
+    public final Map<String, String> tripPatternMap = Maps.newHashMap();
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -182,6 +179,16 @@ public class GTFSFeed implements Cloneable, Closeable {
         return tripStopTimes.values();
     }
 
+    public List<String> getOrderedStopListForTrip (String trip_id) {
+        Iterable<StopTime> orderedStopTimes = getOrderedStopTimesForTrip(trip_id);
+        List<String> stops = Lists.newArrayList();
+        // In-order traversal of StopTimes within this trip. The 2-tuple keys determine ordering.
+        for (StopTime stopTime : orderedStopTimes) {
+            stops.add(stopTime.stop_id);
+        }
+        return stops;
+    }
+
     /**
      *  Bin all trips by the sequence of stops they visit.
      * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
@@ -194,12 +201,9 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (++n % 100000 == 0) {
                 LOG.info("trip {}", human(n));
             }
-            Iterable<StopTime> orderedStopTimes = getOrderedStopTimesForTrip(trip_id);
-            List<String> stops = Lists.newArrayList();
-            // In-order traversal of StopTimes within this trip. The 2-tuple keys determine ordering.
-            for (StopTime stopTime : orderedStopTimes) {
-                stops.add(stopTime.stop_id);
-            }
+
+            List<String> stops = getOrderedStopListForTrip(trip_id);
+
             // Fetch or create the tripId list for this stop pattern, then add the current trip to that list.
             List<String> trips = tripsForPattern.get(stops);
             if (trips == null) {
@@ -209,8 +213,53 @@ public class GTFSFeed implements Cloneable, Closeable {
             trips.add(trip_id);
         }
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
-        
+
+
+        for (Entry<List<String>, List<String>> entry: tripsForPattern.entrySet()){
+            Pattern pattern = new Pattern(this, entry);
+            patterns.put(pattern.pattern_id, pattern);
+            // TODO: Need map for trip to pattern id
+        }
+
         return tripsForPattern;
+    }
+
+    /**
+     * Returns a trip geometry object (LineString) for a given trip id.
+     * If the trip has a shape reference, this will be used for the geometry.
+     * Otherwise, the ordered stoptimes will be used.
+     *
+     * @param   trip_id   trip id of desired trip geometry
+     * @return          the LineString representing the trip geometry.
+     * @see             LineString
+     */
+    public LineString getTripGeometry(String trip_id){
+
+        CoordinateList coordinates = new CoordinateList();
+//        coordinates.
+        Trip trip = trips.get(trip_id);
+
+        // If trip has shape_id, use it to generate geometry.
+        if (trip.shape_id != null){
+            for (Entry<Integer, Shape> entry : trip.shape_points.entrySet()){
+                Double lat = entry.getValue().shape_pt_lat;
+                Double lon = entry.getValue().shape_pt_lon;
+                coordinates.add(new Coordinate(lon, lat));
+            }
+        }
+        // Use the ordered stoptimes.
+        else{
+            Iterable<StopTime> stopTimes;
+            stopTimes = getOrderedStopTimesForTrip(trip.trip_id);
+            for (StopTime stopTime : stopTimes){
+                Stop stop = stops.get(stopTime.stop_id);
+                Double lat = stop.stop_lat;
+                Double lon = stop.stop_lon;
+                coordinates.add(new Coordinate(lon, lat));
+            }
+        }
+
+        return gf.createLineString(coordinates.toCoordinateArray());
     }
 
     public Service getOrCreateService(String serviceId) {

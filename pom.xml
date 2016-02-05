@@ -9,6 +9,12 @@
   <name>gtfs-lib</name>
   <url>https://github.com/conveyal/gtfs-lib</url>
 
+  <properties>
+    <geotools.version>14.0</geotools.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+
   <!-- Define where the source code for this project lives -->
   <scm>
     <connection>scm:git:https://github.com/conveyal/gtfs-lib.git</connection>
@@ -99,6 +105,16 @@
     	<artifactId>commons-io</artifactId>
     	<version>2.4</version>
     </dependency>
+
+    <dependency>
+      <groupId>org.geotools</groupId>
+      <artifactId>gt-api</artifactId>
+      <version>${geotools.version}</version>
+    </dependency>
+
+
+
   </dependencies>
+
 
 </project>
