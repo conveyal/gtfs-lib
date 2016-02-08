@@ -1,8 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.google.common.hash.HashCode;
-import com.sun.deploy.util.StringUtils;
+import com.google.common.base.Joiner;
 import com.vividsolutions.jts.geom.LineString;
 
 import java.util.List;
@@ -23,6 +22,7 @@ public class Pattern {
     public List<String> associatedTrips;
     public LineString geometry;
     public String name;
+    public Joiner joiner = Joiner.on("-").skipNulls();
 
     // TODO: Should a Pattern be generated for a single trip or a set of trips that share the same ordered stop list?
     public Pattern (GTFSFeed feed, Map.Entry<List<String>, List<String>> tripsForStopPattern){
@@ -57,7 +57,7 @@ public class Pattern {
             name = String.valueOf(trip.direction_id);
         }
         else{
-            name = StringUtils.join(orderedStops, "-");
+            name = joiner.join(orderedStops);
         }
 
         // TODO: Implement segmentIndex using JTS to segment out LineString by stops.
