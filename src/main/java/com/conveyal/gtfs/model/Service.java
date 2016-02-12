@@ -38,7 +38,18 @@ public class Service implements Serializable {
 
         else {
             int gtfsDate = date.getYear() * 10000 + date.getMonthValue() * 100 + date.getDayOfMonth();
-            return calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
+            if( calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate) {
+        	switch(date.getDayOfWeek().getValue()) {
+        	    case 1: return calendar.monday==1;
+        	    case 2: return calendar.tuesday==1;
+        	    case 3: return calendar.wednesday==1;
+        	    case 4: return calendar.thursday==1;
+        	    case 5: return calendar.friday==1;
+        	    case 6: return calendar.saturday==1;
+        	    case 7: return calendar.sunday==1;
+        	}
+            }
+            return false;
         }
     }
 }
