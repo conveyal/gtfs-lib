@@ -3,6 +3,7 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.validator.GTFSValidator;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.vividsolutions.jts.geom.*;
@@ -236,7 +237,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public LineString getTripGeometry(String trip_id){
 
         CoordinateList coordinates = new CoordinateList();
-//        coordinates.
+        LineString ls;
         Trip trip = trips.get(trip_id);
 
         // If trip has shape_id, use it to generate geometry.
@@ -246,20 +247,28 @@ public class GTFSFeed implements Cloneable, Closeable {
                 Double lon = entry.getValue().shape_pt_lon;
                 coordinates.add(new Coordinate(lon, lat));
             }
+            ls = gf.createLineString(coordinates.toCoordinateArray());
         }
         // Use the ordered stoptimes.
         else{
             Iterable<StopTime> stopTimes;
             stopTimes = getOrderedStopTimesForTrip(trip.trip_id);
-            for (StopTime stopTime : stopTimes){
-                Stop stop = stops.get(stopTime.stop_id);
-                Double lat = stop.stop_lat;
-                Double lon = stop.stop_lon;
-                coordinates.add(new Coordinate(lon, lat));
+            if (Iterables.size(stopTimes) > 1) {
+                for (StopTime stopTime : stopTimes) {
+                    Stop stop = stops.get(stopTime.stop_id);
+                    Double lat = stop.stop_lat;
+                    Double lon = stop.stop_lon;
+                    coordinates.add(new Coordinate(lon, lat));
+                }
+                ls = gf.createLineString(coordinates.toCoordinateArray());
+            }
+            // set ls equal to null if there is only one stopTime to avoid an exception when creating linestring
+            else{
+                ls = null;
             }
         }
 
-        return gf.createLineString(coordinates.toCoordinateArray());
+        return ls;
     }
 
     public Service getOrCreateService(String serviceId) {
