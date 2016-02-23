@@ -25,7 +25,7 @@ import java.util.Iterator;
  * Represents a GTFS StopTime. Note that once created and saved in a feed, stop times are by convention immutable
  * because they are in a MapDB.
  */
-public class StopTime extends Entity implements Serializable {
+public class StopTime extends Entity implements Cloneable, Serializable {
 
     /* StopTime cannot directly reference Trips or Stops because they would be serialized into the MapDB. */
     public String trip_id;
@@ -105,5 +105,14 @@ public class StopTime extends Entity implements Serializable {
         }
 
 
+    }
+
+    @Override
+    public StopTime clone () {
+        try {
+            return (StopTime) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

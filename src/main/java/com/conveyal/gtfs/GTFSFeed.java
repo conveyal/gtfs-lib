@@ -7,6 +7,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.vividsolutions.jts.geom.*;
+import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
@@ -18,10 +19,15 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
@@ -180,6 +186,90 @@ public class GTFSFeed implements Cloneable, Closeable {
         return tripStopTimes.values();
     }
 
+    /**
+     * For the given trip ID, fetch all the stop times in order, and interpolate stop-to-stop travel times.
+     */
+    public Iterable<StopTime> getInterpolatedStopTimesForTrip (String trip_id) throws FirstAndLastStopsDoNotHaveTimes {
+        // clone stop times so as not to modify base GTFS structures
+        StopTime[] stopTimes = StreamSupport.stream(getOrderedStopTimesForTrip(trip_id).spliterator(), false)
+                .map(st -> st.clone())
+                .toArray(i -> new StopTime[i]);
+
+        // avoid having to make sure that the array has length below.
+        if (stopTimes.length == 0) return Collections.emptyList();
+
+        // first pass: set all partially filled stop times
+        for (StopTime st : stopTimes) {
+            if (st.arrival_time != Entity.INT_MISSING && st.departure_time == Entity.INT_MISSING) {
+                st.departure_time = st.arrival_time;
+            }
+
+            if (st.arrival_time == Entity.INT_MISSING && st.departure_time != Entity.INT_MISSING) {
+                st.arrival_time = st.departure_time;
+            }
+        }
+
+        // quick check: ensure that first and last stops have times.
+        // technically GTFS requires that both arrival_time and departure_time be filled at both the first and last stop,
+        // but we are slightly more lenient and only insist that one of them be filled at both the first and last stop.
+        // The meaning of the first stop's arrival time is unclear, and same for the last stop's departure time (except
+        // in the case of interlining).
+
+        // it's fine to just check departure time, as the above pass ensures that all stop times have either both
+        // arrival and departure times, or neither
+        if (stopTimes[0].departure_time == Entity.INT_MISSING || stopTimes[stopTimes.length - 1].departure_time == Entity.INT_MISSING) {
+            throw new FirstAndLastStopsDoNotHaveTimes();
+        }
+
+        // second pass: fill complete stop times
+        int startOfInterpolatedBlock = -1;
+        for (int stopTime = 0; stopTime < stopTimes.length; stopTime++) {
+
+            if (stopTimes[stopTime].departure_time == Entity.INT_MISSING && startOfInterpolatedBlock == -1) {
+                startOfInterpolatedBlock = stopTime;
+            }
+            else if (stopTimes[stopTime].departure_time != Entity.INT_MISSING && startOfInterpolatedBlock != -1) {
+                // we have found the end of the interpolated section
+                int nInterpolatedStops = stopTime - startOfInterpolatedBlock;
+                double totalLengthOfInterpolatedSection = 0;
+                double[] lengthOfInterpolatedSections = new double[nInterpolatedStops];
+
+                GeodeticCalculator calc = new GeodeticCalculator();
+
+                for (int stopTimeToInterpolate = startOfInterpolatedBlock, i = 0; stopTimeToInterpolate < stopTime; stopTimeToInterpolate++, i++) {
+                    Stop start = stops.get(stopTimes[stopTimeToInterpolate - 1].stop_id);
+                    Stop end = stops.get(stopTimes[stopTimeToInterpolate].stop_id);
+                    calc.setStartingGeographicPoint(start.stop_lon, start.stop_lat);
+                    calc.setDestinationGeographicPoint(end.stop_lon, end.stop_lat);
+                    double segLen = calc.getOrthodromicDistance();
+                    totalLengthOfInterpolatedSection += segLen;
+                    lengthOfInterpolatedSections[i] = segLen;
+                }
+
+                // add the segment post-last-interpolated-stop
+                Stop start = stops.get(stopTimes[stopTime - 1].stop_id);
+                Stop end = stops.get(stopTimes[stopTime].stop_id);
+                calc.setStartingGeographicPoint(start.stop_lon, start.stop_lat);
+                calc.setDestinationGeographicPoint(end.stop_lon, end.stop_lat);
+                totalLengthOfInterpolatedSection += calc.getOrthodromicDistance();
+
+                int departureBeforeInterpolation = stopTimes[startOfInterpolatedBlock - 1].departure_time;
+                int arrivalAfterInterpolation = stopTimes[stopTime].arrival_time;
+                int totalTime = arrivalAfterInterpolation - departureBeforeInterpolation;
+
+                double lengthSoFar = 0;
+                for (int stopTimeToInterpolate = startOfInterpolatedBlock, i = 0; stopTimeToInterpolate < stopTime; stopTimeToInterpolate++, i++) {
+                    lengthSoFar += lengthOfInterpolatedSections[i];
+
+                    int time = (int) (departureBeforeInterpolation + totalTime * (lengthSoFar / totalLengthOfInterpolatedSection));
+                    stopTimes[stopTimeToInterpolate].arrival_time = stopTimes[stopTimeToInterpolate].departure_time = time;
+                }
+            }
+        }
+
+        return Arrays.asList(stopTimes);
+    }
+
     public List<String> getOrderedStopListForTrip (String trip_id) {
         Iterable<StopTime> orderedStopTimes = getOrderedStopTimesForTrip(trip_id);
         List<String> stops = Lists.newArrayList();
@@ -308,4 +398,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     // TODO augment with unrolled calendar, patterns, etc. before validation
+
+    /** Thrown when we cannot interpolate stop times because the first or last stops do not have times */
+    public class FirstAndLastStopsDoNotHaveTimes extends Exception {
+        /** do nothing */
+    }
 }
