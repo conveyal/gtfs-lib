@@ -41,9 +41,6 @@ public class Pattern {
         String trip_id = associatedTrips.get(0);
         Trip trip;
 
-        // Map trip id to pattern id for use elsewhere.
-        feed.tripPatternMap.put(trip_id, pattern_id);
-
         trip = feed.trips.get(trip_id);
         geometry = feed.getTripGeometry(trip.trip_id);
 

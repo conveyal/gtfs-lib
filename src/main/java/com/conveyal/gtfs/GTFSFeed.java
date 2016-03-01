@@ -110,7 +110,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         else {
             LOG.info("Feed ID is '{}'.", feedId);
         }
-        
+
         new Agency.Loader(this).loadTable(zip);
         new Calendar.Loader(this).loadTable(zip);
         new CalendarDate.Loader(this).loadTable(zip);
@@ -309,11 +309,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
 
-
         for (Entry<List<String>, List<String>> entry: tripsForPattern.entrySet()){
             Pattern pattern = new Pattern(this, entry);
             patterns.put(pattern.pattern_id, pattern);
-            // TODO: Need map for trip to pattern id
+            entry.getValue().forEach(tripId -> tripPatternMap.put(tripId, pattern.pattern_id));
         }
 
         return tripsForPattern;
