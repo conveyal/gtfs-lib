@@ -3,12 +3,7 @@ package com.conveyal.gtfs.model;
 import org.mapdb.Fun;
 import org.mapdb.Fun.Tuple2;
 
-import java.util.AbstractMap;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
 
 /**
@@ -86,7 +81,8 @@ public class ShapeMap implements Map<Integer, Shape> {
     // We currently just expose them as immutable sets in RAM, since all of the modification operations are optional. 
     @Override
     public Set<Integer> keySet() {
-        Set<Integer> ret = new HashSet<Integer>(size());
+        // use a linkedhashset so values come out in order
+        Set<Integer> ret = new LinkedHashSet<>();
 
         for (Tuple2<String, Integer> t : wrapped.keySet()) {
             ret.add(t.b);
@@ -99,8 +95,8 @@ public class ShapeMap implements Map<Integer, Shape> {
     @Override
     public Set<Map.Entry<Integer, Shape>> entrySet() {
         // it's ok to pull all the values into RAM as this represents a single shape not all shapes
-
-        HashSet<Map.Entry<Integer, Shape>> ret = new HashSet<Map.Entry<Integer, Shape>>(size());
+        // use a linkedhashset so values come out in order
+        Set<Entry<Integer, Shape>> ret = new LinkedHashSet<>();
 
         for (Map.Entry<Tuple2, Shape> e : wrapped.entrySet()) {
             ret.add(new AbstractMap.SimpleImmutableEntry(e.getKey().b, e.getValue()));
