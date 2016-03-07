@@ -268,6 +268,9 @@ public class GTFSFeed implements Cloneable, Closeable {
                     int time = (int) (departureBeforeInterpolation + totalTime * (lengthSoFar / totalLengthOfInterpolatedSection));
                     stopTimes[stopTimeToInterpolate].arrival_time = stopTimes[stopTimeToInterpolate].departure_time = time;
                 }
+
+                // we're done with this block
+                startOfInterpolatedBlock = -1;
             }
         }
 
