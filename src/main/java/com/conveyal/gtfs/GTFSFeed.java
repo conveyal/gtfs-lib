@@ -104,7 +104,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         new FeedInfo.Loader(this).loadTable(zip);
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
         if (feedId == null) {
-            feedId = zip.getName().replaceAll("\\.zip$", "");
+            feedId = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
             LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
         }
         else {
