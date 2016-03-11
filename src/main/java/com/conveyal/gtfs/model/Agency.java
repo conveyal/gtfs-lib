@@ -28,6 +28,7 @@ public class Agency extends Entity {
     public String agency_lang;
     public String agency_phone;
     public URL    agency_fare_url;
+    public String feed_id;
 
     public static class Loader extends Entity.Loader<Agency> {
 
@@ -46,6 +47,7 @@ public class Agency extends Entity {
             a.agency_timezone = getStringField("agency_timezone", true);
             a.agency_fare_url = getUrlField("agency_fare_url", false);
             a.feed = feed;
+            a.feed_id = feed.feedId;
             feed.agency.put(a.agency_id, a);
         }
 

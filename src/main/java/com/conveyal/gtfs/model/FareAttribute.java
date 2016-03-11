@@ -26,6 +26,7 @@ public class FareAttribute extends Entity {
     public int payment_method;
     public int transfers;
     public int transfer_duration;
+    public String feed_id;
 
     public static class Loader extends Entity.Loader<FareAttribute> {
 
@@ -50,6 +51,7 @@ public class FareAttribute extends Entity {
                 fa.transfers = getIntField("transfers", false, 0, 10); // TODO missing means "unlimited" in this case (rather than 0), supply default value or just use the NULL to mean unlimited
                 fa.transfer_duration = getIntField("transfer_duration", false, 0, 24 * 60 * 60);
                 fa.feed = feed;
+                fa.feed_id = feed.feedId;
                 fare.fare_attribute = fa;
             }
 

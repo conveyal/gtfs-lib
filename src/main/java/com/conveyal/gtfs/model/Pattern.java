@@ -23,26 +23,28 @@ public class Pattern {
     public LineString geometry;
     public String name;
     public Joiner joiner = Joiner.on("-").skipNulls();
+    public String feed_id;
 
     // TODO: Should a Pattern be generated for a single trip or a set of trips that share the same ordered stop list?
     public Pattern (GTFSFeed feed, Map.Entry<List<String>, List<String>> tripsForStopPattern){
 
 
+        this.feed_id = feed.feedId;
 
-        pattern_id = UUID.randomUUID().toString();
+        this.pattern_id = UUID.randomUUID().toString();
 
         // Assign ordered stops to key of tripsForStopPattern
-        orderedStops = tripsForStopPattern.getKey();
+        this.orderedStops = tripsForStopPattern.getKey();
 
         // Assign associated trips to value of tripsForStopPattern
-        associatedTrips = tripsForStopPattern.getValue();
+        this.associatedTrips = tripsForStopPattern.getValue();
 
         // Get geometry for first trip in list of associated trips
         String trip_id = associatedTrips.get(0);
         Trip trip;
 
         trip = feed.trips.get(trip_id);
-        geometry = feed.getTripGeometry(trip.trip_id);
+        this.geometry = feed.getTripGeometry(trip.trip_id);
 
         if (trip.trip_headsign != null){
             name = trip.trip_headsign;

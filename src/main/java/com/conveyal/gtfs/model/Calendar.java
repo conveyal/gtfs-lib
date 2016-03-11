@@ -35,6 +35,7 @@ public class Calendar extends Entity implements Serializable {
     public int sunday;
     public int start_date;
     public int end_date;
+    public String feed_id;
 
     public static class Loader extends Entity.Loader<Calendar> {
 
@@ -64,6 +65,7 @@ public class Calendar extends Entity implements Serializable {
                 c.start_date = getIntField("start_date", true, 18500101, 22001231);
                 c.end_date = getIntField("end_date", true, 18500101, 22001231);
                 c.feed = feed;
+                c.feed_id = feed.feedId;
                 service.calendar = c;
             }
 

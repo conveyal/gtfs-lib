@@ -34,6 +34,7 @@ public class Trip extends Entity {
     public int    bikes_allowed;
     public int    wheelchair_accessible;
     public Collection<Frequency> frequencies;
+    public String feed_id;
 
     public static class Loader extends Entity.Loader<Trip> {
 
@@ -56,6 +57,7 @@ public class Trip extends Entity {
             t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed = feed;
+            t.feed_id = feed.feedId;
             feed.trips.put(t.trip_id, t);
         }
 
