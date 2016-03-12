@@ -4,9 +4,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.google.common.base.Joiner;
 import com.vividsolutions.jts.geom.LineString;
 
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +18,7 @@ public class Pattern {
     public double[] segmentFraction;
     public List<String> orderedStops;
     public List<String> associatedTrips;
+    public Set<Route> associatedRoutes;
     public LineString geometry;
     public String name;
     public Joiner joiner = Joiner.on("-").skipNulls();
@@ -38,7 +37,13 @@ public class Pattern {
 
         // Assign associated trips to value of tripsForStopPattern
         this.associatedTrips = tripsForStopPattern.getValue();
-
+        this.associatedRoutes = new HashSet<>();
+        this.associatedTrips.forEach((id) -> {
+            this.associatedRoutes.add(feed.trips.get(id).route);
+        });
+//        for (String tripId : this.associatedTrips){
+//            this.associatedRoutes.add(feed.trips.get(tripId).route);
+//        }
         // Get geometry for first trip in list of associated trips
         String trip_id = associatedTrips.get(0);
         Trip trip;
