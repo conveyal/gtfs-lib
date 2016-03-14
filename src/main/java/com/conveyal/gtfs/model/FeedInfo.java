@@ -22,7 +22,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.Iterator;
 
-public class FeedInfo extends Entity {
+public class FeedInfo extends Entity implements Cloneable {
 
     public String    feed_id = "NONE";
     public String    feed_publisher_name;
@@ -31,6 +31,14 @@ public class FeedInfo extends Entity {
     public LocalDate feed_start_date;
     public LocalDate feed_end_date;
     public String    feed_version;
+
+    public FeedInfo clone () {
+        try {
+            return (FeedInfo) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static class Loader extends Entity.Loader<FeedInfo> {
 
@@ -86,7 +94,5 @@ public class FeedInfo extends Entity {
         public Iterator<FeedInfo> iterator() {
             return feed.feedInfo.values().iterator();
         }
-
     }
-
 }
