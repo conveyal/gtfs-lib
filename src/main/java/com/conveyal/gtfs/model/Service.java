@@ -1,6 +1,8 @@
 package com.conveyal.gtfs.model;
 
 import com.google.common.collect.Maps;
+
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 
 import java.io.Serializable;
@@ -38,7 +40,28 @@ public class Service implements Serializable {
 
         else {
             int gtfsDate = date.getYear() * 10000 + date.getMonthValue() * 100 + date.getDayOfMonth();
-            return calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
+            boolean withinValidityRange = calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
+
+            if (!withinValidityRange) return false;
+
+            switch (date.getDayOfWeek()) {
+                case MONDAY:
+                    return calendar.monday == 1;
+                case TUESDAY:
+                    return calendar.tuesday == 1;
+                case WEDNESDAY:
+                    return calendar.wednesday == 1;
+                case THURSDAY:
+                    return calendar.thursday == 1;
+                case FRIDAY:
+                    return calendar.friday == 1;
+                case SATURDAY:
+                    return calendar.saturday == 1;
+                case SUNDAY:
+                    return calendar.sunday == 1;
+                default:
+                    throw new IllegalArgumentException("unknown day of week constant!");
+            }
         }
     }
 }
