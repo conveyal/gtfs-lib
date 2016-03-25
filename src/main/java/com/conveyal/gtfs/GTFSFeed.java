@@ -2,10 +2,9 @@ package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.GTFSValidator;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.google.common.collect.Maps;
+import com.google.common.collect.*;
 import com.vividsolutions.jts.geom.*;
 import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.DB;
@@ -19,10 +18,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.stream.Collectors;
@@ -318,7 +314,123 @@ public class GTFSFeed implements Cloneable, Closeable {
             entry.getValue().forEach(tripId -> tripPatternMap.put(tripId, pattern.pattern_id));
         }
 
+        namePatterns();
+
         return tripsForPattern;
+    }
+
+    private void namePatterns() {
+        LOG.info("Generating unique names for patterns");
+
+        Map<String, PatternNamingInfo> namingInfoForRoute = new HashMap<>();
+
+        for (Pattern pattern : patterns.values()) {
+            if (pattern.associatedTrips.isEmpty() || pattern.orderedStops.isEmpty()) continue;
+
+            Trip trip = trips.get(pattern.associatedTrips.get(0));
+
+            // TODO this assumes there is only one route associated with a pattern
+            String route = trip.route.route_id;
+
+            // names are unique at the route level
+            if (!namingInfoForRoute.containsKey(route)) namingInfoForRoute.put(route, new PatternNamingInfo());
+            PatternNamingInfo namingInfo = namingInfoForRoute.get(route);
+
+            if (trip.trip_headsign != null)
+                namingInfo.headsigns.put(trip.trip_headsign, pattern);
+
+            // use stop names not stop IDs as stops may have duplicate names and we want unique pattern names
+            String fromName = stops.get(pattern.orderedStops.get(0)).stop_name;
+            String toName = stops.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
+
+            namingInfo.fromStops.put(fromName, pattern);
+            namingInfo.toStops.put(toName, pattern);
+
+            pattern.orderedStops.stream().map(stops::get).forEach(stop -> {
+               if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) return;
+
+                namingInfo.vias.put(stop.stop_name, pattern);
+            });
+
+            namingInfo.patternsOnRoute.add(pattern);
+        }
+
+        // name the patterns on each route
+        for (PatternNamingInfo info : namingInfoForRoute.values()) {
+            for (Pattern pattern : info.patternsOnRoute) {
+                pattern.name = null; // clear this now so we don't get confused later on
+
+                String headsign = trips.get(pattern.associatedTrips.get(0)).trip_headsign;
+
+                String fromName = stops.get(pattern.orderedStops.get(0)).stop_name;
+                String toName = stops.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
+
+
+                /* We used to use this code but decided it is better to just always have the from/to info, with via if necessary.
+                if (headsign != null && info.headsigns.get(headsign).size() == 1) {
+                    // easy, unique headsign, we're done
+                    pattern.name = headsign;
+                    continue;
+                }
+
+                if (info.toStops.get(toName).size() == 1) {
+                    pattern.name = String.format(Locale.US, "to %s", toName);
+                    continue;
+                }
+
+                if (info.fromStops.get(fromName).size() == 1) {
+                    pattern.name = String.format(Locale.US, "from %s", fromName);
+                    continue;
+                }
+                */
+
+                // check if combination from, to is unique
+                Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
+                intersection.retainAll(info.toStops.get(toName));
+
+                if (intersection.size() == 1) {
+                    pattern.name = String.format(Locale.US, "from %s to %s", fromName, toName);
+                    continue;
+                }
+
+                // check for unique via stop
+                pattern.orderedStops.stream().map(stops::get).forEach(stop -> {
+                    Set<Pattern> viaIntersection = new HashSet<>(intersection);
+                    viaIntersection.retainAll(info.vias.get(stop.stop_name));
+
+                    if (viaIntersection.size() == 1) {
+                        pattern.name = String.format(Locale.US, "from %s to %s via %s", fromName, toName, stop.stop_name);
+                    }
+                });
+
+                if (pattern.name == null) {
+                    // no unique via, one pattern is subset of other.
+                    if (intersection.size() == 2) {
+                        Iterator<Pattern> it = intersection.iterator();
+                        Pattern p0 = it.next();
+                        Pattern p1 = it.next();
+
+                        if (p0.orderedStops.size() > p1.orderedStops.size()) {
+                            p1.name = String.format(Locale.US, "from %s to %s express", fromName, toName);
+                            p0.name = String.format(Locale.US, "from %s to %s local", fromName, toName);
+                        } else if (p1.orderedStops.size() > p0.orderedStops.size()){
+                            p0.name = String.format(Locale.US, "from %s to %s express", fromName, toName);
+                            p1.name = String.format(Locale.US, "from %s to %s local", fromName, toName);
+                        }
+                    }
+                }
+
+                if (pattern.name == null) {
+                    // give up
+                    pattern.name = String.format(Locale.US, "from %s to %s like trip %s", fromName, toName, pattern.associatedTrips.get(0));
+                }
+            }
+
+            // attach a stop count to each
+            for (Pattern pattern : info.patternsOnRoute) {
+                pattern.name = String.format(Locale.US, "%s stops %s", pattern.orderedStops.size(), pattern.name);
+            }
+        }
     }
 
     /**
@@ -408,5 +520,17 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Thrown when we cannot interpolate stop times because the first or last stops do not have times */
     public class FirstAndLastStopsDoNotHaveTimes extends Exception {
         /** do nothing */
+    }
+
+    /**
+     * holds information about pattern names on a particular route,
+     * modeled on https://github.com/opentripplanner/OpenTripPlanner/blob/master/src/main/java/org/opentripplanner/routing/edgetype/TripPattern.java#L379
+     */
+    private static class PatternNamingInfo {
+        Multimap<String, Pattern> headsigns = HashMultimap.create();
+        Multimap<String, Pattern> fromStops = HashMultimap.create();
+        Multimap<String, Pattern> toStops = HashMultimap.create();
+        Multimap<String, Pattern> vias = HashMultimap.create();
+        List<Pattern> patternsOnRoute = new ArrayList<>();
     }
 }
