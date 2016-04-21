@@ -84,8 +84,13 @@ public class FeedInfo extends Entity implements Cloneable {
             writeStringField(i.feed_publisher_name);
             writeUrlField(i.feed_publisher_url);
             writeStringField(i.feed_lang);
-            writeDateField(i.feed_start_date);
-            writeDateField(i.feed_end_date);
+
+            if (i.feed_start_date != null) writeDateField(i.feed_start_date);
+            else writeStringField("");
+
+            if (i.feed_end_date != null) writeDateField(i.feed_end_date);
+            else writeStringField("");
+
             writeStringField(i.feed_version);
             endRecord();
         }
