@@ -133,7 +133,10 @@ public class GTFSFeed implements Cloneable, Closeable {
 
             // write everything
             // TODO: fare attributes, fare rules, shapes
-            new FeedInfo.Writer(this).writeTable(zip);
+
+            // don't write empty feed_info.txt
+            if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
+
             new Agency.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
