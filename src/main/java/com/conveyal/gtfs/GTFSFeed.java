@@ -96,10 +96,14 @@ public class GTFSFeed implements Cloneable, Closeable {
      *
      * Interestingly, all references are resolvable when tables are loaded in alphabetical order.
      */
-    private void loadFromFile(ZipFile zip) throws Exception {
+    private void loadFromFile(ZipFile zip, String fid) throws Exception {
         new FeedInfo.Loader(this).loadTable(zip);
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
-        if (feedId == null) {
+        if (fid != null) {
+            feedId = fid;
+            LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
+        }
+        else if (feedId == null) {
             feedId = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
             LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
         }
@@ -123,6 +127,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
+    }
+
+    private void loadFromFile(ZipFile zip) throws Exception {
+        loadFromFile(zip, null);
     }
 
     public void toFile (String file) {
@@ -164,11 +172,20 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     public static GTFSFeed fromFile(String file) {
+        return fromFile(file, null);
+    }
+
+    public static GTFSFeed fromFile(String file, String feedId) {
         GTFSFeed feed = new GTFSFeed();
         ZipFile zip;
         try {
             zip = new ZipFile(file);
-            feed.loadFromFile(zip);
+            if (feedId == null) {
+                feed.loadFromFile(zip);
+            }
+            else {
+                feed.loadFromFile(zip, feedId);
+            }
             zip.close();
             return feed;
         } catch (Exception e) {
