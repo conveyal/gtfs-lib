@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.GTFSValidator;
+import com.conveyal.gtfs.validator.TripTimesValidator;
 import com.google.common.collect.*;
 import com.vividsolutions.jts.geom.*;
 import org.geotools.referencing.GeodeticCalculator;
@@ -169,6 +170,11 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSValidator validator : validators) {
             validator.validate(this, false);
         }
+    }
+
+    // validate function call that should explicitly list each validator to run on GTFSFeed
+    public void validate () {
+        validate(new TripTimesValidator());
     }
 
     public static GTFSFeed fromFile(String file) {
