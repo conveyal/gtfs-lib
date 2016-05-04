@@ -9,6 +9,7 @@ The main design goals are:
 
 - Avoid all reflection tricks and work imperatively even if it is a bit verbose
 - Allow loading and processing GTFS feeds (much) bigger than available memory
+- Introduce the concept of feed IDs, and do not use agency IDs for this purpose.
 - Perform extensive syntax and semantic validation of feed contents
 - Tolerate and recover from parsing errors, aiming to load the entire file even when values are missing or corrupted
 
