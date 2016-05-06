@@ -3,8 +3,15 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.validator.DuplicateStopsValidator;
 import com.conveyal.gtfs.validator.GTFSValidator;
+import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
+import com.conveyal.gtfs.validator.IllegalShapeValidator;
+import com.conveyal.gtfs.validator.NamesValidator;
+import com.conveyal.gtfs.validator.OverlappingTripsValidator;
+import com.conveyal.gtfs.validator.ReversedTripsValidator;
 import com.conveyal.gtfs.validator.TripTimesValidator;
+import com.conveyal.gtfs.validator.UnusedStopValidator;
 import com.google.common.collect.*;
 import com.vividsolutions.jts.geom.*;
 import org.geotools.referencing.GeodeticCalculator;
@@ -174,7 +181,16 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     // validate function call that should explicitly list each validator to run on GTFSFeed
     public void validate () {
-        validate(new TripTimesValidator());
+        validate(
+                new DuplicateStopsValidator(),
+                new HopSpeedsReasonableValidator(),
+                new IllegalShapeValidator(),
+                new NamesValidator(),
+                new OverlappingTripsValidator(),
+                new ReversedTripsValidator(),
+                new TripTimesValidator(),
+                new UnusedStopValidator()
+        );
     }
 
     public static GTFSFeed fromFile(String file) {
