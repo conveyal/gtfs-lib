@@ -1,9 +1,9 @@
 package com.conveyal.gtfs.validator.service;
 
-import com.conveyal.gtfs.model.Statistic;
+import com.conveyal.gtfs.validator.model.Statistic;
 
 import java.awt.geom.Rectangle2D;
-import java.util.Date;
+import java.time.LocalDate;
 
 /**
  *	Provides statistics for:
@@ -31,13 +31,13 @@ public interface StatisticsService {
 
 	Integer getStopTimesCount();
 	
-	Date getCalendarDateStart();
+	LocalDate getCalendarDateStart();
 	
-	Date getCalendarDateEnd();
+	LocalDate getCalendarDateEnd();
 
-	Date getCalendarServiceRangeStart();
+	LocalDate getCalendarServiceRangeStart();
 
-	Date getCalendarServiceRangeEnd();
+	LocalDate getCalendarServiceRangeEnd();
 
 	Integer getRouteCount(String agencyId);
 
@@ -47,13 +47,13 @@ public interface StatisticsService {
 
 	Integer getStopTimesCount(String agencyId);
 
-	Date getCalendarDateStart(String agencyId);
+	LocalDate getCalendarDateStart(String agencyId);
 		
-	Date getCalendarDateEnd(String agencyId);
+	LocalDate getCalendarDateEnd(String agencyId);
 	
-	Date getCalendarServiceRangeStart(String agencyId);
+	LocalDate getCalendarServiceRangeStart(String agencyId);
 
-	Date getCalendarServiceRangeEnd(String agencyId);
+	LocalDate getCalendarServiceRangeEnd(String agencyId);
 	
 	Rectangle2D getBounds();
 

@@ -18,11 +18,11 @@ public class DuplicateStops implements Serializable {
 	}
 	
 	public String getStop1Id() {
-		return stop1.getId().getId();
+		return stop1.stop_id;
 	}
 	
 	public String getStop2Id() {
-		return stop2.getId().getId();
+		return stop2.stop_id;
 	}
 	
 	public String getStopIds() {
