@@ -23,11 +23,19 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Iterator;
 
-public class CalendarDate extends Entity implements Serializable {
+public class CalendarDate extends Entity implements Cloneable, Serializable {
 
     public Service   service;
     public LocalDate date;
     public int       exception_type;
+
+    public CalendarDate clone () {
+        try {
+            return (CalendarDate) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static class Loader extends Entity.Loader<CalendarDate> {
 
