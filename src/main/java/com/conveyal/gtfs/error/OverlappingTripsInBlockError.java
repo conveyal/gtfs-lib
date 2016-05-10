@@ -8,8 +8,8 @@ import com.conveyal.gtfs.validator.model.Priority;
  */
 public class OverlappingTripsInBlockError extends GTFSError {
 
-    private String[] tripIds;
-    private String affectedEntityId;
+    public String[] tripIds;
+    public String affectedEntityId;
 
     public OverlappingTripsInBlockError(String file, long line, String field, String affectedEntityId, Route route, String[] tripIds, Priority priority) {
         super(file, line, field);

@@ -7,10 +7,10 @@ import com.conveyal.gtfs.validator.model.Priority;
  */
 public class RouteNameError extends GTFSError {
 
-    String affectedEntityId;
-    String type;
-    Priority priority;
-    Object problemData;
+    public String affectedEntityId;
+    public String type;
+    public Priority priority;
+    public Object problemData;
 
     public RouteNameError(String file, long line, String field, String affectedEntityId, String type, Object problemData, Priority priority) {
         super("route", line, field);
