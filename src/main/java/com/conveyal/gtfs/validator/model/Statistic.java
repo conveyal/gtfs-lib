@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.validator.model;
 
 import java.awt.geom.Rectangle2D;
-import java.util.Date;
+import java.time.LocalDate;
 
 /**
  * Model object representing statistics about GTFS. 
@@ -13,10 +13,10 @@ public class Statistic {
 	private Integer tripCount;
 	private Integer stopCount;
 	private Integer stopTimeCount;
-	private Date calendarServiceStart;
-	private Date calendarServiceEnd;
-	private Date calendarStartDate;
-	private Date calendarEndDate;
+	private LocalDate calendarServiceStart;
+	private LocalDate calendarServiceEnd;
+	private LocalDate calendarStartDate;
+	private LocalDate calendarEndDate;
 	private Rectangle2D bounds;
 	
 	public String getAgencyId() {
@@ -49,28 +49,28 @@ public class Statistic {
 	public void setStopTimeCount(Integer stopTimeCount) {
 		this.stopTimeCount = stopTimeCount;
 	}
-	public Date getCalendarStartDate() {
+	public LocalDate getCalendarStartDate() {
 		return calendarStartDate;
 	}
-	public void setCalendarStartDate(Date calendarStartDate) {
+	public void setCalendarStartDate(LocalDate calendarStartDate) {
 		this.calendarStartDate = calendarStartDate;
 	}
-	public Date getCalendarEndDate() {
+	public LocalDate getCalendarEndDate() {
 		return calendarEndDate;
 	}
-	public void setCalendarEndDate(Date calendarEndDate) {
+	public void setCalendarEndDate(LocalDate calendarEndDate) {
 		this.calendarEndDate = calendarEndDate;
 	}
-	public Date getCalendarServiceStart() {
+	public LocalDate getCalendarServiceStart() {
 		return calendarServiceStart;
 	}
-	public void setCalendarServiceStart(Date calendarServiceStart) {
+	public void setCalendarServiceStart(LocalDate calendarServiceStart) {
 		this.calendarServiceStart = calendarServiceStart;
 	}
-	public Date getCalendarServiceEnd() {
+	public LocalDate getCalendarServiceEnd() {
 		return calendarServiceEnd;
 	}
-	public void setCalendarServiceEnd(Date calendarServiceEnd) {
+	public void setCalendarServiceEnd(LocalDate calendarServiceEnd) {
 		this.calendarServiceEnd = calendarServiceEnd;
 	}
         public Rectangle2D getBounds() {
