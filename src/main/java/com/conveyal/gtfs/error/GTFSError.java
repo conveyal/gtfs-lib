@@ -5,9 +5,9 @@ package com.conveyal.gtfs.error;
  */
 public abstract class GTFSError {
 
-    final String file; // TODO GTFSTable enum? Or simply use class objects.
-    final long   line;
-    final String field;
+    public final String file; // TODO GTFSTable enum? Or simply use class objects.
+    public final long   line;
+    public final String field;
 
     public GTFSError(String file, long line, String field) {
         this.file  = file;
