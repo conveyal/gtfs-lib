@@ -13,7 +13,7 @@ public class RouteNameError extends GTFSError {
     Object problemData;
 
     public RouteNameError(String file, long line, String field, String affectedEntityId, String type, Object problemData, Priority priority) {
-        super(file, line, field);
+        super("route", line, field);
         this.affectedEntityId = affectedEntityId;
         this.type = type;
         this.affectedEntityId = affectedEntityId;

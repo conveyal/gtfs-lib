@@ -6,9 +6,12 @@ import com.conveyal.gtfs.validator.model.DuplicateStops;
 public class DuplicateStopError extends GTFSError {
 
     private String message;
+    public DuplicateStops duplicateStop;
+    public DuplicateStopError(String message, DuplicateStops duplicateStop) {
+        super("stop", 0, "stop_lat,stop_lon");
+        this.message = message;
+        this.duplicateStop = duplicateStop;
 
-    public DuplicateStopError(String file, long line, String field, String message, DuplicateStops duplicateStop) {
-        super(file, line, field);
     }
 
     @Override public String getMessage() {
