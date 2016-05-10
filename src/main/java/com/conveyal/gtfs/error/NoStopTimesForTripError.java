@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.validator.model.Priority;
 
 /**
@@ -9,10 +10,12 @@ public class NoStopTimesForTripError extends GTFSError {
 
     public Priority priority = Priority.HIGH;
     public String tripId;
+    public Route route;
 
-    public NoStopTimesForTripError(String tripId) {
+    public NoStopTimesForTripError(String tripId, Route route) {
         super("trip", 0, "trip_id");
         this.tripId = tripId;
+        this.route = route;
     }
 
     @Override public String getMessage() {

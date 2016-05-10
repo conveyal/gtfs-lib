@@ -23,7 +23,11 @@ public class TripTimesValidator extends GTFSValidator {
         // Speed should not be infinite (check distance, time separately)
         boolean isValid = true;
         ValidationResult result = new ValidationResult();
-
+        int errorLimit = 2000;
+        int noStopTimesErrorCount = 0;
+        int stopTimeDepartureBeforeArrivalErrorCount = 0;
+        int stopTimesOutOfSequenceErrorCount = 0;
+        int duplicateTripErrorCount = 0;
         HashMap<String, String> duplicateTripHash = new HashMap<String, String>();
 
         for(Trip trip : feed.trips.values()) {
@@ -33,11 +37,11 @@ public class TripTimesValidator extends GTFSValidator {
             Iterable<StopTime> stopTimes = feed.getOrderedStopTimesForTrip(tripId);
 
             if(stopTimes == null || Iterables.size(stopTimes) == 0) {
-                InvalidValue iv = new InvalidValue("trip", "trip_id", tripId, "NoStopTimesForTrip", "Trip Id " + tripId + " has no stop times." , null, Priority.HIGH);
-                iv.route = trip.route;
-                result.add(iv);
-                feed.errors.add(new NoStopTimesForTripError(tripId));
+                if (noStopTimesErrorCount < errorLimit) {
+                    feed.errors.add(new NoStopTimesForTripError(tripId, trip.route));
+                }
                 isValid = false;
+                noStopTimesErrorCount++;
                 continue;
             }
 
@@ -45,23 +49,20 @@ public class TripTimesValidator extends GTFSValidator {
             for(StopTime stopTime : stopTimes) {
 
                 if(stopTime.departure_time < stopTime.arrival_time) {
-                    InvalidValue iv =
-                            new InvalidValue("stop_time", "trip_id", tripId, "StopTimeDepartureBeforeArrival", "Trip Id " + tripId + " stop sequence " + stopTime.stop_sequence + " departs before arriving.", null, Priority.HIGH);
-                    iv.route = trip.route;
-                    result.add(iv);
-                    feed.errors.add(new StopTimeDepartureBeforeArrivalError(tripId, stopTime.stop_sequence));
+                    if (stopTimeDepartureBeforeArrivalErrorCount < errorLimit) {
+                        feed.errors.add(new StopTimeDepartureBeforeArrivalError(tripId, stopTime.stop_sequence));
+                    }
+                    stopTimeDepartureBeforeArrivalErrorCount++;
                     isValid = false;
                 }
 
                 if(previousStopTime != null) {
 
                     if(stopTime.arrival_time < previousStopTime.departure_time) {
-                        InvalidValue iv =
-                                new InvalidValue("stop_time", "trip_id", tripId, "StopTimesOutOfSequence", "Trip Id " + tripId + " stop sequence " + stopTime.stop_sequence + " arrives before departing " + previousStopTime.stop_sequence, null, Priority.HIGH);
-                        iv.route = trip.route;
-                        feed.errors.add(new StopTimesOutOfSequenceError(tripId, stopTime.stop_sequence, previousStopTime.stop_sequence));
-                        result.add(iv);
-
+                        if (stopTimesOutOfSequenceErrorCount < errorLimit) {
+                            feed.errors.add(new StopTimesOutOfSequenceError(tripId, stopTime.stop_sequence, previousStopTime.stop_sequence));
+                        }
+                        stopTimesOutOfSequenceErrorCount++;
                         isValid = false;
 
                         // only capturing first out of sequence stop for now -- could consider collapsing duplicates based on tripId
@@ -91,11 +92,7 @@ public class TripTimesValidator extends GTFSValidator {
 
             if(duplicateTripHash.containsKey(tripKey)) {
                 String duplicateTripId = duplicateTripHash.get(tripKey);
-                InvalidValue iv =
-                        new InvalidValue("trip", "trip_id", tripId, "DuplicateTrip", "Trip Ids " + duplicateTripId + " & " + tripId + " are duplicates (" + tripKey + ")" , null, Priority.LOW);
-                iv.route = trip.route;
-                feed.errors.add(new DuplicateTripError(tripId, duplicateTripId, tripKey));
-                result.add(iv);
+                feed.errors.add(new DuplicateTripError(tripId, duplicateTripId, tripKey, trip.route));
                 isValid = false;
 
             }

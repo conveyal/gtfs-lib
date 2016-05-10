@@ -6,13 +6,15 @@ import com.conveyal.gtfs.validator.model.Priority;
 /** Indicates that a stop exists more than once in the feed. */
 public class UnusedStopError extends GTFSError {
 
-    private String affectedEntityId;
-    private Priority priority;
+    public String affectedEntityId;
+    public Priority priority;
+    public Stop stop;
 
-    public UnusedStopError(String affectedEntityId, Stop stop, Priority priority) {
+    public UnusedStopError(String affectedEntityId, Stop stop) {
         super("stop", 0, "stop_id");
         this.affectedEntityId = affectedEntityId;
-        this.priority = priority;
+        this.priority = Priority.LOW;
+        this.stop = stop;
     }
 
     @Override public String getMessage() {

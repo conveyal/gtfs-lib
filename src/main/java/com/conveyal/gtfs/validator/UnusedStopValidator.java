@@ -24,8 +24,7 @@ public class UnusedStopValidator extends GTFSValidator {
         // check for unused stops
         for(Stop stop : feed.stops.values()) {
             if(!usedStopIds.contains(stop.stop_id)) {
-                feed.errors.add(new UnusedStopError(stop.stop_id, stop, Priority.LOW));
-                result.add(new InvalidValue("stop", "stop_id", stop.stop_id, "UnusedStop", "Stop Id " + stop.stop_id + " is not used in any trips." , null, Priority.LOW));
+                feed.errors.add(new UnusedStopError(stop.stop_id, stop));
                 isValid = false;
             }
         }

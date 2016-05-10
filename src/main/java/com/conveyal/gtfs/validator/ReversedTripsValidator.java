@@ -36,7 +36,10 @@ public class ReversedTripsValidator extends GTFSValidator {
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
         ValidationResult result = new ValidationResult();
-
+        int errorLimit = 5000;
+        int missingShapeErrorCount = 0;
+        int missingCoordinatesErrorCount = 0;
+        int reversedTripShapeErrorCount = 0;
         Collection<Trip> trips = feed.trips.values();
 
 
@@ -44,11 +47,11 @@ public class ReversedTripsValidator extends GTFSValidator {
 
             String tripId = trip.trip_id;
             if (trip.shape_id == null) {
-                InvalidValue iv = new InvalidValue("trip", "shape_id", tripId, "MissingShape", "Trip " + tripId + " is missing a shape", null, Priority.MEDIUM);
-                iv.route = trip.route;
-                result.add(iv);
                 isValid = false;
-                feed.errors.add(new MissingShapeError(tripId));
+                if (missingShapeErrorCount < errorLimit) {
+                    feed.errors.add(new MissingShapeError(tripId));
+                }
+                missingShapeErrorCount++;
                 continue;
             }
             String shapeId = trip.shape_id;
@@ -78,11 +81,11 @@ public class ReversedTripsValidator extends GTFSValidator {
                 firstShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstShapeCoord));
                 lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));
             } catch (Exception any) {
-                InvalidValue iv = new InvalidValue("trip", "shape_id", tripId, "MissingCoordinates", "Trip " + tripId + " is missing coordinates", null, Priority.MEDIUM);
-                iv.route = trip.route;
-                result.add(iv);
                 isValid = false;
-                feed.errors.add(new ShapeMissingCoordinatesError(tripId, shapeId));
+                if (missingCoordinatesErrorCount < errorLimit) {
+                    feed.errors.add(new ShapeMissingCoordinatesError(tripId, shapeId));
+                }
+                missingCoordinatesErrorCount++;
                 continue;
             }
 
@@ -101,11 +104,10 @@ public class ReversedTripsValidator extends GTFSValidator {
 
             // check if first stop is x times closer to end of shape than the beginning or last stop is x times closer to start than the end
             if(distanceFirstStopToStart > (distanceFirstStopToEnd * distanceMultiplier) && distanceLastStopToEnd > (distanceLastStopToStart * distanceMultiplier)) {
-                InvalidValue iv =
-                        new InvalidValue("trip", "shape_id", tripId, "ReversedTripShape", "Trip " + tripId + " references reversed shape " + shapeId, null, Priority.MEDIUM);
-                iv.route = trip.route;
-                result.add(iv);
-                feed.errors.add(new ReversedTripShapeError(tripId, shapeId));
+                if (reversedTripShapeErrorCount < errorLimit) {
+                    feed.errors.add(new ReversedTripShapeError(tripId, shapeId));
+                }
+                reversedTripShapeErrorCount++;
                 isValid = false;
             }
         }

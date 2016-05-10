@@ -49,7 +49,6 @@ public class IllegalShapeValidator extends GTFSValidator {
                 } catch (Exception e) {
                     isValid = false;
                     feed.errors.add(new IllegalShapeError("stop", 0, "shapeId", shapeId, Priority.MEDIUM));
-//                    result.add(new InvalidValue("stop", "shapeId", shapeId, "Illegal stopCoord for shape", "", null, Priority.MEDIUM));
                 }
             }
 

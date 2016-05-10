@@ -54,7 +54,6 @@ public class DuplicateStopsValidator extends GTFSValidator {
                 projectedStopCoord = GeoUtils.convertLatLonToEuclidean(stopCoord);
             } catch (IllegalArgumentException iae) {
                 feed.errors.add(new StopMissingCoordinatesError(stop.stop_id, stop));
-                result.add(new InvalidValue("stop", "duplicateStops", stop.toString(), "MissingCoordinates", "stop " + stop + " is missing coordinates", null, Priority.MEDIUM));
             }
 
             Geometry geom = geometryFactory.createPoint(projectedStopCoord);
@@ -106,7 +105,6 @@ public class DuplicateStopsValidator extends GTFSValidator {
                                 DuplicateStops duplicateStop = new DuplicateStops(stop1, stop2, distance);
                                 duplicateStops.add(duplicateStop);
                                 feed.errors.add(new DuplicateStopError(duplicateStop.toString(), duplicateStop));
-                                result.add(new InvalidValue("stop", "stop_lat,stop_lon", duplicateStop.getStopIds(), "DuplicateStops", duplicateStop.toString(), duplicateStop, Priority.LOW));
                             }
                         }
 
