@@ -8,13 +8,13 @@ public abstract class GTFSError {
     public final String file; // TODO GTFSTable enum? Or simply use class objects.
     public final long   line;
     public final String field;
-    public final String type;
+    public final String errorType;
 
     public GTFSError(String file, long line, String field) {
         this.file  = file;
         this.line  = line;
         this.field = field;
-        this.type = this.getClass().getSimpleName();
+        this.errorType = this.getClass().getSimpleName();
     }
 
     public String getMessage() {
