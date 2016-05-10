@@ -12,6 +12,8 @@ import com.conveyal.gtfs.validator.OverlappingTripsValidator;
 import com.conveyal.gtfs.validator.ReversedTripsValidator;
 import com.conveyal.gtfs.validator.TripTimesValidator;
 import com.conveyal.gtfs.validator.UnusedStopValidator;
+import com.conveyal.gtfs.validator.service.StatisticsService;
+import com.conveyal.gtfs.validator.service.impl.FeedStats;
 import com.google.common.collect.*;
 import com.vividsolutions.jts.geom.*;
 import org.geotools.referencing.GeodeticCalculator;
@@ -191,6 +193,11 @@ public class GTFSFeed implements Cloneable, Closeable {
                 new TripTimesValidator(),
                 new UnusedStopValidator()
         );
+    }
+
+    public FeedStats calculateStats() {
+        FeedStats feedStats = new FeedStats(this);
+        return feedStats;
     }
 
     public static GTFSFeed fromFile(String file) {
