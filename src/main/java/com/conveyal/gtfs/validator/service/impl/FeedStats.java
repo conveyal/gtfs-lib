@@ -121,8 +121,8 @@ public class FeedStats implements StatisticsService {
             tripsList.add(trip);
             tripsPerService.put(trip.service.service_id, tripsList);
         });
-        LocalDate feedStartDate = feed.feedInfo.get(1) != null
-                ? feed.feedInfo.get(1).feed_start_date
+        LocalDate feedStartDate = !feed.feedInfo.isEmpty()
+                ? feed.feedInfo.values().iterator().next().feed_start_date
                 : null;
         LocalDate startDate = feedStartDate != null
                 ? feedStartDate
@@ -130,8 +130,8 @@ public class FeedStats implements StatisticsService {
         if (startDate == null) {
             startDate = getCalendarDateStart();
         }
-        LocalDate feedEndDate = feed.feedInfo.get(1) != null
-                ? feed.feedInfo.get(1).feed_end_date
+        LocalDate feedEndDate = !feed.feedInfo.isEmpty()
+                ? feed.feedInfo.values().iterator().next().feed_end_date
                 : null;
         LocalDate endDate = feedEndDate != null
                 ? feedEndDate
