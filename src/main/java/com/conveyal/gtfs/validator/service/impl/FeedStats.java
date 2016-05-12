@@ -61,11 +61,15 @@ public class FeedStats implements StatisticsService {
 
         int startDate = 0;
         for (Service service : feed.services.values()) {
-
-            if (startDate == 0
-                    || service.calendar.start_date < startDate)
+            if (service.calendar == null)
+                continue;
+            if (startDate == 0 || service.calendar.start_date < startDate) {
                 startDate = service.calendar.start_date;
+            }
         }
+        if (startDate == 0)
+            return null;
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
         return LocalDate.parse(String.valueOf(startDate), formatter);
     }
@@ -75,11 +79,16 @@ public class FeedStats implements StatisticsService {
         int endDate = 0;
 
         for (Service service : feed.services.values()) {
+            if (service.calendar == null)
+                continue;
 
-            if (endDate == 0
-                    || service.calendar.end_date > endDate)
+            if (endDate == 0 || service.calendar.end_date > endDate) {
                 endDate = service.calendar.end_date;
+            }
         }
+        if (endDate == 0)
+            return null;
+
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
         return LocalDate.parse(String.valueOf(endDate), formatter);
     }
