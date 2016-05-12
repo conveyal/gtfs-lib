@@ -47,6 +47,12 @@ public class MisplacedStopValidator extends GTFSValidator {
                 Geometry bufferedStopGeom = geom.buffer(bufferDistance);
 
                 // TODO: Check for nearest neighbor
+                /*
+                For each stop, compute the nearest neighbor distance, excluding any stops that are within (say) 500m
+                so that way we don’t find distances of 0m when there are a bunch of stops piled up at null island.
+                if that distance is more than 100km, the stop is an outlier
+                i.e. if there are no stops between 500m and 100km away, it’s far from the transit service
+                */
 //                spatialIndex.nearestNeighbour();
 //                List<Stop> stopCandidates = (List<Stop>)spatialIndex.query(bufferedStopGeom.getEnvelopeInternal());
 

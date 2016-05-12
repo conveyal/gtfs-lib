@@ -4,10 +4,16 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
@@ -101,6 +107,58 @@ public class FeedStats implements StatisticsService {
         }
         return endDate;
     }
+
+    public Map<LocalDate, Integer> getTripsPerDateOfService() {
+
+        Map<String, List<Trip>> tripsPerService = new HashMap<>();
+        Map<LocalDate, Integer> tripsPerDate = new TreeMap<>();
+
+        feed.trips.values().stream().forEach(trip -> {
+            List<Trip> tripsList = tripsPerService.get(trip.service.service_id);
+            if (tripsList == null) {
+                tripsList = new ArrayList<>();
+            }
+            tripsList.add(trip);
+            tripsPerService.put(trip.service.service_id, tripsList);
+        });
+        LocalDate feedStartDate = feed.feedInfo.get(1) != null
+                ? feed.feedInfo.get(1).feed_start_date
+                : null;
+        LocalDate startDate = feedStartDate != null
+                ? feedStartDate
+                : getCalendarServiceRangeStart();
+        if (startDate == null) {
+            startDate = getCalendarDateStart();
+        }
+        LocalDate feedEndDate = feed.feedInfo.get(1) != null
+                ? feed.feedInfo.get(1).feed_end_date
+                : null;
+        LocalDate endDate = feedEndDate != null
+                ? feedEndDate
+                : getCalendarServiceRangeEnd();
+        if (endDate == null) {
+            endDate = getCalendarDateEnd();
+        }
+
+        // loop through services
+        for (Service service : feed.services.values()) {
+
+            // iterate through each date between start and end date
+            for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
+                Integer tripCount = tripsPerDate.get(date);
+                if (tripCount == null) {
+                    tripCount = new Integer(0);
+                }
+                // if service is active on given day, add all trips that operate under that service
+                if (service.activeOn(date)) {
+                    tripCount = tripCount + tripsPerService.get(service.service_id).size();
+                }
+                tripsPerDate.put(date, tripCount);
+            }
+        }
+        return tripsPerDate;
+    }
+
 
     public Collection<Agency> getAllAgencies() {
         return feed.agency.values();
