@@ -7,15 +7,17 @@ import com.conveyal.gtfs.validator.DuplicateStopsValidator;
 import com.conveyal.gtfs.validator.GTFSValidator;
 import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
 import com.conveyal.gtfs.validator.IllegalShapeValidator;
+import com.conveyal.gtfs.validator.MisplacedStopValidator;
+import com.conveyal.gtfs.validator.MissingStopCoordinatesValidator;
 import com.conveyal.gtfs.validator.NamesValidator;
 import com.conveyal.gtfs.validator.OverlappingTripsValidator;
 import com.conveyal.gtfs.validator.ReversedTripsValidator;
 import com.conveyal.gtfs.validator.TripTimesValidator;
 import com.conveyal.gtfs.validator.UnusedStopValidator;
-import com.conveyal.gtfs.validator.service.StatisticsService;
 import com.conveyal.gtfs.validator.service.impl.FeedStats;
 import com.google.common.collect.*;
 import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.index.strtree.STRtree;
 import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -86,6 +88,9 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     public List<GTFSError> errors = Lists.newArrayList();
+
+    /* Stops spatial index which gets built lazily by getSpatialIndex() */
+    private transient STRtree spatialIndex;
 
     /* Create geometry factory to produce LineString geometries. */
     GeometryFactory gf = new GeometryFactory();
@@ -187,6 +192,8 @@ public class GTFSFeed implements Cloneable, Closeable {
                 new DuplicateStopsValidator(),
                 new HopSpeedsReasonableValidator(),
                 new IllegalShapeValidator(),
+                new MisplacedStopValidator(),
+                new MissingStopCoordinatesValidator(),
                 new NamesValidator(),
                 new OverlappingTripsValidator(),
                 new ReversedTripsValidator(),
@@ -234,6 +241,27 @@ public class GTFSFeed implements Cloneable, Closeable {
                         Fun.t2(trip_id, Fun.HI)
                 );
         return tripStopTimes.values();
+    }
+
+    /**
+     *
+     */
+    public STRtree getSpatialIndex () {
+        if (this.spatialIndex == null) {
+            synchronized (this) {
+                if (this.spatialIndex == null) {
+                    // buid spatial index
+                    STRtree stopIndex = new STRtree();
+                    for(Stop stop : this.stops.values()) {
+                        Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
+                        stopIndex.insert(new Envelope(stopCoord), stop);
+                    }
+                    stopIndex.build();
+                    this.spatialIndex = stopIndex;
+                }
+            }
+        }
+        return this.spatialIndex;
     }
 
     /**

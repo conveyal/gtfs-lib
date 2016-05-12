@@ -7,7 +7,7 @@ public class DuplicateStopError extends GTFSError {
 
     private String message;
     public DuplicateStops duplicateStop;
-    
+
     public DuplicateStopError(String message, DuplicateStops duplicateStop) {
         super("stop", 0, "stop_lat,stop_lon");
         this.message = message;

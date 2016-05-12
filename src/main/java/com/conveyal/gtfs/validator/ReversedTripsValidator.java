@@ -6,8 +6,6 @@ import com.conveyal.gtfs.error.ReversedTripShapeError;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.model.InvalidValue;
-import com.conveyal.gtfs.validator.model.Priority;
 import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.Iterables;
@@ -17,7 +15,6 @@ import com.vividsolutions.jts.geom.GeometryFactory;
 import org.mapdb.Fun;
 
 import java.util.Collection;
-import java.util.HashMap;
 
 /**
  * Created by landon on 5/2/16.

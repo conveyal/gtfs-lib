@@ -7,9 +7,9 @@ import com.conveyal.gtfs.GTFSFeed;
  */
 public class HopSpeedsReasonableValidator extends GTFSValidator {
 
-    // TODO: implement readonable hop speeds validator
+    // TODO: implement reasonable hop speeds validator
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
-        return false;
+        return true;
     }
 }

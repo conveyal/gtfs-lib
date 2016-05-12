@@ -25,7 +25,7 @@ import java.util.List;
  */
 public class DuplicateStopsValidator extends GTFSValidator {
     static GeometryFactory geometryFactory = new GeometryFactory();
-    private static Double buffer = 2.0;
+    private static Double buffer = 2.0; // in meters
 
     public boolean validate(GTFSFeed feed, boolean repair, Double bufferDistance) {
         if (bufferDistance != null) {
@@ -37,34 +37,25 @@ public class DuplicateStopsValidator extends GTFSValidator {
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
         ValidationResult result = new ValidationResult();
-
+        boolean isValid = true;
         Collection<Stop> stops = feed.stops.values();
 
-        STRtree stopIndex = new STRtree();
+        STRtree stopIndex = feed.getSpatialIndex();
 
         HashMap<String, Geometry> stopProjectedGeomMap = new HashMap<String, Geometry>();
 
         for(Stop stop : stops) {
 
             Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
-
             ProjectedCoordinate projectedStopCoord = null;
-
             try {
                 projectedStopCoord = GeoUtils.convertLatLonToEuclidean(stopCoord);
             } catch (IllegalArgumentException iae) {
-                feed.errors.add(new StopMissingCoordinatesError(stop.stop_id, stop));
+
             }
-
             Geometry geom = geometryFactory.createPoint(projectedStopCoord);
-
-            stopIndex.insert(geom.getEnvelopeInternal(), stop);
-
             stopProjectedGeomMap.put(stop.stop_id, geom);
-
         }
-
-        stopIndex.build();
 
         List<DuplicateStops> duplicateStops = new ArrayList<DuplicateStops>();
 
@@ -104,6 +95,7 @@ public class DuplicateStopsValidator extends GTFSValidator {
 
                                 DuplicateStops duplicateStop = new DuplicateStops(stop1, stop2, distance);
                                 duplicateStops.add(duplicateStop);
+                                isValid = false;
                                 feed.errors.add(new DuplicateStopError(duplicateStop.toString(), duplicateStop));
                             }
                         }
@@ -112,6 +104,6 @@ public class DuplicateStopsValidator extends GTFSValidator {
                 }
             }
         }
-        return false;
+        return isValid;
     }
 }
