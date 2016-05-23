@@ -504,9 +504,10 @@ public class GTFSFeed implements Cloneable, Closeable {
                 }
             }
 
-            // attach a stop count to each
+            // attach a stop and trip count to each
             for (Pattern pattern : info.patternsOnRoute) {
-                pattern.name = String.format(Locale.US, "%s stops %s", pattern.orderedStops.size(), pattern.name);
+                pattern.name = String.format(Locale.US, "%s stops %s (%s trips)",
+                                pattern.orderedStops.size(), pattern.name, pattern.associatedTrips.size());
             }
         }
     }
