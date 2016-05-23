@@ -22,18 +22,16 @@ import java.util.Map;
 
 public class Trip extends Entity {
 
-    public Route  route;
-    public Service service;
+    public String route_id;
+    public String service_id;
     public String trip_id;
     public String trip_headsign;
     public String trip_short_name;
     public int    direction_id;
     public String block_id;
-    public Map<Integer, Shape>  shape_points;
     public String shape_id;
     public int    bikes_allowed;
     public int    wheelchair_accessible;
-    public Collection<Frequency> frequencies;
     public String feed_id;
 
     public static class Loader extends Entity.Loader<Trip> {
@@ -45,20 +43,21 @@ public class Trip extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Trip t = new Trip();
-            t.route           = getRefField("route_id", true, feed.routes);
-            t.service         = getRefField("service_id", true, feed.services); // TODO calendar is special case, join tables
+            t.route_id        = getRefField("route_id", true, feed.routes).route_id;
+            t.service_id      = getRefField("service_id", true, feed.services).service_id;
             t.trip_id         = getStringField("trip_id", true);
             t.trip_headsign   = getStringField("trip_headsign", false);
             t.trip_short_name = getStringField("trip_short_name", false);
             t.direction_id    = getIntField("direction_id", false, 0, 1);
             t.block_id        = getStringField("block_id", false); // make a blocks multimap
-            t.shape_points    = getRefField("shape_id", false, feed.shapes);
             t.shape_id        = getStringField("shape_id", false);
             t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed = feed;
             t.feed_id = feed.feedId;
             feed.trips.put(t.trip_id, t);
+
+            // TODO confirm existence of shape ID
         }
 
     }
@@ -77,7 +76,7 @@ public class Trip extends Entity {
 
         @Override
         protected void writeOneRow(Trip t) throws IOException {
-            writeStringField(t.route.route_id);
+            writeStringField(t.route_id);
             writeStringField(t.trip_id);
             writeStringField(t.trip_headsign);
             writeStringField(t.trip_short_name);
@@ -86,7 +85,7 @@ public class Trip extends Entity {
             writeStringField(t.shape_id);
             writeIntField(t.bikes_allowed);
             writeIntField(t.wheelchair_accessible);
-            writeStringField(t.service.service_id);
+            writeStringField(t.service_id);
             endRecord();
         }
 

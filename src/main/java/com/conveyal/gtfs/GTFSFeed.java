@@ -33,8 +33,6 @@ import java.io.OutputStream;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -63,31 +61,29 @@ public class GTFSFeed implements Cloneable, Closeable {
     // TODO make all of these Maps MapDBs so the entire GTFSFeed is persistent and uses constant memory
 
     /* Some of these should be multimaps since they don't have an obvious unique key. */
-    public final Map<String, Agency>        agency         = Maps.newHashMap();
-    public final Map<String, FeedInfo>      feedInfo       = Maps.newHashMap();
-    public final Map<String, Frequency>     frequencies    = Maps.newHashMap();
-    public final Map<String, Route>         routes         = Maps.newHashMap();
-    public final Map<String, Stop>          stops          = Maps.newHashMap();
-    public final Map<String, Transfer>      transfers      = Maps.newHashMap();
-    public final Map<String, Trip>          trips          = Maps.newHashMap();
+    public final Map<String, Agency>        agency         = db.getTreeMap("agency");
+    public final Map<String, FeedInfo>      feedInfo       = db.getTreeMap("feed_info");
+    // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
+    public final NavigableSet<Tuple2<String, Frequency>>     frequencies    = db.getTreeSet("frequencies");
+    public final Map<String, Route>         routes         = db.getTreeMap("routes");
+    public final Map<String, Stop>          stops          = db.getTreeMap("stops");
+    public final Map<String, Transfer>      transfers      = db.getTreeMap("transfers");
+    public final Map<String, Trip>          trips          = db.getTreeMap("trips");
 
     /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
-    public final ConcurrentNavigableMap<Tuple2, Shape> shapePoints = db.getTreeMap("shapes");
-
-    /* This represents a bunch of views of the previous, one for each shape */
-    public final Map<String, Map<Integer, Shape>> shapes = Maps.newHashMap();
+    public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shapePoints = db.getTreeMap("shapes");
 
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
     public final ConcurrentNavigableMap<Tuple2, StopTime> stop_times = db.getTreeMap("stop_times");
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
-    public final Map<String, Fare> fares = Maps.newHashMap();
+    public final Map<String, Fare> fares = db.getTreeMap("fares");
 
     /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
-    public final Map<String, Service> services = Maps.newHashMap();
+    public final Map<String, Service> services = db.getTreeMap("services");
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
-    public List<GTFSError> errors = Lists.newArrayList();
+    public NavigableSet<GTFSError> errors = db.getTreeSet("errors");
 
     /* Stops spatial index which gets built lazily by getSpatialIndex() */
     private transient STRtree spatialIndex;
@@ -97,9 +93,10 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Map routes to associated trip patterns. */
     // TODO: Hash Multimapping in guava (might need dependency).
-    public final Map<String, Pattern> patterns = Maps.newHashMap();
+    public final Map<String, Pattern> patterns = db.getTreeMap("patterns");
 
-    public final Map<String, String> tripPatternMap = Maps.newHashMap();
+    // TODO bind this to map above so that it is kept up to date automatically
+    public final Map<String, String> tripPatternMap = db.getTreeMap("patternIdForTrip");
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -132,7 +129,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         new FareAttribute.Loader(this).loadTable(zip);
         new FareRule.Loader(this).loadTable(zip);
         new Route.Loader(this).loadTable(zip);
-        new Shape.Loader(this).loadTable(zip);
+        new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
         new Transfer.Loader(this).loadTable(zip);
         new Trip.Loader(this).loadTable(zip);
@@ -166,7 +163,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             new Frequency.Writer(this).writeTable(zip);
             new Route.Writer(this).writeTable(zip);
             new Stop.Writer(this).writeTable(zip);
-            new Shape.Writer(this).writeTable(zip);
+            new ShapePoint.Writer(this).writeTable(zip);
             new Transfer.Writer(this).writeTable(zip);
             new Trip.Writer(this).writeTable(zip);
             new StopTime.Writer(this).writeTable(zip);
@@ -262,6 +259,12 @@ public class GTFSFeed implements Cloneable, Closeable {
             }
         }
         return this.spatialIndex;
+    }
+
+    /** Get the shape for the given shape ID */
+    public Shape getShape (String shape_id) {
+        Shape shape = new Shape(this, shape_id);
+        return shape.shape_dist_traveled.length > 0 ? shape : null;
     }
 
     /**
@@ -408,7 +411,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             Trip trip = trips.get(pattern.associatedTrips.get(0));
 
             // TODO this assumes there is only one route associated with a pattern
-            String route = trip.route.route_id;
+            String route = trip.route_id;
 
             // names are unique at the route level
             if (!namingInfoForRoute.containsKey(route)) namingInfoForRoute.put(route, new PatternNamingInfo());
@@ -524,20 +527,17 @@ public class GTFSFeed implements Cloneable, Closeable {
     public LineString getTripGeometry(String trip_id){
 
         CoordinateList coordinates = new CoordinateList();
-        LineString ls;
+        LineString ls = null;
         Trip trip = trips.get(trip_id);
 
         // If trip has shape_id, use it to generate geometry.
-        if (trip.shape_id != null){
-            for (Entry<Integer, Shape> entry : trip.shape_points.entrySet()){
-                Double lat = entry.getValue().shape_pt_lat;
-                Double lon = entry.getValue().shape_pt_lon;
-                coordinates.add(new Coordinate(lon, lat));
-            }
-            ls = gf.createLineString(coordinates.toCoordinateArray());
+        if (trip.shape_id != null) {
+            Shape shape = getShape(trip.shape_id);
+            if (shape != null) ls = shape.geometry;
         }
+
         // Use the ordered stoptimes.
-        else{
+        if (ls == null) {
             Iterable<StopTime> stopTimes;
             stopTimes = getOrderedStopTimesForTrip(trip.trip_id);
             if (Iterables.size(stopTimes) > 1) {

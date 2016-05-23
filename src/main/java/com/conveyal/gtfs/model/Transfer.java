@@ -20,8 +20,8 @@ import java.util.Iterator;
 
 public class Transfer extends Entity {
 
-    public Stop from_stop;
-    public Stop to_stop;
+    public String from_stop_id;
+    public String to_stop_id;
     public int  transfer_type;
     public int  min_transfer_time;
 
@@ -34,8 +34,8 @@ public class Transfer extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
-            tr.from_stop         = getRefField("from_stop_id", true, feed.stops);
-            tr.to_stop           = getRefField("to_stop_id", true, feed.stops);
+            tr.from_stop_id      = getRefField("from_stop_id", true, feed.stops).stop_id;
+            tr.to_stop_id        = getRefField("to_stop_id", true, feed.stops).stop_id;
             tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
             tr.min_transfer_time = getIntField("min_transfer_time", false, 0, Integer.MAX_VALUE);
             tr.feed = feed;
@@ -56,8 +56,8 @@ public class Transfer extends Entity {
 
         @Override
         protected void writeOneRow(Transfer t) throws IOException {
-            writeStringField(t.from_stop.stop_id);
-            writeStringField(t.to_stop.stop_id);
+            writeStringField(t.from_stop_id);
+            writeStringField(t.to_stop_id);
             writeIntField(t.transfer_type);
             writeIntField(t.min_transfer_time);
             endRecord();

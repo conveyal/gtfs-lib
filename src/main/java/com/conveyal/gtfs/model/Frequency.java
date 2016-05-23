@@ -14,6 +14,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import org.mapdb.Fun;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -21,7 +22,7 @@ import java.util.Iterator;
 
 public class Frequency extends Entity {
 
-    public Trip trip;
+    public String trip_id;
     public int start_time;
     public int end_time;
     public int headway_secs;
@@ -36,21 +37,15 @@ public class Frequency extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Frequency f = new Frequency();
-            f.trip = getRefField("trip_id", true, feed.trips);
+            Trip trip = getRefField("trip_id", true, feed.trips);
+            f.trip_id = trip.trip_id;
             f.start_time = getTimeField("start_time", true);
             f.end_time = getTimeField("end_time", true);
             f.headway_secs = getIntField("headway_secs", true, 1, 24 * 60 * 60);
             f.exact_times = getIntField("exact_times", false, 0, 1);
             f.feed = feed;
-            feed.frequencies.put(f.trip.trip_id, f); // TODO this should be a multimap
-
-            if (f.trip.frequencies == null) {
-                f.trip.frequencies = new ArrayList<>();
-            }
-
-            f.trip.frequencies.add(f);
+            feed.frequencies.add(Fun.t2(f.trip_id, f));
         }
-
     }
 
     public static class Writer extends Entity.Writer<Frequency> {
@@ -65,7 +60,7 @@ public class Frequency extends Entity {
 
         @Override
         public void writeOneRow(Frequency f) throws IOException {
-            writeStringField(f.trip.trip_id);
+            writeStringField(f.trip_id);
             writeTimeField(f.start_time);
             writeTimeField(f.end_time);
             writeIntField(f.headway_secs);
@@ -75,7 +70,9 @@ public class Frequency extends Entity {
 
         @Override
         public Iterator<Frequency> iterator() {
-            return feed.frequencies.values().iterator();
+            return feed.frequencies.stream()
+                    .map(t2 -> t2.b)
+                    .iterator();
         }
 
 

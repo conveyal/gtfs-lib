@@ -18,7 +18,7 @@ public class Pattern {
     public double[] segmentFraction;
     public List<String> orderedStops;
     public List<String> associatedTrips;
-    public Set<Route> associatedRoutes;
+    public Set<String> associatedRoutes;
     public LineString geometry;
     public String name;
     public Joiner joiner = Joiner.on("-").skipNulls();
@@ -39,7 +39,7 @@ public class Pattern {
         this.associatedTrips = tripsForStopPattern.getValue();
         this.associatedRoutes = new HashSet<>();
         this.associatedTrips.forEach((id) -> {
-            this.associatedRoutes.add(feed.trips.get(id).route);
+            this.associatedRoutes.add(feed.trips.get(id).route_id);
         });
 //        for (String tripId : this.associatedTrips){
 //            this.associatedRoutes.add(feed.trips.get(tripId).route);
