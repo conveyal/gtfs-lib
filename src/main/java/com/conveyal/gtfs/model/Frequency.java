@@ -20,13 +20,19 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 
-public class Frequency extends Entity {
+public class Frequency extends Entity implements Comparable<Frequency> {
 
     public String trip_id;
     public int start_time;
     public int end_time;
     public int headway_secs;
     public int exact_times;
+
+    /** must have a comparator since they go in a navigable set that is serialized */
+    @Override
+    public int compareTo(Frequency o) {
+        return this.start_time - o.start_time;
+    }
 
     public static class Loader extends Entity.Loader<Frequency> {
 

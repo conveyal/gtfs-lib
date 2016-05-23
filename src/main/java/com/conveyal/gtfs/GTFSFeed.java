@@ -33,6 +33,7 @@ import java.io.OutputStream;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -352,6 +353,12 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
 
         return Arrays.asList(stopTimes);
+    }
+
+    public Collection<Frequency> getFrequencies (String trip_id) {
+        return frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
+                .map(t2 -> t2.b)
+                .collect(Collectors.toList());
     }
 
     public List<String> getOrderedStopListForTrip (String trip_id) {
