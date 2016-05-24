@@ -31,7 +31,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public static final int FUNICULAR = 5;
 
     public String route_id;
-    public Agency agency;
+    public String agency_id;
     public String route_short_name;
     public String route_long_name;
     public String route_desc;
@@ -51,12 +51,14 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         public void loadOneRow() throws IOException {
             Route r = new Route();
             r.route_id = getStringField("route_id", true);
-            r.agency = getRefField("agency_id", false, feed.agency);
+            Agency agency = getRefField("agency_id", false, feed.agency);
 
             // if there is only one agency, associate with it automatically
             // TODO: what will this do if the agency and the route have agency_ids but they do not match?
-            if (r.agency == null && feed.agency.size() == 1)
-                r.agency = feed.agency.values().iterator().next();
+            if (agency == null && feed.agency.size() == 1)
+                agency = feed.agency.values().iterator().next();
+
+            r.agency_id = agency.agency_id;
 
             r.route_short_name = getStringField("route_short_name", false); // one or the other required, needs a special validator
             r.route_long_name = getStringField("route_long_name", false);
@@ -93,7 +95,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
 
         @Override
         public void writeOneRow(Route r) throws IOException {
-            writeStringField(r.agency.agency_id);
+            writeStringField(r.agency_id);
             writeStringField(r.route_id);
             writeStringField(r.route_short_name);
             writeStringField(r.route_long_name);

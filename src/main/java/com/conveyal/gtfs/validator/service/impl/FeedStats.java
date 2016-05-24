@@ -123,12 +123,12 @@ public class FeedStats implements StatisticsService {
         Map<LocalDate, Integer> tripsPerDate = new TreeMap<>();
 
         feed.trips.values().stream().forEach(trip -> {
-            List<Trip> tripsList = tripsPerService.get(trip.service.service_id);
+            List<Trip> tripsList = tripsPerService.get(trip.service_id);
             if (tripsList == null) {
                 tripsList = new ArrayList<>();
             }
             tripsList.add(trip);
-            tripsPerService.put(trip.service.service_id, tripsList);
+            tripsPerService.put(trip.service_id, tripsList);
         });
         LocalDate feedStartDate = !feed.feedInfo.isEmpty()
                 ? feed.feedInfo.values().iterator().next().feed_start_date
@@ -176,7 +176,7 @@ public class FeedStats implements StatisticsService {
     public Integer getRouteCount(String agencyId) {
         int count = 0;
         for (Route route : feed.routes.values()) {
-            if (agencyId.equals(route.agency.agency_id)) {
+            if (agencyId.equals(route.agency_id)) {
                 count++;
             }
         }
@@ -186,7 +186,8 @@ public class FeedStats implements StatisticsService {
     public Integer getTripCount(String agencyId) {
         int count = 0;
         for (Trip trip : feed.trips.values()) {
-            if (agencyId.equals(trip.route.agency.agency_id)) {
+            Route route = feed.routes.get(trip.route_id);
+            if (agencyId.equals(route.agency_id)) {
                 count++;
             }
         }
@@ -207,7 +208,9 @@ public class FeedStats implements StatisticsService {
     public Integer getStopTimesCount(String agencyId) {
         int count = 0;
         for (StopTime stopTime : feed.stop_times.values()) {
-            if (agencyId.equals(feed.trips.get(stopTime.trip_id).route.agency.agency_id)) {
+            Trip trip = feed.trips.get(stopTime.trip_id);
+            Route route = feed.routes.get(trip.route_id);
+            if (agencyId.equals(route.agency_id)) {
                 count++;
             }
         }

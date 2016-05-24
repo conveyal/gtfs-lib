@@ -6,7 +6,6 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.DuplicateStopsValidator;
 import com.conveyal.gtfs.validator.GTFSValidator;
 import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
-import com.conveyal.gtfs.validator.IllegalShapeValidator;
 import com.conveyal.gtfs.validator.MisplacedStopValidator;
 import com.conveyal.gtfs.validator.MissingStopCoordinatesValidator;
 import com.conveyal.gtfs.validator.NamesValidator;
@@ -189,7 +188,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         validate(
                 new DuplicateStopsValidator(),
                 new HopSpeedsReasonableValidator(),
-                new IllegalShapeValidator(),
                 new MisplacedStopValidator(),
                 new MissingStopCoordinatesValidator(),
                 new NamesValidator(),
@@ -356,8 +354,10 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     public Collection<Frequency> getFrequencies (String trip_id) {
-        return frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
-                .map(t2 -> t2.b)
+        // IntelliJ tells me all these casts are unnecessary, and that's also my feeling, but the code won't compile
+        // without them
+        return (List<Frequency>) frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
+                .map(t2 -> ((Tuple2<String, Frequency>) t2).b)
                 .collect(Collectors.toList());
     }
 

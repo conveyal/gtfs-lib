@@ -78,20 +78,19 @@ public class OverlappingTripsValidator extends GTFSValidator {
                             continue;
 
                         // if trips have same service id they overlap
-                        if(i1.trip.service.service_id.equals(i2.trip.service.service_id)) {
-                            // not strictly correct; they could be on different routes
+                        if(i1.trip.service_id.equals(i2.trip.service_id)) {
                             String[] tripIds = {tripId1, tripId2};
-                            feed.errors.add(new OverlappingTripsInBlockError("trip", 0, "block_id", blockId, i1.trip.route, tripIds, Priority.HIGH));
+                            feed.errors.add(new OverlappingTripsInBlockError("trip", 0, "block_id", blockId, tripIds, Priority.HIGH));
                         }
 
                         else {
 
                             // if trips don't share service id check to see if service dates fall on the same days/day of week
-                            for(Map.Entry<LocalDate, CalendarDate> d1 : feed.services.get(i1.trip.service.service_id).calendar_dates.entrySet()) {
+                            for(Map.Entry<LocalDate, CalendarDate> d1 : feed.services.get(i1.trip.service_id).calendar_dates.entrySet()) {
 
-                                if(feed.services.get(i2.trip.service.service_id).calendar_dates.containsKey(d1.getKey())) {
+                                if(feed.services.get(i2.trip.service_id).calendar_dates.containsKey(d1.getKey())) {
                                     String[] tripIds = {tripId1, tripId2};
-                                    feed.errors.add(new OverlappingTripsInBlockError("trip", 0, "block_id", blockId, i1.trip.route, tripIds, Priority.HIGH));
+                                    feed.errors.add(new OverlappingTripsInBlockError("trip", 0, "block_id", blockId, tripIds, Priority.HIGH));
                                     break;
                                 }
                             }

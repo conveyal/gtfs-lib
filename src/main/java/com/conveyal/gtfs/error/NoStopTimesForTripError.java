@@ -10,12 +10,12 @@ public class NoStopTimesForTripError extends GTFSError {
 
     public Priority priority = Priority.HIGH;
     public String tripId;
-    public Route route;
+    public String routeId;
 
-    public NoStopTimesForTripError(String tripId, Route route) {
+    public NoStopTimesForTripError(String tripId, String routeId) {
         super("trip", 0, "trip_id");
         this.tripId = tripId;
-        this.route = route;
+        this.routeId = routeId;
     }
 
     @Override public String getMessage() {

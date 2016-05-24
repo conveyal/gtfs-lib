@@ -12,14 +12,14 @@ public class DuplicateTripError extends GTFSError {
     public String tripId;
     public String duplicateTripId;
     public String tripKey;
-    public Route route;
+    public String routeId;
 
-    public DuplicateTripError(String tripId, String duplicateTripId, String tripKey, Route route) {
+    public DuplicateTripError(String tripId, String duplicateTripId, String tripKey, String routeId) {
         super("trip", 0, "trip_id");
         this.tripId = tripId;
         this.duplicateTripId = duplicateTripId;
         this.tripKey = tripKey;
-        this.route = route;
+        this.routeId = routeId;
 
     }
 

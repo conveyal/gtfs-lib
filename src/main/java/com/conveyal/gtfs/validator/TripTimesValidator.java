@@ -38,7 +38,7 @@ public class TripTimesValidator extends GTFSValidator {
 
             if(stopTimes == null || Iterables.size(stopTimes) == 0) {
                 if (noStopTimesErrorCount < errorLimit) {
-                    feed.errors.add(new NoStopTimesForTripError(tripId, trip.route));
+                    feed.errors.add(new NoStopTimesForTripError(tripId, trip.route_id));
                 }
                 isValid = false;
                 noStopTimesErrorCount++;
@@ -88,11 +88,11 @@ public class TripTimesValidator extends GTFSValidator {
                 }
             }
 
-            String tripKey = trip.service.service_id + "_"+ blockId + "_" + Iterables.get(stopTimes, 0).departure_time +"_" + Iterables.getLast(stopTimes).arrival_time + "_" + stopIds;
+            String tripKey = trip.service_id + "_"+ blockId + "_" + Iterables.get(stopTimes, 0).departure_time +"_" + Iterables.getLast(stopTimes).arrival_time + "_" + stopIds;
 
             if(duplicateTripHash.containsKey(tripKey)) {
                 String duplicateTripId = duplicateTripHash.get(tripKey);
-                feed.errors.add(new DuplicateTripError(tripId, duplicateTripId, tripKey, trip.route));
+                feed.errors.add(new DuplicateTripError(tripId, duplicateTripId, tripKey, trip.route_id));
                 isValid = false;
 
             }
