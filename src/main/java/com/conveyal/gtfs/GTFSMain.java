@@ -20,7 +20,7 @@ public class GTFSMain {
         if (args.length == 2)
             feed.toFile(args[1]);
         
-        feed.db.close();
+        feed.close();
     }
 
 }

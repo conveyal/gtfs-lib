@@ -47,14 +47,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
 
-    DB db = DBMaker.newTempFileDB()
-            .transactionDisable()
-            .mmapFileEnable()
-            .asyncWriteEnable()
-            .deleteFilesAfterClose()
-            .compressionEnable()
-            // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
-            .make(); // TODO db.close();
+    private DB db;
 
     public String feedId = null;
 
@@ -601,8 +594,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         db.close();
     }
 
-    // TODO augment with unrolled calendar, patterns, etc. before validation
-
     /** Thrown when we cannot interpolate stop times because the first or last stops do not have times */
     public class FirstAndLastStopsDoNotHaveTimes extends Exception {
         /** do nothing */
@@ -618,5 +609,29 @@ public class GTFSFeed implements Cloneable, Closeable {
         Multimap<String, Pattern> toStops = HashMultimap.create();
         Multimap<String, Pattern> vias = HashMultimap.create();
         List<Pattern> patternsOnRoute = new ArrayList<>();
+    }
+
+    /** Create a GTFS feed in a temp file */
+    public GTFSFeed () {
+        db = DBMaker.newTempFileDB()
+                .transactionDisable()
+                .mmapFileEnable()
+                .asyncWriteEnable()
+                .deleteFilesAfterClose()
+                .compressionEnable()
+                // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
+                .make(); // TODO db.close();
+    }
+
+    /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
+    public GTFSFeed (String dbFile) {
+        DBMaker.newFileDB(new File(dbFile))
+                .transactionDisable()
+                .mmapFileEnable()
+                .asyncWriteEnable()
+                .deleteFilesAfterClose()
+                .compressionEnable()
+                // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
+                .make(); // TODO db.close();
     }
 }
