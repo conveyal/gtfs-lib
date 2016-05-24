@@ -13,6 +13,10 @@ import org.opengis.referencing.crs.GeographicCRS;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
 
+/**
+ * GeoUtils ported from old GTFS validator. Does everything with JTS MathTransforms and UTM, which is needlessly complicated,
+ * so all functions are deprecated.
+ */
 public class GeoUtils {
   public static double RADIANS = 2 * Math.PI;
 
@@ -21,6 +25,7 @@ public class GeoUtils {
   public static GeometryFactory geometryFactory = new GeometryFactory(new PrecisionModel(),4326);
   public static GeometryFactory projectedGeometryFactory = new GeometryFactory(new PrecisionModel());
 
+  @Deprecated
   public static ProjectedCoordinate convertLatLonToEuclidean(
     Coordinate latlon) {
 
@@ -29,6 +34,7 @@ public class GeoUtils {
     return convertLonLatToEuclidean(lonlat);
   }
 
+  @Deprecated
   public static ProjectedCoordinate convertLonLatToEuclidean(
     Coordinate lonlat) {
 
@@ -48,7 +54,7 @@ public class GeoUtils {
     return new ProjectedCoordinate(transform, new Coordinate(to.y, to.x), lonlat);
   }
 
-
+  @Deprecated
   public static Coordinate convertToLatLon(
           MathTransform transform, Coordinate xy) {
 
@@ -56,6 +62,7 @@ public class GeoUtils {
     return new Coordinate(lonlat.y, lonlat.x);
   }
 
+  @Deprecated
   public static Coordinate convertToLonLat(
           MathTransform transform, Coordinate xy) {
     final Coordinate to = new Coordinate();
@@ -68,6 +75,7 @@ public class GeoUtils {
     return new Coordinate(to.y, to.x);
   }
 
+  @Deprecated
   public static Coordinate convertToLatLon(ProjectedCoordinate pc) {
 
       final Coordinate point =
@@ -76,7 +84,7 @@ public class GeoUtils {
      }
 
 
-
+  @Deprecated
   public static Coordinate convertToLonLat(ProjectedCoordinate pc) {
 
       final Coordinate point =
@@ -90,6 +98,7 @@ public class GeoUtils {
    * http://gis.stackexchange.com/questions/28986/geotoolkit-conversion-from
    * -lat-long-to-utm
    */
+  @Deprecated
   public static int
       getEPSGCodefromUTS(Coordinate refLonLat) {
     // define base EPSG code value of all UTM zones;
@@ -104,12 +113,13 @@ public class GeoUtils {
     return epsg_code;
   }
 
-
+  @Deprecated
   public static double getMetersInAngleDegrees(
     double distance) {
     return distance / (Math.PI / 180d) / 6378137d;
   }
 
+  @Deprecated
   public static MathTransform getTransform(
     Coordinate refLatLon) {
     //    MathTransformFactory mtFactory = ReferencingFactoryFinder.getMathTransformFactory(null);
@@ -171,6 +181,7 @@ public class GeoUtils {
   /*
    * Taken from OneBusAway's UTMLibrary class
    */
+  @Deprecated
   public static int getUTMZoneForLongitude(double lon) {
 
     if (lon < -180 || lon > 180)
