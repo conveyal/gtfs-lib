@@ -22,6 +22,7 @@ import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
 import org.mapdb.Fun.Tuple2;
+import org.mapdb.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,29 +55,29 @@ public class GTFSFeed implements Cloneable, Closeable {
     // TODO make all of these Maps MapDBs so the entire GTFSFeed is persistent and uses constant memory
 
     /* Some of these should be multimaps since they don't have an obvious unique key. */
-    public final Map<String, Agency>        agency         = db.getTreeMap("agency");
-    public final Map<String, FeedInfo>      feedInfo       = db.getTreeMap("feed_info");
+    public final Map<String, Agency> agency;
+    public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
-    public final NavigableSet<Tuple2<String, Frequency>>     frequencies    = db.getTreeSet("frequencies");
-    public final Map<String, Route>         routes         = db.getTreeMap("routes");
-    public final Map<String, Stop>          stops          = db.getTreeMap("stops");
-    public final Map<String, Transfer>      transfers      = db.getTreeMap("transfers");
-    public final Map<String, Trip>          trips          = db.getTreeMap("trips");
+    public final NavigableSet<Tuple2<String, Frequency>> frequencies;
+    public final Map<String, Route> routes;
+    public final Map<String, Stop> stops;
+    public final Map<String, Transfer> transfers;
+    public final Map<String, Trip> trips;
 
     /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
-    public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shapePoints = db.getTreeMap("shapes");
+    public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
 
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
-    public final ConcurrentNavigableMap<Tuple2, StopTime> stop_times = db.getTreeMap("stop_times");
+    public final ConcurrentNavigableMap<Tuple2, StopTime> stop_times;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
-    public final Map<String, Fare> fares = db.getTreeMap("fares");
+    public final Map<String, Fare> fares;
 
     /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
-    public final Map<String, Service> services = db.getTreeMap("services");
+    public final Map<String, Service> services;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
-    public NavigableSet<GTFSError> errors = db.getTreeSet("errors");
+    public final NavigableSet<GTFSError> errors;
 
     /* Stops spatial index which gets built lazily by getSpatialIndex() */
     private transient STRtree spatialIndex;
@@ -86,10 +87,11 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Map routes to associated trip patterns. */
     // TODO: Hash Multimapping in guava (might need dependency).
-    public final Map<String, Pattern> patterns = db.getTreeMap("patterns");
+    public final Map<String, Pattern> patterns;
 
     // TODO bind this to map above so that it is kept up to date automatically
-    public final Map<String, String> tripPatternMap = db.getTreeMap("patternIdForTrip");
+    public final Map<String, String> tripPatternMap;
+    private boolean loaded = false;
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -101,7 +103,9 @@ public class GTFSFeed implements Cloneable, Closeable {
      *
      * Interestingly, all references are resolvable when tables are loaded in alphabetical order.
      */
-    private void loadFromFile(ZipFile zip, String fid) throws Exception {
+    public void loadFromFile(ZipFile zip, String fid) throws Exception {
+        if (this.loaded) throw new UnsupportedOperationException("Attempt to load GTFS into existing database");
+
         new FeedInfo.Loader(this).loadTable(zip);
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
         if (fid != null) {
@@ -132,9 +136,11 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
+
+        loaded = true;
     }
 
-    private void loadFromFile(ZipFile zip) throws Exception {
+    public void loadFromFile(ZipFile zip) throws Exception {
         loadFromFile(zip, null);
     }
 
@@ -613,25 +619,51 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /** Create a GTFS feed in a temp file */
     public GTFSFeed () {
-        db = DBMaker.newTempFileDB()
+        // calls to this must be first operation in constructor - why, Java?
+        this(DBMaker.newTempFileDB()
                 .transactionDisable()
                 .mmapFileEnable()
                 .asyncWriteEnable()
                 .deleteFilesAfterClose()
                 .compressionEnable()
-                // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
-                .make(); // TODO db.close();
+                // .cacheSize(1024 * 1024) this bloats memory consumption
+                .make()); // TODO db.close();
     }
 
     /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
     public GTFSFeed (String dbFile) {
-        DBMaker.newFileDB(new File(dbFile))
+        this(DBMaker.newFileDB(new File(dbFile))
                 .transactionDisable()
                 .mmapFileEnable()
                 .asyncWriteEnable()
-                .deleteFilesAfterClose()
                 .compressionEnable()
-                // .cacheSize(1024 * 1024) this bloats memory consumption, as do in-memory maps below.
-                .make(); // TODO db.close();
+                // .cacheSize(1024 * 1024) this bloats memory consumption
+                .make()); // TODO db.close();
+    }
+
+    private GTFSFeed (DB db) {
+        this.db = db;
+
+        agency = db.getTreeMap("agency");
+        feedInfo = db.getTreeMap("feed_info");
+        routes = db.getTreeMap("routes");
+        trips = db.getTreeMap("trips");
+        stop_times = db.getTreeMap("stop_times");
+        frequencies = db.getTreeSet("frequencies");
+        transfers = db.getTreeMap("transfers");
+        stops = db.getTreeMap("stops");
+        fares = db.getTreeMap("fares");
+        services = db.getTreeMap("services");
+        shape_points = db.getTreeMap("shape_points");
+
+        // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
+        // nothing else contains JTS objects
+        patterns = db.createTreeMap("patterns")
+                .valueSerializer(Serializer.JAVA)
+                .makeOrGet();
+
+        tripPatternMap = db.getTreeMap("patternForTrip");
+
+        errors = db.getTreeSet("errors");
     }
 }

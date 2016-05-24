@@ -20,7 +20,7 @@ public class Shape {
 
     public Shape (GTFSFeed feed, String shape_id) {
         Map<Fun.Tuple2<String, Integer>, ShapePoint> points =
-                feed.shapePoints.subMap(new Fun.Tuple2(shape_id, null), new Fun.Tuple2(shape_id, Fun.HI));
+                feed.shape_points.subMap(new Fun.Tuple2(shape_id, null), new Fun.Tuple2(shape_id, Fun.HI));
 
         Coordinate[] coords = points.values().stream()
                 .map(point -> new Coordinate(point.shape_pt_lon, point.shape_pt_lat))

@@ -20,7 +20,7 @@ import java.io.IOException;
 
 public class FareRule extends Entity {
 
-    public Fare fare;
+    public String fare_id;
     public String route_id;
     public String origin_id;
     public String destination_id;
@@ -39,7 +39,7 @@ public class FareRule extends Entity {
             String fareId = getStringField("fare_id", true);
             Fare fare = feed.getOrCreateFare(fareId);
             FareRule fr = new FareRule();
-            fr.fare = fare;
+            fr.fare_id = fare.fare_id;
             fr.route_id = getStringField("route_id", false);
             fr.origin_id = getStringField("origin_id", false);
             fr.destination_id = getStringField("destination_id", false);

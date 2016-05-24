@@ -25,7 +25,6 @@ import java.util.Iterator;
 
 public class Calendar extends Entity implements Serializable {
 
-    public Service service;
     public int monday;
     public int tuesday;
     public int wednesday;
@@ -36,6 +35,7 @@ public class Calendar extends Entity implements Serializable {
     public int start_date;
     public int end_date;
     public String feed_id;
+    public String service_id;
 
     public static class Loader extends Entity.Loader<Calendar> {
 
@@ -53,7 +53,7 @@ public class Calendar extends Entity implements Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "service_id"));
             } else {
                 Calendar c = new Calendar();
-                c.service = service;
+                c.service_id = service.service_id;
                 c.monday = getIntField("monday", true, 0, 1);
                 c.tuesday = getIntField("tuesday", true, 0, 1);
                 c.wednesday = getIntField("wednesday", true, 0, 1);
@@ -84,7 +84,7 @@ public class Calendar extends Entity implements Serializable {
 
         @Override
         protected void writeOneRow(Calendar c) throws IOException {
-            writeStringField(c.service.service_id);
+            writeStringField(c.service_id);
             writeIntField(c.monday);
             writeIntField(c.tuesday);
             writeIntField(c.wednesday);

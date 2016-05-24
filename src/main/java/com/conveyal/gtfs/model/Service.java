@@ -49,14 +49,12 @@ public class Service implements Serializable {
             calendar.end_date   = this.calendar.end_date;
             // Create the bidirectional reference between Calendar and Service.
             service.calendar = calendar;
-            calendar.service = service;
         }
         // Copy over all exceptions whose dates fall on days of the week that are retained.
         this.calendar_dates.forEach((date, exception) -> {
             DayOfWeek dow = date.getDayOfWeek();
             if (!daysToRemove.contains(dow)) {
                 CalendarDate newException = exception.clone();
-                newException.service = service;
                 service.calendar_dates.put(date, newException);
             }
         });

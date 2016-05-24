@@ -53,7 +53,7 @@ public class ShapePoint extends Entity {
 
             ShapePoint s = new ShapePoint(shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled);
             s.feed = null; // since we're putting this into MapDB, we don't want circular serialization
-            feed.shapePoints.put(new Tuple2<String, Integer>(s.shape_id, s.shape_pt_sequence), s);
+            feed.shape_points.put(new Tuple2<String, Integer>(s.shape_id, s.shape_pt_sequence), s);
         }
     }
 
@@ -79,7 +79,7 @@ public class ShapePoint extends Entity {
 
         @Override
         protected Iterator<ShapePoint> iterator() {
-            return feed.shapePoints.values().iterator();
+            return feed.shape_points.values().iterator();
         }
     }
 }

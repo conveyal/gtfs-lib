@@ -3,6 +3,7 @@ package com.conveyal.gtfs.model;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 
+import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
 
@@ -10,7 +11,8 @@ import java.util.Map;
  * This table does not exist in GTFS. It is a join of fare_attributes and fare_rules on fare_id.
  * There should only be one fare_attribute per fare_id, but there can be many fare_rules per fare_id.
  */
-public class Fare {
+public class Fare implements Serializable {
+    public static final long serialVersionUID = 1L;
 
     String         fare_id;
     FareAttribute  fare_attribute;

@@ -72,8 +72,8 @@ public class ReversedTripsValidator extends GTFSValidator {
                 firstStopGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstStopCoord));
                 lastStopGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastStopCoord));
 
-                firstShapeCoord = new Coordinate(feed.shapePoints.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shapePoints.get(Fun.t2(shapeId, 0)).shape_pt_lon);
-                lastShapeCoord = new Coordinate(feed.shapePoints.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shapePoints.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
+                firstShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lon);
+                lastShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
 
                 firstShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstShapeCoord));
                 lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));
@@ -87,8 +87,8 @@ public class ReversedTripsValidator extends GTFSValidator {
             }
 
 
-            firstShapeCoord = new Coordinate(feed.shapePoints.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shapePoints.get(Fun.t2(shapeId, 0)).shape_pt_lon);
-            lastShapeCoord = new Coordinate(feed.shapePoints.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shapePoints.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
+            firstShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lon);
+            lastShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
 
             firstShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstShapeCoord));
             lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));

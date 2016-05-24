@@ -4,6 +4,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.google.common.base.Joiner;
 import com.vividsolutions.jts.geom.LineString;
 
+import java.io.Serializable;
 import java.util.*;
 
 import org.slf4j.Logger;
@@ -12,7 +13,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Created by landon on 2/5/16.
  */
-public class Pattern {
+public class Pattern implements Serializable {
+    public static final long serialVersionUID = 1L;
+
     public String pattern_id;
     public int[] segmentIndex;
     public double[] segmentFraction;
@@ -21,7 +24,7 @@ public class Pattern {
     public Set<String> associatedRoutes;
     public LineString geometry;
     public String name;
-    public Joiner joiner = Joiner.on("-").skipNulls();
+    public static Joiner joiner = Joiner.on("-").skipNulls();
     public String feed_id;
 
     // TODO: Should a Pattern be generated for a single trip or a set of trips that share the same ordered stop list?

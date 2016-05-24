@@ -25,7 +25,7 @@ import java.util.Iterator;
 
 public class CalendarDate extends Entity implements Cloneable, Serializable {
 
-    public Service   service;
+    public String    service_id;
     public LocalDate date;
     public int       exception_type;
 
@@ -53,7 +53,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
             } else {
                 CalendarDate cd = new CalendarDate();
-                cd.service = service;
+                cd.service_id = service_id;
                 cd.date = date;
                 cd.exception_type = getIntField("exception_type", true, 1, 2);
                 cd.feed = feed;
@@ -74,7 +74,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
 
         @Override
         protected void writeOneRow(CalendarDate d) throws IOException {
-            writeStringField(d.service.service_id);
+            writeStringField(d.service_id);
             writeDateField(d.date);
             writeIntField(d.exception_type);
             endRecord();
