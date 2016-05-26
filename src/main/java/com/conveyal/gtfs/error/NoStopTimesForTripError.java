@@ -13,7 +13,7 @@ public class NoStopTimesForTripError extends GTFSError {
     public Route route;
 
     public NoStopTimesForTripError(String tripId, Route route) {
-        super("trip", 0, "trip_id");
+        super("trips", 0, "trip_id");
         this.tripId = tripId;
         this.route = route;
     }

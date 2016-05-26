@@ -11,7 +11,7 @@ public class MissingShapeError extends GTFSError {
     public String tripId;
 
     public MissingShapeError(String tripId) {
-        super("trip", 0, "shape_id");
+        super("trips", 0, "shape_id");
         this.tripId = tripId;
     }
 

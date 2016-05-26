@@ -12,7 +12,7 @@ public class ReversedTripShapeError extends GTFSError {
     public String shapeId;
 
     public ReversedTripShapeError(String tripId, String shapeId) {
-        super("trip", 0, "shape_id");
+        super("trips", 0, "shape_id");
         this.tripId = tripId;
         this.shapeId = shapeId;
     }

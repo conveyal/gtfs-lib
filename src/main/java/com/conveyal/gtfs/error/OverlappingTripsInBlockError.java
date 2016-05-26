@@ -12,8 +12,8 @@ public class OverlappingTripsInBlockError extends GTFSError {
     public String affectedEntityId;
     public Priority priority = Priority.HIGH;
 
-    public OverlappingTripsInBlockError(String file, long line, String field, String affectedEntityId, Route route, String[] tripIds, Priority priority) {
-        super(file, line, field);
+    public OverlappingTripsInBlockError(long line, String field, String affectedEntityId, Route route, String[] tripIds, Priority priority) {
+        super("trips", line, field);
         this.tripIds = tripIds;
         this.affectedEntityId = affectedEntityId;
     }

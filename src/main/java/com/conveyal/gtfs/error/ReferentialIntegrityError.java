@@ -12,7 +12,7 @@ public class ReferentialIntegrityError extends GTFSError {
     }
 
     @Override public String getMessage() {
-        return String.format("Entity references non-existant entity '%s'.", badReference);
+        return String.format("Entity references non-existent entity '%s'.", badReference);
     }
 
 }
