@@ -6,7 +6,6 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.DuplicateStopsValidator;
 import com.conveyal.gtfs.validator.GTFSValidator;
 import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
-import com.conveyal.gtfs.validator.IllegalShapeValidator;
 import com.conveyal.gtfs.validator.MisplacedStopValidator;
 import com.conveyal.gtfs.validator.MissingStopCoordinatesValidator;
 import com.conveyal.gtfs.validator.NamesValidator;
@@ -33,8 +32,6 @@ import java.io.OutputStream;
 import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -191,7 +188,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         validate(
                 new DuplicateStopsValidator(),
                 new HopSpeedsReasonableValidator(),
-                new IllegalShapeValidator(),
                 new MisplacedStopValidator(),
                 new MissingStopCoordinatesValidator(),
                 new NamesValidator(),
