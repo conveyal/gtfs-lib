@@ -12,7 +12,7 @@ public class StopTimeDepartureBeforeArrivalError extends GTFSError {
     public int stopSequence;
 
     public StopTimeDepartureBeforeArrivalError(String tripId, int stopSequence) {
-        super("stop_time", 0, "trip_id");
+        super("stop_times", 0, "trip_id");
         this.tripId = tripId;
         this.stopSequence = stopSequence;
 

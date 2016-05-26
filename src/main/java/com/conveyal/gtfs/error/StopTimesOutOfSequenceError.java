@@ -13,7 +13,7 @@ public class StopTimesOutOfSequenceError extends GTFSError {
     public int previousStopSequence;
 
     public StopTimesOutOfSequenceError(String tripId, int stopSequence, int previousStopSequence) {
-        super("stop_time", 0, "trip_id");
+        super("stop_times", 0, "trip_id");
         this.tripId = tripId;
         this.stopSequence = stopSequence;
         this.previousStopSequence = previousStopSequence;
