@@ -8,16 +8,16 @@ import com.conveyal.gtfs.validator.model.Priority;
 public class ShapeMissingCoordinatesError extends GTFSError {
 
     public Priority priority = Priority.MEDIUM;
-    public String tripId;
+    public String[] tripIds;
     public String shapeId;
 
-    public ShapeMissingCoordinatesError(String tripId, String shapeId) {
-        super("trip", 0, "shape_id");
-        this.tripId = tripId;
+    public ShapeMissingCoordinatesError(String shapeId, String[] tripIds) {
+        super("shapes", 0, "shape_id");
+        this.tripIds = tripIds;
         this.shapeId = shapeId;
     }
 
     @Override public String getMessage() {
-        return "Trip " + tripId + " (shape " + shapeId + ") is missing coordinates";
+        return "Shape " + shapeId + " is missing coordinates (affects " + tripIds.length + " trips)";
     }
 }

@@ -81,7 +81,7 @@ public class OverlappingTripsValidator extends GTFSValidator {
                         if(i1.trip.service.service_id.equals(i2.trip.service.service_id)) {
                             // not strictly correct; they could be on different routes
                             String[] tripIds = {tripId1, tripId2};
-                            feed.errors.add(new OverlappingTripsInBlockError("trip", 0, "block_id", blockId, i1.trip.route, tripIds, Priority.HIGH));
+                            feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, i1.trip.route, tripIds, Priority.HIGH));
                         }
 
                         else {
@@ -91,7 +91,7 @@ public class OverlappingTripsValidator extends GTFSValidator {
 
                                 if(feed.services.get(i2.trip.service.service_id).calendar_dates.containsKey(d1.getKey())) {
                                     String[] tripIds = {tripId1, tripId2};
-                                    feed.errors.add(new OverlappingTripsInBlockError("trip", 0, "block_id", blockId, i1.trip.route, tripIds, Priority.HIGH));
+                                    feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, i1.trip.route, tripIds, Priority.HIGH));
                                     break;
                                 }
                             }
