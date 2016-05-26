@@ -246,14 +246,23 @@ public class GTFSFeed implements Cloneable, Closeable {
         if (this.spatialIndex == null) {
             synchronized (this) {
                 if (this.spatialIndex == null) {
-                    // buid spatial index
+                    // build spatial index
                     STRtree stopIndex = new STRtree();
                     for(Stop stop : this.stops.values()) {
-                        Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
-                        stopIndex.insert(new Envelope(stopCoord), stop);
+                        try {
+                            Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
+                            stopIndex.insert(new Envelope(stopCoord), stop);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
                     }
-                    stopIndex.build();
-                    this.spatialIndex = stopIndex;
+                    try {
+                        stopIndex.build();
+                        this.spatialIndex = stopIndex;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
