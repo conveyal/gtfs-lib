@@ -56,7 +56,8 @@ public class TripTimesValidator extends GTFSValidator {
                     isValid = false;
                 }
 
-                if(previousStopTime != null) {
+                // check if previous time is null or arrival time is missing (e.g., non-timepoint)
+                if(previousStopTime != null || stopTime.arrival_time == Integer.MIN_VALUE) {
 
                     if(stopTime.arrival_time < previousStopTime.departure_time) {
                         if (stopTimesOutOfSequenceErrorCount < errorLimit) {
