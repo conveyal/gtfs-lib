@@ -250,6 +250,9 @@ public class GTFSFeed implements Cloneable, Closeable {
                     STRtree stopIndex = new STRtree();
                     for(Stop stop : this.stops.values()) {
                         try {
+                            if (Double.isNaN(stop.stop_lat) || Double.isNaN(stop.stop_lon)) {
+                                continue;
+                            }
                             Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
                             stopIndex.insert(new Envelope(stopCoord), stop);
                         } catch (Exception e) {
