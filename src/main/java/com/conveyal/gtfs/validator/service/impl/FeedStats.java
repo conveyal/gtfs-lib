@@ -135,22 +135,25 @@ public class FeedStats implements StatisticsService {
                 : null;
         LocalDate startDate = feedStartDate != null
                 ? feedStartDate
-                : getCalendarServiceRangeStart();
-        if (startDate == null) {
-            startDate = getCalendarDateStart();
-        }
+                : getCalendarServiceRangeStart() != null
+                ? getCalendarDateStart()
+                : null;
         LocalDate feedEndDate = !feed.feedInfo.isEmpty()
                 ? feed.feedInfo.values().iterator().next().feed_end_date
                 : null;
         LocalDate endDate = feedEndDate != null
                 ? feedEndDate
-                : getCalendarServiceRangeEnd();
-        if (endDate == null) {
-            endDate = getCalendarDateEnd();
-        }
+                : getCalendarServiceRangeEnd() != null
+                ? getCalendarDateEnd()
+                : null;
 
         // loop through services
         for (Service service : feed.services.values()) {
+
+            // skip service if start or end date is null
+            if (startDate == null || endDate == null) {
+                continue;
+            }
 
             // iterate through each date between start and end date
             for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
