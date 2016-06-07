@@ -160,7 +160,10 @@ public class FeedStats implements StatisticsService {
                 }
                 // if service is active on given day, add all trips that operate under that service
                 if (service.activeOn(date)) {
-                    tripCount = tripCount + tripsPerService.get(service.service_id).size();
+                    List<Trip> serviceTrips = tripsPerService.get(service.service_id);
+                    if (serviceTrips != null)
+                        tripCount = tripCount + serviceTrips.size();
+
                 }
                 tripsPerDate.put(date, tripCount);
             }
