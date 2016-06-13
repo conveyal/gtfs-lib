@@ -48,6 +48,10 @@ public class Agency extends Entity {
             a.agency_fare_url = getUrlField("agency_fare_url", false);
             a.feed = feed;
             a.feed_id = feed.feedId;
+
+            // TODO clooge due to not being able to have null keys in mapdb
+            if (a.agency_id == null) a.agency_id = "NONE";
+
             feed.agency.put(a.agency_id, a);
         }
 
