@@ -395,23 +395,28 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
 
+        List<Pattern> patterns = new ArrayList<>();
+
         for (Entry<List<String>, List<String>> entry: tripsForPattern.entrySet()){
             Pattern pattern = new Pattern(this, entry);
-            patterns.put(pattern.pattern_id, pattern);
+            patterns.add(pattern);
             entry.getValue().forEach(tripId -> tripPatternMap.put(tripId, pattern.pattern_id));
         }
 
-        namePatterns();
+        namePatterns(patterns);
+
+        patterns.stream().forEach(p -> this.patterns.put(p.pattern_id, p));
 
         return tripsForPattern;
     }
 
-    private void namePatterns() {
+    /** destructively rename passed in patterns */
+    private void namePatterns(Collection<Pattern> patterns) {
         LOG.info("Generating unique names for patterns");
 
         Map<String, PatternNamingInfo> namingInfoForRoute = new HashMap<>();
 
-        for (Pattern pattern : patterns.values()) {
+        for (Pattern pattern : patterns) {
             if (pattern.associatedTrips.isEmpty() || pattern.orderedStops.isEmpty()) continue;
 
             Trip trip = trips.get(pattern.associatedTrips.get(0));
