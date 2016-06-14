@@ -37,6 +37,7 @@ public class GTFSMain {
         LOG.info("  {} routes", reconnected.routes.size());
         LOG.info("  {} trips", reconnected.trips.size());
         LOG.info("  {} stop times", reconnected.stop_times.size());
+        LOG.info("  Feed ID: {}", reconnected.feedId);
     }
 
 }
