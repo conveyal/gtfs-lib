@@ -3,7 +3,7 @@ package com.conveyal.gtfs.error;
 /**
  * Represents an error encountered
  */
-public abstract class GTFSError {
+public abstract class GTFSError implements Comparable<GTFSError> {
 
     public final String file; // TODO GTFSTable enum? Or simply use class objects.
     public final long   line;
@@ -39,6 +39,16 @@ public abstract class GTFSError {
         sb.append(": ");
         sb.append(getMessage());
         return sb.toString();
+    }
+
+    /** must be comparable to put into mapdb */
+    public int compareTo (GTFSError o) {
+        if (this.file == null && o.file != null) return -1;
+        else if (this.file != null && o.file == null) return 1;
+
+        int file = this.file == null && o.file == null ? 0 : String.CASE_INSENSITIVE_ORDER.compare(this.file, o.file);
+        if (file != 0) return file;
+        else return Long.compare(this.line, o.line);
     }
 
     @Override

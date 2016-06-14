@@ -1,7 +1,10 @@
 package com.conveyal.gtfs.error;
 
+import java.io.Serializable;
+
 /** Indicates that a number is out of the acceptable range. */
-public class RangeError extends GTFSError {
+public class RangeError extends GTFSError implements Serializable {
+    public static final long serialVersionUID = 1L;
 
     double min, max, actual;
 

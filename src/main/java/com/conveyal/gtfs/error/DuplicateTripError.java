@@ -3,10 +3,13 @@ package com.conveyal.gtfs.error;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.validator.model.Priority;
 
+import java.io.Serializable;
+
 /**
  * Created by landon on 5/6/16.
  */
-public class DuplicateTripError extends GTFSError {
+public class DuplicateTripError extends GTFSError implements Serializable {
+    public static final long serialVersionUID = 1L;
 
     public Priority priority = Priority.LOW;
     public String tripId;

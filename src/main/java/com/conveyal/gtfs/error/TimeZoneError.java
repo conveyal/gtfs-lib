@@ -2,10 +2,14 @@ package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.model.Agency;
 
+import java.io.Serializable;
+
 /**
  * Created by landon on 5/11/16.
  */
-public class TimeZoneError extends GTFSError {
+public class TimeZoneError extends GTFSError implements Serializable {
+    public static final long serialVersionUID = 1L;
+
     public Agency agency;
     public String message;
     public String affectedEntityId;

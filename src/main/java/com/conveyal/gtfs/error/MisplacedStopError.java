@@ -3,10 +3,13 @@ package com.conveyal.gtfs.error;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.model.Priority;
 
+import java.io.Serializable;
+
 /**
  * Created by landon on 5/11/16.
  */
-public class MisplacedStopError extends GTFSError {
+public class MisplacedStopError extends GTFSError implements Serializable {
+    public static final long serialVersionUID = 1L;
 
     public String affectedEntityId;
     public Priority priority;
