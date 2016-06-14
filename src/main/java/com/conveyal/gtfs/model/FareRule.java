@@ -15,8 +15,10 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.error.ReferentialIntegrityError;
 
 import java.io.IOException;
+import java.util.Map;
 
 public class FareRule extends Entity {
 
@@ -28,8 +30,11 @@ public class FareRule extends Entity {
 
     public static class Loader extends Entity.Loader<FareRule> {
 
-        public Loader(GTFSFeed feed) {
+        private final Map<String, Fare> fares;
+
+        public Loader(GTFSFeed feed, Map<String, Fare> fares) {
             super(feed, "fare_rules");
+            this.fares = fares;
         }
 
         @Override
@@ -37,7 +42,12 @@ public class FareRule extends Entity {
 
             /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */
             String fareId = getStringField("fare_id", true);
-            Fare fare = feed.getOrCreateFare(fareId);
+
+            if (!fares.containsKey(fareId)) {
+                this.feed.errors.add(new ReferentialIntegrityError(tableName, row, "fare_id", fareId));
+            }
+
+            Fare fare = fares.computeIfAbsent(fareId, Fare::new);
             FareRule fr = new FareRule();
             fr.fare_id = fare.fare_id;
             fr.route_id = getStringField("route_id", false);

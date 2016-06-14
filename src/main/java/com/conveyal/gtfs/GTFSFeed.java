@@ -120,11 +120,26 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.info("Feed ID is '{}'.", feedId);
         }
 
+        db.getAtomicString("feed_id").set(feedId);
+
         new Agency.Loader(this).loadTable(zip);
-        new Calendar.Loader(this).loadTable(zip);
-        new CalendarDate.Loader(this).loadTable(zip);
-        new FareAttribute.Loader(this).loadTable(zip);
-        new FareRule.Loader(this).loadTable(zip);
+
+        // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
+        // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
+        // we're done loading them
+        Map<String, Service> serviceTable = new HashMap<>();
+        new Calendar.Loader(this, serviceTable).loadTable(zip);
+        new CalendarDate.Loader(this, serviceTable).loadTable(zip);
+        this.services.putAll(serviceTable);
+        serviceTable = null; // free memory
+
+        // Same deal
+        Map<String, Fare> fares = new HashMap<>();
+        new FareAttribute.Loader(this, fares).loadTable(zip);
+        new FareRule.Loader(this, fares).loadTable(zip);
+        this.fares.putAll(fares);
+        fares = null; // free memory
+
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
@@ -569,24 +584,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         return ls;
     }
 
-    public Service getOrCreateService(String serviceId) {
-        Service service = services.get(serviceId);
-        if (service == null) {
-            service = new Service(serviceId);
-            services.put(serviceId, service);
-        }
-        return service;
-    }
-
-    public Fare getOrCreateFare(String fareId) {
-        Fare fare = fares.get(fareId);
-        if (fare == null) {
-            fare = new Fare(fareId);
-            fares.put(fareId, fare);
-        }
-        return fare;
-    }
-
     /**
      * Cloning can be useful when you want to make only a few modifications to an existing feed.
      * Keep in mind that this is a shallow copy, so you'll have to create new maps in the clone for tables you want
@@ -660,6 +657,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         fares = db.getTreeMap("fares");
         services = db.getTreeMap("services");
         shape_points = db.getTreeMap("shape_points");
+
+        feedId = db.getAtomicString("feed_id").get();
 
         // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
         // nothing else contains JTS objects

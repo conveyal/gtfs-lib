@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.Iterator;
+import java.util.Map;
 
 public class CalendarDate extends Entity implements Cloneable, Serializable {
 
@@ -39,15 +40,22 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
 
     public static class Loader extends Entity.Loader<CalendarDate> {
 
-        public Loader(GTFSFeed feed) {
+        private final Map<String, Service> services;
+
+        /**
+         * Create a loader. The map parameter should be an in-memory map that will be modified. We can't write directly
+         * to MapDB because we modify services as we load calendar dates, and this creates concurrentmodificationexceptions.
+         */
+        public Loader(GTFSFeed feed, Map<String, Service> services) {
             super(feed, "calendar_dates");
+            this.services = services;
         }
 
         @Override
         public void loadOneRow() throws IOException {
             /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */
             String service_id = getStringField("service_id", true);
-            Service service = feed.getOrCreateService(service_id);
+            Service service = services.computeIfAbsent(service_id, Service::new);
             LocalDate date = getDateField("date", true);
             if (service.calendar_dates.containsKey(date)) {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));

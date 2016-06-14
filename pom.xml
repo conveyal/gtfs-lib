@@ -122,8 +122,12 @@
       <artifactId>gt-epsg-hsql</artifactId>
       <version>11-beta</version>
     </dependency>
-
-
+    
+    <dependency>
+      <groupId>com.amazonaws</groupId>
+      <artifactId>aws-java-sdk-s3</artifactId>
+      <version>1.10.28</version>
+    </dependency>
   </dependencies>
 
 
