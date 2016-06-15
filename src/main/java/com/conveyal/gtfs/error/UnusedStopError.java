@@ -14,7 +14,7 @@ public class UnusedStopError extends GTFSError implements Serializable {
     public Stop stop;
 
     public UnusedStopError(String affectedEntityId, Stop stop) {
-        super("stop", 0, "stop_id");
+        super("stops", 0, "stop_id");
         this.affectedEntityId = affectedEntityId;
         this.priority = Priority.LOW;
         this.stop = stop;

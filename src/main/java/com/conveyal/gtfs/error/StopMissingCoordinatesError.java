@@ -15,7 +15,7 @@ public class StopMissingCoordinatesError extends GTFSError implements Serializab
     public String stopId;
     public Stop stop;
     public StopMissingCoordinatesError(String stopId, Stop stop) {
-        super("stop", 0, "stop_lat,stop_lon");
+        super("stops", 0, "stop_lat,stop_lon");
         this.stopId = stopId;
         this.stop = stop;
     }

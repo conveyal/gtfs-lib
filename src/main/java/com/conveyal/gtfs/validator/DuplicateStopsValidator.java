@@ -59,47 +59,49 @@ public class DuplicateStopsValidator extends GTFSValidator {
 
         List<DuplicateStops> duplicateStops = new ArrayList<DuplicateStops>();
 
-        for(Geometry stopGeom : stopProjectedGeomMap.values()) {
+        if (stopIndex != null) {
+            for(Geometry stopGeom : stopProjectedGeomMap.values()) {
 
-            Geometry bufferedStopGeom = stopGeom.buffer(buffer);
+                Geometry bufferedStopGeom = stopGeom.buffer(buffer);
 
-            List<Stop> stopCandidates = (List<Stop>)stopIndex.query(bufferedStopGeom.getEnvelopeInternal());
+                List<Stop> stopCandidates = (List<Stop>)stopIndex.query(bufferedStopGeom.getEnvelopeInternal());
 
-            if(stopCandidates.size() > 1) {
+                if(stopCandidates.size() > 1) {
 
-                for(Stop stop1 : stopCandidates) {
-                    for(Stop stop2 : stopCandidates) {
+                    for(Stop stop1 : stopCandidates) {
+                        for(Stop stop2 : stopCandidates) {
 
-                        if(stop1.stop_id != stop2.stop_id) {
+                            if(stop1.stop_id != stop2.stop_id) {
 
-                            Boolean stopPairAlreadyFound = false;
-                            for(DuplicateStops duplicate : duplicateStops) {
+                                Boolean stopPairAlreadyFound = false;
+                                for(DuplicateStops duplicate : duplicateStops) {
 
-                                if((duplicate.stop1.feed_id.equals(stop1.feed_id) && duplicate.stop2.feed_id.equals(stop2.feed_id)) ||
-                                        (duplicate.stop2.feed_id.equals(stop1.feed_id) && duplicate.stop1.feed_id.equals(stop2.feed_id)))
-                                    stopPairAlreadyFound = true;
+                                    if((duplicate.stop1.feed_id.equals(stop1.feed_id) && duplicate.stop2.feed_id.equals(stop2.feed_id)) ||
+                                            (duplicate.stop2.feed_id.equals(stop1.feed_id) && duplicate.stop1.feed_id.equals(stop2.feed_id)))
+                                        stopPairAlreadyFound = true;
+                                }
+
+                                if(stopPairAlreadyFound)
+                                    continue;
+
+                                Geometry stop1Geom = stopProjectedGeomMap.get(stop1.stop_id);
+                                Geometry stop2Geom = stopProjectedGeomMap.get(stop2.stop_id);
+
+                                double distance = stop1Geom.distance(stop2Geom);
+
+                                // if stopDistance is within bufferDistance consider duplicate
+                                if(distance <= buffer){
+
+                                    // TODO: a good place to check if stops are part of a station grouping
+
+                                    DuplicateStops duplicateStop = new DuplicateStops(stop1, stop2, distance);
+                                    duplicateStops.add(duplicateStop);
+                                    isValid = false;
+                                    feed.errors.add(new DuplicateStopError(duplicateStop.toString(), duplicateStop));
+                                }
                             }
 
-                            if(stopPairAlreadyFound)
-                                continue;
-
-                            Geometry stop1Geom = stopProjectedGeomMap.get(stop1.stop_id);
-                            Geometry stop2Geom = stopProjectedGeomMap.get(stop2.stop_id);
-
-                            double distance = stop1Geom.distance(stop2Geom);
-
-                            // if stopDistance is within bufferDistance consider duplicate
-                            if(distance <= buffer){
-
-                                // TODO: a good place to check if stops are part of a station grouping
-
-                                DuplicateStops duplicateStop = new DuplicateStops(stop1, stop2, distance);
-                                duplicateStops.add(duplicateStop);
-                                isValid = false;
-                                feed.errors.add(new DuplicateStopError(duplicateStop.toString(), duplicateStop));
-                            }
                         }
-
                     }
                 }
             }

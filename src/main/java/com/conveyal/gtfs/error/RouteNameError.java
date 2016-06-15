@@ -16,7 +16,7 @@ public class RouteNameError extends GTFSError implements Serializable {
     public Object problemData;
 
     public RouteNameError(String file, long line, String field, String affectedEntityId, String type, Object problemData, Priority priority) {
-        super("route", line, field);
+        super("routes", line, field);
         this.affectedEntityId = affectedEntityId;
         this.type = type;
         this.affectedEntityId = affectedEntityId;

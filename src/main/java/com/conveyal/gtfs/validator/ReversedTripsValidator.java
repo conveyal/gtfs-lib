@@ -14,7 +14,11 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
 import org.mapdb.Fun;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Created by landon on 5/2/16.
@@ -38,7 +42,7 @@ public class ReversedTripsValidator extends GTFSValidator {
         int missingCoordinatesErrorCount = 0;
         int reversedTripShapeErrorCount = 0;
         Collection<Trip> trips = feed.trips.values();
-
+        Map<String, List<String>> missingShapesMap = new HashMap<>();
 
         for(Trip trip : trips) {
 
@@ -79,13 +83,18 @@ public class ReversedTripsValidator extends GTFSValidator {
                 lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));
             } catch (Exception any) {
                 isValid = false;
-                if (missingCoordinatesErrorCount < errorLimit) {
-                    feed.errors.add(new ShapeMissingCoordinatesError(tripId, shapeId));
+                List<String> listOfTrips;
+                if (missingShapesMap.containsKey(shapeId)) {
+                    listOfTrips = missingShapesMap.get(shapeId);
                 }
+                else {
+                    listOfTrips = new ArrayList<String>();
+                }
+                listOfTrips.add(tripId);
+                missingShapesMap.put(shapeId, listOfTrips);
                 missingCoordinatesErrorCount++;
                 continue;
             }
-
 
             firstShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lon);
             lastShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
@@ -108,7 +117,12 @@ public class ReversedTripsValidator extends GTFSValidator {
                 isValid = false;
             }
         }
-
+        if (missingCoordinatesErrorCount > 0) {
+            for (Map.Entry<String, List<String>> shapeError : missingShapesMap.entrySet()) {
+                String[] tripIdList = shapeError.getValue().toArray(new String[shapeError.getValue().size()]);
+                feed.errors.add(new ShapeMissingCoordinatesError(shapeError.getKey(), tripIdList));
+            }
+        }
         return isValid;
     }
 }
