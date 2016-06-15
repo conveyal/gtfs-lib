@@ -35,6 +35,8 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
+import java.util.zip.CRC32;
+import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
@@ -63,6 +65,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Stop> stops;
     public final Map<String, Transfer> transfers;
     public final Map<String, Trip> trips;
+
+    /** CRC32 of the GTFS file this was loaded from */
+    public long checksum;
 
     /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
     public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
@@ -105,6 +110,18 @@ public class GTFSFeed implements Cloneable, Closeable {
      */
     public void loadFromFile(ZipFile zip, String fid) throws Exception {
         if (this.loaded) throw new UnsupportedOperationException("Attempt to load GTFS into existing database");
+
+        // NB we don't have a single CRC for the file, so we combine all the CRCs of the component files. NB we are not
+        // simply summing the CRCs because CRCs are (I assume) uniformly randomly distributed throughout the width of a
+        // long, so summing them is a convolution which moves towards a Gaussian with mean 0 (i.e. more concentrated
+        // probability in the center), degrading the quality of the hash. Instead we XOR. Assuming each bit is independent,
+        // this will yield a nice uniformly distributed result, because when combining two bits there is an equal
+        // probability of any input, which means an equal probability of any output. At least I think that's all correct.
+        // Repeated XOR is not commutative but zip.stream returns files in the order they are in the central directory
+        // of the zip file, so that's not a problem.
+        checksum = zip.stream().mapToLong(ZipEntry::getCrc).reduce((l1, l2) -> l1 ^ l2).getAsLong();
+
+        db.getAtomicLong("checksum").set(checksum);
 
         new FeedInfo.Loader(this).loadTable(zip);
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
@@ -659,6 +676,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         shape_points = db.getTreeMap("shape_points");
 
         feedId = db.getAtomicString("feed_id").get();
+        checksum = db.getAtomicLong("checksum").get();
 
         // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
         // nothing else contains JTS objects
