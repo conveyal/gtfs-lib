@@ -536,7 +536,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         Trip trip = trips.get(trip_id);
 
         // If trip has shape_id, use it to generate geometry.
-        if (trip.shape_id != null){
+        if (trip.shape_id != null && trip.shape_points != null){
             for (Entry<Integer, Shape> entry : trip.shape_points.entrySet()){
                 Double lat = entry.getValue().shape_pt_lat;
                 Double lon = entry.getValue().shape_pt_lon;
