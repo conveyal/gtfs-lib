@@ -67,17 +67,17 @@ public class Service implements Serializable {
     public boolean hasAnyService() {
 
         // Look for any service defined in calendar (on days of the week).
-        boolean hasAnyService = calendar != null &&
+        boolean hasAnyService = calendar != null && (
                 calendar.monday == 1 ||
                 calendar.tuesday == 1 ||
                 calendar.wednesday == 1 ||
                 calendar.thursday == 1 ||
                 calendar.friday == 1 ||
-                calendar.saturday == 1||
-                calendar.sunday == 1;
+                calendar.saturday == 1 ||
+                calendar.sunday == 1 );
 
         // Also look for any exceptions of type 1 (added service).
-        hasAnyService |=  calendar_dates.values().stream().anyMatch(cd -> cd.exception_type == 1);
+        hasAnyService |= calendar_dates.values().stream().anyMatch(cd -> cd.exception_type == 1);
 
         return hasAnyService;
     }
