@@ -129,7 +129,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             feedId = fid;
             LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
         }
-        else if (feedId == null) {
+        else if (feedId == null || feedId.isEmpty()) {
             feedId = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
             LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
         }
