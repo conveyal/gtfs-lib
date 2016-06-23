@@ -14,9 +14,9 @@ import java.util.Map;
 public class Fare implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    String         fare_id;
-    FareAttribute  fare_attribute;
-    List<FareRule> fare_rules = Lists.newArrayList();
+    public String         fare_id;
+    public FareAttribute  fare_attribute;
+    public List<FareRule> fare_rules = Lists.newArrayList();
 
     public Fare(String fare_id) {
         this.fare_id = fare_id;
