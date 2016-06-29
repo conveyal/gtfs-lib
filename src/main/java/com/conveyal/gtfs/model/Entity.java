@@ -371,6 +371,10 @@ public abstract class Entity implements Serializable {
                 return;
             }
             
+            writeStringField(convertToGtfsTime(secsSinceMidnight));
+        }
+
+        public static String convertToGtfsTime (int secsSinceMidnight) {
             int seconds = secsSinceMidnight % 60;
             secsSinceMidnight -= seconds;
             // note that the minute and hour values are still expressed in seconds until we write it out, to avoid unnecessary division.
@@ -379,7 +383,7 @@ public abstract class Entity implements Serializable {
             secsSinceMidnight -= minutes;
 
             // integer divide is fine as we've subtracted off remainders
-            writeStringField(String.format("%02d:%02d:%02d", secsSinceMidnight / 3600, minutes / 60, seconds));
+            return String.format("%02d:%02d:%02d", secsSinceMidnight / 3600, minutes / 60, seconds);
         }
 
         protected void writeIntField (Integer val) throws IOException {
