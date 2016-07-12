@@ -16,6 +16,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -42,7 +43,11 @@ public class GTFSCache {
                 }
             });
 
+    /** If bucket is null, work offline and do not use S3 */
     public GTFSCache(String bucket, File cacheDir) {
+        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
+        else LOG.info("Using bucket {} for GTFS Cache", bucket);
+
         this.bucket = bucket;
         this.cacheDir = cacheDir;
     }
@@ -84,9 +89,11 @@ public class GTFSCache {
 
         // upload feed
         // TODO best way to do this? Should we zip the files together?
-        s3.putObject(bucket, cleanId + ".zip", feedFile);
-        s3.putObject(bucket, cleanId + ".db", new File(cacheDir, cleanId + ".db"));
-        s3.putObject(bucket, cleanId + ".db.p", new File(cacheDir, cleanId + ".db.p"));
+        if (bucket != null) {
+            s3.putObject(bucket, cleanId + ".zip", feedFile);
+            s3.putObject(bucket, cleanId + ".db", new File(cacheDir, cleanId + ".db"));
+            s3.putObject(bucket, cleanId + ".db.p", new File(cacheDir, cleanId + ".db.p"));
+        }
 
         // reconnect to feed database
         feed = new GTFSFeed(new File(cacheDir, cleanId + ".db").getAbsolutePath());
@@ -112,43 +119,59 @@ public class GTFSCache {
             return new GTFSFeed(dbFile.getAbsolutePath());
         }
 
-        try {
-            LOG.info("Attempting to download cached GTFS MapDB.");
-            S3Object db = s3.getObject(bucket, id + ".db");
-            InputStream is = db.getObjectContent();
-            FileOutputStream fos = new FileOutputStream(dbFile);
-            ByteStreams.copy(is, fos);
-            is.close();
-            fos.close();
+        if (bucket != null) {
+            try {
+                LOG.info("Attempting to download cached GTFS MapDB.");
+                S3Object db = s3.getObject(bucket, id + ".db");
+                InputStream is = db.getObjectContent();
+                FileOutputStream fos = new FileOutputStream(dbFile);
+                ByteStreams.copy(is, fos);
+                is.close();
+                fos.close();
 
-            S3Object dbp = s3.getObject(bucket, id + ".db.p");
-            InputStream isp = dbp.getObjectContent();
-            FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".db.p"));
-            ByteStreams.copy(isp, fosp);
-            isp.close();
-            fosp.close();
+                S3Object dbp = s3.getObject(bucket, id + ".db.p");
+                InputStream isp = dbp.getObjectContent();
+                FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".db.p"));
+                ByteStreams.copy(isp, fosp);
+                isp.close();
+                fosp.close();
 
-            LOG.info("Returning processed GTFS from S3");
-            return new GTFSFeed(dbFile.getAbsolutePath());
-        } catch (AmazonServiceException | IOException e) {
-            LOG.info("Error retrieving MapDB from S3, will download original GTFS.", e);
+                LOG.info("Returning processed GTFS from S3");
+                return new GTFSFeed(dbFile.getAbsolutePath());
+            } catch (AmazonServiceException | IOException e) {
+                LOG.info("Error retrieving MapDB from S3, will download original GTFS.", e);
+            }
         }
 
-        // if we fell through to here, getting the mapdb was unsuccessful
-        // grab GTFS from S3.
-        try {
-            File feedFile = new File(cacheDir, id + ".zip");
-            S3Object gtfs = s3.getObject(bucket, id + ".zip");
-            InputStream is = gtfs.getObjectContent();
-            FileOutputStream fos = new FileOutputStream(feedFile);
-            ByteStreams.copy(is, fos);
-            is.close();
-            fos.close();
+        // see if the
 
+        // if we fell through to here, getting the mapdb was unsuccessful
+        // grab GTFS from S3 if it is not found locally
+        File feedFile = new File(cacheDir, id + ".zip");
+
+        if (!feedFile.exists() && bucket != null) {
+
+            try {
+                S3Object gtfs = s3.getObject(bucket, id + ".zip");
+                InputStream is = gtfs.getObjectContent();
+                FileOutputStream fos = new FileOutputStream(feedFile);
+                ByteStreams.copy(is, fos);
+                is.close();
+                fos.close();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        if (feedFile.exists()) {
             // TODO this will also re-upload the original feed ZIP to S3.
-            return put(originalId, feedFile);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+            try {
+                return put(originalId, feedFile);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        } else {
+            throw new NoSuchElementException(originalId);
         }
     }
 
