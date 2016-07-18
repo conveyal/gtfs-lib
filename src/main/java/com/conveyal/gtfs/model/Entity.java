@@ -207,8 +207,12 @@ public abstract class Entity implements Serializable {
             V val = null;
             if (str != null) {
                 val = target.get(str);
-                if (val == null) {
-                    feed.errors.add(new ReferentialIntegrityError(tableName, row, column, str));
+                String transitId = column + ":" + str;
+                if (!feed.transitIds.contains(transitId)) {
+                    feed.transitIds.add(transitId);
+                    if (val == null) {
+                        feed.errors.add(new ReferentialIntegrityError(tableName, row, column, str));
+                    }
                 }
             }
             return val;

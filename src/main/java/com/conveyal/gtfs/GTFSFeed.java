@@ -66,6 +66,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Transfer> transfers;
     public final Map<String, Trip> trips;
 
+    public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
     public long checksum;
 
