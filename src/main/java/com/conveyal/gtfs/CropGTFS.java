@@ -40,6 +40,10 @@ public class CropGTFS {
         double lon1 = Double.parseDouble(args[5]);
 
         GTFSFeed feed = GTFSFeed.fromFile(inputFile);
+
+        // We keep two sets of trip IDs because we only keep trips that are referenced by two or more stopTimes.
+        // A TObjectIntMap would be good for this as well, but we don't currently depend on Trove.
+        Set<String> referencedTripIds = new HashSet<>();
         Set<String> retainedTripIds = new HashSet<>();
 
         Envelope envelope = new Envelope(lon0, lon1, lat0, lat1);
@@ -53,13 +57,31 @@ public class CropGTFS {
             }
         }
 
-        System.out.println("Removing stoptimes outside bounding box...");
+        System.out.println("Finding trips with two or more stop_times inside the bounding box...");
         Iterator<StopTime> stIterator = feed.stop_times.values().iterator();
         while (stIterator.hasNext()) {
             StopTime stopTime = stIterator.next();
             if (feed.stops.containsKey(stopTime.stop_id)) {
-                retainedTripIds.add(stopTime.trip_id);
-            } else {
+                // This stop has been retained because it's inside the bounding box.
+                // Keep the stop_time, and also record the trip_id it belongs to so we can retain those.
+                if (referencedTripIds.contains(stopTime.trip_id)) {
+                    // This trip is referenced by two or more stopTimes within the bounding box.
+                    retainedTripIds.add(stopTime.trip_id);
+                } else {
+                    // This is the first time this trip has been referenced by a stopTime within the bounding box.
+                    referencedTripIds.add(stopTime.trip_id);
+                }
+            }
+        }
+
+        System.out.println("Removing stoptimes for trips with less than two stop_times inside the bounding box...");
+        // There are more efficient ways of doing this than iterating over all the stop times.
+        // It could be done inside the trip removal loop below.
+        stIterator = feed.stop_times.values().iterator();
+        while (stIterator.hasNext()) {
+            StopTime stopTime = stIterator.next();
+            if ( ! retainedTripIds.contains(stopTime.trip_id)) {
+                // This trip is not referenced by two or more stopTimes within the bounding box.
                 stIterator.remove();
             }
         }
