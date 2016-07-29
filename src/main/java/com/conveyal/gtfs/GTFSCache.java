@@ -109,6 +109,17 @@ public class GTFSCache {
         }
     }
 
+    public boolean containsId (String id) {
+        GTFSFeed feed = null;
+        try {
+            feed = cache.get(id);
+        } catch (Exception e) {
+            return false;
+        }
+        return feed != null;
+    }
+
+
     /** retrieve a feed from local cache or S3 */
     private GTFSFeed retrieveFeed (String originalId) {
         // see if we have it cached locally
