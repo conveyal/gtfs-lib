@@ -28,6 +28,7 @@ public class Agency extends Entity {
     public String agency_lang;
     public String agency_phone;
     public URL    agency_fare_url;
+    public URL    agency_branding_url;
     public String feed_id;
 
     public static class Loader extends Entity.Loader<Agency> {
