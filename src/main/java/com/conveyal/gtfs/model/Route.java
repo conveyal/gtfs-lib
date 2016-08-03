@@ -92,6 +92,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             writeStringField("route_url");
             writeStringField("route_color");
             writeStringField("route_text_color");
+            writeStringField("route_branding_url");
             endRecord();
         }
 
@@ -106,6 +107,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             writeUrlField(r.route_url);
             writeStringField(r.route_color);
             writeStringField(r.route_text_color);
+            writeUrlField(r.route_branding_url);
             endRecord();
         }
 

@@ -47,6 +47,7 @@ public class Agency extends Entity {
             a.agency_phone = getStringField("agency_phone", false);
             a.agency_timezone = getStringField("agency_timezone", true);
             a.agency_fare_url = getUrlField("agency_fare_url", false);
+            a.agency_branding_url = getUrlField("agency_branding_url", false);
             a.feed = feed;
             a.feed_id = feed.feedId;
 
@@ -66,7 +67,7 @@ public class Agency extends Entity {
         @Override
         public void writeHeaders() throws IOException {
             writer.writeRecord(new String[] {"agency_id", "agency_name", "agency_url", "agency_lang",
-                    "agency_phone", "agency_timezone", "agency_fare_url"});
+                    "agency_phone", "agency_timezone", "agency_fare_url", "agency_branding_url"});
         }
 
         @Override
@@ -78,6 +79,7 @@ public class Agency extends Entity {
             writeStringField(a.agency_phone);
             writeStringField(a.agency_timezone);
             writeUrlField(a.agency_fare_url);
+            writeUrlField(a.agency_branding_url);
             endRecord();
         }
 
