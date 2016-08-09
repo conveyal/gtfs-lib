@@ -16,10 +16,15 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Remove all stoptimes outside the study zone,
- * then remove all trips with no stoptimes,
- * then remove all stops with no stoptimes,
- * then remove all transfers with no stop.
+ * Remove all stops outside the bounding box,
+ * then remove all stop_times outside the bounding box,
+ * recording all trips with two or more stop_times inside the bounding box.
+ * Then remove all trips with no stoptimes or one single stoptime,
+ * then remove all transfers whose stops have been removed.
+ *
+ * Note that this does not crop the GTFS shapes, only the stops and stoptimes.
+ * Therefore in some tools like Transport Analyst, the data set will appear to extend beyond the bounding box
+ * because the entire shapes are drawn.
  */
 public class CropGTFS {
 
@@ -90,7 +95,7 @@ public class CropGTFS {
             }
         }
 
-        System.out.println("Removing trips that had no stoptimes inside bounding box...");
+        System.out.println("Removing trips that had less than two stop_times inside bounding box...");
         Iterator<Trip> tripIterator = feed.trips.values().iterator();
         while (tripIterator.hasNext()) {
             Trip trip = tripIterator.next();
