@@ -35,7 +35,7 @@ public class GTFSCache {
     private static final AmazonS3 s3 = new AmazonS3Client();
 
     private LoadingCache<String, GTFSFeed> cache = CacheBuilder.newBuilder()
-            .maximumSize(20)
+            .maximumSize(10)
             .build(new CacheLoader<String, GTFSFeed>() {
                 @Override
                 public GTFSFeed load(String s) throws Exception {
