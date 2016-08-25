@@ -4,8 +4,9 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
+import com.google.common.base.Strings;
+import com.vividsolutions.jts.geom.*;
+import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,21 +29,19 @@ import java.util.Set;
  */
 public class CropGTFS {
 
+    // Logger is not super useful because as a library, gtfs-lib has no logger implementation defined by default.
     private static final Logger LOG = LoggerFactory.getLogger(CropGTFS.class);
 
-    public static void main (String[] args) {
+    private static final String inputFile = "/Users/abyrd/geodata/nl/NL-2016-08-23.gtfs.zip";
+    private static final String outputFile = "/Users/abyrd/geodata/nl/NL-2016-08-23-noplatforms-noshapes.gtfs.zip";
 
-        if (args.length != 6) {
-            System.out.printf("CropGTFS infile outfile lat0 lon0 lat1 lon1");
-            System.out.printf("Example:");
-            System.out.printf("CropGTFS marseille-aix-gtfs.zip cropped-gtfs.zip 43.08 4.52 43.95 5.80");
-        }
-        String inputFile = args[0];
-        String outputFile = args[1];
-        double lat0 = Double.parseDouble(args[2]);
-        double lon0 = Double.parseDouble(args[3]);
-        double lat1 = Double.parseDouble(args[4]);
-        double lon1 = Double.parseDouble(args[5]);
+    // Replace all stops with their parent stations to simplify trip patterns.
+    private static final boolean MERGE_STATIONS = true;
+
+    // Remove all shapes from the GTFS to make it simpler to render in a web UI
+    private static final boolean REMOVE_SHAPES = true;
+
+    public static void main (String[] args) {
 
         GTFSFeed feed = GTFSFeed.fromFile(inputFile);
 
@@ -51,14 +50,50 @@ public class CropGTFS {
         Set<String> referencedTripIds = new HashSet<>();
         Set<String> retainedTripIds = new HashSet<>();
 
-        Envelope envelope = new Envelope(lon0, lon1, lat0, lat1);
+        // The geometry within which we will keep all stops
+        Geometry bounds = Geometries.getNetherlandsWithoutTexel();
 
         System.out.println("Removing stops outside bounding box...");
+        Map<String, String> stopIdReplacements = new HashMap<>(); // Used when collapsing stops into stations.
         Iterator<Stop> stopIterator = feed.stops.values().iterator();
         while (stopIterator.hasNext()) {
             Stop stop = stopIterator.next();
-            if ( ! envelope.contains(new Coordinate(stop.stop_lon, stop.stop_lat))) {
+            if (MERGE_STATIONS) {
+                // Do not load stops that will be collapsed down into their parent stations.
+                if (!Strings.isNullOrEmpty(stop.parent_station)) {
+                    stopIdReplacements.put(stop.stop_id, stop.parent_station);
+                    stopIterator.remove();
+                    continue;
+                }
+                // Redefine stations as stops in case GTFS consuming software doesn't allow vehicles to stop at stations.
+                // if (stop.location_type == 2) stop.location_type = 1;
+            }
+            if (!bounds.contains(Geometries.geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat)))) {
                 stopIterator.remove();
+            }
+        }
+
+        if (MERGE_STATIONS) {
+            System.out.println("Replacing stop_ids in stop_times with those of their parent stations...");
+            for (Fun.Tuple2 key : feed.stop_times.keySet()) {
+                StopTime stopTime = feed.stop_times.get(key);
+                String replacementStopId = stopIdReplacements.get(stopTime.stop_id);
+                if (replacementStopId != null) {
+                    // Entry.setValue is an unsupported operation in MapDB, just re-put the StopTime.
+                    stopTime.stop_id = replacementStopId;
+                    feed.stop_times.put(key, stopTime);
+                }
+            }
+        }
+
+        if (REMOVE_SHAPES) {
+            System.out.println("Removing shapes table and removing shape IDs from trips...");
+            feed.shape_points.clear();
+            for (String tripId : feed.trips.keySet()) {
+                Trip trip = feed.trips.get(tripId);
+                trip.shape_id = null;
+                // Entry.setValue is an unsupported operation in MapDB, just re-put the trip.
+                feed.trips.put(tripId, trip);
             }
         }
 
@@ -101,6 +136,19 @@ public class CropGTFS {
             Trip trip = tripIterator.next();
             if ( ! retainedTripIds.contains(trip.trip_id)) {
                 tripIterator.remove();
+            }
+        }
+
+        if (MERGE_STATIONS) {
+            System.out.println("Replacing stop_ids in transfers with those of their parent stations...");
+            for (String key : feed.transfers.keySet()) {
+                Transfer transfer = feed.transfers.get(key);
+                String replacementStopId;
+                replacementStopId = stopIdReplacements.get(transfer.from_stop_id);
+                if (replacementStopId != null) transfer.from_stop_id = replacementStopId;
+                replacementStopId = stopIdReplacements.get(transfer.to_stop_id);
+                if (replacementStopId != null) transfer.to_stop_id = replacementStopId;
+                feed.transfers.put(key, transfer);
             }
         }
 

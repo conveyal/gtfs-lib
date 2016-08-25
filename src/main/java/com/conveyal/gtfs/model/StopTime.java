@@ -58,7 +58,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.stop_headsign  = getStringField("stop_headsign", false);
             st.pickup_type    = getIntField("pickup_type", false, 0, 3); // TODO add ranges as parameters
             st.drop_off_type  = getIntField("drop_off_type", false, 0, 3);
-            st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE);
+            st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1);
             st.feed = null; // this could circular-serialize the whole feed
             feed.stop_times.put(new Fun.Tuple2(st.trip_id, st.stop_sequence), st);
