@@ -1,9 +1,6 @@
 package com.conveyal.gtfs;
 
-import com.vividsolutions.jts.geom.CoordinateSequence;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.GeometryFactory;
-import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
 
 /**
@@ -11,10 +8,12 @@ import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
  */
 public class Geometries {
 
+    public static final GeometryFactory geometryFactory = new GeometryFactory();
+
     /**
      * Taken from geofabrik.de country boundary KML, because our OSM PBF files use this same boundary.
      */
-    public static Geometry getNetherlandsBoundary() {
+    public static Geometry getNetherlands() {
         CoordinateSequence netherlandsBoundaryCoordinates = new PackedCoordinateSequence.Double(new double[]{
                         5.920645, 50.748480,
                         5.914113, 50.747530,
@@ -485,9 +484,20 @@ public class Geometries {
                         5.982748, 50.749850,
                         5.958986, 50.759260,
                         5.920645, 50.748480}, 2);
-        GeometryFactory gf = new GeometryFactory();
-        Polygon boundary = gf.createPolygon(netherlandsBoundaryCoordinates);
+        Polygon boundary = geometryFactory.createPolygon(netherlandsBoundaryCoordinates);
         return boundary;
+    }
+
+    /**
+     * The Dutch island of Texel. The Netherlands data set includes a crazy all-to-all representation of Texel's
+     * on-demand transit service.
+     */
+    public static Geometry getTexel() {
+        return geometryFactory.toGeometry(new Envelope(4.702663, 4.933548, 52.98069, 53.192047));
+    }
+
+    public static Geometry getNetherlandsWithoutTexel() {
+        return getNetherlands().difference(getTexel());
     }
 
 }
