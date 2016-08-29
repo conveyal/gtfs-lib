@@ -14,11 +14,10 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import org.mapdb.tuple.Tuple2;
 
 import java.io.IOException;
 import java.util.Iterator;
-
-import org.mapdb.Fun.Tuple2;
 
 public class ShapePoint extends Entity {
 

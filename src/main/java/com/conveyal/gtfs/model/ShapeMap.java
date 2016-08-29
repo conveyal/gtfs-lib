@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.model;
 
-import org.mapdb.Fun;
-import org.mapdb.Fun.Tuple2;
+import org.mapdb.tuple.Tuple;
+import org.mapdb.tuple.Tuple2;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -20,7 +20,7 @@ public class ShapeMap implements Map<Integer, Shape> {
     public ShapeMap (ConcurrentNavigableMap<Tuple2, Shape> allShapes, String shapeId) {
         this.wrapped = allShapes.subMap(
                 new Tuple2 (shapeId, 0),
-                new Tuple2 (shapeId, Fun.HI)
+                new Tuple2 (shapeId, Tuple.HI)
                 );
         this.shapeId = shapeId;
     }

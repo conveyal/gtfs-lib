@@ -6,7 +6,7 @@ import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.base.Strings;
 import com.vividsolutions.jts.geom.*;
-import org.mapdb.Fun;
+import org.mapdb.tuple.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,7 +75,7 @@ public class CropGTFS {
 
         if (MERGE_STATIONS) {
             System.out.println("Replacing stop_ids in stop_times with those of their parent stations...");
-            for (Fun.Tuple2 key : feed.stop_times.keySet()) {
+            for (Tuple2 key : feed.stop_times.keySet()) {
                 StopTime stopTime = feed.stop_times.get(key);
                 String replacementStopId = stopIdReplacements.get(stopTime.stop_id);
                 if (replacementStopId != null) {

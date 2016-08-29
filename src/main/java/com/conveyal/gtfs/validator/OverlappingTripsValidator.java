@@ -9,7 +9,7 @@ import com.conveyal.gtfs.validator.model.InvalidValue;
 import com.conveyal.gtfs.validator.model.Priority;
 import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.google.common.collect.Iterables;
-import org.mapdb.Fun;
+import org.mapdb.tuple.*;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
