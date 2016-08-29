@@ -24,22 +24,21 @@ public class Pattern implements Serializable {
     public Set<String> associatedRoutes;
     public LineString geometry;
     public String name;
+    public String route_id;
     public static Joiner joiner = Joiner.on("-").skipNulls();
     public String feed_id;
 
     // TODO: Should a Pattern be generated for a single trip or a set of trips that share the same ordered stop list?
-    public Pattern (GTFSFeed feed, Map.Entry<List<String>, List<String>> tripsForStopPattern){
-
-
+    public Pattern (GTFSFeed feed, List<String> orderedStops, List<String> trips){
         this.feed_id = feed.feedId;
 
         this.pattern_id = UUID.randomUUID().toString();
 
         // Assign ordered stops to key of tripsForStopPattern
-        this.orderedStops = tripsForStopPattern.getKey();
+        this.orderedStops = orderedStops;
 
         // Assign associated trips to value of tripsForStopPattern
-        this.associatedTrips = tripsForStopPattern.getValue();
+        this.associatedTrips = trips;
         this.associatedRoutes = new HashSet<>();
         this.associatedTrips.forEach((id) -> {
             this.associatedRoutes.add(feed.trips.get(id).route_id);
@@ -53,6 +52,9 @@ public class Pattern implements Serializable {
 
         trip = feed.trips.get(trip_id);
         this.geometry = feed.getTripGeometry(trip.trip_id);
+
+        // patterns are now on one and only one route
+        this.route_id = trip.route_id;
 
         if (trip.trip_headsign != null){
             name = trip.trip_headsign;

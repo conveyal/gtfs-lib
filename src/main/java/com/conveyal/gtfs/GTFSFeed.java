@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
@@ -419,40 +420,41 @@ public class GTFSFeed implements Cloneable, Closeable {
      *  Bin all trips by the sequence of stops they visit.
      * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
      */
-    public Map<List<String>, List<String>> findPatterns() {
-        // A map from a list of stop IDs (the pattern) to a list of trip IDs which fit that pattern.
-        Map<List<String>, List<String>> tripsForPattern = Maps.newHashMap();
+    public void findPatterns() {
         int n = 0;
+
+        Multimap<TripPatternKey, String> tripsForPattern = HashMultimap.create();
+
         for (String trip_id : trips.keySet()) {
             if (++n % 100000 == 0) {
                 LOG.info("trip {}", human(n));
             }
 
-            List<String> stops = getOrderedStopListForTrip(trip_id);
+            Trip trip = trips.get(trip_id);
 
-            // Fetch or create the tripId list for this stop pattern, then add the current trip to that list.
-            List<String> trips = tripsForPattern.get(stops);
-            if (trips == null) {
-                trips = Lists.newArrayList();
-                tripsForPattern.put(stops, trips);
-            }
-            trips.add(trip_id);
+            // no need to scope ID here, this is in the context of a single object
+            TripPatternKey key = new TripPatternKey(trip.route_id);
+
+            StreamSupport.stream(getOrderedStopTimesForTrip(trip_id).spliterator(), false)
+                    .forEach(key::addStopTime);
+
+            tripsForPattern.put(key, trip_id);
         }
-        LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
 
-        List<Pattern> patterns = new ArrayList<>();
-
-        for (Entry<List<String>, List<String>> entry: tripsForPattern.entrySet()){
-            Pattern pattern = new Pattern(this, entry);
-            patterns.add(pattern);
-            entry.getValue().forEach(tripId -> tripPatternMap.put(tripId, pattern.pattern_id));
-        }
+        // create an in memory list because we will rename them and they need to be immutable once they hit mapdb
+        List<Pattern> patterns = tripsForPattern.asMap().entrySet()
+                .stream()
+                .map((e) -> new Pattern(this, e.getKey().stops, new ArrayList<>(e.getValue())))
+                .collect(Collectors.toList());
 
         namePatterns(patterns);
 
-        patterns.stream().forEach(p -> this.patterns.put(p.pattern_id, p));
+        patterns.stream().forEach(p -> {
+            this.patterns.put(p.pattern_id, p);
+            p.associatedTrips.stream().forEach(t -> this.tripPatternMap.put(t, p.pattern_id));
+        });
 
-        return tripsForPattern;
+        LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
     }
 
     /** destructively rename passed in patterns */
