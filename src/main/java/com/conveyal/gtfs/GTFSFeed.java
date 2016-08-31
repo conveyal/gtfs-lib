@@ -20,6 +20,7 @@ import com.vividsolutions.jts.algorithm.ConvexHull;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.index.strtree.STRtree;
 import org.geotools.referencing.GeodeticCalculator;
+import org.mapdb.BTreeMap;
 import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -80,7 +81,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
 
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
-    public final ConcurrentNavigableMap<Tuple2, StopTime> stop_times;
+    public final BTreeMap<Tuple2, StopTime> stop_times;
 
     public ConcurrentMap<String, Long> stopCountByStopTime;
 
@@ -192,13 +193,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             }
         };
 
-        Bind.histogram(stop_times, stopCountByStopTime, new Fun.Function2<Object, Object, Object>() {
-
-            @Override
-            public Object run(Object key, Object stopTime) {
-                return stopTime;
-            }
-        });
+        Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
         
         loaded = true;
     }
@@ -663,6 +658,8 @@ public class GTFSFeed implements Cloneable, Closeable {
             }
 
         }
+
+        return null;
     }
 
     public Polygon getConvexHull() {
