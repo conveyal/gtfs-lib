@@ -15,9 +15,12 @@ import com.conveyal.gtfs.validator.TripTimesValidator;
 import com.conveyal.gtfs.validator.UnusedStopValidator;
 import com.conveyal.gtfs.validator.service.impl.FeedStats;
 import com.google.common.collect.*;
+import com.google.common.eventbus.EventBus;
+import com.vividsolutions.jts.algorithm.ConvexHull;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.index.strtree.STRtree;
 import org.geotools.referencing.GeodeticCalculator;
+import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
@@ -32,7 +35,9 @@ import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -77,6 +82,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
     public final ConcurrentNavigableMap<Tuple2, StopTime> stop_times;
 
+    public ConcurrentMap<String, Long> stopCountByStopTime;
+
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
 
@@ -89,6 +96,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Stops spatial index which gets built lazily by getSpatialIndex() */
     private transient STRtree spatialIndex;
 
+    /* Convex hull of feed (based on stops) built lazily by getConvexHull() */
+    private transient Polygon convexHull;
+
     /* Create geometry factory to produce LineString geometries. */
     GeometryFactory gf = new GeometryFactory();
 
@@ -99,6 +109,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     // TODO bind this to map above so that it is kept up to date automatically
     public final Map<String, String> tripPatternMap;
     private boolean loaded = false;
+
+    /* A place to store an event bus that is passed through constructor. */
+    public transient EventBus eventBus;
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -171,6 +184,22 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.info("{}", error);
         }
 
+        Fun.Function2<String, Tuple2, StopTime> bindFunction = new Fun.Function2<String, Tuple2, StopTime>() {
+
+            @Override
+            public String run(Tuple2 key, StopTime stopTime) {
+                return stopTime.stop_id;
+            }
+        };
+
+        Bind.histogram(stop_times, stopCountByStopTime, new Fun.Function2<Object, Object, Object>() {
+
+            @Override
+            public Object run(Object key, Object stopTime) {
+                return stopTime;
+            }
+        });
+        
         loaded = true;
     }
 
@@ -209,7 +238,15 @@ public class GTFSFeed implements Cloneable, Closeable {
             throw new RuntimeException(e);
         }
     }
-
+//    public void validate (EventBus eventBus, GTFSValidator... validators) {
+//        if (eventBus == null) {
+//
+//        }
+//        for (GTFSValidator validator : validators) {
+//            validator.getClass().getSimpleName();
+//            validator.validate(this, false);
+//        }
+//    }
     public void validate (GTFSValidator... validators) {
         for (GTFSValidator validator : validators) {
             validator.validate(this, false);
@@ -614,6 +651,32 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
 
         return ls;
+    }
+
+    public Polygon getMergedBuffers() {
+        for (Stop stop : this.stops.values()) {
+//            if (this.stopCountByStopTime.containsKey(stop.stop_id) && this.stopCountByStopTime.get(stop.stop_id) > 0) {
+//                continue;
+//            }
+            if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
+                continue;
+            }
+
+        }
+    }
+
+    public Polygon getConvexHull() {
+        if (this.convexHull == null) {
+            synchronized (this) {
+                List<Coordinate> coordinates = this.stops.values().stream().map(
+                        stop -> new Coordinate(stop.stop_lon, stop.stop_lat)
+                ).collect(Collectors.toList());
+                Coordinate[] coords = coordinates.toArray(new Coordinate[coordinates.size()]);
+                ConvexHull convexHull = new ConvexHull(coords, gf);
+                this.convexHull = (Polygon) convexHull.getConvexHull();
+            }
+        }
+        return this.convexHull;
     }
 
     /**
