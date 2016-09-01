@@ -19,6 +19,7 @@ import com.google.common.eventbus.EventBus;
 import com.vividsolutions.jts.algorithm.ConvexHull;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.index.strtree.STRtree;
+import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
 import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.BTreeMap;
 import org.mapdb.Bind;
@@ -35,14 +36,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.util.*;
-import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
@@ -83,7 +80,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
-    public ConcurrentMap<String, Long> stopCountByStopTime;
+    public final ConcurrentMap<String, Long> stopCountByStopTime;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
@@ -99,6 +96,9 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Convex hull of feed (based on stops) built lazily by getConvexHull() */
     private transient Polygon convexHull;
+
+    /* Merged stop buffers polygon built lazily by getMergedBuffers() */
+    private transient Geometry mergedBuffers;
 
     /* Create geometry factory to produce LineString geometries. */
     GeometryFactory gf = new GeometryFactory();
@@ -184,14 +184,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
-
-        Fun.Function2<String, Tuple2, StopTime> bindFunction = new Fun.Function2<String, Tuple2, StopTime>() {
-
-            @Override
-            public String run(Tuple2 key, StopTime stopTime) {
-                return stopTime.stop_id;
-            }
-        };
 
         Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
         
@@ -648,18 +640,29 @@ public class GTFSFeed implements Cloneable, Closeable {
         return ls;
     }
 
-    public Polygon getMergedBuffers() {
-        for (Stop stop : this.stops.values()) {
-//            if (this.stopCountByStopTime.containsKey(stop.stop_id) && this.stopCountByStopTime.get(stop.stop_id) > 0) {
-//                continue;
-//            }
-            if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
-                continue;
+    public Geometry getMergedBuffers() {
+        if (this.mergedBuffers == null) {
+            synchronized (this) {
+                Collection<Geometry> polygons = new ArrayList<>();
+                for (Stop stop : this.stops.values()) {
+                    if (stopCountByStopTime != null && !stopCountByStopTime.containsKey(stop.stop_id)) {
+                        continue;
+                    }
+                    if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
+                        continue;
+                    }
+                    Point stopPoint = gf.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
+                    Polygon stopBuffer = (Polygon) stopPoint.buffer(.01);
+                    polygons.add(stopBuffer);
+                }
+                GeometryCollection geometryCollection = (GeometryCollection) gf.buildGeometry(polygons);
+                this.mergedBuffers = geometryCollection.union();
+                if (polygons.size() > 100) {
+                    this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);
+                }
             }
-
         }
-
-        return null;
+        return this.mergedBuffers;
     }
 
     public Polygon getConvexHull() {
@@ -760,6 +763,8 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .makeOrGet();
 
         tripPatternMap = db.getTreeMap("patternForTrip");
+
+        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
 
         errors = db.getTreeSet("errors");
     }

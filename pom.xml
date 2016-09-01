@@ -97,7 +97,7 @@
     <dependency>
     	<groupId>org.mapdb</groupId>
     	<artifactId>mapdb</artifactId>
-    	<version>1.0.6</version>
+    	<version>1.0.8</version>
     </dependency>
     <!-- Our logging API, no implementation specified as gtfs-lib is a library. -->
     <dependency>
