@@ -240,6 +240,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 validator.validate(this, false);
             } catch (Exception e) {
                 LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
+                LOG.error(e.getMessage());
             }
         }
     }
