@@ -43,8 +43,10 @@ public class Trip extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Trip t = new Trip();
-            t.route_id        = getRefField("route_id", true, feed.routes).route_id;
-            t.service_id      = getRefField("service_id", true, feed.services).service_id;
+            Service service = getRefField("service_id", true, feed.services);
+            Route route = getRefField("route_id", true, feed.routes);
+            t.route_id        = route != null ? route.route_id : null;
+            t.service_id      = service != null ? service.service_id : null;
             t.trip_id         = getStringField("trip_id", true);
             t.trip_headsign   = getStringField("trip_headsign", false);
             t.trip_short_name = getStringField("trip_short_name", false);
