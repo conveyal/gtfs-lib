@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.stats;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
@@ -21,6 +22,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -256,8 +258,25 @@ public class RouteStats {
 
         // loop through services
         for (Service service : feed.services.values()) {
+            // iterate through exceptions
+            for (CalendarDate cd : service.calendar_dates.values()) {
+                LocalDate date = cd.date;
 
-            // skip service if start or end date is null
+                List<Trip> tripList = getTripsForDate(route_id, date);
+                if (tripList == null) {
+                    tripList = new ArrayList<>();
+                }
+                // if service is active on given day, add all trips that operate under that service
+                if (service.activeOn(date)) {
+                    List<Trip> serviceTrips = tripsPerService.get(service.service_id);
+                    if (serviceTrips != null)
+                        tripList.addAll(serviceTrips);
+
+                }
+                tripsPerDate.put(date, tripList);
+            }
+
+            // iterate through calendars iff they exist
             if (startDate == null || endDate == null) {
                 continue;
             }
@@ -288,9 +307,10 @@ public class RouteStats {
         Map<String, List<Trip>> tripsPerService = stats.getTripsPerService();
 
         tripsPerService.forEach(((s, trips) -> {
-            for (Trip trip : trips) {
-                if (!route_id.equals(trip.route_id)) {
-                    trips.remove(trip);
+            for (Iterator<Trip> it = trips.iterator(); it.hasNext();) {
+                Trip trip = it.next();
+                if (!trip.route_id.equals(route_id)) {
+                    it.remove();
                 }
             }
         }));
