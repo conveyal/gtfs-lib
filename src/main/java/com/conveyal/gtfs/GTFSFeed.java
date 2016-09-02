@@ -35,6 +35,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -235,14 +236,22 @@ public class GTFSFeed implements Cloneable, Closeable {
 //        }
 //    }
     public void validate (GTFSValidator... validators) {
+        long startValidation = System.currentTimeMillis();
         for (GTFSValidator validator : validators) {
             try {
+                long startValidator = System.currentTimeMillis();
                 validator.validate(this, false);
+                long endValidator = System.currentTimeMillis();
+                long diff = endValidator - startValidator;
+                LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), diff);
             } catch (Exception e) {
                 LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
                 LOG.error(e.getMessage());
             }
         }
+        long endValidation = System.currentTimeMillis();
+        long total = endValidation - startValidation;
+        LOG.info("{} validators completed in {} milliseconds.", validators.length, total);
     }
 
     // validate function call that should explicitly list each validator to run on GTFSFeed
