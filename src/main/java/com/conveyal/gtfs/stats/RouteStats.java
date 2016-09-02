@@ -3,6 +3,7 @@ package com.conveyal.gtfs.stats;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
@@ -23,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.DoubleStream;
 import java.util.stream.StreamSupport;
@@ -167,6 +169,94 @@ public class RouteStats {
         if (deltas.isEmpty()) return -1;
 
         return deltas.sum() / deltas.size();
+    }
+
+    public Map<LocalDate, Integer> getTripCountPerDateOfService(String route_id) {
+
+        Route route = feed.routes.get(route_id);
+        if (route == null) return null;
+
+        Map<LocalDate, List<Trip>> tripsPerDate = getTripsPerDateOfService(route_id);
+        Map<LocalDate, Integer> tripCountPerDate = new HashMap<>();
+        for (Map.Entry<LocalDate, List<Trip>> entry : tripsPerDate.entrySet()) {
+            LocalDate date = entry.getKey();
+            Integer count = entry.getValue().size();
+            tripCountPerDate.put(date, count);
+        }
+
+        return tripCountPerDate;
+    }
+
+    public Map<LocalDate, List<Trip>> getTripsPerDateOfService(String route_id) {
+
+        Map<String, List<Trip>> tripsPerService = getTripsPerService(route_id);
+        Map<LocalDate, List<Trip>> tripsPerDate = new HashMap<>();
+
+
+        LocalDate startDate = stats.getStartDate();
+        LocalDate endDate = stats.getEndDate();
+
+        // loop through services
+        for (Service service : feed.services.values()) {
+
+            // skip service if start or end date is null
+            if (startDate == null || endDate == null) {
+                continue;
+            }
+
+            // iterate through each date between start and end date
+            for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
+                List<Trip> tripList = getTripsForDate(route_id, date);
+                if (tripList == null) {
+                    tripList = new ArrayList<>();
+                }
+                // if service is active on given day, add all trips that operate under that service
+                if (service.activeOn(date)) {
+                    List<Trip> serviceTrips = tripsPerService.get(service.service_id);
+                    if (serviceTrips != null)
+                        tripList.addAll(serviceTrips);
+
+                }
+                tripsPerDate.put(date, tripList);
+            }
+        }
+        return tripsPerDate;
+    }
+
+    public Map<String, List<Trip>> getTripsPerService (String route_id) {
+        Route route = feed.routes.get(route_id);
+        if (route == null) return null;
+
+        Map<String, List<Trip>> tripsPerService = stats.getTripsPerService();
+
+        tripsPerService.forEach(((s, trips) -> {
+            for (Trip trip : trips) {
+                if (trip.route_id != route_id) {
+                    trips.remove(trip);
+                }
+            }
+        }));
+        return tripsPerService;
+
+//        Map<String, List<Trip>> tripsPerService = new HashMap<>();
+//
+//        feed.trips.values().stream().filter(t -> t.route_id == route_id).forEach(trip -> {
+//            List<Trip> tripsList = tripsPerService.get(trip.service_id);
+//            if (tripsList == null) {
+//                tripsList = new ArrayList<>();
+//            }
+//            tripsList.add(trip);
+//            tripsPerService.put(trip.service_id, tripsList);
+//        });
+//        return tripsPerService;
+    }
+
+    public List<Trip> getTripsForDate (String route_id, LocalDate date) {
+        Route route = feed.routes.get(route_id);
+        if (route == null) return null;
+
+        List<Trip> trips = stats.getTripsForDate(date).stream().filter(trip -> trip.route_id == route_id).collect(Collectors.toList());
+        return trips;
     }
 
     public RouteStatistic getStatisticForRoute (String routeId) {

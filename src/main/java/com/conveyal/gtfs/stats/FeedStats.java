@@ -126,13 +126,7 @@ public class FeedStats {
 
         return tripCountPerDate;
     }
-
-    public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {
-
-        Map<String, List<Trip>> tripsPerService = getTripsPerService();
-        Map<LocalDate, List<Trip>> tripsPerDate = new TreeMap<>();
-
-
+    public LocalDate getStartDate() {
         LocalDate feedStartDate = !feed.feedInfo.isEmpty()
                 ? feed.feedInfo.values().iterator().next().feed_start_date
                 : null;
@@ -141,6 +135,10 @@ public class FeedStats {
                 : getCalendarServiceRangeStart() != null
                 ? getCalendarDateStart()
                 : null;
+        return startDate;
+    }
+
+    public LocalDate getEndDate() {
         LocalDate feedEndDate = !feed.feedInfo.isEmpty()
                 ? feed.feedInfo.values().iterator().next().feed_end_date
                 : null;
@@ -149,6 +147,16 @@ public class FeedStats {
                 : getCalendarServiceRangeEnd() != null
                 ? getCalendarDateEnd()
                 : null;
+        return endDate;
+    }
+    public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {
+
+        Map<String, List<Trip>> tripsPerService = getTripsPerService();
+        Map<LocalDate, List<Trip>> tripsPerDate = new HashMap<>();
+
+        LocalDate startDate = getStartDate();
+        LocalDate endDate = getEndDate();
+
 
         // loop through services
         for (Service service : feed.services.values()) {
