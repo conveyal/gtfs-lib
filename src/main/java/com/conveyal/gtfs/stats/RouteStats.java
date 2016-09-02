@@ -258,29 +258,6 @@ public class RouteStats {
 
         // loop through services
         for (Service service : feed.services.values()) {
-            // iterate through exceptions
-            for (CalendarDate cd : service.calendar_dates.values()) {
-                LocalDate date = cd.date;
-
-                List<Trip> tripList = getTripsForDate(route_id, date);
-                if (tripList == null) {
-                    tripList = new ArrayList<>();
-                }
-                // if service is active on given day, add all trips that operate under that service
-                if (service.activeOn(date)) {
-                    List<Trip> serviceTrips = tripsPerService.get(service.service_id);
-                    if (serviceTrips != null)
-                        tripList.addAll(serviceTrips);
-
-                }
-                tripsPerDate.put(date, tripList);
-            }
-
-            // iterate through calendars iff they exist
-            if (startDate == null || endDate == null) {
-                continue;
-            }
-
             // iterate through each date between start and end date
             for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
                 List<Trip> tripList = getTripsForDate(route_id, date);

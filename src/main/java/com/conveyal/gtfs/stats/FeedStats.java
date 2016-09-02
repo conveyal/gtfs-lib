@@ -127,26 +127,22 @@ public class FeedStats {
         return tripCountPerDate;
     }
     public LocalDate getStartDate() {
-        LocalDate feedStartDate = !feed.feedInfo.isEmpty()
-                ? feed.feedInfo.values().iterator().next().feed_start_date
-                : null;
-        LocalDate startDate = feedStartDate != null
-                ? feedStartDate
-                : getCalendarServiceRangeStart() != null
-                ? getCalendarDateStart()
-                : null;
+        LocalDate startDate = null;
+
+        if (!feed.feedInfo.isEmpty()) startDate = feed.feedInfo.values().iterator().next().feed_start_date;
+        if (startDate == null) startDate = getCalendarServiceRangeStart();
+        if (startDate == null) startDate = getCalendarDateStart();
+
         return startDate;
     }
 
     public LocalDate getEndDate() {
-        LocalDate feedEndDate = !feed.feedInfo.isEmpty()
-                ? feed.feedInfo.values().iterator().next().feed_end_date
-                : null;
-        LocalDate endDate = feedEndDate != null
-                ? feedEndDate
-                : getCalendarServiceRangeEnd() != null
-                ? getCalendarDateEnd()
-                : null;
+        LocalDate endDate = null;
+
+        if (!feed.feedInfo.isEmpty()) endDate = feed.feedInfo.values().iterator().next().feed_end_date;
+        if (endDate == null) endDate = getCalendarServiceRangeEnd();
+        if (endDate == null) endDate = getCalendarDateEnd();
+
         return endDate;
     }
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {

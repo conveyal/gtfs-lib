@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -32,7 +33,7 @@ public class FrequencySummary {
 
         FileWriter writer = new FileWriter(new File(args[1]));
 
-        writer.write("Route,AM Peak Frequency,Midday Frequency,PM Peak Frequency,Evening Frequency,AM Peak Speed,Midday Speed,PM Peak Speed,Evening Speed,Trips/Day\n");
+        writer.write("Route,AM Peak Frequency,Midday Frequency,PM Peak Frequency,Evening Frequency,AM Peak Speed,Midday Speed,PM Peak Speed,Evening Speed,Trips/Day,First trip,Last trip\n");
 
         for (String route_id : feed.routes.keySet()) {
             for (int direction_id : new int[] { 0, 1 }) {
@@ -70,7 +71,11 @@ public class FrequencySummary {
                     speed.append(",");
                 }
 
-                speed.append(stats.getTripCountPerDateOfService(route_id).get(date));
+                speed.append(stats.getTripsPerDateOfService(route_id).get(date).stream().filter(t -> t.direction_id == direction_id).count());
+                speed.append(",");
+                speed.append(stats.getStartTimeForRouteDirection(route_id, direction_id, date).format(DateTimeFormatter.ofPattern("K:mm a")));
+                speed.append(",");
+                speed.append(stats.getEndTimeForRouteDirection(route_id, direction_id, date).format(DateTimeFormatter.ofPattern("K:mm a")));
 
                 writer.write(freq.toString());
                 writer.write(speed.toString());
