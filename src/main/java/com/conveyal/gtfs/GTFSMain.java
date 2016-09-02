@@ -1,6 +1,5 @@
 package com.conveyal.gtfs;
 
-import com.conveyal.gtfs.validator.service.impl.FeedStats;
 import com.google.common.io.Files;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

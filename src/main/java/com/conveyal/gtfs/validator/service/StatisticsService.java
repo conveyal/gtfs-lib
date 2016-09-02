@@ -1,6 +1,6 @@
 package com.conveyal.gtfs.validator.service;
 
-import com.conveyal.gtfs.validator.model.Statistic;
+import com.conveyal.gtfs.stats.model.AgencyStatistic;
 
 import java.awt.geom.Rectangle2D;
 import java.time.LocalDate;
@@ -57,5 +57,5 @@ public interface StatisticsService {
 	
 	Rectangle2D getBounds();
 
-	Statistic getStatistic(String agencyId);
+	AgencyStatistic getStatistic(String agencyId);
 }

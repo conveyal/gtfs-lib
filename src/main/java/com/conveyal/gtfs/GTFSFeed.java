@@ -13,7 +13,7 @@ import com.conveyal.gtfs.validator.OverlappingTripsValidator;
 import com.conveyal.gtfs.validator.ReversedTripsValidator;
 import com.conveyal.gtfs.validator.TripTimesValidator;
 import com.conveyal.gtfs.validator.UnusedStopValidator;
-import com.conveyal.gtfs.validator.service.impl.FeedStats;
+import com.conveyal.gtfs.stats.FeedStats;
 import com.google.common.collect.*;
 import com.google.common.eventbus.EventBus;
 import com.vividsolutions.jts.algorithm.ConvexHull;
@@ -35,7 +35,6 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
-import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -611,6 +610,29 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
+    public LineString getStraightLineForStops(String trip_id) {
+        CoordinateList coordinates = new CoordinateList();
+        LineString ls = null;
+        Trip trip = trips.get(trip_id);
+
+        Iterable<StopTime> stopTimes;
+        stopTimes = getOrderedStopTimesForTrip(trip.trip_id);
+        if (Iterables.size(stopTimes) > 1) {
+            for (StopTime stopTime : stopTimes) {
+                Stop stop = stops.get(stopTime.stop_id);
+                Double lat = stop.stop_lat;
+                Double lon = stop.stop_lon;
+                coordinates.add(new Coordinate(lon, lat));
+            }
+            ls = gf.createLineString(coordinates.toCoordinateArray());
+        }
+        // set ls equal to null if there is only one stopTime to avoid an exception when creating linestring
+        else{
+            ls = null;
+        }
+        return ls;
+    }
+
     /**
      * Returns a trip geometry object (LineString) for a given trip id.
      * If the trip has a shape reference, this will be used for the geometry.
@@ -634,21 +656,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         // Use the ordered stoptimes.
         if (ls == null) {
-            Iterable<StopTime> stopTimes;
-            stopTimes = getOrderedStopTimesForTrip(trip.trip_id);
-            if (Iterables.size(stopTimes) > 1) {
-                for (StopTime stopTime : stopTimes) {
-                    Stop stop = stops.get(stopTime.stop_id);
-                    Double lat = stop.stop_lat;
-                    Double lon = stop.stop_lon;
-                    coordinates.add(new Coordinate(lon, lat));
-                }
-                ls = gf.createLineString(coordinates.toCoordinateArray());
-            }
-            // set ls equal to null if there is only one stopTime to avoid an exception when creating linestring
-            else{
-                ls = null;
-            }
+            ls = getStraightLineForStops(trip_id);
         }
 
         return ls;

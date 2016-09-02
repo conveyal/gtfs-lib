@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.validator.model;
+package com.conveyal.gtfs.stats.model;
 
 import java.awt.geom.Rectangle2D;
 import java.time.LocalDate;
@@ -7,7 +7,7 @@ import java.time.LocalDate;
  * Model object representing statistics about GTFS. 
  *
  */
-public class Statistic {
+public class AgencyStatistic {
 	private String agencyId;
 	private Integer routeCount;
 	private Integer tripCount;

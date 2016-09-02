@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.validator.service.impl;
+package com.conveyal.gtfs.stats;
 
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
@@ -10,23 +10,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.stream.Collectors;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Agency;
-import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.model.Statistic;
-import com.conveyal.gtfs.validator.service.StatisticsService;
+import com.conveyal.gtfs.stats.model.AgencyStatistic;
 
 /**
  * Retrieves a base set of statistics from the GTFS.
  *
  */
-public class FeedStats implements StatisticsService {
+public class FeedStats {
 
     private GTFSFeed feed = null;
 
@@ -117,19 +114,25 @@ public class FeedStats implements StatisticsService {
         return endDate;
     }
 
-    public Map<LocalDate, Integer> getTripsPerDateOfService() {
+    public Map<LocalDate, Integer> getTripCountPerDateOfService() {
 
-        Map<String, List<Trip>> tripsPerService = new HashMap<>();
-        Map<LocalDate, Integer> tripsPerDate = new TreeMap<>();
+        Map<LocalDate, List<Trip>> tripsPerDate = getTripsPerDateOfService();
+        Map<LocalDate, Integer> tripCountPerDate = new HashMap<>();
+        for (Map.Entry<LocalDate, List<Trip>> entry : tripsPerDate.entrySet()) {
+            LocalDate date = entry.getKey();
+            Integer count = entry.getValue().size();
+            tripCountPerDate.put(date, count);
+        }
 
-        feed.trips.values().stream().forEach(trip -> {
-            List<Trip> tripsList = tripsPerService.get(trip.service_id);
-            if (tripsList == null) {
-                tripsList = new ArrayList<>();
-            }
-            tripsList.add(trip);
-            tripsPerService.put(trip.service_id, tripsList);
-        });
+        return tripCountPerDate;
+    }
+
+    public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {
+
+        Map<String, List<Trip>> tripsPerService = getTripsPerService();
+        Map<LocalDate, List<Trip>> tripsPerDate = new TreeMap<>();
+
+
         LocalDate feedStartDate = !feed.feedInfo.isEmpty()
                 ? feed.feedInfo.values().iterator().next().feed_start_date
                 : null;
@@ -157,125 +160,55 @@ public class FeedStats implements StatisticsService {
 
             // iterate through each date between start and end date
             for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
-                Integer tripCount = tripsPerDate.get(date);
-                if (tripCount == null) {
-                    tripCount = new Integer(0);
+                List<Trip> tripList = getTripsForDate(date);
+                if (tripList == null) {
+                    tripList = new ArrayList<>();
                 }
                 // if service is active on given day, add all trips that operate under that service
                 if (service.activeOn(date)) {
                     List<Trip> serviceTrips = tripsPerService.get(service.service_id);
                     if (serviceTrips != null)
-                        tripCount = tripCount + serviceTrips.size();
+                        tripList.addAll(serviceTrips);
 
                 }
-                tripsPerDate.put(date, tripCount);
+                tripsPerDate.put(date, tripList);
             }
         }
         return tripsPerDate;
     }
 
+    public Map<String, List<Trip>> getTripsPerService () {
+        Map<String, List<Trip>> tripsPerService = new HashMap<>();
+
+        feed.trips.values().stream().forEach(trip -> {
+            List<Trip> tripsList = tripsPerService.get(trip.service_id);
+            if (tripsList == null) {
+                tripsList = new ArrayList<>();
+            }
+            tripsList.add(trip);
+            tripsPerService.put(trip.service_id, tripsList);
+        });
+        return tripsPerService;
+    }
+
+    public List<Trip> getTripsForDate (LocalDate date) {
+        List<Trip> trips = new ArrayList<>();
+
+        // loop through services
+        for (Service service : feed.services.values()) {
+            // if service is active on given day, add all trips that operate under that service
+            if (service.activeOn(date)) {
+                List<Trip> serviceTrips = feed.trips.values().stream().filter(trip -> trip.service_id == service.service_id).collect(Collectors.toList());
+                if (serviceTrips != null)
+                    trips.addAll(serviceTrips);
+
+            }
+        }
+        return trips;
+    }
 
     public Collection<Agency> getAllAgencies() {
         return feed.agency.values();
-    }
-
-    public Integer getRouteCount(String agencyId) {
-        int count = 0;
-        for (Route route : feed.routes.values()) {
-            if (agencyId.equals(route.agency_id)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    public Integer getTripCount(String agencyId) {
-        int count = 0;
-        for (Trip trip : feed.trips.values()) {
-            Route route = feed.routes.get(trip.route_id);
-            if (agencyId.equals(route.agency_id)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    public Integer getStopCount(String agencyId) {
-        int count = 0;
-        for (Stop stop : feed.stops.values()) {
-//            AgencyAndId id = stop.stop_id;
-//            if (agencyId.equals(id.getAgencyId())) {
-                count++;
-//            }
-        }
-        return count;
-    }
-
-    public Integer getStopTimesCount(String agencyId) {
-        int count = 0;
-        for (StopTime stopTime : feed.stop_times.values()) {
-            Trip trip = feed.trips.get(stopTime.trip_id);
-            Route route = feed.routes.get(trip.route_id);
-            if (agencyId.equals(route.agency_id)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    public LocalDate getCalendarServiceRangeStart(String agencyId) {
-        int startDate = 0;
-        for (Service service : feed.services.values()) {
-//            if (agencyId.equals(service.agency_id)) {
-                if (startDate == 0
-                        || service.calendar.start_date < startDate)
-                    startDate = service.calendar.start_date;
-//            }
-        }
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-        return LocalDate.parse(String.valueOf(startDate), formatter);
-    }
-
-    public LocalDate getCalendarServiceRangeEnd(String agencyId) {
-        int endDate = 0;
-
-        for (Service service : feed.services.values()) {
-//            if (agencyId.equals(service.agency_id)) {
-                if (endDate == 0
-                        || service.calendar.end_date > endDate)
-                    endDate = service.calendar.end_date;
-//            }
-        }
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-        return LocalDate.parse(String.valueOf(endDate), formatter);
-    }
-
-    public LocalDate getCalendarDateStart(String agencyId) {
-        LocalDate startDate = null;
-        for (Service service : feed.services.values()) {
-            for (LocalDate date : service.calendar_dates.keySet()) {
-//                if (agencyId.equals(serviceCalendarDate.getServiceId().getAgencyId())) {
-                    if (startDate == null
-                            || date.isBefore(startDate))
-                        startDate = date;
-//                }
-            }
-        }
-        return startDate;
-    }
-
-    public LocalDate getCalendarDateEnd(String agencyId) {
-        LocalDate endDate = null;
-        for (Service service : feed.services.values()) {
-            for (LocalDate date : service.calendar_dates.keySet()) {
-//                if (agencyId.equals(serviceCalendarDate.getServiceId().getAgencyId())) {
-                    if (endDate == null
-                            || date.isAfter(endDate))
-                        endDate = date;
-//                }
-            }
-        }
-        return endDate;
     }
 
     /**
@@ -298,28 +231,27 @@ public class FeedStats implements StatisticsService {
         return ret;
     }
 
-    public Statistic getStatistic(String agencyId) {
-        Statistic gs = new Statistic();
+    public AgencyStatistic getStatistic(String agencyId) {
+        AgencyStatistic gs = new AgencyStatistic();
         gs.setAgencyId(agencyId);
-        gs.setRouteCount(getRouteCount(agencyId));
-        gs.setTripCount(getTripCount(agencyId));
-        gs.setStopCount(getStopCount(agencyId));
-        gs.setStopTimeCount(getStopTimesCount(agencyId));
-        gs.setCalendarStartDate(getCalendarDateStart(agencyId));
-        gs.setCalendarEndDate(getCalendarDateEnd(agencyId));
-        gs.setCalendarServiceStart(getCalendarServiceRangeStart(agencyId));
-        gs.setCalendarServiceEnd(getCalendarServiceRangeEnd(agencyId));
+        gs.setRouteCount(AgencyStats.getRouteCount(feed, agencyId));
+        gs.setTripCount(AgencyStats.getTripCount(feed, agencyId));
+        gs.setStopCount(AgencyStats.getStopCount(feed, agencyId));
+        gs.setStopTimeCount(AgencyStats.getStopTimesCount(feed, agencyId));
+        gs.setCalendarStartDate(AgencyStats.getCalendarDateStart(feed, agencyId));
+        gs.setCalendarEndDate(AgencyStats.getCalendarDateEnd(feed, agencyId));
+        gs.setCalendarServiceStart(AgencyStats.getCalendarServiceRangeStart(feed, agencyId));
+        gs.setCalendarServiceEnd(AgencyStats.getCalendarServiceRangeEnd(feed, agencyId));
         gs.setBounds(getBounds());
         return gs;
     }
 
     public String getStatisticAsCSV(String agencyId) {
-        Statistic s = getStatistic(agencyId);
+        AgencyStatistic s = getStatistic(agencyId);
         return formatStatisticAsCSV(s);
-
     }
 
-    public static String formatStatisticAsCSV(Statistic s) {
+    public static String formatStatisticAsCSV(AgencyStatistic s) {
         StringBuffer buff = new StringBuffer();
         buff.append(s.getAgencyId());
         buff.append(",");
