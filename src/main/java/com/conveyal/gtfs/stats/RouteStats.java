@@ -66,12 +66,15 @@ public class RouteStats {
     public double getSpeedForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
         System.out.println(route_id);
         int count = 0;
-        List<Trip> trips = stats.getTripsForDate(date);
+        List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
+                .filter(t -> t.direction_id == direction_id)
+                .collect(Collectors.toList());
+
         TDoubleList speeds = new TDoubleArrayList();
         long first = 86399;
         long last = 0;
 
-        for (Trip trip : trips.stream().filter(t -> t.route_id.equals(route_id) && t.direction_id == direction_id).collect(Collectors.toList())) {
+        for (Trip trip : tripsForRouteDirection) {
 
             StopTime firstStopTime = feed.stop_times.ceilingEntry(Fun.t2(trip.trip_id, null)).getValue();
             StopTime lastStopTime = feed.stop_times.floorEntry(Fun.t2(trip.trip_id, Fun.HI)).getValue();
@@ -113,8 +116,8 @@ public class RouteStats {
 
         Set<String> commonStops = null;
 
-        List<Trip> tripsForRouteDirection = trips.stream()
-                 .filter(t -> t.route_id.equals(route_id) && t.direction_id == direction_id)
+        List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
+                .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
         for (Trip trip : tripsForRouteDirection) {
@@ -169,6 +172,61 @@ public class RouteStats {
         if (deltas.isEmpty()) return -1;
 
         return deltas.sum() / deltas.size();
+    }
+
+    public LocalTime getStartTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
+        int earliestDeparture = Integer.MAX_VALUE;
+
+        List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
+                .filter(t -> t.direction_id == direction_id)
+                .collect(Collectors.toList());
+
+        for (Trip trip : tripsForRouteDirection) {
+            StopTime st;
+            try {
+                // use interpolated times in case our common stop is not a time point
+                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
+                        .findFirst()
+                        .orElse(null);
+            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
+                return null;
+            }
+
+            // shouldn't actually encounter any departures after midnight, but skip any departures that do
+            if (st.departure_time > 86399) continue;
+
+            if (st.departure_time <= earliestDeparture) {
+                earliestDeparture = st.departure_time;
+            }
+        }
+        return LocalTime.ofSecondOfDay(earliestDeparture);
+    }
+
+    public LocalTime getEndTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
+        int latestArrival = Integer.MIN_VALUE;
+
+        List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
+                .filter(t -> t.direction_id == direction_id)
+                .collect(Collectors.toList());
+
+        for (Trip trip : tripsForRouteDirection) {
+            StopTime st;
+            try {
+                // use interpolated times in case our common stop is not a time point
+                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
+                        .reduce((a, b) -> b)
+                        .orElse(null);
+            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
+                return null;
+            }
+
+            if (st.arrival_time >= latestArrival) {
+                latestArrival = st.arrival_time;
+            }
+        }
+
+        // return end time as 2:00 am if last arrival occurs after midnight
+        return LocalTime.ofSecondOfDay(latestArrival % 86399);
     }
 
     public Map<LocalDate, Integer> getTripCountPerDateOfService(String route_id) {
@@ -231,31 +289,19 @@ public class RouteStats {
 
         tripsPerService.forEach(((s, trips) -> {
             for (Trip trip : trips) {
-                if (trip.route_id != route_id) {
+                if (!route_id.equals(trip.route_id)) {
                     trips.remove(trip);
                 }
             }
         }));
         return tripsPerService;
-
-//        Map<String, List<Trip>> tripsPerService = new HashMap<>();
-//
-//        feed.trips.values().stream().filter(t -> t.route_id == route_id).forEach(trip -> {
-//            List<Trip> tripsList = tripsPerService.get(trip.service_id);
-//            if (tripsList == null) {
-//                tripsList = new ArrayList<>();
-//            }
-//            tripsList.add(trip);
-//            tripsPerService.put(trip.service_id, tripsList);
-//        });
-//        return tripsPerService;
     }
 
     public List<Trip> getTripsForDate (String route_id, LocalDate date) {
         Route route = feed.routes.get(route_id);
         if (route == null) return null;
 
-        List<Trip> trips = stats.getTripsForDate(date).stream().filter(trip -> trip.route_id == route_id).collect(Collectors.toList());
+        List<Trip> trips = stats.getTripsForDate(date).stream().filter(trip -> route_id.equals(trip.route_id)).collect(Collectors.toList());
         return trips;
     }
 
@@ -266,11 +312,11 @@ public class RouteStats {
         if (route == null) {
             throw new NullPointerException("Route does not exist.");
         }
-        feed.patterns.values().stream().filter(pattern -> pattern.route_id == routeId).forEach(p -> {
-            p.associatedTrips.forEach(t -> {
-                Trip trip = feed.trips.get(t);
-            });
-        });
+//        feed.patterns.values().stream().filter(pattern -> pattern.route_id.equals(routeId)).forEach(p -> {
+//            p.associatedTrips.forEach(t -> {
+//                Trip trip = feed.trips.get(t);
+//            });
+//        });
         rs.routeId = route.route_id;
         rs.routeName = route.route_short_name != null ? route.route_short_name : route.route_long_name;
         rs.headwayPeak = null;
