@@ -2,9 +2,11 @@ package com.conveyal.gtfs.validator.service;
 
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.PrecisionModel;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchIdentifierException;
 import org.opengis.referencing.crs.CRSAuthorityFactory;
@@ -196,7 +198,17 @@ public class GeoUtils {
   }
 
 
+    /** Get the length of a linestring in meters */
+    public static double getDistance(LineString tripGeometry) {
+      double distance = 0;
+      for (int i = 0; i < tripGeometry.getNumPoints() - 1; i++) {
+        try {
+          distance += JTS.orthodromicDistance(tripGeometry.getCoordinateN(i), tripGeometry.getCoordinateN(i + 1), DefaultGeographicCRS.WGS84);
+        } catch (TransformException e) {
+          throw new RuntimeException(e);
+        }
+      }
 
-
-
+      return distance;
+    }
 }
