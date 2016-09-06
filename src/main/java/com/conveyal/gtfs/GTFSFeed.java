@@ -234,12 +234,12 @@ public class GTFSFeed implements Cloneable, Closeable {
 //            validator.validate(this, false);
 //        }
 //    }
-    public void validate (GTFSValidator... validators) {
+    public void validate (boolean repair, GTFSValidator... validators) {
         long startValidation = System.currentTimeMillis();
         for (GTFSValidator validator : validators) {
             try {
                 long startValidator = System.currentTimeMillis();
-                validator.validate(this, false);
+                validator.validate(this, repair);
                 long endValidator = System.currentTimeMillis();
                 long diff = endValidator - startValidator;
                 LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), diff);
@@ -255,7 +255,21 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     // validate function call that should explicitly list each validator to run on GTFSFeed
     public void validate () {
-        validate(
+        validate(false,
+                new DuplicateStopsValidator(),
+                new HopSpeedsReasonableValidator(),
+                new MisplacedStopValidator(),
+                new MissingStopCoordinatesValidator(),
+                new NamesValidator(),
+                new OverlappingTripsValidator(),
+                new ReversedTripsValidator(),
+                new TripTimesValidator(),
+                new UnusedStopValidator()
+        );
+    }
+
+    public void validateAndRepair () {
+        validate(true,
                 new DuplicateStopsValidator(),
                 new HopSpeedsReasonableValidator(),
                 new MisplacedStopValidator(),
