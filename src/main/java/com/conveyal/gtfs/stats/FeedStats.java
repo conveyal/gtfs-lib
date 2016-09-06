@@ -202,7 +202,9 @@ public class FeedStats {
         for (Service service : feed.services.values()) {
             // if service is active on given day, add all trips that operate under that service
             if (service.activeOn(date)) {
-                List<Trip> serviceTrips = feed.trips.values().stream().filter(trip -> trip.service_id.equals(service.service_id)).collect(Collectors.toList());
+                List<Trip> serviceTrips = feed.trips.values().stream().filter(trip ->
+                        trip.service_id != null && service.service_id != null && trip.service_id.equals(service.service_id)
+                ).collect(Collectors.toList());
                 if (serviceTrips != null)
                     trips.addAll(serviceTrips);
 
