@@ -677,8 +677,8 @@ public class GTFSFeed implements Cloneable, Closeable {
                     Polygon stopBuffer = (Polygon) stopPoint.buffer(.01);
                     polygons.add(stopBuffer);
                 }
-                GeometryCollection geometryCollection = (GeometryCollection) gf.buildGeometry(polygons);
-                this.mergedBuffers = geometryCollection.union();
+                Geometry multiGeometry = gf.buildGeometry(polygons);
+                this.mergedBuffers = multiGeometry.union();
                 if (polygons.size() > 100) {
                     this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);
                 }
