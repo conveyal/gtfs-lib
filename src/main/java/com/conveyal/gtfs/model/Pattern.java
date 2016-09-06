@@ -21,7 +21,6 @@ public class Pattern implements Serializable {
     public double[] segmentFraction;
     public List<String> orderedStops;
     public List<String> associatedTrips;
-    public Set<String> associatedRoutes;
     public LineString geometry;
     public String name;
     public String route_id;
@@ -39,13 +38,7 @@ public class Pattern implements Serializable {
 
         // Assign associated trips to value of tripsForStopPattern
         this.associatedTrips = trips;
-        this.associatedRoutes = new HashSet<>();
-        this.associatedTrips.forEach((id) -> {
-            this.associatedRoutes.add(feed.trips.get(id).route_id);
-        });
-//        for (String tripId : this.associatedTrips){
-//            this.associatedRoutes.add(feed.trips.get(tripId).route);
-//        }
+
         // Get geometry for first trip in list of associated trips
         String trip_id = associatedTrips.get(0);
         Trip trip;
