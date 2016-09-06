@@ -664,7 +664,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     public Geometry getMergedBuffers() {
         if (this.mergedBuffers == null) {
-            synchronized (this) {
+//            synchronized (this) {
                 Collection<Geometry> polygons = new ArrayList<>();
                 for (Stop stop : this.stops.values()) {
                     if (stopCountByStopTime != null && !stopCountByStopTime.containsKey(stop.stop_id)) {
@@ -682,7 +682,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 if (polygons.size() > 100) {
                     this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);
                 }
-            }
+//            }
         }
         return this.mergedBuffers;
     }
