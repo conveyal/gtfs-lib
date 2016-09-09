@@ -1,9 +1,11 @@
 package com.conveyal.gtfs.error;
 
+import java.io.Serializable;
+
 /**
  * Represents an error encountered
  */
-public abstract class GTFSError implements Comparable<GTFSError> {
+public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
 
     public final String file; // TODO GTFSTable enum? Or simply use class objects.
     public final long   line;
