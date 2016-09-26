@@ -89,6 +89,7 @@ public class GTFSCache {
 
         // upload feed
         // TODO best way to do this? Should we zip the files together?
+        LOG.info("Writing feed to s3 cache");
         if (bucket != null) {
             s3.putObject(bucket, cleanId + ".zip", feedFile);
             s3.putObject(bucket, cleanId + ".db", new File(cacheDir, cleanId + ".db"));
