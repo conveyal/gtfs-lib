@@ -82,7 +82,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
     public final ConcurrentMap<String, Long> stopCountByStopTime;
-    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeMap;
+    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
@@ -189,7 +189,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
 
         Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
-        Bind.secondaryKeys(stop_times, stopStopTimeMap, (key, stopTime) -> new String[] {stopTime.stop_id});
+        Bind.secondaryKeys(stop_times, stopStopTimeSet, (key, stopTime) -> new String[] {stopTime.stop_id});
 
         loaded = true;
     }
@@ -832,7 +832,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         tripPatternMap = db.getTreeMap("patternForTrip");
 
         stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
-        stopStopTimeMap = db.getTreeSet("stopStopTimeMap");
+        stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
 
         errors = db.getTreeSet("errors");
         System.out.println(errors.iterator().hasNext() ? errors.iterator().next().errorType : "no val");
