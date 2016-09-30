@@ -9,6 +9,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -72,8 +73,13 @@ public class GTFSCache {
         // read the feed
         String cleanTempId = cleanId(tempId);
         File dbFile = new File(cacheDir, cleanTempId + ".db");
+        File movedFeedFile = new File(cacheDir, cleanTempId + ".zip");
+
+        // don't copy if we're loading from a locally-cached feed
+        if (!feedFile.equals(movedFeedFile)) Files.copy(feedFile, movedFeedFile);
+
         GTFSFeed feed = new GTFSFeed(dbFile.getAbsolutePath());
-        feed.loadFromFile(new ZipFile(feedFile));
+        feed.loadFromFile(new ZipFile(movedFeedFile));
         feed.findPatterns();
 
         if (idGenerator != null) id = idGenerator.apply(feed);
@@ -83,6 +89,7 @@ public class GTFSCache {
         feed.close(); // make sure everything is written to disk
 
         if (idGenerator != null) {
+            new File(cacheDir, cleanTempId + ".zip").renameTo(new File(cacheDir, cleanId + ".zip"));
             new File(cacheDir, cleanTempId + ".db").renameTo(new File(cacheDir, cleanId + ".db"));
             new File(cacheDir, cleanTempId + ".db.p").renameTo(new File(cacheDir, cleanId + ".db.p"));
         }
