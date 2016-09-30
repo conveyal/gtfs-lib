@@ -14,6 +14,7 @@ import com.conveyal.gtfs.validator.ReversedTripsValidator;
 import com.conveyal.gtfs.validator.TripTimesValidator;
 import com.conveyal.gtfs.validator.UnusedStopValidator;
 import com.conveyal.gtfs.stats.FeedStats;
+import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.*;
 import com.google.common.eventbus.EventBus;
 import com.vividsolutions.jts.algorithm.ConvexHull;
@@ -81,6 +82,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
     public final ConcurrentMap<String, Long> stopCountByStopTime;
+    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeMap;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
@@ -183,10 +185,12 @@ public class GTFSFeed implements Cloneable, Closeable {
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
+            LOG.info("{}", error);
         }
 
         Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
-        
+        Bind.secondaryKeys(stop_times, stopStopTimeMap, (key, stopTime) -> new String[] {stopTime.stop_id});
+
         loaded = true;
     }
 
@@ -245,7 +249,8 @@ public class GTFSFeed implements Cloneable, Closeable {
                 LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), diff);
             } catch (Exception e) {
                 LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
-                LOG.error(e.getMessage());
+//                LOG.error(e.toString());
+                e.printStackTrace();
             }
         }
         long endValidation = System.currentTimeMillis();
@@ -676,6 +681,32 @@ public class GTFSFeed implements Cloneable, Closeable {
         return ls;
     }
 
+    public double getTripDistance (String trip_id, boolean straightLine) {
+        return straightLine
+                ? GeoUtils.getDistance(this.getStraightLineForStops(trip_id))
+                : GeoUtils.getDistance(this.getTripGeometry(trip_id));
+    }
+
+    public double getTripSpeed (String trip_id) {
+        return getTripSpeed(trip_id, false);
+    }
+
+    public double getTripSpeed (String trip_id, boolean straightLine) {
+
+        StopTime firstStopTime = this.stop_times.ceilingEntry(Fun.t2(trip_id, null)).getValue();
+        StopTime lastStopTime = this.stop_times.floorEntry(Fun.t2(trip_id, Fun.HI)).getValue();
+
+        // ensure that stopTime returned matches trip id (i.e., that the trip has stoptimes)
+        if (!firstStopTime.trip_id.equals(trip_id) || !lastStopTime.trip_id.equals(trip_id)) {
+            return Double.NaN;
+        }
+
+        double distance = getTripDistance(trip_id, straightLine);
+        int time = lastStopTime.arrival_time - firstStopTime.departure_time;
+
+        return distance / time; // meters per second
+    }
+
     public Geometry getMergedBuffers() {
         if (this.mergedBuffers == null) {
 //            synchronized (this) {
@@ -801,7 +832,9 @@ public class GTFSFeed implements Cloneable, Closeable {
         tripPatternMap = db.getTreeMap("patternForTrip");
 
         stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
+        stopStopTimeMap = db.getTreeSet("stopStopTimeMap");
 
         errors = db.getTreeSet("errors");
+        System.out.println(errors.iterator().hasNext() ? errors.iterator().next().errorType : "no val");
     }
 }
