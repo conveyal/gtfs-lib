@@ -167,7 +167,7 @@ public class FeedStats {
     }
 
     /** Get total revenue distance (in meters) for all trips on a given date. */
-    public int getTotalRevenueDistanceForTrips (LocalDate date) {
+    public double getTotalRevenueDistanceForTrips (LocalDate date) {
         return patternStats.getTotalRevenueDistanceForTrips(getTripsForDate(date));
     }
 
