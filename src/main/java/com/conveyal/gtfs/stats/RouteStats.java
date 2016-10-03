@@ -37,10 +37,14 @@ import java.util.stream.StreamSupport;
 public class RouteStats {
     private GTFSFeed feed = null;
     private FeedStats stats = null;
+    private PatternStats patternStats = null;
+    private StopStats stopStats = null;
+
     public RouteStats (GTFSFeed f) {
         feed = f;
         stats = new FeedStats(feed);
-//        stats.getTripsPerDateOfService();
+        patternStats = new PatternStats(feed);
+        stopStats = new StopStats(feed);
     }
 
     public List<RouteStatistic> getStatisticForAll () {
@@ -66,56 +70,15 @@ public class RouteStats {
 
     /** Get average speed on a direction of a route, in meters/second */
     public double getSpeedForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
-        System.out.println(route_id);
-        int count = 0;
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        TDoubleList speeds = new TDoubleArrayList();
-        long first = 86399;
-        long last = 0;
-
-        for (Trip trip : tripsForRouteDirection) {
-
-            StopTime firstStopTime = feed.stop_times.ceilingEntry(Fun.t2(trip.trip_id, null)).getValue();
-            StopTime lastStopTime = feed.stop_times.floorEntry(Fun.t2(trip.trip_id, Fun.HI)).getValue();
-
-            // ensure that stopTime returned matches trip id (i.e., that the trip has stoptimes)
-            if (!firstStopTime.trip_id.equals(trip.trip_id) || !lastStopTime.trip_id.equals(trip.trip_id)) {
-                continue;
-            }
-
-            LocalTime tripBeginTime = LocalTime.ofSecondOfDay(firstStopTime.departure_time % 86399); // convert 24hr+ seconds to 0 - 86399
-            if (tripBeginTime.isAfter(to) || tripBeginTime.isBefore(from)) {
-                continue;
-            }
-            count++;
-            if (firstStopTime.departure_time <= first) {
-                first = firstStopTime.departure_time;
-            }
-            if (firstStopTime.departure_time >= last) {
-                last = firstStopTime.departure_time;
-            }
-            // TODO: Matt, work your geography magic.
-            double distance = GeoUtils.getDistance(feed.getStraightLineForStops(trip.trip_id));
-            int time = lastStopTime.arrival_time - firstStopTime.departure_time;
-            if (time != 0)
-                speeds.add(distance / time); // meters per second
-        }
-
-        if (speeds.isEmpty()) return Double.NaN;
-
-        return speeds.sum() / speeds.size();
+        return patternStats.getAverageSpeedForTrips(tripsForRouteDirection, from, to);
     }
 
     /** Get the average headway of a route over a time window, in seconds */
     public int getHeadwayForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
-        System.out.println(route_id);
-        List<Trip> trips = stats.getTripsForDate(date);
-
-        TIntList timesAtStop = new TIntArrayList();
-
         Set<String> commonStops = null;
 
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
@@ -136,44 +99,7 @@ public class RouteStats {
 
         String commonStop = commonStops.iterator().next();
 
-        for (Trip trip : tripsForRouteDirection) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .filter(candidate -> candidate.stop_id.equals(commonStop))
-                        .findFirst()
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return -1;
-            }
-
-            // these trips are actually running on the next day, skip them
-            if (st.departure_time > 86399) continue;
-
-            LocalTime timeAtStop = LocalTime.ofSecondOfDay(st.departure_time);
-
-            if (timeAtStop.isAfter(to) || timeAtStop.isBefore(from)) {
-                continue;
-            }
-
-            timesAtStop.add(st.departure_time);
-        }
-
-        timesAtStop.sort();
-
-        // convert to deltas
-        TIntList deltas = new TIntArrayList();
-
-        for (int i = 0; i < timesAtStop.size() - 1; i++) {
-            int delta = timesAtStop.get(i + 1) - timesAtStop.get(i);
-
-            if (delta > 60) deltas.add(delta);
-        }
-
-        if (deltas.isEmpty()) return -1;
-
-        return deltas.sum() / deltas.size();
+        return stopStats.getStopHeadwayForTrips(commonStop, tripsForRouteDirection, from, to);
     }
 
     public LocalTime getStartTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
@@ -298,7 +224,9 @@ public class RouteStats {
         Route route = feed.routes.get(route_id);
         if (route == null) return null;
 
-        List<Trip> trips = stats.getTripsForDate(date).stream().filter(trip -> route_id.equals(trip.route_id)).collect(Collectors.toList());
+        List<Trip> trips = stats.getTripsForDate(date).stream()
+                .filter(trip -> route_id.equals(trip.route_id))
+                .collect(Collectors.toList());
         return trips;
     }
 
