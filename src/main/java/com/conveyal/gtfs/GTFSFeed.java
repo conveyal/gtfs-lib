@@ -36,6 +36,7 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -707,6 +708,18 @@ public class GTFSFeed implements Cloneable, Closeable {
         return distance / time; // meters per second
     }
 
+    public ZoneId getTimeZoneForStop (String stop_id) {
+        SortedSet<Tuple2<String, Tuple2>> index = stopStopTimeSet.subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
+        StopTime stopTime = this.stop_times.get(index.first().b);
+
+        Trip trip = this.trips.get(stopTime.trip_id);
+        Route route = this.routes.get(trip.route_id);
+        Agency agency = route.agency_id != null ? this.agency.get(route.agency_id) : this.agency.get(0);
+
+        return ZoneId.of(agency.agency_timezone);
+    }
+
+    // TODO: code review
     public Geometry getMergedBuffers() {
         if (this.mergedBuffers == null) {
 //            synchronized (this) {
