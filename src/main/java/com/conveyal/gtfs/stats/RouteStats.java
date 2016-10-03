@@ -1,21 +1,10 @@
 package com.conveyal.gtfs.stats;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.RouteStatistic;
-import com.conveyal.gtfs.validator.service.GeoUtils;
-import gnu.trove.list.TDoubleList;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TDoubleArrayList;
-import gnu.trove.list.array.TIntArrayList;
-import org.geotools.geometry.jts.JTS;
-import org.mapdb.Fun;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -26,10 +15,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
-import java.util.stream.DoubleStream;
-import java.util.stream.StreamSupport;
 
 /**
  * Created by landon on 9/2/16.
