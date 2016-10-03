@@ -24,10 +24,10 @@ public class StopStats {
     private FeedStats stats = null;
     private RouteStats routeStats = null;
 
-    public StopStats (GTFSFeed f) {
+    public StopStats (GTFSFeed f, FeedStats fs) {
         feed = f;
-        stats = new FeedStats(feed);
-        routeStats = new RouteStats(feed);
+        stats = fs;
+        routeStats = new RouteStats(feed, fs);
     }
 
     public long getTripCountForDate (String stop_id, LocalDate date) {

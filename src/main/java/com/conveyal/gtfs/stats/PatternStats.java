@@ -26,9 +26,9 @@ public class PatternStats {
     private GTFSFeed feed = null;
     private FeedStats stats = null;
 
-    public PatternStats (GTFSFeed f) {
+    public PatternStats (GTFSFeed f, FeedStats fs) {
         feed = f;
-        stats = new FeedStats(feed);
+        stats = fs;
     }
 
     public double getPatternSpeed (String pattern_id, LocalDate date, LocalTime from, LocalTime to) {

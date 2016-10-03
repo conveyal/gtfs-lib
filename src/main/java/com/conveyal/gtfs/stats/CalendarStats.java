@@ -16,9 +16,9 @@ public class CalendarStats {
     private GTFSFeed feed = null;
     private FeedStats stats = null;
 
-//    public CalendarStats (GTFSFeed f) {
+//    public CalendarStats (GTFSFeed f, FeedStats fs) {
 //        feed = f;
-//        stats = new FeedStats(feed);
+//        stats = fs;
 //    }
 
 //    public Set<String> getServiceIdsForDates (LocalDate from, LocalDate to) {

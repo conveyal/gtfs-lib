@@ -31,11 +31,13 @@ public class FeedStats {
     private GTFSFeed feed = null;
     private PatternStats patternStats = null;
     private StopStats stopStats = null;
+    private RouteStats routeStats = null;
 
     public FeedStats(GTFSFeed f) {
         feed = f;
-        patternStats = new PatternStats(feed);
-        stopStats = new StopStats(feed);
+        patternStats = new PatternStats(feed, this);
+        stopStats = new StopStats(feed, this);
+        routeStats = new RouteStats(feed, this);
     }
 
     public Integer getAgencyCount() {
