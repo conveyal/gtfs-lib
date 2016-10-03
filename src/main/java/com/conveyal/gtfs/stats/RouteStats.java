@@ -29,8 +29,8 @@ public class RouteStats {
     public RouteStats (GTFSFeed f, FeedStats fs) {
         feed = f;
         stats = fs;
-        patternStats = new PatternStats(feed, fs);
-        stopStats = new StopStats(feed, fs);
+        patternStats = stats.pattern;
+        stopStats = stats.stop;
     }
 
     public List<RouteStatistic> getStatisticForAll () {

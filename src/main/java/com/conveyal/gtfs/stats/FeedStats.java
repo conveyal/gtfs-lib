@@ -29,15 +29,15 @@ import org.mapdb.Fun;
 public class FeedStats {
 
     private GTFSFeed feed = null;
-    private PatternStats patternStats = null;
-    private StopStats stopStats = null;
-    private RouteStats routeStats = null;
+    public PatternStats pattern = null;
+    public StopStats stop = null;
+    public RouteStats route = null;
 
     public FeedStats(GTFSFeed f) {
-        feed = f;
-        patternStats = new PatternStats(feed, this);
-        stopStats = new StopStats(feed, this);
-        routeStats = new RouteStats(feed, this);
+        this.feed = f;
+        this.pattern = new PatternStats(feed, this);
+        this.stop = new StopStats(feed, this);
+        this.route = new RouteStats(feed, this);
     }
 
     public Integer getAgencyCount() {
@@ -156,28 +156,28 @@ public class FeedStats {
     }
 
     public LocalTime getStartTime (LocalDate date) {
-        return patternStats.getStartTimeForTrips(getTripsForDate(date));
+        return this.pattern.getStartTimeForTrips(getTripsForDate(date));
     }
 
     public LocalTime getEndTime (LocalDate date) {
-        return patternStats.getEndTimeForTrips(getTripsForDate(date));
+        return this.pattern.getEndTimeForTrips(getTripsForDate(date));
     }
 
     /** Get total revenue time (in seconds) for all trips on a given date. */
     public int getTotalRevenueTimeForTrips (LocalDate date) {
-        return patternStats.getTotalRevenueTimeForTrips(getTripsForDate(date));
+        return this.pattern.getTotalRevenueTimeForTrips(getTripsForDate(date));
     }
 
     /** Get total revenue distance (in meters) for all trips on a given date. */
     public double getTotalRevenueDistanceForTrips (LocalDate date) {
-        return patternStats.getTotalRevenueDistanceForTrips(getTripsForDate(date));
+        return this.pattern.getTotalRevenueDistanceForTrips(getTripsForDate(date));
     }
 
     /** in seconds */
     public double getDailyAverageHeadway (LocalDate date, LocalTime from, LocalTime to) {
 
         OptionalDouble avg =  feed.stops.values().stream()
-                .map(stop -> stopStats.getAverageHeadwayForStop(stop.stop_id, date, from, to))
+                .map(s -> this.stop.getAverageHeadwayForStop(s.stop_id, date, from, to))
                 .mapToDouble(headway -> headway)
                 .average();
 
@@ -185,7 +185,7 @@ public class FeedStats {
     }
 
     public double getAverageTripSpeed (LocalTime from, LocalTime to) {
-        return patternStats.getAverageSpeedForTrips(feed.trips.values(), from, to);
+        return this.pattern.getAverageSpeedForTrips(feed.trips.values(), from, to);
     }
 
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {

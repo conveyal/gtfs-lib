@@ -27,7 +27,7 @@ public class StopStats {
     public StopStats (GTFSFeed f, FeedStats fs) {
         feed = f;
         stats = fs;
-        routeStats = new RouteStats(feed, fs);
+        routeStats = stats.route;
     }
 
     public long getTripCountForDate (String stop_id, LocalDate date) {
