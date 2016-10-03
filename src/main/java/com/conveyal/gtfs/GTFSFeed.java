@@ -682,6 +682,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         return ls;
     }
 
+    /** Get the length of a trip in meters */
     public double getTripDistance (String trip_id, boolean straightLine) {
         return straightLine
                 ? GeoUtils.getDistance(this.getStraightLineForStops(trip_id))
@@ -706,6 +707,14 @@ public class GTFSFeed implements Cloneable, Closeable {
         int time = lastStopTime.arrival_time - firstStopTime.departure_time;
 
         return distance / time; // meters per second
+    }
+
+    /** Returns sorted map of stop_ids mapped to tuple keys of trip_id, stop_sequence (for use in feed.stop_times) */
+    public SortedSet<Fun.Tuple2<String, Fun.Tuple2>> getStopTimesForStop (String stop_id) {
+        SortedSet<Fun.Tuple2<String, Fun.Tuple2>> index = this.stopStopTimeSet
+                .subSet(new Fun.Tuple2<>(stop_id, null), new Fun.Tuple2(stop_id, Fun.HI));
+
+        return index;
     }
 
     public ZoneId getTimeZoneForStop (String stop_id) {
