@@ -103,58 +103,21 @@ public class RouteStats {
     }
 
     public LocalTime getStartTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
-        int earliestDeparture = Integer.MAX_VALUE;
+
 
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        for (Trip trip : tripsForRouteDirection) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .findFirst()
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return null;
-            }
-
-            // shouldn't actually encounter any departures after midnight, but skip any departures that do
-            if (st.departure_time > 86399) continue;
-
-            if (st.departure_time <= earliestDeparture) {
-                earliestDeparture = st.departure_time;
-            }
-        }
-        return LocalTime.ofSecondOfDay(earliestDeparture);
+        return patternStats.getStartTimeForTrips(tripsForRouteDirection);
     }
 
     public LocalTime getEndTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
-        int latestArrival = Integer.MIN_VALUE;
-
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        for (Trip trip : tripsForRouteDirection) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .reduce((a, b) -> b)
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return null;
-            }
-
-            if (st.arrival_time >= latestArrival) {
-                latestArrival = st.arrival_time;
-            }
-        }
-
-        // return end time as 2:00 am if last arrival occurs after midnight
-        return LocalTime.ofSecondOfDay(latestArrival % 86399);
+        return patternStats.getEndTimeForTrips(tripsForRouteDirection);
     }
 
     public Map<LocalDate, Integer> getTripCountPerDateOfService(String route_id) {

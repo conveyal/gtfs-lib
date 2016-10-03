@@ -26,14 +26,41 @@ public class StopStats {
 
     private GTFSFeed feed = null;
     private FeedStats stats = null;
+    private RouteStats routeStats = null;
 
     public StopStats (GTFSFeed f) {
         feed = f;
         stats = new FeedStats(feed);
+        routeStats = new RouteStats(feed);
     }
 
-    /** Get the average headway for a given service date at a stop (by individual routes) over a time window, in seconds */
-    public Map<String, Integer> getHeadwaysForStop (String stop_id, LocalDate date, LocalTime from, LocalTime to) {
+    public long getTripCountForDate (String stop_id, LocalDate date) {
+        return getTripsForDate(stop_id, date).size();
+    }
+
+    /** Get list of trips for specified date of service */
+    public List<Trip> getTripsForDate (String stop_id, LocalDate date) {
+        List<String> tripIds = stats.getTripsForDate(date).stream()
+                .map(trip -> trip.trip_id)
+                .collect(Collectors.toList());
+
+        return feed.getStopTimesForStop(stop_id).stream()
+                .map(t -> feed.trips.get(t.b.a)) // map to trip ids
+                .filter(t -> tripIds.contains(t.trip_id)) // filter by trip_id list for date
+                .collect(Collectors.toList());
+    }
+
+    public int getAverageHeadwayForStop (String stop_id, LocalDate date, LocalTime from, LocalTime to) {
+        List<Trip> tripsForStop = feed.getStopTimesForStop(stop_id).stream()
+                .map(t -> feed.trips.get(t.b.a))
+                .filter(trip -> feed.services.get(trip.service_id).activeOn(date))
+                .collect(Collectors.toList());
+
+        return getStopHeadwayForTrips(stop_id, tripsForStop, from, to);
+    }
+
+    /** Get the route headway for a given service date at a stop over a time window, in seconds */
+    public Map<String, Integer> getRouteHeadwaysForStop (String stop_id, LocalDate date, LocalTime from, LocalTime to) {
         Map<String, Integer> routeHeadwayMap = new HashMap<>();
         List<Route> routes = feed.patterns.values().stream()
                 .filter(p -> p.orderedStops.contains(stop_id))
