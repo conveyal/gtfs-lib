@@ -857,6 +857,5 @@ public class GTFSFeed implements Cloneable, Closeable {
         stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
 
         errors = db.getTreeSet("errors");
-        System.out.println(errors.iterator().hasNext() ? errors.iterator().next().errorType : "no val");
     }
 }
