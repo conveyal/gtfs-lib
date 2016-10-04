@@ -33,17 +33,17 @@ public class RouteStats {
         stopStats = stats.stop;
     }
 
-    public List<RouteStatistic> getStatisticForAll () {
+    public List<RouteStatistic> getStatisticForAll (LocalDate date, LocalTime from, LocalTime to) {
         List<RouteStatistic> stats = new ArrayList<>();
 
         for (String id : feed.routes.keySet()) {
-            stats.add(getStatisticForRoute(id));
+            stats.add(getStatisticForRoute(id, date, from, to));
         }
         return stats;
     }
 
-    public String getStatisticForAllAsCsv () {
-        List<RouteStatistic> stats = getStatisticForAll();
+    public String getStatisticForAllAsCsv (LocalDate date, LocalTime from, LocalTime to) {
+        List<RouteStatistic> stats = getStatisticForAll(date, from, to);
         StringBuffer buffer = new StringBuffer();
         buffer.append(RouteStatistic.getHeaderAsCsv());
         for (RouteStatistic rs : stats) {
@@ -52,6 +52,11 @@ public class RouteStats {
         }
 
         return buffer.toString();
+    }
+
+    public String getRouteName (String route_id) {
+        Route route = feed.routes.get(route_id);
+        return route != null ? route.route_short_name + " - " + route.route_long_name : null;
     }
 
     /** Get average speed on a direction of a route, in meters/second */
@@ -179,24 +184,9 @@ public class RouteStats {
         return trips;
     }
 
-    public RouteStatistic getStatisticForRoute (String routeId) {
-        RouteStatistic rs = new RouteStatistic();
-        Route route = feed.routes.get(routeId);
+    public RouteStatistic getStatisticForRoute (String route_id, LocalDate date, LocalTime from, LocalTime to) {
+        RouteStatistic rs = new RouteStatistic(this, route_id, date, from, to);
 
-        if (route == null) {
-            throw new NullPointerException("Route does not exist.");
-        }
-//        feed.patterns.values().stream().filter(pattern -> pattern.route_id.equals(routeId)).forEach(p -> {
-//            p.associatedTrips.forEach(t -> {
-//                Trip trip = feed.trips.get(t);
-//            });
-//        });
-        rs.routeId = route.route_id;
-        rs.routeName = route.route_short_name != null ? route.route_short_name : route.route_long_name;
-        rs.headwayPeak = null;
-        rs.headwayOffPeak = null;
-        rs.avgSpeedPeak = null;
-        rs.avgSpeedOffPeak = null;
         return rs;
     }
 
