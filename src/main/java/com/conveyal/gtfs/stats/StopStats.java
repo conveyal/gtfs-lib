@@ -142,10 +142,10 @@ public class StopStats {
     }
 
     /** Returns a map from route_id to transferPerformanceSummary for each route at a stop for a specified date. */
-    public Map<String, List<TransferPerformanceSummary>> getTransferPerformance (String stop_id, LocalDate date) {
+    public List<TransferPerformanceSummary> getTransferPerformance (String stop_id, LocalDate date) {
         SortedSet<Fun.Tuple2<String, Fun.Tuple2>> stopTimes = feed.getStopTimesForStop(stop_id);
-        Map<Route, List<StopTime>> routeStopTimeMap  = new HashMap<>();
-        Map<String, List<TransferPerformanceSummary>> transferPerformanceMap = new HashMap<>();
+        Map<String, List<StopTime>> routeStopTimeMap  = new HashMap<>();
+        List<TransferPerformanceSummary> transferPerformanceMap = new ArrayList<>();
         // TODO: do we need to handle interpolated stop times???
 
         // first stream stopTimes for stop into route -> list of stopTimes map
@@ -159,68 +159,81 @@ public class StopStats {
                         Route route = feed.routes.get(trip.route_id);
 
                         List<StopTime> times = new ArrayList<>();
-                        if (routeStopTimeMap.containsKey(route)) {
-                            times.addAll(routeStopTimeMap.get(route));
+                        if (routeStopTimeMap.containsKey(route.route_id)) {
+                            times.addAll(routeStopTimeMap.get(route.route_id));
                         }
                         times.add(st);
-                        routeStopTimeMap.put(route, times);
+                        routeStopTimeMap.put(route.route_id, times);
                     }
                 });
-
+        Map<Fun.Tuple2<String, String>, TIntList> waitTimesByRoute = new HashMap<>();
+        Map<Fun.Tuple2<String, String>, Set<Fun.Tuple2<StopTime, StopTime>>> missedTransfers = new HashMap<>();
         // iterate over every entry in route -> list of stopTimes map
-        for (Map.Entry<Route, List<StopTime>> entry : routeStopTimeMap.entrySet()) {
+        for (Map.Entry<String, List<StopTime>> entry : routeStopTimeMap.entrySet()) {
             final int MISSED_TRANSFER_THRESHOLD = 60 * 10;
             List<StopTime> currentTimes = entry.getValue();
-            Set<Set<StopTime>> missedTransfers = new HashSet<>();
-            Route currentRoute = entry.getKey();
+
+            String currentRoute = entry.getKey();
+
             for (StopTime currentTime : currentTimes) {
                 if (currentTime.arrival_time > 0) {
-
                     // cycle through all other routes that stop here.
-                    for (Map.Entry<Route, List<StopTime>> entry2 : routeStopTimeMap.entrySet()) {
-                        TIntList waitTimes = new TIntArrayList();
+                    for (Map.Entry<String, List<StopTime>> entry2 : routeStopTimeMap.entrySet()) {
+
                         List<StopTime> compareTimes = entry2.getValue();
-                        Route compareRoute = entry2.getKey();
-                        if (compareRoute.route_id.equals(currentRoute.route_id)) {
+                        String compareRoute = entry2.getKey();
+                        Fun.Tuple2<String, String> routeKey = new Fun.Tuple2(currentRoute, compareRoute);
+                        if (compareRoute.equals(currentRoute)) {
                             continue;
                         }
+                        if (!waitTimesByRoute.containsKey(routeKey)) {
+                            waitTimesByRoute.put(routeKey, new TIntArrayList());
+                        }
+
+                        int shortestWait = Integer.MAX_VALUE;
                         // compare current time against departure times for route
                         for (StopTime compareTime : compareTimes) {
                             if (compareTime.departure_time > 0) {
                                 int waitTime = compareTime.departure_time - currentTime.arrival_time;
 
-                                // if non-negative wait time, add to list
-                                if (waitTime >= 0){
-                                    waitTimes.add(waitTime);
+                                // if non-negative and shortest, save for later
+                                if (waitTime >= 0 && waitTime < shortestWait){
+                                    shortestWait = waitTime;
                                 }
-                                // otherwise, check for missed opportunities
+                                // otherwise, check for missed near-transfer opportunities
                                 else {
-                                    if (waitTime * -1 <= MISSED_TRANSFER_THRESHOLD) {
-                                        Set<StopTime> missedTransfer = new HashSet<>();
-                                        missedTransfer.add(currentTime);
-                                        missedTransfer.add(compareTime);
-                                        missedTransfers.add(missedTransfer);
+                                    if (waitTime < 0 && waitTime * -1 <= MISSED_TRANSFER_THRESHOLD) {
+                                        Fun.Tuple2<StopTime, StopTime> missedTransfer = new Fun.Tuple2(compareTime, currentTime);
+//                                        missedTransfer.add(currentTime);
+//                                        missedTransfer.add(compareTime);
+                                        if (!missedTransfers.containsKey(routeKey)) {
+                                            missedTransfers.put(routeKey, new HashSet<>());
+                                        }
+                                        missedTransfers.get(routeKey).add(missedTransfer);
                                     }
                                 }
                             }
                         }
-                        if (waitTimes.isEmpty()) {
-                            continue;
-                        }
-                        int min = waitTimes.min();
-                        int max = waitTimes.max();
-                        int avg = waitTimes.sum() / waitTimes.size();
-                        TransferPerformanceSummary routeTransferPerformance = new TransferPerformanceSummary(currentRoute.route_id, compareRoute.route_id, min, max, avg, missedTransfers);
-                        List<TransferPerformanceSummary> tpList = new ArrayList<>();
-                        if (transferPerformanceMap.containsKey(currentRoute.route_id)) {
-                            tpList.addAll(transferPerformanceMap.get(currentRoute.route_id));
-                        }
-                        tpList.add(routeTransferPerformance);
-                        transferPerformanceMap.put(currentRoute.route_id, tpList);
+                        // add shortestWait for currentTime to map
+                        if (shortestWait < Integer.MAX_VALUE)
+                            waitTimesByRoute.get(routeKey).add(shortestWait);
                     }
                 }
             }
         }
+        for (Map.Entry<Fun.Tuple2<String, String>, TIntList> entry : waitTimesByRoute.entrySet()) {
+            Fun.Tuple2<String, String> routeKey = entry.getKey();
+            TIntList waitTimes = entry.getValue();
+            if (waitTimes.isEmpty()) {
+                continue;
+            }
+            int min = waitTimes.min();
+            int max = waitTimes.max();
+            int avg = waitTimes.sum() / waitTimes.size();
+            TransferPerformanceSummary routeTransferPerformance = new TransferPerformanceSummary(routeKey.a, routeKey.b, min, max, avg, missedTransfers.get(routeKey));
+            transferPerformanceMap.add(routeTransferPerformance);
+        }
+
         return transferPerformanceMap;
     }
 }

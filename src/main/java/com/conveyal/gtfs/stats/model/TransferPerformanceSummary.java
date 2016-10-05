@@ -1,6 +1,8 @@
 package com.conveyal.gtfs.stats.model;
 
 import com.conveyal.gtfs.model.StopTime;
+import org.mapdb.Fun;
+
 import java.util.Set;
 
 /**
@@ -12,8 +14,8 @@ public class TransferPerformanceSummary {
     public int bestCase;
     public int worstCase;
     public int typicalCase;
-    public Set<Set<StopTime>> missedOpportunities;
-    public TransferPerformanceSummary (String fromRoute, String toRoute, int minWaitTime, int maxWaitTime, int avgWaitTime, Set<Set<StopTime>> missedTransfers) {
+    public Set<Fun.Tuple2<StopTime, StopTime>> missedOpportunities;
+    public TransferPerformanceSummary (String fromRoute, String toRoute, int minWaitTime, int maxWaitTime, int avgWaitTime, Set<Fun.Tuple2<StopTime, StopTime>> missedTransfers) {
         this.fromRoute = fromRoute;
         this.toRoute = toRoute;
         bestCase = minWaitTime;
@@ -22,5 +24,8 @@ public class TransferPerformanceSummary {
         missedOpportunities = missedTransfers;
     }
 
+    public String toString () {
+        return String.format("From routes %s to %s, the best case transfer time is %d seconds, worst case is %d seconds, and typical case is %d seconds. %d missed near-transfer opportunities.", fromRoute, toRoute, bestCase, worstCase, typicalCase, missedOpportunities.size());
+    }
 
 }
