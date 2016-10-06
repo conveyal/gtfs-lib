@@ -37,38 +37,59 @@ public class StopStats {
         routeStats = stats.route;
     }
 
-    public Set<Route> getRoutes (String stop_id) {
+    public List<Route> getRoutes (String stop_id) {
         return feed.patterns.values().stream()
                 .filter(p -> p.orderedStops.contains(stop_id))
+                .distinct()
                 .map(p -> feed.routes.get(p.route_id))
-                .collect(Collectors.toSet());
+                .collect(Collectors.toList());
     }
 
+    /**
+     * Gets count of routes that visit a stop.
+     * @param stop_id
+     * @return count of routes for stop
+     */
     public int getRouteCount (String stop_id) {
         return getRoutes(stop_id).size();
     }
 
+    /**
+     * Gets count of trips that visit a stop for a specified date of service.
+     * @param stop_id
+     * @param date
+     * @return count of trips for date
+     */
     public int getTripCountForDate (String stop_id, LocalDate date) {
         return (int) getTripsForDate(stop_id, date).size();
     }
 
-    /** Get list of trips for specified date of service */
+    /**
+     * Get list of trips that visit a stop for a specified date of service.
+     * @param stop_id
+     * @param date
+     * @return list of trips for date
+     */
     public List<Trip> getTripsForDate (String stop_id, LocalDate date) {
         List<String> tripIds = stats.getTripsForDate(date).stream()
                 .map(trip -> trip.trip_id)
                 .collect(Collectors.toList());
 
-        return feed.getStopTimesForStop(stop_id).stream()
-                .map(t -> feed.trips.get(t.b.a)) // map to trip ids
+        return feed.getDistinctTripsForStop(stop_id).stream()
                 .filter(t -> tripIds.contains(t.trip_id)) // filter by trip_id list for date
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get the average headway, in seconds, for all trips at a stop over a time window.
+     * @param stop_id
+     * @param date
+     * @param from
+     * @param to
+     * @return avg. headway (in seconds)
+     */
     public int getAverageHeadwayForStop (String stop_id, LocalDate date, LocalTime from, LocalTime to) {
-        List<Trip> tripsForStop = feed.getStopTimesForStop(stop_id).stream()
-                .map(t -> feed.trips.get(t.b.a))
-                .filter(trip -> feed.services.get(trip.service_id).activeOn(date))
-                .collect(Collectors.toList());
+        List<Trip> tripsForStop = getTripsForDate(stop_id, date);
 
         return getStopHeadwayForTrips(stop_id, tripsForStop, from, to);
     }
@@ -87,7 +108,16 @@ public class StopStats {
         return routeHeadwayMap;
     }
 
-    /** Get the average headway for a set of trips at a stop over a time window, in seconds */
+    /**
+     * Get the average headway, in seconds, for a set of trips at a stop over a time window.
+     * @param stop_id
+     * @param trips
+     * @param from
+     * @param to
+     * @return avg. headway (in seconds)
+     */
+    //TODO: add direction_id?
+    //TODO: specified stop vs. first stop
     public int getStopHeadwayForTrips (String stop_id, List<Trip> trips, LocalTime from, LocalTime to) {
         TIntList timesAtStop = new TIntArrayList();
 
@@ -130,32 +160,44 @@ public class StopStats {
         return deltas.sum() / deltas.size();
     }
 
+    /**
+     * Get the average headway, in seconds, for a route at a stop over a time window.
+     * @param stop_id
+     * @param route_id
+     * @param date
+     * @param from
+     * @param to
+     * @return avg. headway (in seconds)
+     */
     public int getHeadwayForStopByRoute (String stop_id, String route_id, LocalDate date, LocalTime from, LocalTime to) {
 
-        List<Trip> tripsForStop = feed.getStopTimesForStop(stop_id).stream()
-                .filter(t -> feed.trips.get(t.a).route_id.equals(route_id))
-                .map(t -> feed.trips.get(t.b.a))
+        List<Trip> tripsForStop = feed.getDistinctTripsForStop(stop_id).stream()
+                .filter(trip -> feed.trips.get(trip.trip_id).route_id.equals(route_id))
                 .filter(trip -> feed.services.get(trip.service_id).activeOn(date))
                 .collect(Collectors.toList());
 
         return getStopHeadwayForTrips(stop_id, tripsForStop, from, to);
     }
 
-    /** Returns a map from route_id to transferPerformanceSummary for each route at a stop for a specified date. */
+    /**
+     * Returns a list of transfer performance summaries for each route pair at a stop for the specified date of service.
+     * @param stop_id
+     * @param date
+     * @return
+     */
     public List<TransferPerformanceSummary> getTransferPerformance (String stop_id, LocalDate date) {
-        SortedSet<Fun.Tuple2<String, Fun.Tuple2>> stopTimes = feed.getStopTimesForStop(stop_id);
+        List<StopTime> stopTimes = feed.getStopTimesForStop(stop_id);
         Map<String, List<StopTime>> routeStopTimeMap  = new HashMap<>();
         List<TransferPerformanceSummary> transferPerformanceMap = new ArrayList<>();
         // TODO: do we need to handle interpolated stop times???
 
         // first stream stopTimes for stop into route -> list of stopTimes map
         stopTimes.stream()
-                .forEach(t -> {
-                    Trip trip = feed.trips.get(t.b.a);
+                .forEach(st -> {
+                    Trip trip = feed.trips.get(st.trip_id);
                     Service service = feed.services.get(trip.service_id);
                     // only add to map if trip is active on given date
                     if (service != null && service.activeOn(date)) {
-                        StopTime st = feed.stop_times.get(t.b);
                         Route route = feed.routes.get(trip.route_id);
 
                         List<StopTime> times = new ArrayList<>();
@@ -229,8 +271,9 @@ public class StopStats {
             }
             int min = waitTimes.min();
             int max = waitTimes.max();
-            int avg = waitTimes.sum() / waitTimes.size();
-            TransferPerformanceSummary routeTransferPerformance = new TransferPerformanceSummary(routeKey.a, routeKey.b, min, max, avg, missedTransfers.get(routeKey));
+            waitTimes.sort();
+            int median = waitTimes.get(waitTimes.size() / 2);
+            TransferPerformanceSummary routeTransferPerformance = new TransferPerformanceSummary(routeKey.a, routeKey.b, min, max, median, missedTransfers.get(routeKey));
             transferPerformanceMap.add(routeTransferPerformance);
         }
 

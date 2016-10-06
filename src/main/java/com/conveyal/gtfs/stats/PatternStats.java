@@ -31,6 +31,14 @@ public class PatternStats {
         stats = fs;
     }
 
+    /**
+     * Gets the pattern speed for a given pattern for a specified date and time window.
+     * @param pattern_id
+     * @param date
+     * @param from
+     * @param to
+     * @return
+     */
     public double getPatternSpeed (String pattern_id, LocalDate date, LocalTime from, LocalTime to) {
 
         List<Trip> trips = getTripsForDate(pattern_id, date);
@@ -38,6 +46,13 @@ public class PatternStats {
         return getAverageSpeedForTrips(trips, from, to);
     }
 
+    /**
+     * Get average speed for set of trips that begin within the time window in meters per second.
+     * @param trips
+     * @param from
+     * @param to
+     * @return avg. speed (meters per second)
+     */
     public double getAverageSpeedForTrips (Collection<Trip> trips, LocalTime from, LocalTime to) {
         TDoubleList speeds = new TDoubleArrayList();
 
@@ -62,43 +77,40 @@ public class PatternStats {
         return speeds.sum() / speeds.size();
     }
 
+    /**
+     * Get earliest departure time for a set of trips.
+     * @param trips
+     * @return earliest departure time
+     */
     public LocalTime getStartTimeForTrips (Collection<Trip> trips) {
         int earliestDeparture = Integer.MAX_VALUE;
 
         for (Trip trip : trips) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .findFirst()
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return null;
+            StopTime st = feed.getOrderedStopTimesForTrip(trip.trip_id).iterator().next();
+            int dep = st.departure_time;
+
+            // these trips begin on the next day, so we need to cast them to 0 - 86399
+            if (dep > 86399) {
+                dep = dep % 86399;
             }
 
-            // shouldn't actually encounter any departures after midnight, but skip any departures that do
-            if (st.departure_time > 86399) continue;
-
-            if (st.departure_time <= earliestDeparture) {
-                earliestDeparture = st.departure_time;
+            if (dep <= earliestDeparture) {
+                earliestDeparture = dep;
             }
         }
         return LocalTime.ofSecondOfDay(earliestDeparture);
     }
 
+    /**
+     * Get last arrival time for a set of trips.
+     * @param trips
+     * @return last arrival time (if arrival occurs after midnight, time is expressed in terms of following day, e.g., 2:00 AM)
+     */
     public LocalTime getEndTimeForTrips (Collection<Trip> trips) {
         int latestArrival = Integer.MIN_VALUE;
 
         for (Trip trip : trips) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .reduce((a, b) -> b)
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return null;
-            }
+            StopTime st = feed.getOrderedStopTimesForTrip(trip.trip_id).iterator().next();
 
             if (st.arrival_time >= latestArrival) {
                 latestArrival = st.arrival_time;
@@ -109,27 +121,28 @@ public class PatternStats {
         return LocalTime.ofSecondOfDay(latestArrival % 86399);
     }
 
-    /** Get total revenue time (in seconds) for set of trips. */
+    /**
+     * Get total revenue time (in seconds) for set of trips.
+     * @param trips
+     * @return total revenue time (in seconds)
+     */
     public int getTotalRevenueTimeForTrips (Collection<Trip> trips) {
         TIntList times = new TIntArrayList();
         for (Trip trip : trips) {
             StopTime first;
             StopTime last;
-            Spliterator<StopTime> interpolated = null;
-            try {
-                interpolated = feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator();
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes firstAndLastStopsDoNotHaveTimes) {
-                return -1;
-            }
+            Spliterator<StopTime> stopTimes = feed.getOrderedStopTimesForTrip(trip.trip_id).spliterator();;
 
-            first = StreamSupport.stream(interpolated, false)
+            first = StreamSupport.stream(stopTimes, false)
                     .findFirst()
                     .orElse(null);
 
-            last = StreamSupport.stream(interpolated, false)
+            last = StreamSupport.stream(stopTimes, false)
                     .reduce((a, b) -> b)
                     .orElse(null);
-            int time = last.departure_time - first.arrival_time;
+
+            // revenue time should not include layovers at termini
+            int time = last.arrival_time - first.departure_time;
 
             times.add(time);
         }
@@ -137,8 +150,12 @@ public class PatternStats {
         return times.sum();
     }
 
-    /** Get total revenue distance (in meters) for set of trips. */
-    public double getTotalRevenueDistanceForTrips (Collection<Trip> trips) {
+    /**
+     * Get total revenue distance (in meters) for set of trips.
+     * @param trips
+     * @return total trip distance (in meters)
+     */
+    public double getTotalDistanceForTrips (Collection<Trip> trips) {
         TDoubleList distances = new TDoubleArrayList();
         for (Trip trip : trips) {
             distances.add(feed.getTripDistance(trip.trip_id, false));
@@ -147,12 +164,22 @@ public class PatternStats {
         return distances.sum();
     }
 
+    /**
+     * Get distance for a pattern. Uses the first trip associated with the pattern.
+     * @param pattern_id
+     * @return distance (in meters)
+     */
     public double getPatternDistance (String pattern_id) {
         Pattern pattern = feed.patterns.get(pattern_id);
 
         return feed.getTripDistance(pattern.associatedTrips.iterator().next(), false);
     }
 
+    /**
+     * Get average stop spacing for a pattern.
+     * @param pattern_id
+     * @return avg. stop spacing (in meters)
+     */
     public double getAverageStopSpacing (String pattern_id) {
         Pattern pattern = feed.patterns.get(pattern_id);
 
