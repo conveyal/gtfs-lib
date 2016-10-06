@@ -1,60 +1,57 @@
 package com.conveyal.gtfs.stats.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.stats.FeedStats;
+import com.conveyal.gtfs.stats.RouteStats;
 
 import java.awt.geom.Rectangle2D;
 import java.time.LocalDate;
+import java.time.LocalTime;
 
 /**
  * Created by landon on 9/2/16.
  */
 public class RouteStatistic {
-//    private GTFSFeed feed;
-    public String routeId;
+    public String route_id;
     public String routeName;
-    public Double headwayPeak;
-    public Double headwayOffPeak;
-    public Double avgSpeedPeak;
-    public Double avgSpeedOffPeak;
+    public int headway;
+    public Double avgSpeed;
+//    public Double avgSpeedOffPeak;
 //    private LocalDate calendarServiceEnd;
 //    private LocalDate calendarStartDate;
 //    private LocalDate calendarEndDate;
 //    private Rectangle2D bounds;
 
-    public RouteStatistic () {
+    public RouteStatistic (RouteStats stats, String route_id, LocalDate date, LocalTime from, LocalTime to) {
+        this.route_id = route_id;
+        routeName = stats.getRouteName(route_id);
+        headway = stats.getHeadwayForRouteDirection(this.route_id, 0, date, from, to);
+        avgSpeed = stats.getSpeedForRouteDirection(this.route_id, 0, date, from, to);
     }
 
     public static String getHeaderAsCsv () {
         StringBuffer buffer = new StringBuffer();
 
-        buffer.append("routeId");
+        buffer.append("route_id");
         buffer.append(",");
         buffer.append("routeName");
         buffer.append(",");
-        buffer.append("headwayPeak");
+        buffer.append("headway");
         buffer.append(",");
-        buffer.append("headwayOffPeak");
-        buffer.append(",");
-        buffer.append("avgSpeedPeak");
-        buffer.append(",");
-        buffer.append("avgSpeedOffPeak");
+        buffer.append("avgSpeed");
 
         return buffer.toString();
     }
     public String asCsv () {
         StringBuffer buffer = new StringBuffer();
 
-        buffer.append(routeId);
+        buffer.append(route_id);
         buffer.append(",");
         buffer.append(routeName);
         buffer.append(",");
-        buffer.append(headwayPeak);
+        buffer.append(headway);
         buffer.append(",");
-        buffer.append(headwayOffPeak);
-        buffer.append(",");
-        buffer.append(avgSpeedPeak);
-        buffer.append(",");
-        buffer.append(avgSpeedOffPeak);
+        buffer.append(avgSpeed);
 
         return buffer.toString();
     }

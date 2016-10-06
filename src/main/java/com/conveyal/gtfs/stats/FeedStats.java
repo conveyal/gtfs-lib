@@ -3,21 +3,24 @@ package com.conveyal.gtfs.stats;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
+import java.util.OptionalDouble;
 import java.util.stream.Collectors;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.AgencyStatistic;
+import org.mapdb.Fun;
 
 /**
  * Retrieves a base set of statistics from the GTFS.
@@ -26,9 +29,15 @@ import com.conveyal.gtfs.stats.model.AgencyStatistic;
 public class FeedStats {
 
     private GTFSFeed feed = null;
+    public PatternStats pattern = null;
+    public StopStats stop = null;
+    public RouteStats route = null;
 
     public FeedStats(GTFSFeed f) {
-        feed = f;
+        this.feed = f;
+        this.pattern = new PatternStats(feed, this);
+        this.stop = new StopStats(feed, this);
+        this.route = new RouteStats(feed, this);
     }
 
     public Integer getAgencyCount() {
@@ -145,6 +154,40 @@ public class FeedStats {
 
         return endDate;
     }
+
+    public LocalTime getStartTime (LocalDate date) {
+        return this.pattern.getStartTimeForTrips(getTripsForDate(date));
+    }
+
+    public LocalTime getEndTime (LocalDate date) {
+        return this.pattern.getEndTimeForTrips(getTripsForDate(date));
+    }
+
+    /** Get total revenue time (in seconds) for all trips on a given date. */
+    public int getTotalRevenueTimeForTrips (LocalDate date) {
+        return this.pattern.getTotalRevenueTimeForTrips(getTripsForDate(date));
+    }
+
+    /** Get total revenue distance (in meters) for all trips on a given date. */
+    public double getTotalDistanceForTrips (LocalDate date) {
+        return this.pattern.getTotalDistanceForTrips(getTripsForDate(date));
+    }
+
+    /** in seconds */
+    public double getDailyAverageHeadway (LocalDate date, LocalTime from, LocalTime to) {
+
+        OptionalDouble avg =  feed.stops.values().stream()
+                .map(s -> this.stop.getAverageHeadwayForStop(s.stop_id, date, from, to))
+                .mapToDouble(headway -> headway)
+                .average();
+
+        return avg.getAsDouble();
+    }
+
+    public double getAverageTripSpeed (LocalTime from, LocalTime to) {
+        return this.pattern.getAverageSpeedForTrips(feed.trips.values(), from, to);
+    }
+
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {
 
         Map<String, List<Trip>> tripsPerService = getTripsPerService();
@@ -199,17 +242,21 @@ public class FeedStats {
         List<Trip> trips = new ArrayList<>();
 
         // loop through services
-        for (Service service : feed.services.values()) {
-            // if service is active on given day, add all trips that operate under that service
-            if (service.activeOn(date)) {
-                List<Trip> serviceTrips = feed.trips.values().stream().filter(trip ->
-                        trip.service_id != null && service.service_id != null && trip.service_id.equals(service.service_id)
-                ).collect(Collectors.toList());
-                if (serviceTrips != null)
-                    trips.addAll(serviceTrips);
-
-            }
-        }
+        // if service is active on given day, add all trips that operate under that service
+        feed.services.values().stream()
+                .filter(service -> service.activeOn(date))
+                .forEach(service -> {
+                    List<Trip> serviceTrips = feed.trips.values().stream()
+                            .filter(trip ->
+                                trip.service_id != null
+                                && service.service_id != null
+                                && trip.service_id.equals(service.service_id))
+                            .collect(Collectors.toList());
+                    if (serviceTrips != null) {
+                        trips.addAll(serviceTrips);
+                    }
+                }
+        );
         return trips;
     }
 

@@ -2,6 +2,7 @@ package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.stats.RouteStats;
 
 import java.io.File;
@@ -29,7 +30,8 @@ public class FrequencySummary {
     public static void main(String... args) throws IOException {
         GTFSFeed feed = GTFSFeed.fromFile(args[0]);
         feed.findPatterns();
-        RouteStats stats = new RouteStats(feed);
+        FeedStats fs = new FeedStats(feed);
+        RouteStats stats = new RouteStats(feed, fs);
 
         FileWriter writer = new FileWriter(new File(args[1]));
 

@@ -1,21 +1,10 @@
 package com.conveyal.gtfs.stats;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.RouteStatistic;
-import com.conveyal.gtfs.validator.service.GeoUtils;
-import gnu.trove.list.TDoubleList;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TDoubleArrayList;
-import gnu.trove.list.array.TIntArrayList;
-import org.geotools.geometry.jts.JTS;
-import org.mapdb.Fun;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -26,10 +15,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
-import java.util.stream.DoubleStream;
-import java.util.stream.StreamSupport;
 
 /**
  * Created by landon on 9/2/16.
@@ -37,23 +23,27 @@ import java.util.stream.StreamSupport;
 public class RouteStats {
     private GTFSFeed feed = null;
     private FeedStats stats = null;
-    public RouteStats (GTFSFeed f) {
+    private PatternStats patternStats = null;
+    private StopStats stopStats = null;
+
+    public RouteStats (GTFSFeed f, FeedStats fs) {
         feed = f;
-        stats = new FeedStats(feed);
-//        stats.getTripsPerDateOfService();
+        stats = fs;
+        patternStats = stats.pattern;
+        stopStats = stats.stop;
     }
 
-    public List<RouteStatistic> getStatisticForAll () {
+    public List<RouteStatistic> getStatisticForAll (LocalDate date, LocalTime from, LocalTime to) {
         List<RouteStatistic> stats = new ArrayList<>();
 
         for (String id : feed.routes.keySet()) {
-            stats.add(getStatisticForRoute(id));
+            stats.add(getStatisticForRoute(id, date, from, to));
         }
         return stats;
     }
 
-    public String getStatisticForAllAsCsv () {
-        List<RouteStatistic> stats = getStatisticForAll();
+    public String getStatisticForAllAsCsv (LocalDate date, LocalTime from, LocalTime to) {
+        List<RouteStatistic> stats = getStatisticForAll(date, from, to);
         StringBuffer buffer = new StringBuffer();
         buffer.append(RouteStatistic.getHeaderAsCsv());
         for (RouteStatistic rs : stats) {
@@ -64,58 +54,38 @@ public class RouteStats {
         return buffer.toString();
     }
 
-    /** Get average speed on a direction of a route, in meters/second */
+    public String getRouteName (String route_id) {
+        Route route = feed.routes.get(route_id);
+        return route != null ? route.route_short_name + " - " + route.route_long_name : null;
+    }
+
+    /**
+     * Get average speed on a direction of a route, in meters per second.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @param from
+     * @param to
+     * @return avg. speed (meters per second)
+     */
     public double getSpeedForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
-        System.out.println(route_id);
-        int count = 0;
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        TDoubleList speeds = new TDoubleArrayList();
-        long first = 86399;
-        long last = 0;
-
-        for (Trip trip : tripsForRouteDirection) {
-
-            StopTime firstStopTime = feed.stop_times.ceilingEntry(Fun.t2(trip.trip_id, null)).getValue();
-            StopTime lastStopTime = feed.stop_times.floorEntry(Fun.t2(trip.trip_id, Fun.HI)).getValue();
-
-            // ensure that stopTime returned matches trip id (i.e., that the trip has stoptimes)
-            if (!firstStopTime.trip_id.equals(trip.trip_id) || !lastStopTime.trip_id.equals(trip.trip_id)) {
-                continue;
-            }
-
-            LocalTime tripBeginTime = LocalTime.ofSecondOfDay(firstStopTime.departure_time % 86399); // convert 24hr+ seconds to 0 - 86399
-            if (tripBeginTime.isAfter(to) || tripBeginTime.isBefore(from)) {
-                continue;
-            }
-            count++;
-            if (firstStopTime.departure_time <= first) {
-                first = firstStopTime.departure_time;
-            }
-            if (firstStopTime.departure_time >= last) {
-                last = firstStopTime.departure_time;
-            }
-            // TODO: Matt, work your geography magic.
-            double distance = GeoUtils.getDistance(feed.getStraightLineForStops(trip.trip_id));
-            int time = lastStopTime.arrival_time - firstStopTime.departure_time;
-            if (time != 0)
-                speeds.add(distance / time); // meters per second
-        }
-
-        if (speeds.isEmpty()) return Double.NaN;
-
-        return speeds.sum() / speeds.size();
+        return patternStats.getAverageSpeedForTrips(tripsForRouteDirection, from, to);
     }
 
-    /** Get the average headway of a route over a time window, in seconds */
+    /**
+     * Get the average headway for a route direction for a specified service date and time window, in seconds.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @param from
+     * @param to
+     * @return avg. headway in seconds
+     */
     public int getHeadwayForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
-        System.out.println(route_id);
-        List<Trip> trips = stats.getTripsForDate(date);
-
-        TIntList timesAtStop = new TIntArrayList();
-
         Set<String> commonStops = null;
 
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
@@ -136,99 +106,39 @@ public class RouteStats {
 
         String commonStop = commonStops.iterator().next();
 
-        for (Trip trip : tripsForRouteDirection) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .filter(candidate -> candidate.stop_id.equals(commonStop))
-                        .findFirst()
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return -1;
-            }
-
-            // these trips are actually running on the next day, skip them
-            if (st.departure_time > 86399) continue;
-
-            LocalTime timeAtStop = LocalTime.ofSecondOfDay(st.departure_time);
-
-            if (timeAtStop.isAfter(to) || timeAtStop.isBefore(from)) {
-                continue;
-            }
-
-            timesAtStop.add(st.departure_time);
-        }
-
-        timesAtStop.sort();
-
-        // convert to deltas
-        TIntList deltas = new TIntArrayList();
-
-        for (int i = 0; i < timesAtStop.size() - 1; i++) {
-            int delta = timesAtStop.get(i + 1) - timesAtStop.get(i);
-
-            if (delta > 60) deltas.add(delta);
-        }
-
-        if (deltas.isEmpty()) return -1;
-
-        return deltas.sum() / deltas.size();
+        return stopStats.getStopHeadwayForTrips(commonStop, tripsForRouteDirection, from, to);
     }
 
+    /**
+     * Get earliest departure time for a given route direction on the specified date.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @return earliest departure time
+     */
     public LocalTime getStartTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
-        int earliestDeparture = Integer.MAX_VALUE;
+
 
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        for (Trip trip : tripsForRouteDirection) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .findFirst()
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return null;
-            }
-
-            // shouldn't actually encounter any departures after midnight, but skip any departures that do
-            if (st.departure_time > 86399) continue;
-
-            if (st.departure_time <= earliestDeparture) {
-                earliestDeparture = st.departure_time;
-            }
-        }
-        return LocalTime.ofSecondOfDay(earliestDeparture);
+        return patternStats.getStartTimeForTrips(tripsForRouteDirection);
     }
 
+    /**
+     * Get latest arrival time for a given route direction on the specified date.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @return last arrival time
+     */
     public LocalTime getEndTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
-        int latestArrival = Integer.MIN_VALUE;
-
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        for (Trip trip : tripsForRouteDirection) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .reduce((a, b) -> b)
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return null;
-            }
-
-            if (st.arrival_time >= latestArrival) {
-                latestArrival = st.arrival_time;
-            }
-        }
-
-        // return end time as 2:00 am if last arrival occurs after midnight
-        return LocalTime.ofSecondOfDay(latestArrival % 86399);
+        return patternStats.getEndTimeForTrips(tripsForRouteDirection);
     }
 
     public Map<LocalDate, Integer> getTripCountPerDateOfService(String route_id) {
@@ -247,6 +157,11 @@ public class RouteStats {
         return tripCountPerDate;
     }
 
+    /**
+     * Returns a map of dates to list of trips for a given route.
+     * @param route_id
+     * @return mapping of trips to dates
+     */
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService(String route_id) {
 
         Map<String, List<Trip>> tripsPerService = getTripsPerService(route_id);
@@ -277,6 +192,11 @@ public class RouteStats {
         return tripsPerDate;
     }
 
+    /**
+     * Maps a list of trips to all service entries for a given route.
+     * @param route_id
+     * @return mapping of trips to service_id
+     */
     public Map<String, List<Trip>> getTripsPerService (String route_id) {
         Route route = feed.routes.get(route_id);
         if (route == null) return null;
@@ -294,32 +214,25 @@ public class RouteStats {
         return tripsPerService;
     }
 
+    /**
+     * Gets all trips for a given route that operate on the specified date.
+     * @param route_id
+     * @param date
+     * @return
+     */
     public List<Trip> getTripsForDate (String route_id, LocalDate date) {
         Route route = feed.routes.get(route_id);
         if (route == null) return null;
 
-        List<Trip> trips = stats.getTripsForDate(date).stream().filter(trip -> route_id.equals(trip.route_id)).collect(Collectors.toList());
+        List<Trip> trips = stats.getTripsForDate(date).stream()
+                .filter(trip -> route_id.equals(trip.route_id))
+                .collect(Collectors.toList());
         return trips;
     }
 
-    public RouteStatistic getStatisticForRoute (String routeId) {
-        RouteStatistic rs = new RouteStatistic();
-        Route route = feed.routes.get(routeId);
+    public RouteStatistic getStatisticForRoute (String route_id, LocalDate date, LocalTime from, LocalTime to) {
+        RouteStatistic rs = new RouteStatistic(this, route_id, date, from, to);
 
-        if (route == null) {
-            throw new NullPointerException("Route does not exist.");
-        }
-//        feed.patterns.values().stream().filter(pattern -> pattern.route_id.equals(routeId)).forEach(p -> {
-//            p.associatedTrips.forEach(t -> {
-//                Trip trip = feed.trips.get(t);
-//            });
-//        });
-        rs.routeId = route.route_id;
-        rs.routeName = route.route_short_name != null ? route.route_short_name : route.route_long_name;
-        rs.headwayPeak = null;
-        rs.headwayOffPeak = null;
-        rs.avgSpeedPeak = null;
-        rs.avgSpeedOffPeak = null;
         return rs;
     }
 
