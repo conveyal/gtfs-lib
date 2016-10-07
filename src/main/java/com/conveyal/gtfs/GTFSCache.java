@@ -194,6 +194,7 @@ public class GTFSCache {
                 is.close();
                 fos.close();
             } catch (Exception e) {
+                LOG.warn("Could not download feed at s3://{}/{}.", bucket, key);
                 throw new RuntimeException(e);
             }
         }
