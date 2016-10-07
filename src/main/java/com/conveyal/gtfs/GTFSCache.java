@@ -30,6 +30,7 @@ public class GTFSCache {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
 
     public final String bucket;
+    public final String bucketFolder;
 
     public final File cacheDir;
 
@@ -50,6 +51,18 @@ public class GTFSCache {
         else LOG.info("Using bucket {} for GTFS Cache", bucket);
 
         this.bucket = bucket;
+        this.bucketFolder = null;
+
+        this.cacheDir = cacheDir;
+    }
+
+    public GTFSCache(String bucket, String bucketFolder, File cacheDir) {
+        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
+        else LOG.info("Using bucket {} for GTFS Cache", bucket);
+
+        this.bucket = bucket;
+        this.bucketFolder = bucketFolder;
+
         this.cacheDir = cacheDir;
     }
 
@@ -98,9 +111,11 @@ public class GTFSCache {
         // TODO best way to do this? Should we zip the files together?
         LOG.info("Writing feed to s3 cache");
         if (bucket != null) {
-            s3.putObject(bucket, cleanId + ".zip", feedFile);
-            s3.putObject(bucket, cleanId + ".db", new File(cacheDir, cleanId + ".db"));
-            s3.putObject(bucket, cleanId + ".db.p", new File(cacheDir, cleanId + ".db.p"));
+            String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
+            
+            s3.putObject(bucket, key + ".zip", feedFile);
+            s3.putObject(bucket, key + ".db", new File(cacheDir, cleanId + ".db"));
+            s3.putObject(bucket, key + ".db.p", new File(cacheDir, cleanId + ".db.p"));
         }
 
         // reconnect to feed database
