@@ -61,7 +61,7 @@ public class GTFSCache {
         else LOG.info("Using bucket {} for GTFS Cache", bucket);
 
         this.bucket = bucket;
-        this.bucketFolder = bucketFolder;
+        this.bucketFolder = bucketFolder.replaceAll("\\/","");
 
         this.cacheDir = cacheDir;
     }
