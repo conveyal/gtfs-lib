@@ -15,6 +15,16 @@ public class TransferPerformanceSummary {
     public int worstCase;
     public int typicalCase;
     public Set<Fun.Tuple2<StopTime, StopTime>> missedOpportunities;
+
+    /**
+     *
+     * @param fromRoute
+     * @param toRoute
+     * @param minWaitTime
+     * @param maxWaitTime
+     * @param avgWaitTime
+     * @param missedTransfers
+     */
     public TransferPerformanceSummary (String fromRoute, String toRoute, int minWaitTime, int maxWaitTime, int avgWaitTime, Set<Fun.Tuple2<StopTime, StopTime>> missedTransfers) {
         this.fromRoute = fromRoute;
         this.toRoute = toRoute;

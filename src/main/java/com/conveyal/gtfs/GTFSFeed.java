@@ -682,17 +682,19 @@ public class GTFSFeed implements Cloneable, Closeable {
         return ls;
     }
 
-    /** Get the length of a trip in meters */
+    /** Get the length of a trip in meters. */
     public double getTripDistance (String trip_id, boolean straightLine) {
         return straightLine
                 ? GeoUtils.getDistance(this.getStraightLineForStops(trip_id))
                 : GeoUtils.getDistance(this.getTripGeometry(trip_id));
     }
 
+    /** Get trip speed (using trip shape if available) in meters per second. */
     public double getTripSpeed (String trip_id) {
         return getTripSpeed(trip_id, false);
     }
 
+    /** Get trip speed in meters per second. */
     public double getTripSpeed (String trip_id, boolean straightLine) {
 
         StopTime firstStopTime = this.stop_times.ceilingEntry(Fun.t2(trip_id, null)).getValue();
@@ -704,22 +706,35 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
 
         double distance = getTripDistance(trip_id, straightLine);
+
+        // trip time (in seconds)
         int time = lastStopTime.arrival_time - firstStopTime.departure_time;
 
         return distance / time; // meters per second
     }
 
-    /** Returns sorted map of stop_ids mapped to tuple keys of trip_id, stop_sequence (for use in feed.stop_times) */
-    public SortedSet<Fun.Tuple2<String, Fun.Tuple2>> getStopTimesForStop (String stop_id) {
-        SortedSet<Fun.Tuple2<String, Fun.Tuple2>> index = this.stopStopTimeSet
-                .subSet(new Fun.Tuple2<>(stop_id, null), new Fun.Tuple2(stop_id, Fun.HI));
+    /** Get list of stop_times ordered by arrival time for a given stop_id. */
+    public List<StopTime> getStopTimesForStop (String stop_id) {
+        SortedSet<Tuple2<String, Tuple2>> index = this.stopStopTimeSet
+                .subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
 
-        return index;
+        return index.stream()
+                .map(tuple -> this.stop_times.get(tuple.b))
+                .sorted((a, b) -> Integer.compare(a.arrival_time, b.arrival_time))
+                .collect(Collectors.toList());
     }
 
-    public ZoneId getTimeZoneForStop (String stop_id) {
-        SortedSet<Tuple2<String, Tuple2>> index = stopStopTimeSet.subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
-        StopTime stopTime = this.stop_times.get(index.first().b);
+    /** Get list of distinct trips (filters out multiple visits by a trip) a given stop_id. */
+    public List<Trip> getDistinctTripsForStop (String stop_id) {
+        return getStopTimesForStop(stop_id).stream()
+                .map(stopTime -> this.trips.get(stopTime.trip_id))
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    /** Get the likely time zone for a stop using the agency of the first stop time encountered for the stop. */
+    public ZoneId getAgencyTimeZoneForStop (String stop_id) {
+        StopTime stopTime = getStopTimesForStop(stop_id).iterator().next();
 
         Trip trip = this.trips.get(stopTime.trip_id);
         Route route = this.routes.get(trip.route_id);

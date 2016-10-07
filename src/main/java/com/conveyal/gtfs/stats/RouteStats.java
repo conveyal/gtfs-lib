@@ -59,7 +59,15 @@ public class RouteStats {
         return route != null ? route.route_short_name + " - " + route.route_long_name : null;
     }
 
-    /** Get average speed on a direction of a route, in meters/second */
+    /**
+     * Get average speed on a direction of a route, in meters per second.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @param from
+     * @param to
+     * @return avg. speed (meters per second)
+     */
     public double getSpeedForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
@@ -68,7 +76,15 @@ public class RouteStats {
         return patternStats.getAverageSpeedForTrips(tripsForRouteDirection, from, to);
     }
 
-    /** Get the average headway of a route over a time window, in seconds */
+    /**
+     * Get the average headway for a route direction for a specified service date and time window, in seconds.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @param from
+     * @param to
+     * @return avg. headway in seconds
+     */
     public int getHeadwayForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
         Set<String> commonStops = null;
 
@@ -93,6 +109,13 @@ public class RouteStats {
         return stopStats.getStopHeadwayForTrips(commonStop, tripsForRouteDirection, from, to);
     }
 
+    /**
+     * Get earliest departure time for a given route direction on the specified date.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @return earliest departure time
+     */
     public LocalTime getStartTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
 
 
@@ -103,6 +126,13 @@ public class RouteStats {
         return patternStats.getStartTimeForTrips(tripsForRouteDirection);
     }
 
+    /**
+     * Get latest arrival time for a given route direction on the specified date.
+     * @param route_id
+     * @param direction_id
+     * @param date
+     * @return last arrival time
+     */
     public LocalTime getEndTimeForRouteDirection (String route_id, int direction_id, LocalDate date) {
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
@@ -127,6 +157,11 @@ public class RouteStats {
         return tripCountPerDate;
     }
 
+    /**
+     * Returns a map of dates to list of trips for a given route.
+     * @param route_id
+     * @return mapping of trips to dates
+     */
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService(String route_id) {
 
         Map<String, List<Trip>> tripsPerService = getTripsPerService(route_id);
@@ -157,6 +192,11 @@ public class RouteStats {
         return tripsPerDate;
     }
 
+    /**
+     * Maps a list of trips to all service entries for a given route.
+     * @param route_id
+     * @return mapping of trips to service_id
+     */
     public Map<String, List<Trip>> getTripsPerService (String route_id) {
         Route route = feed.routes.get(route_id);
         if (route == null) return null;
@@ -174,6 +214,12 @@ public class RouteStats {
         return tripsPerService;
     }
 
+    /**
+     * Gets all trips for a given route that operate on the specified date.
+     * @param route_id
+     * @param date
+     * @return
+     */
     public List<Trip> getTripsForDate (String route_id, LocalDate date) {
         Route route = feed.routes.get(route_id);
         if (route == null) return null;
