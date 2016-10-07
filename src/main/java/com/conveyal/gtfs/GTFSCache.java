@@ -112,7 +112,7 @@ public class GTFSCache {
         LOG.info("Writing feed to s3 cache");
         if (bucket != null) {
             String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
-            
+
             s3.putObject(bucket, key + ".zip", feedFile);
             s3.putObject(bucket, key + ".db", new File(cacheDir, cleanId + ".db"));
             s3.putObject(bucket, key + ".db.p", new File(cacheDir, cleanId + ".db.p"));
@@ -147,6 +147,7 @@ public class GTFSCache {
     private GTFSFeed retrieveFeed (String originalId) {
         // see if we have it cached locally
         String id = cleanId(originalId);
+        String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
         File dbFile = new File(cacheDir, id + ".db");
         if (dbFile.exists()) {
             LOG.info("Processed GTFS was found cached locally");
@@ -156,14 +157,14 @@ public class GTFSCache {
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
-                S3Object db = s3.getObject(bucket, id + ".db");
+                S3Object db = s3.getObject(bucket, key + ".db");
                 InputStream is = db.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(dbFile);
                 ByteStreams.copy(is, fos);
                 is.close();
                 fos.close();
 
-                S3Object dbp = s3.getObject(bucket, id + ".db.p");
+                S3Object dbp = s3.getObject(bucket, key + ".db.p");
                 InputStream isp = dbp.getObjectContent();
                 FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".db.p"));
                 ByteStreams.copy(isp, fosp);
@@ -186,7 +187,7 @@ public class GTFSCache {
         if (!feedFile.exists() && bucket != null) {
 
             try {
-                S3Object gtfs = s3.getObject(bucket, id + ".zip");
+                S3Object gtfs = s3.getObject(bucket, key + ".zip");
                 InputStream is = gtfs.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(feedFile);
                 ByteStreams.copy(is, fos);
