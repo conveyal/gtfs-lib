@@ -131,7 +131,7 @@ public class StopStats {
         for (StopTime st : stopTimes) {
 
             // these trips are actually running on the next day, skip them
-            if (st.departure_time > 86399) continue;
+            if (st.departure_time > 86399 || st.departure_time < 0) continue;
 
             LocalTime timeAtStop = LocalTime.ofSecondOfDay(st.departure_time);
 
