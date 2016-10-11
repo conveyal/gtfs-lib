@@ -33,10 +33,10 @@ public class PatternStats {
 
     /**
      * Gets the pattern speed for a given pattern for a specified date and time window.
-     * @param pattern_id
-     * @param date
-     * @param from
-     * @param to
+     * @param pattern_id pattern ID
+     * @param date service date
+     * @param from beginning of time window
+     * @param to end of time window
      * @return
      */
     public double getPatternSpeed (String pattern_id, LocalDate date, LocalTime from, LocalTime to) {
@@ -186,9 +186,16 @@ public class PatternStats {
         return getPatternDistance(pattern_id) / pattern.orderedStops.size();
     }
 
-
+    /**
+     *
+     * @param pattern_id pattern ID
+     * @param date service date
+     * @param from beginning of time window
+     * @param to end of time window
+     * @return
+     */
     public int getHeadwayForPattern (String pattern_id, LocalDate date, LocalTime from, LocalTime to) {
-        
+
         List<Trip> tripsForPattern = getTripsForDate(pattern_id, date);
 
         String commonStop = stats.route.getCommonStopForTrips(tripsForPattern);
@@ -197,18 +204,28 @@ public class PatternStats {
         return stats.stop.getStopHeadwayForTrips(commonStop, tripsForPattern, from, to);
     }
 
+    /**
+     *
+     * @param pattern_id pattern ID
+     * @param date service date
+     * @return list of trips
+     */
     public long getTripCountForDate (String pattern_id, LocalDate date) {
         return getTripsForDate(pattern_id, date).size();
     }
 
+    /**
+     *
+     * @param pattern_id pattern ID
+     * @param date service date
+     * @return list of trips
+     */
     public List<Trip> getTripsForDate (String pattern_id, LocalDate date) {
         Pattern pattern = feed.patterns.get(pattern_id);
         if (pattern == null) return null;
 
-        List<Trip> trips = stats.getTripsForDate(date).stream()
+        return stats.getTripsForDate(date).stream()
                 .filter(trip -> pattern.associatedTrips.contains(trip.trip_id))
                 .collect(Collectors.toList());
-
-        return trips;
     }
 }

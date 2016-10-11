@@ -236,6 +236,10 @@ public class RouteStats {
         return trips;
     }
 
+    public long getTripCountForDate (String route_id, LocalDate date) {
+        return getTripsForDate(route_id, date).size();
+    }
+
     public RouteStatistic getStatisticForRoute (String route_id, LocalDate date, LocalTime from, LocalTime to) {
         RouteStatistic rs = new RouteStatistic(this, route_id, date, from, to);
 

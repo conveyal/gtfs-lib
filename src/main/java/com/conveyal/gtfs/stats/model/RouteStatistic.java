@@ -16,6 +16,7 @@ public class RouteStatistic {
     public String routeName;
     public int headway;
     public Double avgSpeed;
+    public long tripCount;
 //    public Double avgSpeedOffPeak;
 //    private LocalDate calendarServiceEnd;
 //    private LocalDate calendarStartDate;
@@ -25,8 +26,10 @@ public class RouteStatistic {
     public RouteStatistic (RouteStats stats, String route_id, LocalDate date, LocalTime from, LocalTime to) {
         this.route_id = route_id;
         routeName = stats.getRouteName(route_id);
+        // TODO: add fields for inbound and outbound directions
         headway = stats.getHeadwayForRouteDirection(this.route_id, 0, date, from, to);
         avgSpeed = stats.getSpeedForRouteDirection(this.route_id, 0, date, from, to);
+        tripCount = stats.getTripCountForDate(this.route_id, date);
     }
 
     public static String getHeaderAsCsv () {

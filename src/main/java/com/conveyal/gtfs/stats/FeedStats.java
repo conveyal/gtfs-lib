@@ -52,6 +52,11 @@ public class FeedStats {
         return feed.trips.size();
     }
 
+    public Integer getTripCount(LocalDate date) {
+        return getTripsForDate(date).size();
+    }
+
+
     public Integer getStopCount() {
         return feed.stops.size();
     }
@@ -174,18 +179,19 @@ public class FeedStats {
     }
 
     /** in seconds */
-    public double getDailyAverageHeadway (LocalDate date, LocalTime from, LocalTime to) {
+    public int getDailyAverageHeadway (LocalDate date, LocalTime from, LocalTime to) {
 
         OptionalDouble avg =  feed.stops.values().stream()
                 .map(s -> this.stop.getAverageHeadwayForStop(s.stop_id, date, from, to))
                 .mapToDouble(headway -> headway)
                 .average();
 
-        return avg.getAsDouble();
+        return (int) avg.getAsDouble();
     }
 
-    public double getAverageTripSpeed (LocalTime from, LocalTime to) {
-        return this.pattern.getAverageSpeedForTrips(feed.trips.values(), from, to);
+    public double getAverageTripSpeed (LocalDate date, LocalTime from, LocalTime to) {
+        List<Trip> trips = getTripsForDate(date);
+        return this.pattern.getAverageSpeedForTrips(trips, from, to);
     }
 
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {
