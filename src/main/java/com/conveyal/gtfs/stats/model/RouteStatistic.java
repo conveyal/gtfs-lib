@@ -17,6 +17,7 @@ public class RouteStatistic {
     public int headway;
     public Double avgSpeed;
     public long tripCount;
+    public double stopSpacing;
 //    public Double avgSpeedOffPeak;
 //    private LocalDate calendarServiceEnd;
 //    private LocalDate calendarStartDate;
@@ -30,6 +31,7 @@ public class RouteStatistic {
         headway = stats.getHeadwayForRouteDirection(this.route_id, 0, date, from, to);
         avgSpeed = stats.getSpeedForRouteDirection(this.route_id, 0, date, from, to);
         tripCount = stats.getTripCountForDate(this.route_id, date);
+        stopSpacing = stats.getAverageStopSpacing(this.route_id);
     }
 
     public static String getHeaderAsCsv () {

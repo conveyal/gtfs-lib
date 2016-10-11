@@ -14,6 +14,7 @@ public class PatternStatistic {
     public int headway;
     public Double avgSpeed;
     public long tripCount;
+    public double stopSpacing;
 //    public Double avgSpeedOffPeak;
 //    private LocalDate calendarServiceEnd;
 //    private LocalDate calendarStartDate;
@@ -25,5 +26,6 @@ public class PatternStatistic {
         headway = stats.getHeadwayForPattern(this.pattern_id, date, from, to);
         avgSpeed = stats.getPatternSpeed(this.pattern_id, date, from, to);
         tripCount = stats.getTripCountForDate(this.pattern_id, date);
+        stopSpacing = stats.getAverageStopSpacing(this.pattern_id);
     }
 }

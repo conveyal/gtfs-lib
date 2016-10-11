@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.stats;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Trip;
@@ -238,6 +239,20 @@ public class RouteStats {
 
     public long getTripCountForDate (String route_id, LocalDate date) {
         return getTripsForDate(route_id, date).size();
+    }
+
+    /**
+     * Get average stop spacing for a route.
+     * @param route_id
+     * @return avg. stop spacing (in meters)
+     */
+    public double getAverageStopSpacing (String route_id) {
+        return feed.patterns.values().stream()
+                .filter(p -> p.route_id.equals(route_id))
+                .map(p -> stats.pattern.getAverageStopSpacing(p.pattern_id))
+                .mapToDouble(headway -> headway)
+                .average()
+                .getAsDouble();
     }
 
     public RouteStatistic getStatisticForRoute (String route_id, LocalDate date, LocalTime from, LocalTime to) {

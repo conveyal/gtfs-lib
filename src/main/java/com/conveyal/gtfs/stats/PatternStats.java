@@ -182,7 +182,6 @@ public class PatternStats {
      */
     public double getAverageStopSpacing (String pattern_id) {
         Pattern pattern = feed.patterns.get(pattern_id);
-
         return getPatternDistance(pattern_id) / pattern.orderedStops.size();
     }
 
