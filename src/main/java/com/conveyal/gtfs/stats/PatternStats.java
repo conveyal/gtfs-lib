@@ -72,7 +72,7 @@ public class PatternStats {
             }
         }
 
-        if (speeds.isEmpty()) return Double.NaN;
+        if (speeds.isEmpty()) return -1;
 
         return speeds.sum() / speeds.size();
     }
