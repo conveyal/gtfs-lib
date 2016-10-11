@@ -177,7 +177,8 @@ public class StopStats {
     }
 
     /**
-     * Returns a list of transfer performance summaries for each route pair at a stop for the specified date of service.
+     * Returns a list of transfer performance summaries (max, min, and median wait times between routes)
+     * for each route pair at a stop for the specified date of service.
      * @param stop_id
      * @param date
      * @return
