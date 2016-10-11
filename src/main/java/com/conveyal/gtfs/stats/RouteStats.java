@@ -86,13 +86,20 @@ public class RouteStats {
      * @return avg. headway in seconds
      */
     public int getHeadwayForRouteDirection (String route_id, int direction_id, LocalDate date, LocalTime from, LocalTime to) {
-        Set<String> commonStops = null;
-
         List<Trip> tripsForRouteDirection = getTripsForDate(route_id, date).stream()
                 .filter(t -> t.direction_id == direction_id)
                 .collect(Collectors.toList());
 
-        for (Trip trip : tripsForRouteDirection) {
+        String commonStop = getCommonStopForTrips(tripsForRouteDirection);
+        if (commonStop == null) return -1;
+
+        return stats.stop.getStopHeadwayForTrips(commonStop, tripsForRouteDirection, from, to);
+    }
+
+    public String getCommonStopForTrips(List<Trip> trips) {
+        Set<String> commonStops = null;
+
+        for (Trip trip : trips) {
             List<String> stops = feed.getOrderedStopListForTrip(trip.trip_id);
 
             if (commonStops == null) {
@@ -102,11 +109,10 @@ public class RouteStats {
             }
         }
 
-        if (commonStops.isEmpty()) return -1;
+        if (commonStops.isEmpty()) return null;
 
         String commonStop = commonStops.iterator().next();
-
-        return stopStats.getStopHeadwayForTrips(commonStop, tripsForRouteDirection, from, to);
+        return commonStop;
     }
 
     /**

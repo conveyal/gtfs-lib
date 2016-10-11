@@ -186,6 +186,19 @@ public class PatternStats {
         return getPatternDistance(pattern_id) / pattern.orderedStops.size();
     }
 
+
+    public int getHeadwayForPattern (String pattern_id, LocalDate date, LocalTime from, LocalTime to) {
+        Pattern pattern = feed.patterns.get(pattern_id);
+        List<Trip> tripsForPattern = pattern.associatedTrips.stream()
+                .map(feed.trips::get)
+                .collect(Collectors.toList());
+
+        String commonStop = stats.route.getCommonStopForTrips(tripsForPattern);
+        if (commonStop == null) return -1;
+
+        return stats.stop.getStopHeadwayForTrips(commonStop, tripsForPattern, from, to);
+    }
+
     public long getTripCountForDate (String pattern_id, LocalDate date) {
         return getTripsForDate(pattern_id, date).size();
     }
