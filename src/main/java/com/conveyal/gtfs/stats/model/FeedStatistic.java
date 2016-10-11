@@ -10,7 +10,7 @@ import java.time.LocalTime;
  */
 public class FeedStatistic {
 
-    public String pattern_id;
+    public String feed_id;
     public int headway;
     public Double avgSpeed;
     public long tripCount;
@@ -21,8 +21,8 @@ public class FeedStatistic {
 //    private LocalDate calendarEndDate;
 //    private Rectangle2D bounds;
 
-    public FeedStatistic (FeedStats stats, String pattern_id, LocalDate date, LocalTime from, LocalTime to) {
-        this.pattern_id = pattern_id;
+    public FeedStatistic (FeedStats stats, LocalDate date, LocalTime from, LocalTime to) {
+        feed_id = stats.feed_id;
         headway = stats.getDailyAverageHeadway(date, from, to);
         avgSpeed = stats.getAverageTripSpeed(date, from, to);
         tripCount = stats.getTripCount(date);

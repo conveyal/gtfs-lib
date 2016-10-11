@@ -29,12 +29,14 @@ import org.mapdb.Fun;
 public class FeedStats {
 
     private GTFSFeed feed = null;
+    public String feed_id = null;
     public PatternStats pattern = null;
     public StopStats stop = null;
     public RouteStats route = null;
 
     public FeedStats(GTFSFeed f) {
         this.feed = f;
+        this.feed_id = f.feedId;
         this.pattern = new PatternStats(feed, this);
         this.stop = new StopStats(feed, this);
         this.route = new RouteStats(feed, this);
