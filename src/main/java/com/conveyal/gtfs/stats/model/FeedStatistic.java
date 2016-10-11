@@ -14,7 +14,7 @@ public class FeedStatistic {
     public int headway;
     public Double avgSpeed;
     public long tripCount;
-    public double revenueTime;
+    public int revenueTime;
 //    public Double avgSpeedOffPeak;
 //    private LocalDate calendarServiceEnd;
 //    private LocalDate calendarStartDate;
