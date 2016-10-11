@@ -109,7 +109,7 @@ public class RouteStats {
             }
         }
 
-        if (commonStops.isEmpty()) return null;
+        if (commonStops == null || commonStops.isEmpty()) return null;
 
         String commonStop = commonStops.iterator().next();
         return commonStop;
