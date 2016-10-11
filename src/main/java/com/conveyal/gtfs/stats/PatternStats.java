@@ -188,10 +188,8 @@ public class PatternStats {
 
 
     public int getHeadwayForPattern (String pattern_id, LocalDate date, LocalTime from, LocalTime to) {
-        Pattern pattern = feed.patterns.get(pattern_id);
-        List<Trip> tripsForPattern = pattern.associatedTrips.stream()
-                .map(feed.trips::get)
-                .collect(Collectors.toList());
+        
+        List<Trip> tripsForPattern = getTripsForDate(pattern_id, date);
 
         String commonStop = stats.route.getCommonStopForTrips(tripsForPattern);
         if (commonStop == null) return -1;
