@@ -120,18 +120,15 @@ public class StopStats {
     //TODO: specified stop vs. first stop
     public int getStopHeadwayForTrips (String stop_id, List<Trip> trips, LocalTime from, LocalTime to) {
         TIntList timesAtStop = new TIntArrayList();
+        Set<String> tripIds = trips.stream()
+                .map(t -> t.trip_id)
+                .collect(Collectors.toSet());
 
-        for (Trip trip : trips) {
-            StopTime st;
-            try {
-                // use interpolated times in case our common stop is not a time point
-                st = StreamSupport.stream(feed.getInterpolatedStopTimesForTrip(trip.trip_id).spliterator(), false)
-                        .filter(candidate -> candidate.stop_id.equals(stop_id))
-                        .findFirst()
-                        .orElse(null);
-            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                return -1;
-            }
+        List<StopTime> stopTimes = feed.getStopTimesForStop(stop_id).stream()
+                .filter(st -> tripIds.contains(st.trip_id))
+                .collect(Collectors.toList());
+
+        for (StopTime st : stopTimes) {
 
             // these trips are actually running on the next day, skip them
             if (st.departure_time > 86399) continue;
@@ -187,6 +184,7 @@ public class StopStats {
      */
     public List<TransferPerformanceSummary> getTransferPerformance (String stop_id, LocalDate date) {
         List<StopTime> stopTimes = feed.getStopTimesForStop(stop_id);
+
         Map<String, List<StopTime>> routeStopTimeMap  = new HashMap<>();
         List<TransferPerformanceSummary> transferPerformanceMap = new ArrayList<>();
         // TODO: do we need to handle interpolated stop times???
