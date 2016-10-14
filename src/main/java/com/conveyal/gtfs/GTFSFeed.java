@@ -36,11 +36,17 @@ import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.time.LocalDate;
+import java.time.Period;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -55,6 +61,7 @@ import static com.conveyal.gtfs.util.Util.human;
 public class GTFSFeed implements Cloneable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
+    private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private DB db;
 
@@ -70,7 +77,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Route> routes;
     public final Map<String, Stop> stops;
     public final Map<String, Transfer> transfers;
-    public final Map<String, Trip> trips;
+    public final BTreeMap<String, Trip> trips;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -82,14 +89,20 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
-    public final ConcurrentMap<String, Long> stopCountByStopTime;
+//    public final ConcurrentMap<String, Long> stopCountByStopTime;
+
+    /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
     public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
+
+    public final NavigableSet<Tuple2<String, String>> tripsPerService;
+
+    public final NavigableSet<Tuple2<String, String>> servicesPerDate;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
 
     /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
-    public final Map<String, Service> services;
+    public final BTreeMap<String, Service> services;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     public final NavigableSet<GTFSError> errors;
@@ -187,9 +200,29 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
-
-        Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
+        LOG.info("Building stop to stop times index");
+//        Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
         Bind.secondaryKeys(stop_times, stopStopTimeSet, (key, stopTime) -> new String[] {stopTime.stop_id});
+        LOG.info("Building trips per service index");
+        Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
+        LOG.info("Building services per date index");
+        Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
+            IntStream stream = IntStream.range(0,
+                    Period.between(
+                            LocalDate.parse(String.valueOf(service.calendar.start_date), dateFormatter),
+                            LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter).plus(1, ChronoUnit.DAYS) // end date is not inclusive
+                    ).getDays()
+            );
+            String[] array = stream.mapToObj(offset -> LocalDate.parse(
+                    String.valueOf(service.calendar.start_date),
+                    dateFormatter).plusDays(offset)
+            )
+                    .filter(service::activeOn)
+                    .map(date -> date.format(dateFormatter))
+                    .toArray(size -> new String[size]);
+
+            return array;
+        });
 
         loaded = true;
     }
@@ -723,6 +756,26 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .collect(Collectors.toList());
     }
 
+    public List<Trip> getTripsForService (String service_id) {
+        SortedSet<Tuple2<String, String>> index = this.tripsPerService
+                .subSet(new Tuple2<>(service_id, null), new Tuple2(service_id, Fun.HI));
+
+        return index.stream()
+                .map(tuple -> this.trips.get(tuple.b))
+                .collect(Collectors.toList());
+    }
+
+    /** Get list of services for each date of service. */
+    public List<Service> getServicesForDate (LocalDate date) {
+        String dateString = date.format(dateFormatter);
+        SortedSet<Tuple2<String, String>> index = this.servicesPerDate
+                .subSet(new Tuple2<>(dateString, null), new Tuple2(dateString, Fun.HI));
+
+        return index.stream()
+                .map(tuple -> this.services.get(tuple.b))
+                .collect(Collectors.toList());
+    }
+
     /** Get list of distinct trips (filters out multiple visits by a trip) a given stop_id. */
     public List<Trip> getDistinctTripsForStop (String stop_id) {
         return getStopTimesForStop(stop_id).stream()
@@ -748,7 +801,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 //            synchronized (this) {
                 Collection<Geometry> polygons = new ArrayList<>();
                 for (Stop stop : this.stops.values()) {
-                    if (stopCountByStopTime != null && !stopCountByStopTime.containsKey(stop.stop_id)) {
+                    if (getStopTimesForStop(stop.stop_id).isEmpty()) {
                         continue;
                     }
                     if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
@@ -867,8 +920,9 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         tripPatternMap = db.getTreeMap("patternForTrip");
 
-        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
         stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
+        tripsPerService = db.getTreeSet("tripsPerService");
+        servicesPerDate = db.getTreeSet("servicesPerDate");
 
         errors = db.getTreeSet("errors");
     }

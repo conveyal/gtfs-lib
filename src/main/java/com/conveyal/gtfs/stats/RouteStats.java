@@ -170,55 +170,16 @@ public class RouteStats {
      * @return mapping of trips to dates
      */
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService(String route_id) {
-
-        Map<String, List<Trip>> tripsPerService = getTripsPerService(route_id);
-        Map<LocalDate, List<Trip>> tripsPerDate = new HashMap<>();
-
-
-        LocalDate startDate = stats.getStartDate();
-        LocalDate endDate = stats.getEndDate();
-
-        // loop through services
-        for (Service service : feed.services.values()) {
-            // iterate through each date between start and end date
-            for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
-                List<Trip> tripList = getTripsForDate(route_id, date);
-                if (tripList == null) {
-                    tripList = new ArrayList<>();
-                }
-                // if service is active on given day, add all trips that operate under that service
-                if (service.activeOn(date)) {
-                    List<Trip> serviceTrips = tripsPerService.get(service.service_id);
-                    if (serviceTrips != null)
-                        tripList.addAll(serviceTrips);
-
-                }
-                tripsPerDate.put(date, tripList);
-            }
+        Map<LocalDate, List<Trip>> tripsPerDate = stats.getTripsPerDateOfService();
+        for (Map.Entry<LocalDate, List<Trip>> e : tripsPerDate.entrySet()) {
+            LocalDate date = e.getKey();
+            List<Trip> trips = e.getValue().stream()
+                    .filter(t -> t.route_id.equals(route_id))
+                    .collect(Collectors.toList());
+            tripsPerDate.put(date, trips);
         }
+
         return tripsPerDate;
-    }
-
-    /**
-     * Maps a list of trips to all service entries for a given route.
-     * @param route_id
-     * @return mapping of trips to service_id
-     */
-    public Map<String, List<Trip>> getTripsPerService (String route_id) {
-        Route route = feed.routes.get(route_id);
-        if (route == null) return null;
-
-        Map<String, List<Trip>> tripsPerService = stats.getTripsPerService();
-
-        tripsPerService.forEach(((s, trips) -> {
-            for (Iterator<Trip> it = trips.iterator(); it.hasNext();) {
-                Trip trip = it.next();
-                if (!trip.route_id.equals(route_id)) {
-                    it.remove();
-                }
-            }
-        }));
-        return tripsPerService;
     }
 
     /**

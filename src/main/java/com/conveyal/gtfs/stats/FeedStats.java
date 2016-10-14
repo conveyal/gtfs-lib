@@ -198,52 +198,24 @@ public class FeedStats {
 
     public Map<LocalDate, List<Trip>> getTripsPerDateOfService() {
 
-        Map<String, List<Trip>> tripsPerService = getTripsPerService();
         Map<LocalDate, List<Trip>> tripsPerDate = new HashMap<>();
 
         LocalDate startDate = getStartDate();
         LocalDate endDate = getEndDate();
 
+        // iterate through each date between start and end date
+        for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
+            List<Trip> trips = feed.getServicesForDate(date).stream()
+                    .map(s -> feed.getTripsForService(s.service_id))
+                    .flatMap(List::stream)
+                    .collect(Collectors.toList());
 
-        // loop through services
-        for (Service service : feed.services.values()) {
+            if (trips.isEmpty()) continue;
 
-            // skip service if start or end date is null
-            if (startDate == null || endDate == null) {
-                continue;
-            }
-
-            // iterate through each date between start and end date
-            for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
-                List<Trip> tripList = getTripsForDate(date);
-                if (tripList == null) {
-                    tripList = new ArrayList<>();
-                }
-                // if service is active on given day, add all trips that operate under that service
-                if (service.activeOn(date)) {
-                    List<Trip> serviceTrips = tripsPerService.get(service.service_id);
-                    if (serviceTrips != null)
-                        tripList.addAll(serviceTrips);
-
-                }
-                tripsPerDate.put(date, tripList);
-            }
+            tripsPerDate.put(date, trips);
         }
+
         return tripsPerDate;
-    }
-
-    public Map<String, List<Trip>> getTripsPerService () {
-        Map<String, List<Trip>> tripsPerService = new HashMap<>();
-
-        feed.trips.values().stream().forEach(trip -> {
-            List<Trip> tripsList = tripsPerService.get(trip.service_id);
-            if (tripsList == null) {
-                tripsList = new ArrayList<>();
-            }
-            tripsList.add(trip);
-            tripsPerService.put(trip.service_id, tripsList);
-        });
-        return tripsPerService;
     }
 
     public List<Trip> getTripsForDate (LocalDate date) {
