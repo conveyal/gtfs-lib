@@ -19,17 +19,18 @@ public class UnusedStopValidator extends GTFSValidator {
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
         ValidationResult result = new ValidationResult();
-        
+        long index = 1;
         // check for unused stops
         for (Iterator<Stop> iter = feed.stops.values().iterator(); iter.hasNext();) {
             Stop stop = iter.next();
-            if(!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
-                feed.errors.add(new UnusedStopError(stop.stop_id, stop));
+            if(feed.getStopTimesForStop(stop.stop_id).isEmpty()) {
+                feed.errors.add(new UnusedStopError(stop.stop_id, index, stop));
                 isValid = false;
                 if (repair) {
                     iter.remove();
                 }
             }
+            index++;
         }
         return isValid;
     }
