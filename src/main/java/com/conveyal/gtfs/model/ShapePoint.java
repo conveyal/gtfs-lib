@@ -44,6 +44,11 @@ public class ShapePoint extends Entity {
         }
 
         @Override
+        protected boolean isRequired() {
+            return false;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             String shape_id = getStringField("shape_id", true);
             double shape_pt_lat = getDoubleField("shape_pt_lat", true, -90D, 90D);

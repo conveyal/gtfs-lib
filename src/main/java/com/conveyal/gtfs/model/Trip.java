@@ -41,12 +41,16 @@ public class Trip extends Entity {
         }
 
         @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             Trip t = new Trip();
-            Service service = getRefField("service_id", true, feed.services);
-            Route route = getRefField("route_id", true, feed.routes);
-            t.route_id        = route != null ? route.route_id : null;
-            t.service_id      = service != null ? service.service_id : null;
+
+            t.route_id        = getStringField("route_id", true);
+            t.service_id      = getStringField("service_id", true);
             t.trip_id         = getStringField("trip_id", true);
             t.trip_headsign   = getStringField("trip_headsign", false);
             t.trip_short_name = getStringField("trip_short_name", false);
@@ -59,7 +63,13 @@ public class Trip extends Entity {
             t.feed_id = feed.feedId;
             feed.trips.put(t.trip_id, t);
 
+            /*
+              Check referential integrity without storing references. Trip cannot directly reference Services or
+              Routes because they would be serialized into the MapDB.
+             */
             // TODO confirm existence of shape ID
+            getRefField("service_id", true, feed.services);
+            getRefField("route_id", true, feed.routes);
         }
 
     }

@@ -9,6 +9,7 @@ import com.conveyal.gtfs.error.MissingTableError;
 import com.conveyal.gtfs.error.NumberParseError;
 import com.conveyal.gtfs.error.RangeError;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
+import com.conveyal.gtfs.error.TableInSubdirectoryError;
 import com.conveyal.gtfs.error.TimeParseError;
 import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.util.Deduplicator;
@@ -29,6 +30,7 @@ import java.net.URL;
 import java.nio.charset.Charset;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
@@ -59,7 +61,7 @@ public abstract class Entity implements Serializable {
         protected final GTFSFeed feed;    // the feed into which we are loading the entities
         protected final String tableName; // name of corresponding table without .txt
         protected final Set<String> missingRequiredColumns = Sets.newHashSet();
-        public boolean required = false;
+//        public boolean required = false;
 
         protected CsvReader reader;
         protected long      row;
@@ -218,6 +220,8 @@ public abstract class Entity implements Serializable {
             return val;
         }
 
+        protected abstract boolean isRequired();
+
         /** Implemented by subclasses to read one row, produce one GTFS entity, and store that entity in a map. */
         protected abstract void loadOneRow() throws IOException;
 
@@ -230,13 +234,23 @@ public abstract class Entity implements Serializable {
         public void loadTable(ZipFile zip) throws IOException {
             ZipEntry entry = zip.getEntry(tableName + ".txt");
             if (entry == null) {
+                Enumeration<? extends ZipEntry> entries = zip.entries();
+                // check if table is contained within sub-directory
+                while (entries.hasMoreElements()) {
+                    ZipEntry e = entries.nextElement();
+                    if (e.getName().endsWith(tableName + ".txt")) {
+                        entry = e;
+                        feed.errors.add(new TableInSubdirectoryError(tableName, entry.getName().replace(tableName + ".txt", "")));
+                    }
+                }
                 /* This GTFS table did not exist in the zip. */
-                if (required) {
+                if (this.isRequired()) {
                     feed.errors.add(new MissingTableError(tableName));
                 } else {
                     LOG.info("Table {} was missing but it is not required.", tableName);
                 }
-                return;
+
+                if (entry == null) return;
             }
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
             InputStream zis = zip.getInputStream(entry);

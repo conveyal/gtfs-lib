@@ -49,6 +49,11 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         }
 
         @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             Route r = new Route();
             r.route_id = getStringField("route_id", true);

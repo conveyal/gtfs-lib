@@ -43,6 +43,11 @@ public class Stop extends Entity {
         }
 
         @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             Stop s = new Stop();
             s.stop_id   = getStringField("stop_id", true);

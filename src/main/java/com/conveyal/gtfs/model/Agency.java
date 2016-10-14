@@ -38,6 +38,11 @@ public class Agency extends Entity {
         }
 
         @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             Agency a = new Agency();
             a.agency_id    = getStringField("agency_id", false); // can only be absent if there is a single agency -- requires a special validator.

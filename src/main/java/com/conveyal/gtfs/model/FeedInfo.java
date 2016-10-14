@@ -47,6 +47,11 @@ public class FeedInfo extends Entity implements Cloneable {
         }
 
         @Override
+        protected boolean isRequired() {
+            return false;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             FeedInfo fi = new FeedInfo();
             fi.feed_id = getStringField("feed_id", false);

@@ -38,6 +38,11 @@ public class FareAttribute extends Entity {
         }
 
         @Override
+        protected boolean isRequired() {
+            return false;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
 
             /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */

@@ -32,6 +32,11 @@ public class Transfer extends Entity {
         }
 
         @Override
+        protected boolean isRequired() {
+            return false;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
             tr.from_stop_id      = getRefField("from_stop_id", true, feed.stops).stop_id;

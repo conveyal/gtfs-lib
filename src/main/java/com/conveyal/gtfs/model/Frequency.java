@@ -62,6 +62,11 @@ public class Frequency extends Entity implements Comparable<Frequency> {
         }
 
         @Override
+        protected boolean isRequired() {
+            return false;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             Frequency f = new Frequency();
             Trip trip = getRefField("trip_id", true, feed.trips);

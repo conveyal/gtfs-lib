@@ -52,6 +52,11 @@ public class Calendar extends Entity implements Serializable {
         }
 
         @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
 
             /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */

@@ -46,6 +46,11 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         }
 
         @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
         public void loadOneRow() throws IOException {
             StopTime st = new StopTime();
             st.trip_id        = getStringField("trip_id", true);

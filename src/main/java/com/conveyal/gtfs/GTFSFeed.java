@@ -186,7 +186,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
-            LOG.info("{}", error);
         }
 
         Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
