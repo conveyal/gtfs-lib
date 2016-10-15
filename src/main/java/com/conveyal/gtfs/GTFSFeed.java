@@ -207,21 +207,21 @@ public class GTFSFeed implements Cloneable, Closeable {
         Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
         LOG.info("Building services per date index");
         Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
-            IntStream stream = IntStream.range(0,
-                    Period.between(
-                            LocalDate.parse(String.valueOf(service.calendar.start_date), dateFormatter),
-                            LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter).plus(1, ChronoUnit.DAYS) // end date is not inclusive
-                    ).getDays()
-            );
-            String[] array = stream.mapToObj(offset -> LocalDate.parse(
-                    String.valueOf(service.calendar.start_date),
-                    dateFormatter).plusDays(offset)
-            )
+
+            LocalDate startDate = service.calendar != null
+                    ? LocalDate.parse(String.valueOf(service.calendar.start_date), dateFormatter)
+                    : service.calendar_dates.keySet().stream().sorted().findFirst().get();
+            LocalDate endDate = service.calendar != null
+                    ? LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter)
+                    : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
+
+            // end date for Period.between is not inclusive
+
+            return IntStream.range(0, Period.between(startDate, endDate.plus(1, ChronoUnit.DAYS)).getDays())
+                    .mapToObj(offset -> startDate.plusDays(offset))
                     .filter(service::activeOn)
                     .map(date -> date.format(dateFormatter))
                     .toArray(size -> new String[size]);
-
-            return array;
         });
 
         loaded = true;
