@@ -205,10 +205,7 @@ public class FeedStats {
 
         // iterate through each date between start and end date
         for (LocalDate date = startDate; date.isBefore(endDate); date = date.plusDays(1)) {
-            List<Trip> trips = feed.getServicesForDate(date).stream()
-                    .map(s -> feed.getTripsForService(s.service_id))
-                    .flatMap(List::stream)
-                    .collect(Collectors.toList());
+            List<Trip> trips = getTripsForDate(date);
 
             if (trips.isEmpty()) continue;
 
@@ -219,25 +216,10 @@ public class FeedStats {
     }
 
     public List<Trip> getTripsForDate (LocalDate date) {
-        List<Trip> trips = new ArrayList<>();
-
-        // loop through services
-        // if service is active on given day, add all trips that operate under that service
-        feed.services.values().stream()
-                .filter(service -> service.activeOn(date))
-                .forEach(service -> {
-                    List<Trip> serviceTrips = feed.trips.values().stream()
-                            .filter(trip ->
-                                trip.service_id != null
-                                && service.service_id != null
-                                && trip.service_id.equals(service.service_id))
-                            .collect(Collectors.toList());
-                    if (serviceTrips != null) {
-                        trips.addAll(serviceTrips);
-                    }
-                }
-        );
-        return trips;
+        return feed.getServicesForDate(date).stream()
+                .map(s -> feed.getTripsForService(s.service_id))
+                .flatMap(List::stream)
+                .collect(Collectors.toList());
     }
 
     public Collection<Agency> getAllAgencies() {
