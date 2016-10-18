@@ -61,7 +61,6 @@ public abstract class Entity implements Serializable {
         protected final GTFSFeed feed;    // the feed into which we are loading the entities
         protected final String tableName; // name of corresponding table without .txt
         protected final Set<String> missingRequiredColumns = Sets.newHashSet();
-//        public boolean required = false;
 
         protected CsvReader reader;
         protected long      row;
