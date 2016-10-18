@@ -11,9 +11,9 @@ import java.io.Serializable;
 public class OverlappingTripsInBlockError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public String[] tripIds;
-    public String affectedEntityId;
-    public Priority priority = Priority.HIGH;
+    public final String[] tripIds;
+    public final String affectedEntityId;
+    public final Priority priority = Priority.HIGH;
 
     public OverlappingTripsInBlockError(long line, String field, String affectedEntityId, Route route, String[] tripIds, Priority priority) {
         super("trips", line, field);

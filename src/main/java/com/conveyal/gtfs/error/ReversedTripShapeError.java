@@ -10,9 +10,9 @@ import java.io.Serializable;
 public class ReversedTripShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.HIGH;
-    public String tripId;
-    public String shapeId;
+    public final Priority priority = Priority.HIGH;
+    public final String tripId;
+    public final String shapeId;
 
     public ReversedTripShapeError(String tripId, String shapeId) {
         super("trips", 0, "shape_id");

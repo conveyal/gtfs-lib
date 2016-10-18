@@ -11,9 +11,9 @@ import java.io.Serializable;
 public class NoStopTimesForTripError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.HIGH;
-    public String tripId;
-    public String routeId;
+    public final Priority priority = Priority.HIGH;
+    public final String tripId;
+    public final String routeId;
 
     public NoStopTimesForTripError(String tripId, String routeId) {
         super("trip", 0, "trip_id");

@@ -9,9 +9,9 @@ import java.io.Serializable;
 public class UnusedStopError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public String affectedEntityId;
-    public Priority priority;
-    public Stop stop;
+    public final String affectedEntityId;
+    public final Priority priority;
+    public final Stop stop;
 
     public UnusedStopError(String affectedEntityId, long line, Stop stop) {
         super("stops", line, "stop_id");

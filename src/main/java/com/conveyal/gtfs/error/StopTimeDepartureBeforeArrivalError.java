@@ -10,9 +10,9 @@ import java.io.Serializable;
 public class StopTimeDepartureBeforeArrivalError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.HIGH;
-    public String tripId;
-    public int stopSequence;
+    public final Priority priority = Priority.HIGH;
+    public final String tripId;
+    public final int stopSequence;
 
     public StopTimeDepartureBeforeArrivalError(String tripId, int stopSequence) {
         super("stop_times", 0, "trip_id");

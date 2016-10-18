@@ -10,10 +10,10 @@ import java.io.Serializable;
 public class StopTimesOutOfSequenceError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.HIGH;
-    public String tripId;
-    public int stopSequence;
-    public int previousStopSequence;
+    public final Priority priority = Priority.HIGH;
+    public final String tripId;
+    public final int stopSequence;
+    public final int previousStopSequence;
 
     public StopTimesOutOfSequenceError(String tripId, int stopSequence, int previousStopSequence) {
         super("stop_times", 0, "trip_id");

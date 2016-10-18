@@ -6,8 +6,8 @@ import java.io.Serializable;
 public class ReferentialIntegrityError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    // TODO maybe also store the entity ID of the entity which contained the bad reference, in addition to the row number
-    String badReference = null;
+    // TODO: maybe also store the entity ID of the entity which contained the bad reference, in addition to the row number
+    public final String badReference;
 
     public ReferentialIntegrityError(String tableName, long row, String field, String badReference) {
         super(tableName, row, field);
@@ -15,7 +15,7 @@ public class ReferentialIntegrityError extends GTFSError implements Serializable
     }
 
     @Override public String getMessage() {
-        return String.format("Entity references non-existent entity '%s'.", badReference);
+        return String.format(badReference);
     }
 
 }

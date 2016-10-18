@@ -11,9 +11,9 @@ import java.io.Serializable;
 public class StopMissingCoordinatesError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.MEDIUM;
-    public String stopId;
-    public Stop stop;
+    public final Priority priority = Priority.MEDIUM;
+    public final String stopId;
+    public final Stop stop;
     public StopMissingCoordinatesError(String stopId, Stop stop) {
         super("stops", 0, "stop_lat,stop_lon");
         this.stopId = stopId;

@@ -10,9 +10,9 @@ import java.io.Serializable;
 public class ShapeMissingCoordinatesError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.MEDIUM;
-    public String[] tripIds;
-    public String shapeId;
+    public final Priority priority = Priority.MEDIUM;
+    public final String[] tripIds;
+    public final String shapeId;
 
     public ShapeMissingCoordinatesError(String shapeId, String[] tripIds) {
         super("shapes", 0, "shape_id");

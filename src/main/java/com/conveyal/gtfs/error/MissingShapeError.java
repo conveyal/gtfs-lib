@@ -10,8 +10,8 @@ import java.io.Serializable;
 public class MissingShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.MEDIUM;
-    public String tripId;
+    public final Priority priority = Priority.MEDIUM;
+    public final String tripId;
 
     public MissingShapeError(String tripId) {
         super("trips", 0, "shape_id");

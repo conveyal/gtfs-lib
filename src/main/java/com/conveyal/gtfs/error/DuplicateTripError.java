@@ -11,14 +11,14 @@ import java.io.Serializable;
 public class DuplicateTripError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public Priority priority = Priority.LOW;
-    public String tripId;
-    public String duplicateTripId;
-    public String tripKey;
-    public String routeId;
+    public final Priority priority = Priority.LOW;
+    public final String tripId;
+    public final String duplicateTripId;
+    public final String tripKey;
+    public final String routeId;
 
     public DuplicateTripError(String tripId, String duplicateTripId, String tripKey, String routeId) {
-        super("trip", 0, "trip_id");
+        super("trips", 0, "trip_id");
         this.tripId = tripId;
         this.duplicateTripId = duplicateTripId;
         this.tripKey = tripKey;

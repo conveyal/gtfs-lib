@@ -11,12 +11,12 @@ import java.io.Serializable;
 public class MisplacedStopError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public String affectedEntityId;
-    public Priority priority;
-    public Stop stop;
+    public final String affectedEntityId;
+    public final Priority priority;
+    public final Stop stop;
 
-    public MisplacedStopError(String affectedEntityId, Stop stop) {
-        super("stops", 0, "stop_id");
+    public MisplacedStopError(String affectedEntityId, long line, Stop stop) {
+        super("stops", line, "stop_id");
         this.affectedEntityId = affectedEntityId;
         this.priority = Priority.HIGH;
         this.stop = stop;

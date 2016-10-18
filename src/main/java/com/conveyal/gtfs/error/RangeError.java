@@ -6,7 +6,7 @@ import java.io.Serializable;
 public class RangeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    double min, max, actual;
+    final double min, max, actual;
 
     public RangeError(String file, long line, String field, double min, double max, double actual) {
         super(file, line, field);

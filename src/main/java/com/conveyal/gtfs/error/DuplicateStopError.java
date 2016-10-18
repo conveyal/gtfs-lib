@@ -8,8 +8,8 @@ import java.io.Serializable;
 public class DuplicateStopError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    private String message;
-    public DuplicateStops duplicateStop;
+    private final String message;
+    public final DuplicateStops duplicateStop;
 
     public DuplicateStopError(String message, DuplicateStops duplicateStop) {
         super("stop", 0, "stop_lat,stop_lon");
