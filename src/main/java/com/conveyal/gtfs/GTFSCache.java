@@ -219,6 +219,6 @@ public class GTFSCache {
     }
 
     public static String cleanId(String id) {
-        return id.replaceAll("[^A-Za-z0-9]", "-");
+        return id.replaceAll("[^A-Za-z0-9_]", "-");
     }
 }
