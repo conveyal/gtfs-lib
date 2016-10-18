@@ -109,13 +109,15 @@ public class GTFSCache {
 
         // upload feed
         // TODO best way to do this? Should we zip the files together?
-        LOG.info("Writing feed to s3 cache");
         if (bucket != null) {
+            LOG.info("Writing feed to s3 cache");
             String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
 
             s3.putObject(bucket, key + ".zip", feedFile);
+            LOG.info("Zip file written.");
             s3.putObject(bucket, key + ".db", new File(cacheDir, cleanId + ".db"));
             s3.putObject(bucket, key + ".db.p", new File(cacheDir, cleanId + ".db.p"));
+            LOG.info("db files written.");
         }
 
         // reconnect to feed database
@@ -174,7 +176,7 @@ public class GTFSCache {
                 LOG.info("Returning processed GTFS from S3");
                 return new GTFSFeed(dbFile.getAbsolutePath());
             } catch (AmazonServiceException | IOException e) {
-                LOG.info("Error retrieving MapDB from S3, will download original GTFS.", e);
+                LOG.info("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
         }
 
@@ -182,10 +184,11 @@ public class GTFSCache {
 
         // if we fell through to here, getting the mapdb was unsuccessful
         // grab GTFS from S3 if it is not found locally
+        LOG.info("Loading feed from local cache directory...");
         File feedFile = new File(cacheDir, id + ".zip");
 
         if (!feedFile.exists() && bucket != null) {
-
+            LOG.info("Feed not found locally, downloading from S3.");
             try {
                 S3Object gtfs = s3.getObject(bucket, key + ".zip");
                 InputStream is = gtfs.getObjectContent();
