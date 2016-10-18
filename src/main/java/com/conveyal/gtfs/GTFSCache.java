@@ -153,7 +153,11 @@ public class GTFSCache {
         File dbFile = new File(cacheDir, id + ".db");
         if (dbFile.exists()) {
             LOG.info("Processed GTFS was found cached locally");
-            return new GTFSFeed(dbFile.getAbsolutePath());
+            try {
+                return new GTFSFeed(dbFile.getAbsolutePath());
+            } catch (Exception e) {
+                LOG.info("Error loading local MapDB.", e);
+            }
         }
 
         if (bucket != null) {
