@@ -24,6 +24,7 @@ public class MisplacedStopValidator extends GTFSValidator {
         Envelope nullIsland = new Envelope(-1, 1, -1, 1);
         STRtree spatialIndex = feed.getSpatialIndex();
         GeometryFactory geometryFactory = new GeometryFactory();
+        long index = 1;
 
         for (Stop stop : feed.stops.values()) {
             try {
@@ -31,7 +32,7 @@ public class MisplacedStopValidator extends GTFSValidator {
 
                 // Check if stop is in null island
                 if (nullIsland.contains(stopCoord)) {
-                    feed.errors.add(new MisplacedStopError(stop.stop_id, stop));
+                    feed.errors.add(new MisplacedStopError(stop.stop_id, index, stop));
                     isValid = false;
                     continue;
                 }
@@ -59,7 +60,7 @@ public class MisplacedStopValidator extends GTFSValidator {
             } catch (Exception e) {
                 continue;
             }
-
+            index++;
         }
         return isValid;
     }
