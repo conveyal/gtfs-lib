@@ -36,7 +36,7 @@ public class TripTimesValidator extends GTFSValidator {
 
             Iterable<StopTime> stopTimes = feed.getOrderedStopTimesForTrip(tripId);
 
-            if(stopTimes == null || Iterables.size(stopTimes) == 0) {
+            if (stopTimes == null || Iterables.size(stopTimes) == 0) {
                 if (noStopTimesErrorCount < errorLimit) {
                     feed.errors.add(new NoStopTimesForTripError(tripId, trip.route_id));
                 }
@@ -46,7 +46,7 @@ public class TripTimesValidator extends GTFSValidator {
             }
 
             StopTime previousStopTime = null;
-            for(StopTime stopTime : stopTimes) {
+            for (StopTime stopTime : stopTimes) {
 
                 if(stopTime.departure_time < stopTime.arrival_time) {
                     if (stopTimeDepartureBeforeArrivalErrorCount < errorLimit) {
@@ -75,8 +75,12 @@ public class TripTimesValidator extends GTFSValidator {
                     }
 
                 }
-
                 previousStopTime = stopTime;
+
+                // break out of validator if error count equals limit and we're not repairing feed
+                if (!repair && stopTimesOutOfSequenceErrorCount >= errorLimit) {
+                    break;
+                }
             }
 
             // check for duplicate trips starting at the same time with the same service id
@@ -104,9 +108,11 @@ public class TripTimesValidator extends GTFSValidator {
             else
                 duplicateTripHash.put(tripKey, tripId);
 
-
+            // break out of validator if error count equals limit and we're not repairing feed
+            if (!repair && stopTimesOutOfSequenceErrorCount >= errorLimit) {
+                break;
+            }
         }
-
         return isValid;
     }
 }
