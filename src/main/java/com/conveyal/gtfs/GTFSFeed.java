@@ -743,14 +743,13 @@ public class GTFSFeed implements Cloneable, Closeable {
         return distance / time; // meters per second
     }
 
-    /** Get list of stop_times ordered by arrival time for a given stop_id. */
+    /** Get list of stop_times for a given stop_id. */
     public List<StopTime> getStopTimesForStop (String stop_id) {
         SortedSet<Tuple2<String, Tuple2>> index = this.stopStopTimeSet
                 .subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
 
         return index.stream()
                 .map(tuple -> this.stop_times.get(tuple.b))
-                .sorted((a, b) -> Integer.compare(a.arrival_time, b.arrival_time))
                 .collect(Collectors.toList());
     }
 
