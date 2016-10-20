@@ -27,7 +27,7 @@ public class UnusedStopValidator extends GTFSValidator {
         // check for unused stops
         for (Iterator<Stop> iter = feed.stops.values().iterator(); iter.hasNext();) {
             Stop stop = iter.next();
-            if(feed.getStopTimesForStop(stop.stop_id).isEmpty()) {
+            if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
                 if (unusedStopErrorCount < errorLimit) {
                     feed.errors.add(new UnusedStopError(stop.stop_id, index, stop));
                 }

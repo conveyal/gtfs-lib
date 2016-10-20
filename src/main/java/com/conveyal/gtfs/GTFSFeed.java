@@ -93,6 +93,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
     public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
+    public final ConcurrentMap<String, Long> stopCountByStopTime;
 
     public final NavigableSet<Tuple2<String, String>> tripsPerService;
 
@@ -201,6 +202,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.info("{}", error);
         }
         LOG.info("Building stop to stop times index");
+        Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
         Bind.secondaryKeys(stop_times, stopStopTimeSet, (key, stopTime) -> new String[] {stopTime.stop_id});
         LOG.info("Building trips per service index");
         Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
@@ -773,6 +775,12 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .collect(Collectors.toList());
     }
 
+    public List<LocalDate> getDatesOfService () {
+        return this.servicesPerDate.stream()
+                .map(tuple -> LocalDate.parse(tuple.a, dateFormatter))
+                .collect(Collectors.toList());
+    }
+
     /** Get list of distinct trips (filters out multiple visits by a trip) a given stop_id. */
     public List<Trip> getDistinctTripsForStop (String stop_id) {
         return getStopTimesForStop(stop_id).stream()
@@ -917,6 +925,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         tripPatternMap = db.getTreeMap("patternForTrip");
 
+        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
         stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
         tripsPerService = db.getTreeSet("tripsPerService");
         servicesPerDate = db.getTreeSet("servicesPerDate");
