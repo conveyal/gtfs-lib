@@ -126,7 +126,7 @@ public class PatternStats {
      * @param trips
      * @return total revenue time (in seconds)
      */
-    public int getTotalRevenueTimeForTrips (Collection<Trip> trips) {
+    public long getTotalRevenueTimeForTrips (Collection<Trip> trips) {
         TIntList times = new TIntArrayList();
         for (Trip trip : trips) {
             StopTime first;
