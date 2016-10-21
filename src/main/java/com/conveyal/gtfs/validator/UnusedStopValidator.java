@@ -6,8 +6,10 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.model.InvalidValue;
 import com.conveyal.gtfs.validator.model.Priority;
 import com.conveyal.gtfs.validator.model.ValidationResult;
+import com.google.common.collect.Sets;
 import org.mapdb.Fun;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.SortedSet;
@@ -30,6 +32,7 @@ public class UnusedStopValidator extends GTFSValidator {
             if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
                 if (unusedStopErrorCount < errorLimit) {
                     feed.errors.add(new UnusedStopError(stop.stop_id, index, stop));
+                    unusedStopErrorCount++;
                 }
                 isValid = false;
                 if (repair) {
