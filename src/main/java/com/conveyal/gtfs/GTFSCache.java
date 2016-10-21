@@ -131,8 +131,14 @@ public class GTFSCache {
             LOG.info("Writing feed to s3 cache");
             String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
 
-            s3.putObject(bucket, key + ".zip", feedFile);
-            LOG.info("Zip file written.");
+            // write zip to s3 if not already there
+            if (!s3.doesObjectExist(bucket, key + ".zip")) {
+                s3.putObject(bucket, key + ".zip", feedFile);
+                LOG.info("Zip file written.");
+            }
+            else {
+                LOG.info("Zip file already exists on s3.");
+            }
             s3.putObject(bucket, key + ".db", new File(cacheDir, cleanId + ".db"));
             s3.putObject(bucket, key + ".db.p", new File(cacheDir, cleanId + ".db.p"));
             LOG.info("db files written.");
