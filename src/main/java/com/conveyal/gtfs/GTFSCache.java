@@ -8,8 +8,11 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
+import com.google.common.cache.RemovalNotification;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
+import com.google.common.util.concurrent.ExecutionError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,9 +38,24 @@ public class GTFSCache {
     public final File cacheDir;
 
     private static final AmazonS3 s3 = new AmazonS3Client();
-
+    RemovalListener<String, GTFSFeed> removalListener = new RemovalListener<String, GTFSFeed>() {
+        @Override
+        public void onRemoval(RemovalNotification<String, GTFSFeed> removalNotification) {
+            // delete local files only if using s3
+            if (bucket != null) {
+                String id = removalNotification.getKey();
+                String[] extensions = {".db", ".db.p", ".zip"};
+                // delete local cache files (including zip) when feed removed from cache
+                for (String type : extensions) {
+                    File file = new File(cacheDir, id + type);
+                    file.delete();
+                }
+            }
+        }
+    };
     private LoadingCache<String, GTFSFeed> cache = CacheBuilder.newBuilder()
             .maximumSize(10)
+            .removalListener(removalListener)
             .build(new CacheLoader<String, GTFSFeed>() {
                 @Override
                 public GTFSFeed load(String s) throws Exception {
@@ -219,6 +237,7 @@ public class GTFSCache {
     }
 
     public static String cleanId(String id) {
+        // replace all special characters with `-`, except for underscore `_`
         return id.replaceAll("[^A-Za-z0-9_]", "-");
     }
 }
