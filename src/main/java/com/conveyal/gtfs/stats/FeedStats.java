@@ -261,7 +261,9 @@ public class FeedStats {
 
         LocalDate startDate = getStartDate();
         LocalDate endDate = getEndDate();
-
+        if (startDate == null || endDate == null) {
+            return tripsPerDate;
+        }
         int allDates = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
         List<LocalDate> dates = IntStream.range(0, allDates)
                 .mapToObj(offset -> startDate.plusDays(offset))
