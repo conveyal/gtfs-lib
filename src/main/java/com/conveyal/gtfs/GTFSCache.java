@@ -154,7 +154,9 @@ public class GTFSCache {
         try {
             return cache.get(id);
         } catch (ExecutionException e) {
-            throw new RuntimeException(e);
+            LOG.info("Error loading local MapDB.", e);
+            deleteLocalDBFiles(id);
+            return null;
         }
     }
 
@@ -181,12 +183,7 @@ public class GTFSCache {
                 return new GTFSFeed(dbFile.getAbsolutePath());
             } catch (Exception e) {
                 LOG.info("Error loading local MapDB.", e);
-                String[] extensions = {".db", ".db.p"};
-                // delete ONLY local cache db files
-                for (String type : extensions) {
-                    File file = new File(cacheDir, id + type);
-                    file.delete();
-                }
+                deleteLocalDBFiles(id);
             }
         }
 
@@ -245,6 +242,15 @@ public class GTFSCache {
             }
         } else {
             throw new NoSuchElementException(originalId);
+        }
+    }
+
+    private void deleteLocalDBFiles(String id) {
+        String[] extensions = {".db", ".db.p"};
+        // delete ONLY local cache db files
+        for (String type : extensions) {
+            File file = new File(cacheDir, id + type);
+            file.delete();
         }
     }
 
