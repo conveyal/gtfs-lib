@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
 import java.time.Period;
@@ -45,6 +46,7 @@ import java.time.temporal.TemporalUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -889,14 +891,26 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
-    public GTFSFeed (String dbFile) {
-        this(DBMaker.newFileDB(new File(dbFile))
-                .transactionDisable()
-                .mmapFileEnable()
-                .asyncWriteEnable()
-                .compressionEnable()
-                // .cacheSize(1024 * 1024) this bloats memory consumption
-                .make()); // TODO db.close();
+    public GTFSFeed (String dbFile) throws IOException, ExecutionException {
+        this(constructDB(dbFile)); // TODO db.close();
+    }
+
+    private static DB constructDB(String dbFile) {
+        DB db;
+        try{
+            DBMaker dbMaker = DBMaker.newFileDB(new File(dbFile));
+            db = dbMaker
+                    .transactionDisable()
+                    .mmapFileEnable()
+                    .asyncWriteEnable()
+                    .compressionEnable()
+//                     .cacheSize(1024 * 1024) this bloats memory consumption
+                    .make();
+            return db;
+        } catch (Exception e) {
+            LOG.error("Could not construct db from file.", e);
+            throw e;
+        }
     }
 
     private GTFSFeed (DB db) {

@@ -1,9 +1,8 @@
 package com.conveyal.gtfs;
 
-import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -12,7 +11,6 @@ import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
-import com.google.common.util.concurrent.ExecutionError;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -154,14 +152,14 @@ public class GTFSCache {
         try {
             return cache.get(id);
         } catch (ExecutionException e) {
-            LOG.info("Error loading local MapDB.", e);
+            LOG.error("Error loading local MapDB.", e);
             deleteLocalDBFiles(id);
             return null;
         }
     }
 
     public boolean containsId (String id) {
-        GTFSFeed feed = null;
+        GTFSFeed feed;
         try {
             feed = cache.get(id);
         } catch (Exception e) {
@@ -177,12 +175,16 @@ public class GTFSCache {
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
         File dbFile = new File(cacheDir, id + ".db");
+        GTFSFeed feed;
         if (dbFile.exists()) {
             LOG.info("Processed GTFS was found cached locally");
             try {
-                return new GTFSFeed(dbFile.getAbsolutePath());
+                feed = new GTFSFeed(dbFile.getAbsolutePath());
+                if (feed != null) {
+                    return feed;
+                }
             } catch (Exception e) {
-                LOG.info("Error loading local MapDB.", e);
+                LOG.warn("Error loading local MapDB.", e);
                 deleteLocalDBFiles(id);
             }
         }
@@ -205,9 +207,14 @@ public class GTFSCache {
                 fosp.close();
 
                 LOG.info("Returning processed GTFS from S3");
-                return new GTFSFeed(dbFile.getAbsolutePath());
-            } catch (AmazonServiceException | IOException e) {
-                LOG.info("Error retrieving MapDB from S3, will load from original GTFS.", e);
+                feed = new GTFSFeed(dbFile.getAbsolutePath());
+                if (feed != null) {
+                    return feed;
+                }
+            } catch (AmazonS3Exception e) {
+                LOG.warn("DB file for key {} does not exist on S3.", key);
+            } catch (ExecutionException | IOException e) {
+                LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
         }
 
@@ -228,7 +235,7 @@ public class GTFSCache {
                 is.close();
                 fos.close();
             } catch (Exception e) {
-                LOG.warn("Could not download feed at s3://{}/{}.", bucket, key);
+                LOG.error("Could not download feed at s3://{}/{}.", bucket, key);
                 throw new RuntimeException(e);
             }
         }
