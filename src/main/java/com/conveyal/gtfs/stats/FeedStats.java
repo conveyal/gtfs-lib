@@ -308,6 +308,11 @@ public class FeedStats {
         Rectangle2D ret = null;
 
         for (Stop stop : feed.stops.values()) {
+
+            // skip over stops that don't have any stop times
+            if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
+                continue;
+            }
             if (ret == null) {
                 ret = new Rectangle2D.Double(stop.stop_lon, stop.stop_lat, 0, 0);
             }
