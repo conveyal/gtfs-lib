@@ -17,6 +17,7 @@ import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.*;
 import com.google.common.eventbus.EventBus;
+import com.google.common.util.concurrent.ExecutionError;
 import com.vividsolutions.jts.algorithm.ConvexHull;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.index.strtree.STRtree;
@@ -35,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
@@ -907,9 +909,9 @@ public class GTFSFeed implements Cloneable, Closeable {
 //                     .cacheSize(1024 * 1024) this bloats memory consumption
                     .make();
             return db;
-        } catch (Exception e) {
+        } catch (ExecutionError | IOError | Exception e) {
             LOG.error("Could not construct db from file.", e);
-            throw e;
+            return null;
         }
     }
 
