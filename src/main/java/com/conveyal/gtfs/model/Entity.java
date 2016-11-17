@@ -112,10 +112,14 @@ public abstract class Entity implements Serializable {
         }
 
         protected int getIntField(String column, boolean required, int min, int max) throws IOException {
+            return getIntField(column, required, min, max, 0);
+        }
+
+        protected int getIntField(String column, boolean required, int min, int max, int defaultValue) throws IOException {
             String str = getFieldCheckRequired(column, required);
             int val = INT_MISSING;
             if (str == null) {
-                val = 0; // TODO boolean emptyMeansZero (in one case this is not true)
+                val = defaultValue; // defaults to 0 per overloaded function, unless provided.
             } else try {
                 val = Integer.parseInt(str);
                 checkRangeInclusive(min, max, val);
