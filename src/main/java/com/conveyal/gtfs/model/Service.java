@@ -121,4 +121,25 @@ public class Service implements Serializable {
             }
         }
     }
+
+    /**
+     * Checks for overlapping days of week between two service calendars
+     * @param s1
+     * @param s2
+     * @return true if both calendars simultaneously operate on at least one day of the week
+     */
+    public static boolean checkOverlap (Service s1, Service s2) {
+        if (s1.calendar == null || s2.calendar == null) {
+            return false;
+        }
+        // overlap exists if at least one day of week is shared by two calendars
+        boolean overlappingDays = s1.calendar.monday == 1 && s2.calendar.monday == 1 ||
+                s1.calendar.tuesday == 1 && s2.calendar.tuesday == 1 ||
+                s1.calendar.wednesday == 1 && s2.calendar.wednesday == 1 ||
+                s1.calendar.thursday == 1 && s2.calendar.thursday == 1 ||
+                s1.calendar.friday == 1 && s2.calendar.friday == 1 ||
+                s1.calendar.saturday == 1 && s2.calendar.saturday == 1 ||
+                s1.calendar.sunday == 1 && s2.calendar.sunday == 1;
+        return overlappingDays;
+    }
 }

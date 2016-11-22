@@ -3,6 +3,7 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.OverlappingTripsInBlockError;
 import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.model.InvalidValue;
@@ -88,11 +89,15 @@ public class OverlappingTripsValidator extends GTFSValidator {
                         }
 
                         else {
+                            Service s1 = feed.services.get(i1.trip.service_id);
+                            Service s2 = feed.services.get(i2.trip.service_id);
+                            boolean overlap = Service.checkOverlap(s1, s2);
 
                             // if trips don't share service id check to see if service dates fall on the same days/day of week
-                            for(Map.Entry<LocalDate, CalendarDate> d1 : feed.services.get(i1.trip.service_id).calendar_dates.entrySet()) {
-
-                                if(feed.services.get(i2.trip.service_id).calendar_dates.containsKey(d1.getKey())) {
+                            for(Map.Entry<LocalDate, CalendarDate> d1 : s1.calendar_dates.entrySet()) {
+                                LocalDate date = d1.getKey();
+                                boolean activeOnDate = s1.activeOn(date) && s2.activeOn(date);
+                                if (activeOnDate || overlap) {
                                     String[] tripIds = {tripId1, tripId2};
                                     try {
                                         feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, feed.routes.get(i1.trip.route_id), tripIds, Priority.HIGH));
