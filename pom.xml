@@ -214,18 +214,6 @@
   </repositories>
 
   <dependencies>
-    <dependency>
-      <groupId>com.conveyal</groupId>
-      <artifactId>gtfs-lib</artifactId>
-      <version>${project.version}</version>
-
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>slf4j-simple</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
     <!-- CSV parser -->
     <dependency>
       <groupId>net.sourceforge.javacsv</groupId>
@@ -269,6 +257,7 @@
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
       <version>1.7.10</version>
+      <scope>runtime</scope>
     </dependency>
     <dependency>
     	<groupId>commons-io</groupId>
