@@ -85,7 +85,7 @@ public class FeedInfo extends Entity implements Cloneable {
 
         @Override
         public void writeOneRow(FeedInfo i) throws IOException {
-            writeStringField(i.feed_id.equals("NONE") ? "" : i.feed_id);
+            writeStringField(i.feed_id != null && i.feed_id.equals("NONE") ? "" : i.feed_id);
             writeStringField(i.feed_publisher_name);
             writeUrlField(i.feed_publisher_url);
             writeStringField(i.feed_lang);

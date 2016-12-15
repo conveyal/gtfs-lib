@@ -17,6 +17,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
 
 import java.io.IOException;
+import java.util.Iterator;
 import java.util.Map;
 
 public class FareAttribute extends Entity {
@@ -65,6 +66,36 @@ public class FareAttribute extends Entity {
 
         }
 
+    }
+
+    public static class Writer extends Entity.Writer<FareAttribute> {
+        public Writer(GTFSFeed feed) {
+            super(feed, "fare_attributes");
+        }
+
+        @Override
+        public void writeHeaders() throws IOException {
+            writer.writeRecord(new String[] {"fare_id", "price", "currency_type", "payment_method",
+                    "transfers", "transfer_duration"});
+        }
+
+        @Override
+        public void writeOneRow(FareAttribute fa) throws IOException {
+            writeStringField(fa.fare_id);
+            writeDoubleField(fa.price);
+            writeStringField(fa.currency_type);
+            writeIntField(fa.payment_method);
+            writeIntField(fa.transfers);
+            writeIntField(fa.transfer_duration);
+            endRecord();
+        }
+
+        @Override
+        public Iterator<FareAttribute> iterator() {
+            return feed.fares.values().stream()
+                    .map(f -> f.fare_attribute)
+                    .iterator();
+        }
     }
 
 }
