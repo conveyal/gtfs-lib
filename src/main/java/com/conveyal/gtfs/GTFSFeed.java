@@ -242,7 +242,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             ZipOutputStream zip = new ZipOutputStream(os);
 
             // write everything
-            // TODO: fare attributes, fare rules, shapes
+            // TODO: shapes
 
             // don't write empty feed_info.txt
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
@@ -250,6 +250,8 @@ public class GTFSFeed implements Cloneable, Closeable {
             new Agency.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
+            new FareAttribute.Writer(this).writeTable(zip);
+            new FareRule.Writer(this).writeTable(zip);
             new Frequency.Writer(this).writeTable(zip);
             new Route.Writer(this).writeTable(zip);
             new Stop.Writer(this).writeTable(zip);
