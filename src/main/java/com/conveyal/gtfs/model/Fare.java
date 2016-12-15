@@ -16,12 +16,10 @@ public class Fare implements Serializable {
 
     public String         fare_id;
     public FareAttribute  fare_attribute;
-    public List<FareRule> fare_rules;
+    public List<FareRule> fare_rules = Lists.newArrayList();
 
     public Fare(String fare_id) {
         this.fare_id = fare_id;
-        this.fare_attribute = new FareAttribute();
-        this.fare_rules = Lists.newArrayList();
     }
 
 }
