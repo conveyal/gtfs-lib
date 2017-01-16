@@ -141,10 +141,12 @@ public class PatternStats {
                     .reduce((a, b) -> b)
                     .orElse(null);
 
-            // revenue time should not include layovers at termini
-            int time = last.arrival_time - first.departure_time;
+            if (last != null && first != null) {
+                // revenue time should not include layovers at termini
+                int time = last.arrival_time - first.departure_time;
 
-            times.add(time);
+                times.add(time);
+            }
         }
 
         return times.sum();
