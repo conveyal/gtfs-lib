@@ -14,6 +14,14 @@ public class ReferentialIntegrityError extends GTFSError implements Serializable
         this.badReference = badReference;
     }
 
+    /** must be comparable to put into mapdb */
+    @Override
+    public int compareTo (GTFSError o) {
+        int compare = super.compareTo(o);
+        if (compare != 0) return compare;
+        return this.badReference.compareTo((((ReferentialIntegrityError) o).badReference));
+    }
+
     @Override public String getMessage() {
         return String.format(badReference);
     }
