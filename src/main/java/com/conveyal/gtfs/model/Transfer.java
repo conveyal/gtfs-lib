@@ -24,6 +24,10 @@ public class Transfer extends Entity {
     public String to_stop_id;
     public int  transfer_type;
     public int  min_transfer_time;
+    public String from_route_id;
+    public String to_route_id;
+    public String from_trip_id;
+    public String to_trip_id;
 
     public static class Loader extends Entity.Loader<Transfer> {
 
@@ -39,10 +43,22 @@ public class Transfer extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
-            tr.from_stop_id      = getRefField("from_stop_id", true, feed.stops).stop_id;
-            tr.to_stop_id        = getRefField("to_stop_id", true, feed.stops).stop_id;
+            tr.from_stop_id      = getStringField("from_stop_id", true);
+            tr.to_stop_id        = getStringField("to_stop_id", true);
             tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
             tr.min_transfer_time = getIntField("min_transfer_time", false, 0, Integer.MAX_VALUE);
+            tr.from_route_id        = getStringField("from_route_id", false);
+            tr.to_route_id        = getStringField("to_route_id", false);
+            tr.from_trip_id        = getStringField("from_trip_id", false);
+            tr.to_trip_id        = getStringField("to_trip_id", false);
+
+            getRefField("from_stop_id", true, feed.stops);
+            getRefField("to_stop_id", true, feed.stops);
+            getRefField("from_route_id", false, feed.routes);
+            getRefField("to_route_id", false, feed.routes);
+            getRefField("from_trip_id", false, feed.trips);
+            getRefField("to_trip_id", false, feed.trips);
+
             tr.feed = feed;
             feed.transfers.put(Long.toString(row), tr);
         }
