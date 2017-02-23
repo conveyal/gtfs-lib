@@ -50,6 +50,8 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
 
         int file = this.file == null && o.file == null ? 0 : String.CASE_INSENSITIVE_ORDER.compare(this.file, o.file);
         if (file != 0) return file;
+        int errorType = String.CASE_INSENSITIVE_ORDER.compare(this.errorType, o.errorType);
+        if (errorType != 0) return errorType;
         else return Long.compare(this.line, o.line);
     }
 
