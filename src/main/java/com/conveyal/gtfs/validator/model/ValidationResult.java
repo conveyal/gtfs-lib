@@ -2,16 +2,12 @@ package com.conveyal.gtfs.validator.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.stats.model.FeedStatistic;
 
 import java.io.Serializable;
-import java.time.LocalDate;
 import java.util.Date;
-import java.util.List;
 import java.util.NavigableSet;
-import java.util.stream.Collectors;
 
 
 public class ValidationResult implements Serializable {
