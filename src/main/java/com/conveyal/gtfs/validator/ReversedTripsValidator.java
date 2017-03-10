@@ -4,6 +4,9 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.MissingShapeError;
 import com.conveyal.gtfs.error.ReversedTripShapeError;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
+import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.Shape;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.model.ValidationResult;
@@ -42,7 +45,7 @@ public class ReversedTripsValidator extends GTFSValidator {
         int missingCoordinatesErrorCount = 0;
         int reversedTripShapeErrorCount = 0;
         Collection<Trip> trips = feed.trips.values();
-        Map<String, List<String>> missingShapesMap = new HashMap<>();
+        Map<ShapePoint, List<String>> missingShapesMap = new HashMap<>();
 
         for(Trip trip : trips) {
 
@@ -50,7 +53,7 @@ public class ReversedTripsValidator extends GTFSValidator {
             if (trip.shape_id == null) {
                 isValid = false;
                 if (missingShapeErrorCount < errorLimit) {
-                    feed.errors.add(new MissingShapeError(tripId));
+                    feed.errors.add(new MissingShapeError(trip));
                 }
                 missingShapeErrorCount++;
                 continue;
@@ -61,14 +64,20 @@ public class ReversedTripsValidator extends GTFSValidator {
 
             StopTime lastStop = Iterables.getLast(stopTimes);
 
-            Coordinate firstStopCoord = null;
-            Coordinate lastStopCoord = null;
-            Geometry firstShapeGeom = null;
-            Geometry lastShapeGeom = null;
-            Geometry firstStopGeom = null;
-            Geometry lastStopGeom = null;
-            Coordinate firstShapeCoord = null;
-            Coordinate lastShapeCoord = null;
+            ShapePoint firstShape = feed.shape_points.ceilingEntry(Fun.t2(shapeId, null)).getValue();
+            Map.Entry<Fun.Tuple2<String, Integer>, ShapePoint> entry = feed.shape_points.floorEntry(new Fun.Tuple2(shapeId, Fun.HI));
+            ShapePoint lastShape = entry.getValue();
+
+            Coordinate firstStopCoord;
+            Coordinate lastStopCoord;
+            Geometry firstShapeGeom;
+            Geometry lastShapeGeom;
+            Geometry firstStopGeom;
+            Geometry lastStopGeom;
+            Coordinate firstShapeCoord;
+            Coordinate lastShapeCoord;
+
+            // if coordinate creation fails here, add trip_id to missing shapes list
             try {
                 firstStopCoord = new Coordinate(feed.stops.get(firstStop.stop_id).stop_lat, feed.stops.get(firstStop.stop_id).stop_lon);
                 lastStopCoord = new Coordinate(feed.stops.get(lastStop.stop_id).stop_lat, feed.stops.get(lastStop.stop_id).stop_lon);
@@ -76,31 +85,25 @@ public class ReversedTripsValidator extends GTFSValidator {
                 firstStopGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstStopCoord));
                 lastStopGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastStopCoord));
 
-                firstShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lon);
-                lastShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
+                firstShapeCoord = new Coordinate(firstShape.shape_pt_lat, firstShape.shape_pt_lon);
+                lastShapeCoord = new Coordinate(lastShape.shape_pt_lat, lastShape.shape_pt_lon);
 
                 firstShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstShapeCoord));
                 lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));
             } catch (Exception any) {
                 isValid = false;
                 List<String> listOfTrips;
-                if (missingShapesMap.containsKey(shapeId)) {
-                    listOfTrips = missingShapesMap.get(shapeId);
+                if (missingShapesMap.containsKey(firstShape)) {
+                    listOfTrips = missingShapesMap.get(firstShape);
                 }
                 else {
                     listOfTrips = new ArrayList<String>();
                 }
                 listOfTrips.add(tripId);
-                missingShapesMap.put(shapeId, listOfTrips);
+                missingShapesMap.put(firstShape, listOfTrips);
                 missingCoordinatesErrorCount++;
                 continue;
             }
-
-            firstShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, 0)).shape_pt_lon);
-            lastShapeCoord = new Coordinate(feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lat, feed.shape_points.get(Fun.t2(shapeId, Fun.HI)).shape_pt_lon);
-
-            firstShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstShapeCoord));
-            lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));
 
             Double distanceFirstStopToStart = firstStopGeom.distance(firstShapeGeom);
             Double distanceFirstStopToEnd = firstStopGeom.distance(lastShapeGeom);
@@ -109,16 +112,16 @@ public class ReversedTripsValidator extends GTFSValidator {
             Double distanceLastStopToStart = lastStopGeom.distance(firstShapeGeom);
 
             // check if first stop is x times closer to end of shape than the beginning or last stop is x times closer to start than the end
-            if(distanceFirstStopToStart > (distanceFirstStopToEnd * distanceMultiplier) && distanceLastStopToEnd > (distanceLastStopToStart * distanceMultiplier)) {
+            if (distanceFirstStopToStart > (distanceFirstStopToEnd * distanceMultiplier) && distanceLastStopToEnd > (distanceLastStopToStart * distanceMultiplier)) {
                 if (reversedTripShapeErrorCount < errorLimit) {
-                    feed.errors.add(new ReversedTripShapeError(tripId, shapeId));
+                    feed.errors.add(new ReversedTripShapeError(trip));
                 }
                 reversedTripShapeErrorCount++;
                 isValid = false;
             }
         }
         if (missingCoordinatesErrorCount > 0) {
-            for (Map.Entry<String, List<String>> shapeError : missingShapesMap.entrySet()) {
+            for (Map.Entry<ShapePoint, List<String>> shapeError : missingShapesMap.entrySet()) {
                 String[] tripIdList = shapeError.getValue().toArray(new String[shapeError.getValue().size()]);
                 feed.errors.add(new ShapeMissingCoordinatesError(shapeError.getKey(), tripIdList));
             }
