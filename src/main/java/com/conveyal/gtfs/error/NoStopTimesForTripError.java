@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
@@ -12,16 +13,14 @@ public class NoStopTimesForTripError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public final Priority priority = Priority.HIGH;
-    public final String tripId;
     public final String routeId;
 
-    public NoStopTimesForTripError(String tripId, String routeId) {
-        super("trip", 0, "trip_id");
-        this.tripId = tripId;
-        this.routeId = routeId;
+    public NoStopTimesForTripError(Trip trip) {
+        super("trip", trip.sourceFileLine, "trip_id", trip.trip_id);
+        this.routeId = trip.route_id;
     }
 
     @Override public String getMessage() {
-        return "Trip Id " + tripId + " has no stop times.";
+        return String.format("Trip Id %s (route: %s) has no stop times.", affectedEntityId, routeId);
     }
 }

@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
@@ -11,17 +13,15 @@ public class StopTimeDepartureBeforeArrivalError extends GTFSError implements Se
     public static final long serialVersionUID = 1L;
 
     public final Priority priority = Priority.HIGH;
-    public final String tripId;
     public final int stopSequence;
 
-    public StopTimeDepartureBeforeArrivalError(String tripId, int stopSequence) {
-        super("stop_times", 0, "trip_id");
-        this.tripId = tripId;
-        this.stopSequence = stopSequence;
+    public StopTimeDepartureBeforeArrivalError(StopTime stopTime) {
+        super("stop_times", stopTime.sourceFileLine, "trip_id", stopTime.trip_id);
+        this.stopSequence = stopTime.stop_sequence;
 
     }
 
     @Override public String getMessage() {
-        return "Trip Id " + tripId + " stop sequence " + stopSequence + " departs before arriving.";
+        return "Trip Id " + affectedEntityId + " stop sequence " + stopSequence + " departs before arriving.";
     }
 }

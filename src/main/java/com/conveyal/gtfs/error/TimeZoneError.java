@@ -11,11 +11,9 @@ public class TimeZoneError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public final String message;
-    public final String affectedEntityId;
     public TimeZoneError(String tableName, long line, String field, String affectedEntityId, String message) {
-        super(tableName, line, field);
+        super(tableName, line, field, affectedEntityId);
         this.message = message;
-        this.affectedEntityId = affectedEntityId;
     }
 
     @Override public String getMessage() {

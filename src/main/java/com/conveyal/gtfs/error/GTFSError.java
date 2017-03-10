@@ -10,12 +10,18 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
     public final String file; // TODO GTFSTable enum? Or simply use class objects.
     public final long   line;
     public final String field;
+    public final String affectedEntityId;
     public final String errorType;
 
     public GTFSError(String file, long line, String field) {
+        this(file, line, field, null);
+    }
+
+    public GTFSError(String file, long line, String field, String affectedEntityId) {
         this.file  = file;
         this.line  = line;
         this.field = field;
+        this.affectedEntityId = affectedEntityId;
         this.errorType = this.getClass().getSimpleName();
     }
 
@@ -52,6 +58,8 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
         if (file != 0) return file;
         int errorType = String.CASE_INSENSITIVE_ORDER.compare(this.errorType, o.errorType);
         if (errorType != 0) return errorType;
+        int affectedEntityId = this.affectedEntityId == null && o.affectedEntityId == null ? 0 : String.CASE_INSENSITIVE_ORDER.compare(this.affectedEntityId, o.affectedEntityId);
+        if (affectedEntityId != 0) return affectedEntityId;
         else return Long.compare(this.line, o.line);
     }
 

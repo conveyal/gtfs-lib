@@ -12,15 +12,13 @@ public class StopMissingCoordinatesError extends GTFSError implements Serializab
     public static final long serialVersionUID = 1L;
 
     public final Priority priority = Priority.MEDIUM;
-    public final String stopId;
     public final Stop stop;
-    public StopMissingCoordinatesError(String stopId, Stop stop) {
-        super("stops", 0, "stop_lat,stop_lon");
-        this.stopId = stopId;
+    public StopMissingCoordinatesError(Stop stop) {
+        super("stops", stop.sourceFileLine, "stop_lat,stop_lon", stop.stop_id);
         this.stop = stop;
     }
 
     @Override public String getMessage() {
-        return "Stop " + stopId + " is missing coordinates";
+        return "Stop " + affectedEntityId + " is missing coordinates";
     }
 }
