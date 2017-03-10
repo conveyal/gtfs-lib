@@ -53,6 +53,7 @@ public class FareAttribute extends Entity {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "fare_id"));
             } else {
                 FareAttribute fa = new FareAttribute();
+                fa.sourceFileLine = row;
                 fa.fare_id = fareId;
                 fa.price = getDoubleField("price", true, 0, Integer.MAX_VALUE);
                 fa.currency_type = getStringField("currency_type", true);

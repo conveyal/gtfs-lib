@@ -47,6 +47,7 @@ import java.util.zip.ZipOutputStream;
 public abstract class Entity implements Serializable {
 
     public static final int INT_MISSING = Integer.MIN_VALUE;
+    public long sourceFileLine;
 
     /* The feed from which this entity was loaded. */
     transient GTFSFeed feed;
@@ -92,7 +93,7 @@ public abstract class Entity implements Serializable {
             String str = reader.get(column);
             if (str == null) {
                 if (!missingRequiredColumns.contains(column)) {
-                    feed.errors.add(new MissingColumnError(tableName, column));
+                    feed.errors.add(new MissingColumnError(tableName, row, column));
                     missingRequiredColumns.add(column);
                 }
             } else if (str.isEmpty()) {

@@ -49,12 +49,14 @@ public class FareRule extends Entity {
             /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */
             String fareId = getStringField("fare_id", true);
 
+            /* Referential integrity check for fare id */
             if (!fares.containsKey(fareId)) {
                 this.feed.errors.add(new ReferentialIntegrityError(tableName, row, "fare_id", fareId));
             }
 
             Fare fare = fares.computeIfAbsent(fareId, Fare::new);
             FareRule fr = new FareRule();
+            fr.sourceFileLine = row;
             fr.fare_id = fare.fare_id;
             fr.route_id = getStringField("route_id", false);
             fr.origin_id = getStringField("origin_id", false);

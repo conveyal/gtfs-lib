@@ -49,6 +49,7 @@ public class Trip extends Entity {
         public void loadOneRow() throws IOException {
             Trip t = new Trip();
 
+            t.sourceFileLine  = row;
             t.route_id        = getStringField("route_id", true);
             t.service_id      = getStringField("service_id", true);
             t.trip_id         = getStringField("trip_id", true);

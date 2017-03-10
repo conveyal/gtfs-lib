@@ -45,6 +45,7 @@ public class Agency extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Agency a = new Agency();
+            a.sourceFileLine = row;
             a.agency_id    = getStringField("agency_id", false); // can only be absent if there is a single agency -- requires a special validator.
             a.agency_name  = getStringField("agency_name", true);
             a.agency_url   = getUrlField("agency_url", true);

@@ -20,7 +20,10 @@ public class Pattern implements Serializable {
     public int[] segmentIndex;
     public double[] segmentFraction;
     public List<String> orderedStops;
+    // TODO: change list of trips to set
     public List<String> associatedTrips;
+    // TODO: add set of shapes
+//    public Set<String> associatedShapes;
     public LineString geometry;
     public String name;
     public String route_id;

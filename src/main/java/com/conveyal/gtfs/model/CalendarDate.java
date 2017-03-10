@@ -66,6 +66,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
             } else {
                 CalendarDate cd = new CalendarDate();
+                cd.sourceFileLine = row;
                 cd.service_id = service_id;
                 cd.date = date;
                 cd.exception_type = getIntField("exception_type", true, 1, 2);
