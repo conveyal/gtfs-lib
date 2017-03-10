@@ -1,13 +1,14 @@
 package com.conveyal.gtfs.stats.model;
 
 import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.time.LocalDate;
 
 /**
  * Model object representing statistics about GTFS. 
  *
  */
-public class AgencyStatistic {
+public class AgencyStatistic implements Serializable {
 	private String agencyId;
 	private Integer routeCount;
 	private Integer tripCount;

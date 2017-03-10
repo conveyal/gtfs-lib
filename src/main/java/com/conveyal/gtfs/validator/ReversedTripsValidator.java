@@ -39,7 +39,6 @@ public class ReversedTripsValidator extends GTFSValidator {
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
         int errorLimit = 5000;
         int missingShapeErrorCount = 0;
         int missingCoordinatesErrorCount = 0;

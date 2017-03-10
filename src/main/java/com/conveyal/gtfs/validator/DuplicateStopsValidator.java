@@ -36,7 +36,6 @@ public class DuplicateStopsValidator extends GTFSValidator {
 
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
-        ValidationResult result = new ValidationResult();
         boolean isValid = true;
         Collection<Stop> stops = feed.stops.values();
 

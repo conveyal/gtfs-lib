@@ -22,7 +22,6 @@ public class TripTimesValidator extends GTFSValidator {
         // Trips should have at least one hop (at least two stops)
         // Speed should not be infinite (check distance, time separately)
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
         int errorLimit = 2000;
         int noStopTimesErrorCount = 0;
         int stopTimeDepartureBeforeArrivalErrorCount = 0;

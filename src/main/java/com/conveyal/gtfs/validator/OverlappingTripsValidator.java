@@ -29,9 +29,6 @@ public class OverlappingTripsValidator extends GTFSValidator {
 
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
-
-        ValidationResult result = new ValidationResult();
-
         // check for overlapping trips within block
         HashMap<String, ArrayList<BlockInterval>> blockIntervals = new HashMap<String, ArrayList<BlockInterval>>();
 

@@ -22,7 +22,6 @@ public class UnusedStopValidator extends GTFSValidator {
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
         long index = 1;
         int unusedStopErrorCount = 0;
         int errorLimit = 2000;

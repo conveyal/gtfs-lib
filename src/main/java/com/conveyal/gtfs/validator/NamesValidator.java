@@ -14,7 +14,6 @@ public class NamesValidator extends GTFSValidator {
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
 
         ///////// ROUTES
         for (Route route : feed.routes.values()) {
