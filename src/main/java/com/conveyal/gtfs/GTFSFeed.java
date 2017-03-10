@@ -135,6 +135,10 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* A place to store an event bus that is passed through constructor. */
     public transient EventBus eventBus;
 
+    public LocalDate feedStartDate = LocalDate.MAX;
+
+    public LocalDate feedEndDate = LocalDate.MIN;
+
     /**
      * The order in which we load the tables is important for two reasons.
      * 1. We must load feed_info first so we know the feed ID before loading any other entities. This could be relaxed
@@ -211,6 +215,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         LOG.info("Building trips per service index");
         Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
         LOG.info("Building services per date index");
+        final LocalDate[] fullStartDate = { LocalDate.MAX };
+        final LocalDate[] fullEndDate = { LocalDate.MIN };
         Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
 
             LocalDate startDate = service.calendar != null
@@ -219,6 +225,12 @@ public class GTFSFeed implements Cloneable, Closeable {
             LocalDate endDate = service.calendar != null
                     ? LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter)
                     : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
+            if (startDate.isBefore(fullStartDate[0])) {
+                fullStartDate[0] = startDate;
+            }
+            if (endDate.isAfter(fullEndDate[0])) {
+                fullEndDate[0] = endDate;
+            }
             // end date for Period.between is not inclusive
             int daysOfService = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
             return IntStream.range(0, daysOfService)
