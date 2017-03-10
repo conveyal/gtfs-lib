@@ -25,6 +25,7 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.AgencyStatistic;
+import com.vividsolutions.jts.geom.Geometry;
 import org.mapdb.Fun;
 
 /**
@@ -150,7 +151,7 @@ public class FeedStats {
     public LocalDate getStartDate() {
         LocalDate startDate = null;
 
-        if (!feed.feedInfo.isEmpty()) startDate = feed.feedInfo.values().iterator().next().feed_start_date;
+        if (feed.hasFeedInfo()) startDate = feed.getFeedInfo().feed_start_date;
         if (startDate == null) startDate = getCalendarServiceRangeStart();
         if (startDate == null) startDate = getCalendarDateStart();
 
@@ -160,7 +161,7 @@ public class FeedStats {
     public LocalDate getEndDate() {
         LocalDate endDate = null;
 
-        if (!feed.feedInfo.isEmpty()) endDate = feed.feedInfo.values().iterator().next().feed_end_date;
+        if (feed.hasFeedInfo()) endDate = feed.getFeedInfo().feed_end_date;
         if (endDate == null) endDate = getCalendarServiceRangeEnd();
         if (endDate == null) endDate = getCalendarDateEnd();
 
@@ -364,5 +365,35 @@ public class FeedStats {
         buff.append(",");
         buff.append(s.getCalendarEndDate());
         return buff.toString();
+    }
+
+    public long getFrequencyCount() {
+        return feed.frequencies.size();
+    }
+
+    public long getShapePointCount() {
+        return feed.shape_points.size();
+    }
+
+    public long getFareAttributeCount() {
+        return feed.fares.size();
+    }
+
+    public long getFareRulesCount() {
+        return feed.fares.values().stream()
+                .mapToInt(fare -> fare.fare_rules.size())
+                .sum();
+    }
+
+    public long getServiceCount() {
+        return feed.services.size();
+    }
+
+    public List<LocalDate> getDatesOfService() {
+        return feed.getDatesOfService();
+    }
+
+    public Geometry getMergedBuffers() {
+        return feed.getMergedBuffers();
     }
 }
