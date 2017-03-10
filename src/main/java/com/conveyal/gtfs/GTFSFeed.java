@@ -354,6 +354,14 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
+    public boolean hasFeedInfo () {
+        return !this.feedInfo.isEmpty();
+    }
+
+    public FeedInfo getFeedInfo () {
+        return this.hasFeedInfo() ? this.feedInfo.values().iterator().next() : null;
+    }
+
     /**
      * For the given trip ID, fetch all the stop times in order of increasing stop_sequence.
      * This is an efficient iteration over a tree map.
