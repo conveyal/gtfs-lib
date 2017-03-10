@@ -28,7 +28,7 @@ public class TripTimesValidator extends GTFSValidator {
         int stopTimeDepartureBeforeArrivalErrorCount = 0;
         int stopTimesOutOfSequenceErrorCount = 0;
         int duplicateTripErrorCount = 0;
-        HashMap<String, String> duplicateTripHash = new HashMap<String, String>();
+        HashMap<String, String> duplicateTripHash = new HashMap<>();
 
         for(Trip trip : feed.trips.values()) {
 
@@ -38,7 +38,7 @@ public class TripTimesValidator extends GTFSValidator {
 
             if (stopTimes == null || Iterables.size(stopTimes) == 0) {
                 if (noStopTimesErrorCount < errorLimit) {
-                    feed.errors.add(new NoStopTimesForTripError(tripId, trip.route_id));
+                    feed.errors.add(new NoStopTimesForTripError(trip));
                 }
                 isValid = false;
                 noStopTimesErrorCount++;
@@ -50,7 +50,7 @@ public class TripTimesValidator extends GTFSValidator {
 
                 if(stopTime.departure_time < stopTime.arrival_time) {
                     if (stopTimeDepartureBeforeArrivalErrorCount < errorLimit) {
-                        feed.errors.add(new StopTimeDepartureBeforeArrivalError(tripId, stopTime.stop_sequence));
+                        feed.errors.add(new StopTimeDepartureBeforeArrivalError(stopTime));
                     }
                     stopTimeDepartureBeforeArrivalErrorCount++;
                     isValid = false;
@@ -65,7 +65,7 @@ public class TripTimesValidator extends GTFSValidator {
                 if (previousStopTime != null) {
                     if(stopTime.arrival_time < previousStopTime.departure_time) {
                         if (stopTimesOutOfSequenceErrorCount < errorLimit) {
-                            feed.errors.add(new StopTimesOutOfSequenceError(tripId, stopTime.stop_sequence, previousStopTime.stop_sequence));
+                            feed.errors.add(new StopTimesOutOfSequenceError(stopTime, previousStopTime));
                         }
                         stopTimesOutOfSequenceErrorCount++;
                         isValid = false;
@@ -101,7 +101,7 @@ public class TripTimesValidator extends GTFSValidator {
 
             if(duplicateTripHash.containsKey(tripKey)) {
                 String duplicateTripId = duplicateTripHash.get(tripKey);
-                feed.errors.add(new DuplicateTripError(tripId, duplicateTripId, tripKey, trip.route_id));
+                feed.errors.add(new DuplicateTripError(trip, duplicateTripId, tripKey));
                 isValid = false;
 
             }
@@ -109,7 +109,7 @@ public class TripTimesValidator extends GTFSValidator {
                 duplicateTripHash.put(tripKey, tripId);
 
             // break out of validator if error count equals limit and we're not repairing feed
-            if (!repair && stopTimesOutOfSequenceErrorCount >= errorLimit) {
+            if (!repair && duplicateTripErrorCount >= errorLimit) {
                 break;
             }
         }

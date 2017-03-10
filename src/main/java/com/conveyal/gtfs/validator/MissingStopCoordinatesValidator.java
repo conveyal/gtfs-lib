@@ -16,12 +16,11 @@ public class MissingStopCoordinatesValidator extends GTFSValidator {
         boolean isValid = true;
         for (Stop stop : feed.stops.values()) {
             Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
-
-            ProjectedCoordinate projectedStopCoord = null;
             try {
-                projectedStopCoord = GeoUtils.convertLatLonToEuclidean(stopCoord);
+                // attempt to project coordinate
+                GeoUtils.convertLatLonToEuclidean(stopCoord);
             } catch (IllegalArgumentException iae) {
-                feed.errors.add(new StopMissingCoordinatesError(stop.stop_id, stop));
+                feed.errors.add(new StopMissingCoordinatesError(stop));
                 isValid = false;
             }
         }

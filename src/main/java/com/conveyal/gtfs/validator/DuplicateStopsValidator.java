@@ -97,7 +97,7 @@ public class DuplicateStopsValidator extends GTFSValidator {
                                     DuplicateStops duplicateStop = new DuplicateStops(stop1, stop2, distance);
                                     duplicateStops.add(duplicateStop);
                                     isValid = false;
-                                    feed.errors.add(new DuplicateStopError(duplicateStop.toString(), duplicateStop));
+                                    feed.errors.add(new DuplicateStopError(duplicateStop));
                                 }
                             }
 
