@@ -2,12 +2,8 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateStopError;
-import com.conveyal.gtfs.error.StopMissingCoordinatesError;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.validator.model.DuplicateStops;
-import com.conveyal.gtfs.validator.model.InvalidValue;
-import com.conveyal.gtfs.validator.model.Priority;
-import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.conveyal.gtfs.validator.service.ProjectedCoordinate;
 import com.vividsolutions.jts.geom.Coordinate;
