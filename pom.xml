@@ -1,36 +1,67 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.conveyal</groupId>
-  <artifactId>gtfs-lib</artifactId>
-  <packaging>jar</packaging>
-  <version>1.5.0-SNAPSHOT</version>
+
   <name>gtfs-lib</name>
+  <description>A library for reading and manipulating GTFS feeds of arbitrary size</description>
   <url>https://github.com/conveyal/gtfs-lib</url>
 
-  <properties>
-    <geotools.version>14.0</geotools.version>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
+  <groupId>com.conveyal</groupId>
+  <artifactId>gtfs-lib</artifactId>
+  <version>1.5.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
 
+  <licenses>
+    <license>
+      <name>BSD 2-Clause</name>
+      <url>https://opensource.org/licenses/BSD-2-Clause</url>
+    </license>
+  </licenses>
+
+  <!-- Below are the primary contributors,
+     for all contributions see https://github.com/conveyal/gtfs-lib/graphs/contributors -->
+  <developers>
+    <developer>
+      <name>Landon Reed</name>
+      <email>lreed@conveyal.com</email>
+      <organization>Conveyal</organization>
+      <organizationUrl>http://conveyal.com/</organizationUrl>
+    </developer>
+    <developer>
+      <name>Andrew Byrd</name>
+      <email>abyrd@conveyal.com</email>
+      <organization>Conveyal</organization>
+      <organizationUrl>http://conveyal.com/</organizationUrl>
+    </developer>
+    <developer>
+      <name>Matt Conway</name>
+      <email>mconway@conveyal.com</email>
+      <organization>Conveyal</organization>
+      <organizationUrl>http://conveyal.com/</organizationUrl>
+    </developer>
+  </developers>
 
   <!-- Define where the source code for this project lives -->
   <scm>
     <connection>scm:git:https://github.com/conveyal/gtfs-lib.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/conveyal/gtfs-lib.git</developerConnection>
-    <url>https://github.com/conveyal/gtfs-lib.git</url>
+    <url>https://github.com/conveyal/gtfs-lib/</url>
   </scm>
 
   <!-- Define where the artifacts produced by this build will be deployed -->
   <distributionManagement>
-    <repository>
-      <!-- Also used as snapshotRepository by default -->
-      <id>conveyal-maven-repo</id>
-      <name>Conveyal Maven Repository</name>
-      <url>s3://maven.conveyal.com/</url>
-    </repository>
+    <!-- We are using Sonatype Nexus Staging instead of Maven Release plugin.
+         Only a snapshot repo should be configured. Releases are done from that snapshot staging repo. -->
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
   </distributionManagement>
+
+  <properties>
+    <geotools.version>14.0</geotools.version>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
 
   <build>
     <plugins>
@@ -43,6 +74,65 @@
           <source>1.8</source>
           <target>1.8</target>
         </configuration>
+      </plugin>
+      <plugin>
+        <!-- Recommended way to deploy to OSSRH , which allows deferred manual release to Central. -->
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.7</version>
+        <extensions>true</extensions>
+        <configuration>
+          <serverId>ossrh</serverId>
+          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <autoReleaseAfterClose>true</autoReleaseAfterClose>
+        </configuration>
+      </plugin>
+      <plugin>
+        <!-- Attach Javadoc to releases -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.10.3</version>
+        <configuration>
+          <!-- Turn off Java 8 strict Javadoc checking -->
+          <additionalparam>-Xdoclint:none</additionalparam>
+        </configuration>
+        <executions>
+          <!-- Compress Javadoc into JAR and include that JAR when deploying. -->
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <!-- Attach a JAR of source code to releases -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <version>1.5</version>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <!-- We sign in the verify phase, which means it will happen for install and deploy but not package. -->
+            <phase>verify</phase>
+            <goals>
+              <goal>sign</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
       <plugin>
         <groupId>org.jacoco</groupId>
@@ -64,27 +154,16 @@
         </executions>
       </plugin>
     </plugins>
-    <!-- "Wagon" necessary for uploading/deploying artifacts to the Conveyal Maven repo on Amazon S3. -->
-    <extensions>
-      <extension>
-          <groupId>org.kuali.maven.wagons</groupId>
-          <artifactId>maven-s3-wagon</artifactId>
-          <version>1.2.1</version>
-      </extension>
-    </extensions>
   </build>
+
   <repositories>
-    <repository>
-      <id>conveyal</id>
-      <name>Conveyal Maven Repository</name>
-       <url>https://maven.conveyal.com/</url>
-    </repository>
     <repository>
       <id>osgeo</id>
       <name>Open Source Geospatial Foundation Repository</name>
       <url>http://download.osgeo.org/webdav/geotools/</url>
     </repository>
   </repositories>
+
   <dependencies>
     <!-- CSV parser -->
     <dependency>
@@ -99,30 +178,30 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-    	<groupId>com.beust</groupId>
-    	<artifactId>jcommander</artifactId>
-    	<version>1.30</version>
+      <groupId>com.beust</groupId>
+      <artifactId>jcommander</artifactId>
+      <version>1.30</version>
     </dependency>
     <dependency>
-    	<groupId>com.google.guava</groupId>
-    	<artifactId>guava</artifactId>
-    	<version>18.0</version>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+      <version>18.0</version>
     </dependency>
     <dependency>
-    	<groupId>com.vividsolutions</groupId>
-    	<artifactId>jts</artifactId>
-    	<version>1.13</version>
+      <groupId>com.vividsolutions</groupId>
+      <artifactId>jts</artifactId>
+      <version>1.13</version>
     </dependency>
     <dependency>
-    	<groupId>org.mapdb</groupId>
-    	<artifactId>mapdb</artifactId>
-    	<version>1.0.8</version>
+      <groupId>org.mapdb</groupId>
+      <artifactId>mapdb</artifactId>
+      <version>1.0.8</version>
     </dependency>
     <!-- Our logging API, no implementation specified as gtfs-lib is a library. -->
     <dependency>
-    	<groupId>org.slf4j</groupId>
-    	<artifactId>slf4j-api</artifactId>
-    	<version>1.7.10</version>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>1.7.10</version>
     </dependency>
     <!-- https://mvnrepository.com/artifact/org.slf4j/slf4j-simple -->
     <dependency>
@@ -131,38 +210,35 @@
       <version>1.7.10</version>
     </dependency>
     <dependency>
-    	<groupId>commons-io</groupId>
-    	<artifactId>commons-io</artifactId>
-    	<version>2.4</version>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <version>2.4</version>
     </dependency>
-
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-api</artifactId>
       <version>${geotools.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-epsg-hsql</artifactId>
       <version>11-beta</version>
     </dependency>
-
     <dependency>
       <groupId>com.amazonaws</groupId>
       <artifactId>aws-java-sdk-s3</artifactId>
       <version>1.11.18</version>
     </dependency>
-      <dependency>
-          <groupId>net.sf.trove4j</groupId>
-          <artifactId>trove4j</artifactId>
-          <version>3.0.3</version>
-      </dependency>
-      <dependency>
-          <groupId>net.sf.trove4j</groupId>
-          <artifactId>trove4j</artifactId>
-          <version>3.0.3</version>
-      </dependency>
+    <dependency>
+      <groupId>net.sf.trove4j</groupId>
+      <artifactId>trove4j</artifactId>
+      <version>3.0.3</version>
+    </dependency>
+    <dependency>
+      <groupId>net.sf.trove4j</groupId>
+      <artifactId>trove4j</artifactId>
+      <version>3.0.3</version>
+    </dependency>
   </dependencies>
 
 
