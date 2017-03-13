@@ -30,7 +30,7 @@ public class UnusedStopValidator extends GTFSValidator {
             Stop stop = iter.next();
             if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
                 if (unusedStopErrorCount < errorLimit) {
-                    feed.errors.add(new UnusedStopError(stop.stop_id, index, stop));
+                    feed.errors.add(new UnusedStopError(stop));
                     unusedStopErrorCount++;
                 }
                 isValid = false;

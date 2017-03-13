@@ -93,7 +93,7 @@ public abstract class Entity implements Serializable {
             String str = reader.get(column);
             if (str == null) {
                 if (!missingRequiredColumns.contains(column)) {
-                    feed.errors.add(new MissingColumnError(tableName, row, column));
+                    feed.errors.add(new MissingColumnError(tableName, column));
                     missingRequiredColumns.add(column);
                 }
             } else if (str.isEmpty()) {

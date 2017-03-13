@@ -18,6 +18,7 @@ public class MissingStopCoordinatesValidator extends GTFSValidator {
             Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
             try {
                 // attempt to project coordinate
+
                 GeoUtils.convertLatLonToEuclidean(stopCoord);
             } catch (IllegalArgumentException iae) {
                 feed.errors.add(new StopMissingCoordinatesError(stop));

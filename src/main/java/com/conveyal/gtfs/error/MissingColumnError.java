@@ -6,8 +6,8 @@ import java.io.Serializable;
 public class MissingColumnError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public MissingColumnError(String file, long line, String field) {
-        super(file, line, field);
+    public MissingColumnError(String file, String field) {
+        super(file, 0, field);
     }
 
     @Override public String getMessage() {
