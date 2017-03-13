@@ -2,10 +2,7 @@ package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.util.json.JsonManager;
-import com.conveyal.gtfs.util.json.JsonViews;
 import com.conveyal.gtfs.validator.model.ValidationResult;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.io.Files;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.DefaultParser;
@@ -17,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.zip.ZipFile;
 
 public class GTFSMain {
@@ -45,7 +41,7 @@ public class GTFSMain {
         // TODO: add way to run only specific validators
         if(cmd.hasOption("validate")) {
             feed.validate();
-            JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class, JsonViews.Validation.class);
+            JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class);
             ValidationResult result = new ValidationResult(args[0], feed, new FeedStats(feed));
             File resultFile;
             if (args.length >= 2) {

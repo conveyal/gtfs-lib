@@ -32,7 +32,7 @@ public class JsonManager<T> {
      * @param theClass The class to create a json manager for (yes, also in the diamonds).
      * @param view The view to use
      */
-    public JsonManager (Class<T> theClass, Class view) {
+    public JsonManager (Class<T> theClass) {
         this.theClass = theClass;
         this.om = new ObjectMapper();
         om.addMixInAnnotations(Rectangle2D.class, Rectangle2DMixIn.class);
@@ -47,7 +47,7 @@ public class JsonManager<T> {
         om.getSerializerProvider().setNullKeySerializer(new JacksonSerializers.MyDtoNullKeySerializer());
         SimpleFilterProvider filters = new SimpleFilterProvider();
         filters.addFilter("bbox", SimpleBeanPropertyFilter.filterOutAllExcept("west", "east", "south", "north"));
-        this.ow = om.writer(filters).withView(view);
+        this.ow = om.writer(filters);
     }
 
     private Class<T> theClass;
