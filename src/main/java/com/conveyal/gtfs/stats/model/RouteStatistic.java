@@ -5,13 +5,14 @@ import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.stats.RouteStats;
 
 import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 /**
  * Created by landon on 9/2/16.
  */
-public class RouteStatistic {
+public class RouteStatistic implements Serializable {
     public String route_id;
     public String routeName;
     public int headway;

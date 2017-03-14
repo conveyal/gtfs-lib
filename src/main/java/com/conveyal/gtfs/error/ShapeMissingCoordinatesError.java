@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
@@ -12,15 +13,13 @@ public class ShapeMissingCoordinatesError extends GTFSError implements Serializa
 
     public final Priority priority = Priority.MEDIUM;
     public final String[] tripIds;
-    public final String shapeId;
 
-    public ShapeMissingCoordinatesError(String shapeId, String[] tripIds) {
-        super("shapes", 0, "shape_id");
+    public ShapeMissingCoordinatesError(ShapePoint shapePoint, String[] tripIds) {
+        super("shapes", shapePoint.sourceFileLine, "shape_id", shapePoint.shape_id);
         this.tripIds = tripIds;
-        this.shapeId = shapeId;
     }
 
     @Override public String getMessage() {
-        return "Shape " + shapeId + " is missing coordinates (affects " + tripIds.length + " trips)";
+        return "Shape " + affectedEntityId + " is missing coordinates (affects " + tripIds.length + " trips)";
     }
 }

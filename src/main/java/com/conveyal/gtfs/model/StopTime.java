@@ -53,6 +53,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         @Override
         public void loadOneRow() throws IOException {
             StopTime st = new StopTime();
+            st.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
             st.trip_id        = getStringField("trip_id", true);
             // TODO: arrival_time and departure time are not required, but if one is present the other should be
             // also, if this is the first or last stop, they are both required
@@ -65,7 +66,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.drop_off_type  = getIntField("drop_off_type", false, 0, 3);
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
-            st.feed = null; // this could circular-serialize the whole feed
+            st.feed           = null; // this could circular-serialize the whole feed
             feed.stop_times.put(new Fun.Tuple2(st.trip_id, st.stop_sequence), st);
 
             /*

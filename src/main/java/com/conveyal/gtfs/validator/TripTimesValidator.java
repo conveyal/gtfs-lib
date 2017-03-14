@@ -5,6 +5,7 @@ import com.conveyal.gtfs.error.DuplicateTripError;
 import com.conveyal.gtfs.error.NoStopTimesForTripError;
 import com.conveyal.gtfs.error.StopTimeDepartureBeforeArrivalError;
 import com.conveyal.gtfs.error.StopTimesOutOfSequenceError;
+import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.model.InvalidValue;
@@ -12,6 +13,7 @@ import com.conveyal.gtfs.validator.model.Priority;
 import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.google.common.collect.Iterables;
 
+import java.time.LocalTime;
 import java.util.HashMap;
 
 public class TripTimesValidator extends GTFSValidator {
@@ -22,13 +24,12 @@ public class TripTimesValidator extends GTFSValidator {
         // Trips should have at least one hop (at least two stops)
         // Speed should not be infinite (check distance, time separately)
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
         int errorLimit = 2000;
         int noStopTimesErrorCount = 0;
         int stopTimeDepartureBeforeArrivalErrorCount = 0;
         int stopTimesOutOfSequenceErrorCount = 0;
         int duplicateTripErrorCount = 0;
-        HashMap<String, String> duplicateTripHash = new HashMap<String, String>();
+        HashMap<String, String> duplicateTripHash = new HashMap<>();
 
         for(Trip trip : feed.trips.values()) {
 
@@ -38,7 +39,7 @@ public class TripTimesValidator extends GTFSValidator {
 
             if (stopTimes == null || Iterables.size(stopTimes) == 0) {
                 if (noStopTimesErrorCount < errorLimit) {
-                    feed.errors.add(new NoStopTimesForTripError(tripId, trip.route_id));
+                    feed.errors.add(new NoStopTimesForTripError(trip));
                 }
                 isValid = false;
                 noStopTimesErrorCount++;
@@ -48,9 +49,10 @@ public class TripTimesValidator extends GTFSValidator {
             StopTime previousStopTime = null;
             for (StopTime stopTime : stopTimes) {
 
+                // check for out of order departures and arrivals
                 if(stopTime.departure_time < stopTime.arrival_time) {
                     if (stopTimeDepartureBeforeArrivalErrorCount < errorLimit) {
-                        feed.errors.add(new StopTimeDepartureBeforeArrivalError(tripId, stopTime.stop_sequence));
+                        feed.errors.add(new StopTimeDepartureBeforeArrivalError(stopTime));
                     }
                     stopTimeDepartureBeforeArrivalErrorCount++;
                     isValid = false;
@@ -63,9 +65,10 @@ public class TripTimesValidator extends GTFSValidator {
 
                 // check if previous time is null
                 if (previousStopTime != null) {
+                    // check for out of sequence stop times
                     if(stopTime.arrival_time < previousStopTime.departure_time) {
                         if (stopTimesOutOfSequenceErrorCount < errorLimit) {
-                            feed.errors.add(new StopTimesOutOfSequenceError(tripId, stopTime.stop_sequence, previousStopTime.stop_sequence));
+                            feed.errors.add(new StopTimesOutOfSequenceError(stopTime, previousStopTime));
                         }
                         stopTimesOutOfSequenceErrorCount++;
                         isValid = false;
@@ -85,23 +88,25 @@ public class TripTimesValidator extends GTFSValidator {
 
             // check for duplicate trips starting at the same time with the same service id
 
-            String stopIds = "";
             String blockId = "";
 
             if(trip.block_id != null)
                 blockId = trip.block_id;
 
-            for(StopTime stopTime : stopTimes) {
-                if (stopTime.stop_id != null && feed.stops.get(stopTime.stop_id) != null) {
-                    stopIds += stopTime.stop_id + ",";
-                }
-            }
+            String patternId = feed.tripPatternMap.get(tripId);
+            String patternName = feed.patterns.get(patternId).name;
+            int firstDeparture = Iterables.get(stopTimes, 0).departure_time;
+            int lastArrival = Iterables.getLast(stopTimes).arrival_time;
 
-            String tripKey = trip.service_id + "_"+ blockId + "_" + Iterables.get(stopTimes, 0).departure_time +"_" + Iterables.getLast(stopTimes).arrival_time + "_" + stopIds;
+            String tripKey = trip.service_id + "_"+ blockId + "_" + firstDeparture +"_" + lastArrival + "_" + patternId;
 
             if(duplicateTripHash.containsKey(tripKey)) {
+                String firstDepartureString = LocalTime.ofSecondOfDay(Iterables.get(stopTimes, 0).departure_time % 86399).toString();
+                String lastArrivalString = LocalTime.ofSecondOfDay(Iterables.getLast(stopTimes).arrival_time % 86399).toString();
                 String duplicateTripId = duplicateTripHash.get(tripKey);
-                feed.errors.add(new DuplicateTripError(tripId, duplicateTripId, tripKey, trip.route_id));
+                Trip duplicateTrip = feed.trips.get(duplicateTripId);
+                long line = trip.sourceFileLine > duplicateTrip.sourceFileLine ? trip.sourceFileLine : duplicateTrip.sourceFileLine;
+                feed.errors.add(new DuplicateTripError(trip, line, duplicateTripId, patternName, firstDepartureString, lastArrivalString));
                 isValid = false;
 
             }
@@ -109,7 +114,7 @@ public class TripTimesValidator extends GTFSValidator {
                 duplicateTripHash.put(tripKey, tripId);
 
             // break out of validator if error count equals limit and we're not repairing feed
-            if (!repair && stopTimesOutOfSequenceErrorCount >= errorLimit) {
+            if (!repair && duplicateTripErrorCount >= errorLimit) {
                 break;
             }
         }

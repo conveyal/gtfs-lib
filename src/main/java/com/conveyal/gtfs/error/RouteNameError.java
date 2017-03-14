@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
@@ -10,14 +11,12 @@ import java.io.Serializable;
 public class RouteNameError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public final String affectedEntityId;
     public final String type;
     public final Priority priority;
     public final Object problemData;
 
-    public RouteNameError(String file, long line, String field, String affectedEntityId, String type, Object problemData, Priority priority) {
-        super("routes", line, field);
-        this.affectedEntityId = affectedEntityId;
+    public RouteNameError(Route route, String field, String type, Object problemData, Priority priority) {
+        super("routes", route.sourceFileLine, field, route.route_id);
         this.type = type;
         this.priority = priority;
         this.problemData = problemData;

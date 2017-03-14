@@ -47,6 +47,7 @@ import java.util.zip.ZipOutputStream;
 public abstract class Entity implements Serializable {
 
     public static final int INT_MISSING = Integer.MIN_VALUE;
+    public long sourceFileLine;
 
     /* The feed from which this entity was loaded. */
     transient GTFSFeed feed;

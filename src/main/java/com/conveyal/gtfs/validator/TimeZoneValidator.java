@@ -19,17 +19,17 @@ public class TimeZoneValidator extends GTFSValidator {
         for (Agency agency : feed.agency.values()) {
             index++;
             if (agency.agency_timezone == null) {
-                feed.errors.add(new TimeZoneError("agency", index, "agency_timezone", agency.agency_id, "Agency is without timezone"));
+                feed.errors.add(new TimeZoneError("agency", agency.sourceFileLine, "agency_timezone", agency.agency_id, "Agency is without timezone"));
                 continue;
             }
             ZoneId tz;
             try {
                 tz = ZoneId.of(agency.agency_timezone);
             } catch (ZoneRulesException z) {
-                feed.errors.add(new TimeZoneError("agency", index, "agency_timezone", agency.agency_id, "Agency timezone wasn't found in timezone database reason: " + z.getMessage()));
+                feed.errors.add(new TimeZoneError("agency", agency.sourceFileLine, "agency_timezone", agency.agency_id, "Agency timezone wasn't found in timezone database reason: " + z.getMessage()));
                 continue;
             } catch (DateTimeException dt) {
-                feed.errors.add(new TimeZoneError("agency", index, "agency_timezone", agency.agency_id, "Agency timezone in wrong format. Expected format: area/city"));
+                feed.errors.add(new TimeZoneError("agency", agency.sourceFileLine, "agency_timezone", agency.agency_id, "Agency timezone in wrong format. Expected format: area/city"));
                 //timezone will be set to GMT if it is still empty after for loop
                 continue;
             }
@@ -44,10 +44,10 @@ public class TimeZoneValidator extends GTFSValidator {
             try {
                 tz = ZoneId.of(stop.stop_timezone);
             } catch (ZoneRulesException z) {
-                feed.errors.add(new TimeZoneError("stops", index, "stop_timezone", stop.stop_id, "Stop timezone wasn't found in timezone database reason: " + z.getMessage()));
+                feed.errors.add(new TimeZoneError("stops", stop.sourceFileLine, "stop_timezone", stop.stop_id, "Stop timezone wasn't found in timezone database reason: " + z.getMessage()));
                 continue;
             } catch (DateTimeException dt) {
-                feed.errors.add(new TimeZoneError("stops", index, "stop_timezone", stop.stop_id, "Stop timezone in wrong format. Expected format: area/city"));
+                feed.errors.add(new TimeZoneError("stops", stop.sourceFileLine, "stop_timezone", stop.stop_id, "Stop timezone in wrong format. Expected format: area/city"));
                 //timezone will be set to GMT if it is still empty after for loop
                 continue;
             }

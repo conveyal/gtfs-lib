@@ -7,7 +7,6 @@ import com.conveyal.gtfs.validator.DuplicateStopsValidator;
 import com.conveyal.gtfs.validator.GTFSValidator;
 import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
 import com.conveyal.gtfs.validator.MisplacedStopValidator;
-import com.conveyal.gtfs.validator.MissingStopCoordinatesValidator;
 import com.conveyal.gtfs.validator.NamesValidator;
 import com.conveyal.gtfs.validator.OverlappingTripsValidator;
 import com.conveyal.gtfs.validator.ReversedTripsValidator;
@@ -303,7 +302,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                 new DuplicateStopsValidator(),
                 new HopSpeedsReasonableValidator(),
                 new MisplacedStopValidator(),
-                new MissingStopCoordinatesValidator(),
                 new NamesValidator(),
                 new OverlappingTripsValidator(),
                 new ReversedTripsValidator(),
@@ -317,7 +315,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                 new DuplicateStopsValidator(),
                 new HopSpeedsReasonableValidator(),
                 new MisplacedStopValidator(),
-                new MissingStopCoordinatesValidator(),
                 new NamesValidator(),
                 new OverlappingTripsValidator(),
                 new ReversedTripsValidator(),
@@ -352,6 +349,14 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.error("Error loading GTFS: {}", e.getMessage());
             throw new RuntimeException(e);
         }
+    }
+
+    public boolean hasFeedInfo () {
+        return !this.feedInfo.isEmpty();
+    }
+
+    public FeedInfo getFeedInfo () {
+        return this.hasFeedInfo() ? this.feedInfo.values().iterator().next() : null;
     }
 
     /**

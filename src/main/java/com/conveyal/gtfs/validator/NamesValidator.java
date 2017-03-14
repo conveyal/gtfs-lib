@@ -14,7 +14,6 @@ public class NamesValidator extends GTFSValidator {
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
 
         ///////// ROUTES
         for (Route route : feed.routes.values()) {
@@ -34,27 +33,27 @@ public class NamesValidator extends GTFSValidator {
 
             //RouteShortAndLongNamesAreBlank
             if (longName.isEmpty() && shortName.isEmpty()) {
-                feed.errors.add(new RouteNameError("route", 0, "route_short_name,route_long_name", route.route_id, "RouteShortAndLongNamesAreBlank", route, Priority.HIGH));
+                feed.errors.add(new RouteNameError(route, "route_short_name,route_long_name", "RouteShortAndLongNamesAreBlank", route, Priority.HIGH));
                 isValid = false;
             }
             //ValidateRouteShortNameIsTooLong
             if (shortName.length() > 6) {
-                feed.errors.add(new RouteNameError("route", 0, "route_short_name", route.route_id, "ValidateRouteShortNameIsTooLong", route, Priority.MEDIUM));
+                feed.errors.add(new RouteNameError(route, "route_short_name", "ValidateRouteShortNameIsTooLong", route, Priority.MEDIUM));
                 isValid = false;
             }
             //ValidateRouteLongNameContainShortName
             if (!longName.isEmpty() && !shortName.isEmpty() && longName.contains(shortName)) {
-                feed.errors.add(new RouteNameError("route", 0, "route_short_name,route_long_name", route.route_id, "ValidateRouteLongNameContainShortName", route, Priority.MEDIUM));
+                feed.errors.add(new RouteNameError(route, "route_short_name,route_long_name", "ValidateRouteLongNameContainShortName", route, Priority.MEDIUM));
                 isValid = false;
             }
             //ValidateRouteDescriptionSameAsRouteName
             if (!desc.isEmpty() && (desc.equals(shortName) || desc.equals(longName))) {
-                feed.errors.add(new RouteNameError("route", 0, "route_short_name,route_long_name,route_desc", route.route_id, "ValidateRouteDescriptionSameAsRouteName", route, Priority.MEDIUM));
+                feed.errors.add(new RouteNameError(route, "route_short_name,route_long_name,route_desc", "ValidateRouteDescriptionSameAsRouteName", route, Priority.MEDIUM));
                 isValid = false;
             }
             //ValidateRouteTypeInvalidValid
             if (route.route_type < 0 || route.route_type > 7){
-                feed.errors.add(new RouteNameError("route", 0, "route_type", route.route_id, "ValidateRouteTypeInvalidValid", route, Priority.HIGH));
+                feed.errors.add(new RouteNameError(route, "route_type", "ValidateRouteTypeInvalidValid", route, Priority.HIGH));
                 isValid = false;
             }
         }

@@ -57,6 +57,7 @@ public class ShapePoint extends Entity {
             double shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE);
 
             ShapePoint s = new ShapePoint(shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled);
+            s.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
             s.feed = null; // since we're putting this into MapDB, we don't want circular serialization
             feed.shape_points.put(new Tuple2<String, Integer>(s.shape_id, s.shape_pt_sequence), s);
         }

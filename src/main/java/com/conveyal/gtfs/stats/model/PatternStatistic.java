@@ -2,13 +2,14 @@ package com.conveyal.gtfs.stats.model;
 
 import com.conveyal.gtfs.stats.PatternStats;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
 /**
  * Created by landon on 10/11/16.
  */
-public class PatternStatistic {
+public class PatternStatistic implements Serializable {
 
     public String pattern_id;
     public int headway;

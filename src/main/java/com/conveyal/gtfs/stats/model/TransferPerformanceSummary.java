@@ -3,12 +3,13 @@ package com.conveyal.gtfs.stats.model;
 import com.conveyal.gtfs.model.StopTime;
 import org.mapdb.Fun;
 
+import java.io.Serializable;
 import java.util.Set;
 
 /**
  * Created by landon on 10/4/16.
  */
-public class TransferPerformanceSummary {
+public class TransferPerformanceSummary implements Serializable {
     public String fromRoute;
     public String toRoute;
     public int bestCase;

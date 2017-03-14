@@ -43,13 +43,14 @@ public class Transfer extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
+            tr.sourceFileLine    = row + 1; // offset line number by 1 to account for 0-based row index
             tr.from_stop_id      = getStringField("from_stop_id", true);
             tr.to_stop_id        = getStringField("to_stop_id", true);
             tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
             tr.min_transfer_time = getIntField("min_transfer_time", false, 0, Integer.MAX_VALUE);
-            tr.from_route_id        = getStringField("from_route_id", false);
-            tr.to_route_id        = getStringField("to_route_id", false);
-            tr.from_trip_id        = getStringField("from_trip_id", false);
+            tr.from_route_id     = getStringField("from_route_id", false);
+            tr.to_route_id       = getStringField("to_route_id", false);
+            tr.from_trip_id      = getStringField("from_trip_id", false);
             tr.to_trip_id        = getStringField("to_trip_id", false);
 
             getRefField("from_stop_id", true, feed.stops);

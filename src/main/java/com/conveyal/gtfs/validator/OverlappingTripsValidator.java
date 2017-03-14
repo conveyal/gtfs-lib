@@ -6,17 +6,13 @@ import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.model.InvalidValue;
-import com.conveyal.gtfs.validator.model.Priority;
 import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.google.common.collect.Iterables;
-import org.mapdb.Fun;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,9 +29,6 @@ public class OverlappingTripsValidator extends GTFSValidator {
 
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
-
-        ValidationResult result = new ValidationResult();
-
         // check for overlapping trips within block
         HashMap<String, ArrayList<BlockInterval>> blockIntervals = new HashMap<String, ArrayList<BlockInterval>>();
 
@@ -82,7 +75,7 @@ public class OverlappingTripsValidator extends GTFSValidator {
                         if(i1.trip.service_id.equals(i2.trip.service_id)) {
                             String[] tripIds = {tripId1, tripId2};
                             try {
-                                feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, feed.routes.get(i1.trip.route_id), tripIds, Priority.HIGH));
+                                feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, i1.trip.route_id, tripIds));
                             } catch (Exception e) {
 
                             }
@@ -100,7 +93,7 @@ public class OverlappingTripsValidator extends GTFSValidator {
                                 if (activeOnDate || overlap) {
                                     String[] tripIds = {tripId1, tripId2};
                                     try {
-                                        feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, feed.routes.get(i1.trip.route_id), tripIds, Priority.HIGH));
+                                        feed.errors.add(new OverlappingTripsInBlockError(0, "block_id", blockId, i1.trip.route_id, tripIds));
                                     } catch (Exception e) {
 
                                     }

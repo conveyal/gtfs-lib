@@ -22,7 +22,6 @@ public class UnusedStopValidator extends GTFSValidator {
     @Override
     public boolean validate(GTFSFeed feed, boolean repair) {
         boolean isValid = true;
-        ValidationResult result = new ValidationResult();
         long index = 1;
         int unusedStopErrorCount = 0;
         int errorLimit = 2000;
@@ -31,7 +30,7 @@ public class UnusedStopValidator extends GTFSValidator {
             Stop stop = iter.next();
             if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
                 if (unusedStopErrorCount < errorLimit) {
-                    feed.errors.add(new UnusedStopError(stop.stop_id, index, stop));
+                    feed.errors.add(new UnusedStopError(stop));
                     unusedStopErrorCount++;
                 }
                 isValid = false;

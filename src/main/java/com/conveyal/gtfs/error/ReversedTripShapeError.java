@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.model.Priority;
 
 import java.io.Serializable;
@@ -11,16 +12,14 @@ public class ReversedTripShapeError extends GTFSError implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public final Priority priority = Priority.HIGH;
-    public final String tripId;
     public final String shapeId;
 
-    public ReversedTripShapeError(String tripId, String shapeId) {
-        super("trips", 0, "shape_id");
-        this.tripId = tripId;
-        this.shapeId = shapeId;
+    public ReversedTripShapeError(Trip trip) {
+        super("trips", trip.sourceFileLine, "shape_id", trip.trip_id);
+        this.shapeId = trip.shape_id;
     }
 
     @Override public String getMessage() {
-        return "Trip " + tripId + " references reversed shape " + shapeId;
+        return "Trip " + affectedEntityId + " references reversed shape " + shapeId;
     }
 }
