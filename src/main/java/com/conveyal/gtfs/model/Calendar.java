@@ -13,6 +13,7 @@ import java.util.Map;
 
 public class Calendar extends Entity implements Serializable {
 
+    private static final long serialVersionUID = 6634236680822635875L;
     public int monday;
     public int tuesday;
     public int wednesday;

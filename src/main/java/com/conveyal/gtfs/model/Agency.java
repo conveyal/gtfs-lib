@@ -8,6 +8,7 @@ import java.util.Iterator;
 
 public class Agency extends Entity {
 
+    private static final long serialVersionUID = -2825890165823575940L;
     public String agency_id;
     public String agency_name;
     public URL    agency_url;

@@ -9,6 +9,7 @@ import java.util.Map;
 
 public class Trip extends Entity {
 
+    private static final long serialVersionUID = -4869384750974542712L;
     public String route_id;
     public String service_id;
     public String trip_id;

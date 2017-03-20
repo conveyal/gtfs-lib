@@ -9,6 +9,7 @@ import java.util.Map;
 
 public class FareAttribute extends Entity {
 
+    private static final long serialVersionUID = 2157859372072056891L;
     public String fare_id;
     public double price;
     public String currency_type;

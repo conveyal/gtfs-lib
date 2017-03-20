@@ -10,6 +10,7 @@ import java.util.Map;
 
 public class FareRule extends Entity {
 
+    private static final long serialVersionUID = 3209660216692732272L;
     public String fare_id;
     public String route_id;
     public String origin_id;

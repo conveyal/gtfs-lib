@@ -7,6 +7,7 @@ import java.util.Iterator;
 
 public class Transfer extends Entity {
 
+    private static final long serialVersionUID = -4944512120812641063L;
     public String from_stop_id;
     public String to_stop_id;
     public int  transfer_type;

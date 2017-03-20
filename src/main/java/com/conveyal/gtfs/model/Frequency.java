@@ -30,6 +30,7 @@ public class Frequency extends Entity implements Comparable<Frequency> {
          return sb.toString();
      }
 
+    private static final long serialVersionUID = -7182161664471704133L;
     public String trip_id;
     public int start_time;
     public int end_time;

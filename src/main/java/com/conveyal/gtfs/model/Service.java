@@ -18,6 +18,7 @@ import static java.time.DayOfWeek.*;
  */
 public class Service implements Serializable {
 
+    private static final long serialVersionUID = 7966238549509747091L;
     public String   service_id;
     public Calendar calendar;
     public Map<LocalDate, CalendarDate> calendar_dates = Maps.newHashMap();
