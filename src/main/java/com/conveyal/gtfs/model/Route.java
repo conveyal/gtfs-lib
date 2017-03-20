@@ -8,6 +8,8 @@ import java.util.Iterator;
 
 public class Route extends Entity { // implements Entity.Factory<Route>
 
+    private static final long serialVersionUID = -819444896818029068L;
+
     public static final int TRAM = 0;
     public static final int SUBWAY = 1;
     public static final int RAIL = 2;

@@ -46,6 +46,7 @@ import java.util.zip.ZipOutputStream;
 // TODO K is the key type for this table
 public abstract class Entity implements Serializable {
 
+    private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
     public long sourceFileLine;
 

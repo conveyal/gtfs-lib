@@ -14,6 +14,7 @@ import java.util.Iterator;
  */
 public class StopTime extends Entity implements Cloneable, Serializable {
 
+    private static final long serialVersionUID = -8883780047901081832L;
     /* StopTime cannot directly reference Trips or Stops because they would be serialized into the MapDB. */
     public String trip_id;
     public int    arrival_time = INT_MISSING;

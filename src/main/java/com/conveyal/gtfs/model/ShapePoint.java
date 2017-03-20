@@ -9,6 +9,7 @@ import org.mapdb.Fun.Tuple2;
 
 public class ShapePoint extends Entity {
 
+    private static final long serialVersionUID = 6751814959971086070L;
     public final String shape_id;
     public final double shape_pt_lat;
     public final double shape_pt_lon;

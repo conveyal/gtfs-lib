@@ -13,6 +13,7 @@ import java.util.Map;
 
 public class CalendarDate extends Entity implements Cloneable, Serializable {
 
+    private static final long serialVersionUID = 6936614582249119431L;
     public String    service_id;
     public LocalDate date;
     public int       exception_type;

@@ -8,6 +8,7 @@ import java.util.Iterator;
 
 public class Stop extends Entity {
 
+    private static final long serialVersionUID = 464065335273514677L;
     public String stop_id;
     public String stop_code;
     public String stop_name;

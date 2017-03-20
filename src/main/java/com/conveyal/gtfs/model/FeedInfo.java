@@ -11,6 +11,7 @@ import java.util.Iterator;
 
 public class FeedInfo extends Entity implements Cloneable {
 
+    private static final long serialVersionUID = 8718856987299076452L;
     public String    feed_id = "NONE";
     public String    feed_publisher_name;
     public URL       feed_publisher_url;
