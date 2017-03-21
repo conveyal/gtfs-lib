@@ -24,33 +24,36 @@ public class GTFSMain {
         Options options = getOptions();
         CommandLineParser parser = new DefaultParser();
         CommandLine cmd = parser.parse( options, args);
+        String[] arguments = cmd.getArgs();
         if (cmd.hasOption("help")) {
             printHelp(options);
             return;
         }
-        if (args.length < 1) {
+        if (arguments.length < 1) {
             System.out.println("Please specify a GTFS feed to load.");
             System.exit(1);
         }
         File tempFile = File.createTempFile("gtfs", ".db");
 
         GTFSFeed feed = new GTFSFeed(tempFile.getAbsolutePath());
-        feed.loadFromFile(new ZipFile(args[0]));
+        feed.loadFromFile(new ZipFile(arguments[0]));
 
         feed.findPatterns();
         // TODO: add way to run only specific validators
         if(cmd.hasOption("validate")) {
             feed.validate();
             JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class);
-            ValidationResult result = new ValidationResult(args[0], feed, new FeedStats(feed));
+            ValidationResult result = new ValidationResult(arguments[0], feed, new FeedStats(feed));
+            String resultString = json.write(result);
             File resultFile;
-            if (args.length >= 2) {
-                resultFile = new File(args[1]);
+            if (arguments.length >= 2) {
+                resultFile = new File(arguments[1]);
+                FileUtils.writeStringToFile(resultFile, resultString);
+                LOG.info("Storing validation result at: {}", resultFile.getAbsolutePath());
             } else {
-                resultFile = File.createTempFile("result", ".json");
+                LOG.info("Printing validation result for {}", feed.feedId);
+                System.out.print(resultString);
             }
-            FileUtils.writeStringToFile(resultFile, json.write(result));
-            LOG.info("Storing validation result at: {}", resultFile.getAbsolutePath());
         }
         feed.close();
 
