@@ -444,7 +444,7 @@ public abstract class Entity implements Serializable {
 
 
     // shared code between reading and writing
-    private static final String human (long n) {
+    public static final String human (long n) {
         if (n >= 1000000) return String.format("%.1fM", n/1000000.0);
         if (n >= 1000) return String.format("%.1fk", n/1000.0);
         else return String.format("%d", n);
