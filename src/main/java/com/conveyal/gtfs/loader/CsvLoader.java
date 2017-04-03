@@ -17,14 +17,40 @@ import java.util.zip.ZipFile;
 import static com.conveyal.gtfs.model.Entity.human;
 
 /**
- * After experimenting with loading GTFS CSV tables into Java objects and then using ORM to put those objects into
- * a database, we'll now experiment with loading straight from CSV into a database, but checking and cleaning the data while
- * doing so. Two different ways: batched prepared inserts and loading from comma or tab separated files.
+ * This class loads CSV tables from zipped GTFS into an SQL relational database management system.
+ * Comparing the GTFS specification for a table with the headers present in the GTFS CSV, it dynamically builds up a
+ * table definitions and SQL statements to interact with those tables. It retains all columns present in the GTFS,
+ * including optional columns, known extensions, and unrecognized proprietary extensions.
  *
- * This class should check that:
- * 1. all rows have the same number of fields as there are headers
- * 2. all required fields are present
- * 3. all fields can be converted to the proper data types and are in range
+ * batched prepared inserts and loading from comma or tab separated files.
+ *
+ * Our previous approach involved loading GTFS CSV tables into Java objects and then using an object-relational mapping
+ * to put those objects into a database. In that case a fixed number of fields are represented. If the GTFS feed
+ * contains extra proprietary fields, they are lost immediately on import. The Java model objects must contain fields
+ * for all GTFS columns that will ever be retrieved, and memory and database space are required to represent all those
+ * fields even when they are not present in a particular feed. The same would be true of a direct-to-database approach
+ * if multiple feeds were loaded into the same tables: a "lowest common denominator" set of fields would need to be
+ * selected. However, we create one set of tables per GTFS feed loaded into the same database and namespace them with
+ * what the SQL spec calls "schemas".
+ *
+ * The structure of the CSV file and the data it contains are validated line by line during the load process. This
+ * allows us to handle error recovery ourselves, recording detailed messages about the largest possible number of errors
+ * rather than failing at the first error.
+ *
+ * This is important because of the generally long turnaround for GTFS publication, repair, and validation. If a newly
+ * submitted feed fails to import because of a missing file, we don't want to report that single error to the feed
+ * producer, only to discover and report additional errors when the repaired feed is re-submitted weeks later.
+ *
+ * The fact that existing libraries would abort a GTFS import upon encountering very common, recoverable errors was the
+ * original motivation for creating gtfs-lib. Error recovery is all the more important when bulk-loading data into
+ * database systems - the Postgres 'copy' import is particularly brittle and does not provide error messages that would
+ * help the feed producer repair their feed.
+ *
+ * The validation performed during CSV loading includes:
+ * - columns are present for all required fields
+ * - all rows have the same number of fields as there are headers
+ * - fields do not contain problematic characters
+ * - field contents can be converted to the target data types and are in range
  * 4. referential integrity?
  */
 public class CsvLoader {
