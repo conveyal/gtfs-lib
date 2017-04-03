@@ -2,7 +2,9 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
 
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
+import java.sql.SQLType;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -14,11 +16,11 @@ public class StringField extends Field {
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public String validateAndConvert(String original) {
-        return cleanString(original);
+    public String validateAndConvert (String string) {
+        return cleanString(string);
     }
 
-    public void setPreparedStatementParameter (int oneBasedIndex, String string, PreparedStatement preparedStatement) {
+    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
         } catch (Exception ex) {
@@ -27,8 +29,8 @@ public class StringField extends Field {
     }
 
     @Override
-    public String getSqlType() {
-        return "varchar";
+    public SQLType getSqlType() {
+        return JDBCType.VARCHAR;
     }
 
 }

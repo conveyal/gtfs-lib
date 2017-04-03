@@ -2,7 +2,9 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
 
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
+import java.sql.SQLType;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -28,7 +30,7 @@ public class IntegerField extends Field {
     }
 
     @Override
-    public void setPreparedStatementParameter (int oneBasedIndex, String string, PreparedStatement preparedStatement) {
+    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setInt(oneBasedIndex, validate(string));
         } catch (Exception ex) {
@@ -43,8 +45,8 @@ public class IntegerField extends Field {
     }
 
     @Override
-    public String getSqlType () {
-        return "integer";
+    public SQLType getSqlType () {
+        return JDBCType.INTEGER;
     }
 
 }

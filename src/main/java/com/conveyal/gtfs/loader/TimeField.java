@@ -1,10 +1,10 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
-import com.j256.ormlite.stmt.query.In;
 
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
+import java.sql.SQLType;
 
 /**
  * A field in the format HH:MM:SS, which will be stored as a number of seconds after midnight.
@@ -16,7 +16,7 @@ public class TimeField extends Field {
     }
 
     @Override
-    public void setPreparedStatementParameter (int oneBasedIndex, String string, PreparedStatement preparedStatement) {
+    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setInt(oneBasedIndex, getSeconds(string));
         } catch (Exception ex) {
@@ -27,7 +27,7 @@ public class TimeField extends Field {
     // Actually this is converting the string. Can we use some JDBC existing functions for this?
     @Override
     public String validateAndConvert(String hhmmss) {
-        return Integer.toString(getSeconds(cleanString(hhmmss)));
+        return Integer.toString(getSeconds(hhmmss));
     }
 
     private static int getSeconds (String hhmmss) {
@@ -39,8 +39,8 @@ public class TimeField extends Field {
     }
 
     @Override
-    public String getSqlType () {
-        return "integer";
+    public SQLType getSqlType () {
+        return JDBCType.INTEGER;
     }
 
 }

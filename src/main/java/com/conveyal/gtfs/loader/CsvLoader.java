@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
 import org.postgresql.copy.CopyManager;
@@ -98,28 +99,26 @@ public class CsvLoader {
         Field[] fields = new Field[csvReader.getHeaderCount()];
         Set<String> fieldsSeen = new HashSet<>();
         for (int h = 0; h < csvReader.getHeaderCount(); h++) {
-            String header = csvReader.getHeader(h);
+            String header = sanitize(csvReader.getHeader(h));
             if (fieldsSeen.contains(header)) {
-                // Error: duplicate field name
+                // Error: duplicate field name TODO deal with missing (null) Field object below
                 fields[h] = null;
             } else {
-                fields[h] = table.getFieldForHeader(header);
+                fields[h] = table.getFieldForName(header);
                 fieldsSeen.add(header);
             }
         }
 
-        // Replace the GTFS spec table with the actual SQL table we are populating.
+        // Replace the GTFS spec Table with one representing the SQL table we will populate.
         table = new Table(table.name, fields);
 
-        // final String URL = "jdbc:h2:file:~/test-db";
-        // final String URL = "jdbc:h2:mem:";
-        final String URL = "jdbc:postgresql://localhost/catalogue";
-        // Driver should auto-register these days.
-        connection = DriverManager.getConnection(URL);
-        // Statement statement = connection.createStatement();
-        // statement.execute("create schema if not exists nl");
-        // connection.setSchema()
+        final String h2_file_url = "jdbc:h2:file:~/test-db";
+        final String h2_mem_url = "jdbc:h2:mem:";
+        final String postgres_local_url = "jdbc:postgresql://localhost/catalogue";
+        // JODBC drivers should auto-register these days. You used to have to trick the class loader into loading them.
+        connection = DriverManager.getConnection(postgres_local_url);
         connection.setAutoCommit(false);
+        // TODO set up schemas
         statement = connection.createStatement();
 
         // Some databases require the table to exist before a statement can be prepared.
@@ -141,8 +140,8 @@ public class CsvLoader {
         while (csvReader.readRecord()) {
             // The CSV reader's current record is zero-based and does not include the header line.
             // Convert to a CSV file line number that will make more sense to people reading error messages.
-            long line = csvReader.getCurrentRecord() + 2;
-            if (line % 500_000 == 0) LOG.info("Processed {}", human(line));
+            long lineNumber = csvReader.getCurrentRecord() + 2;
+            if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
             if (csvReader.getColumnCount() != fields.length) {
                 LOG.error("Wrong number of fields in CSV row. Skipping it.");
                 continue;
@@ -150,21 +149,28 @@ public class CsvLoader {
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 String string = csvReader.get(f);
-                if (string == null || string.isEmpty()) string = "0"; // FIXME Need to define default values
-                if (viaText) transformedStrings[f] = field.validateAndConvert(string);
-                else field.setPreparedStatementParameter(f + 1, string, insertStatement);
+                if (string.isEmpty()) { // TODO verify that CSV reader always returns empty strings, not nulls
+                    if (field.isRequired()) throw new StorageException("Missing required field."); // TODO record and recover.
+                    if (viaText) transformedStrings[f] = "\\N"; // Represents null in Postgres text format
+                    else insertStatement.setNull(f + 1, field.getSqlType().getVendorTypeNumber());
+                } else {
+                    if (viaText) transformedStrings[f] = field.validateAndConvert(string);
+                    // Micro-benchmarks show it's 4-5% faster to call the type-specific parameter setters rather than setObject with a type code.
+                    else field.setParameter(insertStatement, f + 1, string);
+                }
             }
             if (viaText) {
                 tempTextFileStream.printf(String.join("\t", transformedStrings));
                 tempTextFileStream.print('\n');
             } else {
                 insertStatement.addBatch();
-                if (line % INSERT_BATCH_SIZE == 0) insertStatement.executeBatch();
+                if (lineNumber % INSERT_BATCH_SIZE == 0) insertStatement.executeBatch();
             }
         }
 
         if (viaText) {
             LOG.info("Loading into database table from temporary text file...");
+            tempTextFileStream.close();
             if (COPY_OVER_NETWORK) {
                 // Allows sending over network, only slightly slower
                 final String copySql = String.format("copy %s from stdin", table.name);
@@ -182,24 +188,42 @@ public class CsvLoader {
 
         LOG.info("Indexing...");
         // statement.execute("create index on stop_times (trip_id, stop_sequence)");
+        // TODO build all indexes by just running an SQL script.
 
         LOG.info("Committing transaction...");
         connection.commit();
         LOG.info("Done.");
     }
 
+    /**
+     * Protect against SQL injection.
+     * The only place we include arbitrary input in SQL is the column names of tables.
+     * Implicitly (looking at all existing table names) these should consist entirely of
+     * lowercase letters and underscores.
+     *
+     * TODO test including SQL injection text (quote and semicolon)
+     */
+    private static String sanitize (String string) {
+        String clean = string.replace("\\W", "");
+        if (!clean.equals(string)) {
+            // TODO recover and record error.
+            throw new StorageException("Column header includes illegal characters: " + string);
+        }
+        return clean;
+    }
+
     public static void main (String[] args) {
 
-        //final String file = "/Users/abyrd/r5/pdx/portland-2016-08-22.gtfs.zip";
-        final String file = "/Users/abyrd/geodata/nl/NL-OPENOV-20170322-gtfs.zip";
+        final String pdx_file = "/Users/abyrd/r5/pdx/portland-2016-08-22.gtfs.zip";
+        final String nl_file = "/Users/abyrd/geodata/nl/NL-OPENOV-20170322-gtfs.zip";
         try {
-            final ZipFile zip = new ZipFile(file);
+            final ZipFile zip = new ZipFile(nl_file);
             final CsvLoader loader = new CsvLoader(zip);
             loader.load(Table.routes, false);
             loader.load(Table.stops, false);
             loader.load(Table.trips, true);
-            loader.load(Table.stop_times, true);
-            loader.load(Table.shapes, true);
+//            loader.load(Table.stop_times, true);
+//            loader.load(Table.shapes, true);
             zip.close();
         } catch (Exception ex) {
             LOG.error("Error loading GTFS: {}", ex.getMessage());

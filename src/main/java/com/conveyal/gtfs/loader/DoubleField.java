@@ -2,7 +2,9 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
 
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
+import java.sql.SQLType;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -27,7 +29,7 @@ public class DoubleField extends Field {
     }
 
     @Override
-    public void setPreparedStatementParameter (int oneBasedIndex, String string, PreparedStatement preparedStatement) {
+    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setDouble(oneBasedIndex, validate(string));
         } catch (Exception ex) {
@@ -42,7 +44,12 @@ public class DoubleField extends Field {
     }
 
     @Override
-    public String getSqlType () {
+    public SQLType getSqlType () {
+        return JDBCType.DOUBLE;
+    }
+
+    @Override
+    public String getSqlTypeName () {
         return "double precision";
     }
 

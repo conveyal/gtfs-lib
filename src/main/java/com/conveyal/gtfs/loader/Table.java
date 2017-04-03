@@ -33,8 +33,8 @@ public class Table {
         new StringField("route_desc",  OPTIONAL),
         new IntegerField("route_type", REQUIRED, 999),
         new URLField("route_url",  OPTIONAL),
-        new StringField("route_color",  OPTIONAL), // really this is an int in hex notation
-        new StringField("route_text_color",  OPTIONAL)
+        new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
+        new ColorField("route_text_color",  OPTIONAL)
     );
 
     public static final Table stops = new Table("stops",
@@ -112,10 +112,16 @@ public class Table {
         return String.format("insert into %s (%s) values (%s)", name, joinedFieldNames, questionMarks);
     }
 
-    public Field getFieldForHeader (String fieldName) {
-        for (Field field : fields) if (field.name.equals(fieldName)) return field;
-        LOG.warn("Unrecognized header {}. Treating it as a proprietary string field.", fieldName);
-        return new StringField(fieldName, UNKNOWN);
+    /**
+     * @param name a column name from the header of a CSV file
+     * @return the Field object from this table with the given name. If there is no such field defined, create
+     * a new Field object for this name.
+     */
+    public Field getFieldForName(String name) {
+        // Linear search, assuming a small number of fields per table.
+        for (Field field : fields) if (field.name.equals(name)) return field;
+        LOG.warn("Unrecognized header {}. Treating it as a proprietary string field.", name);
+        return new StringField(name, UNKNOWN);
     }
 
 }

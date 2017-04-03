@@ -2,9 +2,9 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
 
-import java.net.MalformedURLException;
-import java.net.URL;
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
+import java.sql.SQLType;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -16,17 +16,17 @@ public class URLField extends Field {
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public String validateAndConvert(String original) {
+    public String validateAndConvert (String string) {
         try {
-            String cleanString = cleanString(original);
+            string = cleanString(string);
             // new URL(cleanString); TODO call this to validate, but we can't default to zero
-            return cleanString;
+            return string;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
     }
 
-    public void setPreparedStatementParameter (int oneBasedIndex, String string, PreparedStatement preparedStatement) {
+    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
         } catch (Exception ex) {
@@ -35,8 +35,8 @@ public class URLField extends Field {
     }
 
     @Override
-    public String getSqlType() {
-        return "varchar";
+    public SQLType getSqlType() {
+        return JDBCType.VARCHAR;
     }
 
 }
