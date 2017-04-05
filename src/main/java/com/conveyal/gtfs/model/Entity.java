@@ -4,6 +4,7 @@ import com.beust.jcommander.internal.Sets;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
 import com.conveyal.gtfs.error.EmptyFieldError;
+import com.conveyal.gtfs.error.EmptyTableError;
 import com.conveyal.gtfs.error.MissingColumnError;
 import com.conveyal.gtfs.error.MissingTableError;
 import com.conveyal.gtfs.error.NumberParseError;
@@ -264,13 +265,19 @@ public abstract class Entity implements Serializable {
             InputStream bis = new BOMInputStream(zis);
             CsvReader reader = new CsvReader(bis, ',', Charset.forName("UTF8"));
             this.reader = reader;
-            reader.readHeaders();
+            boolean hasHeaders = reader.readHeaders();
+            if (!hasHeaders) {
+                feed.errors.add(new EmptyTableError(tableName));
+            }
             while (reader.readRecord()) {
                 // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
                 if (++row % 500000 == 0) {
                     LOG.info("Record number {}", human(row));
                 }
                 loadOneRow(); // Call subclass method to produce an entity from the current row.
+            }
+            if (row == 0) {
+                feed.errors.add(new EmptyTableError(tableName));
             }
         }
 
