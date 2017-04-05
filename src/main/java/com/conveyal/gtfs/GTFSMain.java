@@ -44,7 +44,7 @@ public class GTFSMain {
             feed.validate();
             JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class);
             ValidationResult result = new ValidationResult(arguments[0], feed, new FeedStats(feed));
-            String resultString = json.write(result);
+            String resultString = json.writePretty(result);
             File resultFile;
             if (arguments.length >= 2) {
                 resultFile = new File(arguments[1]);
@@ -52,6 +52,7 @@ public class GTFSMain {
                 LOG.info("Storing validation result at: {}", resultFile.getAbsolutePath());
             } else {
                 LOG.info("Printing validation result for {}", feed.feedId);
+
                 System.out.print(resultString);
             }
         }

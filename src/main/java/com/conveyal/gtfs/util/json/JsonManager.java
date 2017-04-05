@@ -66,6 +66,13 @@ public class JsonManager<T> {
         return ow.writeValueAsString(o);
     }
 
+    public String writePretty(Object o) throws JsonProcessingException {
+        if (o instanceof String) {
+            return (String) o;
+        }
+        return om.writerWithDefaultPrettyPrinter().writeValueAsString(o);
+    }
+
     /**
      * Convert an object to its JSON representation
      * @param o the object to convert
