@@ -58,9 +58,9 @@ public interface EntityPopulator<T> {
 
     public static final EntityPopulator<Trip> TRIP = (result, columnForName) -> {
         Trip trip = new Trip();
+        trip.trip_id         = getStringIfPresent(result, "trip_id", columnForName);
         trip.route_id        = getStringIfPresent(result, "route_id", columnForName);
         trip.service_id      = getStringIfPresent(result, "service_id", columnForName);
-        trip.trip_id         = getStringIfPresent(result, "trrip_id", columnForName);
         trip.trip_headsign   = getStringIfPresent(result, "trip_headsign", columnForName);
         trip.trip_short_name = getStringIfPresent(result, "trip_short_name", columnForName);
         trip.block_id        = getStringIfPresent(result, "block_id", columnForName);
