@@ -32,7 +32,7 @@ public abstract class Field {
 
     // Overridden to create exception for "double precision", since its enum value is just called DOUBLE.
     public String getSqlTypeName () {
-        return getSqlType().getName();
+        return getSqlType().getName().toLowerCase();
     }
 
     public String getSqlDeclaration() {

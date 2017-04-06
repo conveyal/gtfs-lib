@@ -18,12 +18,13 @@ import java.util.zip.ZipFile;
 import static com.conveyal.gtfs.model.Entity.human;
 
 /**
- * This class loads CSV tables from zipped GTFS into an SQL relational database management system.
- * Comparing the GTFS specification for a table with the headers present in the GTFS CSV, it dynamically builds up a
+ * This class loads CSV tables from zipped GTFS into an SQL relational database management system with a JDBC driver.
+ * By comparing the GTFS specification for a table with the headers present in the GTFS CSV, it dynamically builds up
  * table definitions and SQL statements to interact with those tables. It retains all columns present in the GTFS,
  * including optional columns, known extensions, and unrecognized proprietary extensions.
  *
- * batched prepared inserts and loading from comma or tab separated files.
+ * It supports several ways of putting the data into the tables: batched prepared inserts or loading from an
+ * intermediate tab separated text file.
  *
  * Our previous approach involved loading GTFS CSV tables into Java objects and then using an object-relational mapping
  * to put those objects into a database. In that case a fixed number of fields are represented. If the GTFS feed
@@ -52,12 +53,16 @@ import static com.conveyal.gtfs.model.Entity.human;
  * - all rows have the same number of fields as there are headers
  * - fields do not contain problematic characters
  * - field contents can be converted to the target data types and are in range
- * 4. referential integrity?
+ * - TODO referential integrity
  */
 public class CsvLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(CsvLoader.class);
     private static final boolean COPY_OVER_NETWORK = true;
+
+    public static final String H2_FILE_URL = "jdbc:h2:file:~/test-db";
+    public static final String H2_MEM_URL = "jdbc:h2:mem:";
+    public static final String POSTGRES_LOCAL_URL = "jdbc:postgresql://localhost/catalogue";
 
     protected Connection connection;
     protected Statement statement;
@@ -112,11 +117,8 @@ public class CsvLoader {
         // Replace the GTFS spec Table with one representing the SQL table we will populate.
         table = new Table(table.name, fields);
 
-        final String h2_file_url = "jdbc:h2:file:~/test-db";
-        final String h2_mem_url = "jdbc:h2:mem:";
-        final String postgres_local_url = "jdbc:postgresql://localhost/catalogue";
         // JODBC drivers should auto-register these days. You used to have to trick the class loader into loading them.
-        connection = DriverManager.getConnection(postgres_local_url);
+        connection = DriverManager.getConnection(POSTGRES_LOCAL_URL);
         connection.setAutoCommit(false);
         // TODO set up schemas
         statement = connection.createStatement();
@@ -222,8 +224,8 @@ public class CsvLoader {
             loader.load(Table.routes, false);
             loader.load(Table.stops, false);
             loader.load(Table.trips, true);
-//            loader.load(Table.stop_times, true);
-//            loader.load(Table.shapes, true);
+            loader.load(Table.stop_times, true);
+            loader.load(Table.shapes, true);
             zip.close();
         } catch (Exception ex) {
             LOG.error("Error loading GTFS: {}", ex.getMessage());
