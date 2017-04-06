@@ -16,6 +16,8 @@ import static com.conveyal.gtfs.loader.Requirement.*;
  * This groups a table name with a description of the fields in the table.
  * It can be normative (expressing the specification for a CSV table in GTFS)
  * or descriptive (providing the schema of an RDBMS table).
+ *
+ * TODO associate Table with EntityPopulator (combine read and write sides)
  */
 public class Table {
 
@@ -25,7 +27,7 @@ public class Table {
 
     Field[] fields;
 
-    public static final Table routes = new Table("routes",
+    public static final Table ROUTES = new Table("routes",
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
@@ -37,7 +39,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL)
     );
 
-    public static final Table stops = new Table("stops",
+    public static final Table STOPS = new Table("stops",
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
         new StringField("stop_name",  REQUIRED),
@@ -52,7 +54,7 @@ public class Table {
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
     );
 
-    public static final Table trips = new Table("trips",
+    public static final Table TRIPS = new Table("trips",
         new StringField("trip_id",  REQUIRED),
         new StringField("route_id",  REQUIRED),
         new StringField("service_id",  REQUIRED),
@@ -65,7 +67,7 @@ public class Table {
         new ShortField("bikes_allowed", OPTIONAL, 2)
     );
 
-    public static final Table stop_times = new Table("stop_times",
+    public static final Table STOP_TIMES = new Table("stop_times",
         new StringField("trip_id", REQUIRED),
         new IntegerField("stop_sequence", REQUIRED),
         new StringField("stop_id", REQUIRED),
@@ -79,7 +81,7 @@ public class Table {
         new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     );
 
-    public static final Table shapes = new Table("shapes",
+    public static final Table SHAPES = new Table("shapes",
         new StringField("shape_id", REQUIRED),
         new IntegerField("shape_pt_sequence", REQUIRED),
         new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
@@ -107,7 +109,7 @@ public class Table {
     }
 
     public String generateInsertSql () {
-        String questionMarks = String.join(",", Collections.nCopies(fields.length, "?"));
+        String questionMarks = String.join(", ", Collections.nCopies(fields.length, "?"));
         String joinedFieldNames = Arrays.stream(fields).map(f -> f.name).collect(Collectors.joining(", "));
         return String.format("insert into %s (%s) values (%s)", name, joinedFieldNames, questionMarks);
     }

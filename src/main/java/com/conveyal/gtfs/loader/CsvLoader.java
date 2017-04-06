@@ -60,10 +60,6 @@ public class CsvLoader {
     private static final Logger LOG = LoggerFactory.getLogger(CsvLoader.class);
     private static final boolean COPY_OVER_NETWORK = true;
 
-    public static final String H2_FILE_URL = "jdbc:h2:file:~/test-db";
-    public static final String H2_MEM_URL = "jdbc:h2:mem:";
-    public static final String POSTGRES_LOCAL_URL = "jdbc:postgresql://localhost/catalogue";
-
     protected Connection connection;
     protected Statement statement;
     protected CsvReader csvReader;
@@ -114,25 +110,23 @@ public class CsvLoader {
             }
         }
 
-        // Replace the GTFS spec Table with one representing the SQL table we will populate.
-        table = new Table(table.name, fields);
+        // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
+        Table targetTable = new Table(table.name, fields);
 
-        // JODBC drivers should auto-register these days. You used to have to trick the class loader into loading them.
-        connection = DriverManager.getConnection(POSTGRES_LOCAL_URL);
-        connection.setAutoCommit(false);
-        // TODO set up schemas
+        ConnectionSource connectionSource = new ConnectionSource(ConnectionSource.POSTGRES_LOCAL_URL);
+        connection = connectionSource.getConnection("nl");
         statement = connection.createStatement();
 
         // Some databases require the table to exist before a statement can be prepared.
-        table.createSqlTable(connection);
+        targetTable.createSqlTable(connection);
 
         if (viaText) {
             // No need to output headers to temp text file, our SQL table column order exactly matches our text file.
-            tempTextFile = File.createTempFile(table.name, "text");
+            tempTextFile = File.createTempFile(targetTable.name, "text");
             tempTextFileStream = new PrintStream(new BufferedOutputStream(new FileOutputStream(tempTextFile)));
             LOG.info("Loading via temporary text file at " + tempTextFile.getAbsolutePath());
         } else {
-            insertStatement = connection.prepareStatement(table.generateInsertSql());
+            insertStatement = connection.prepareStatement(targetTable.generateInsertSql());
             LOG.info(insertStatement.toString()); // Logs the SQL for the prepared statement
         }
 
@@ -189,8 +183,18 @@ public class CsvLoader {
         }
 
         LOG.info("Indexing...");
-        // statement.execute("create index on stop_times (trip_id, stop_sequence)");
-        // TODO build all indexes by just running an SQL script.
+        // We determine which columns should be indexed based on field order in the GTFS spec model table.
+        // Not sure that's a good idea, this could use some abstraction.
+        String idColumn = table.fields[0].name;
+        String orderColumn = table.fields[1].name;
+        String indexColumns = idColumn;
+        if (orderColumn.contains("_sequence")) indexColumns = String.join(", ", idColumn, orderColumn);
+        // TODO create primary key and fall back on plain index (consider not null & unique constraints)
+        String indexSql = String.format("create index on %s (%s)", table.name, indexColumns);
+        //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
+        LOG.info(indexSql);
+        statement.execute(indexSql);
+        // TODO add foreign key constraints, and recover recording errors as needed.
 
         LOG.info("Committing transaction...");
         connection.commit();
@@ -205,11 +209,11 @@ public class CsvLoader {
      *
      * TODO test including SQL injection text (quote and semicolon)
      */
-    private static String sanitize (String string) {
-        String clean = string.replace("\\W", "");
+    public static String sanitize (String string) {
+        String clean = string.replaceAll("[^\\p{Alnum}_-]", "");
         if (!clean.equals(string)) {
             // TODO recover and record error.
-            throw new StorageException("Column header includes illegal characters: " + string);
+            throw new StorageException("String includes illegal (non alphanumeric or dash) characters: " + string);
         }
         return clean;
     }
@@ -221,11 +225,11 @@ public class CsvLoader {
         try {
             final ZipFile zip = new ZipFile(nl_file);
             final CsvLoader loader = new CsvLoader(zip);
-            loader.load(Table.routes, false);
-            loader.load(Table.stops, false);
-            loader.load(Table.trips, true);
-            loader.load(Table.stop_times, true);
-            loader.load(Table.shapes, true);
+            loader.load(Table.ROUTES, false);
+            loader.load(Table.STOPS, false);
+            loader.load(Table.TRIPS, true);
+            loader.load(Table.SHAPES, true);
+            loader.load(Table.STOP_TIMES, true);
             zip.close();
         } catch (Exception ex) {
             LOG.error("Error loading GTFS: {}", ex.getMessage());
