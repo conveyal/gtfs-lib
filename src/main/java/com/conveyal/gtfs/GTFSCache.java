@@ -256,7 +256,7 @@ public class GTFSCache {
                 throw new RuntimeException(e);
             }
         } else {
-            LOG.warn("Feed {} found neither locally nor on S3", originalId);
+            LOG.warn("Feed {} not found locally", originalId);
             throw new NoSuchElementException(originalId);
         }
     }
