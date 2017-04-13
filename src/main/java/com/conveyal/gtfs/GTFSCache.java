@@ -8,7 +8,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import org.slf4j.Logger;
@@ -38,21 +37,6 @@ public class GTFSCache {
     private static final int DEFAULT_CACHE_SIZE = 10;
 
     private static final AmazonS3 s3 = new AmazonS3Client();
-    RemovalListener<String, GTFSFeed> removalListener = new RemovalListener<String, GTFSFeed>() {
-        @Override
-        public void onRemoval(RemovalNotification<String, GTFSFeed> removalNotification) {
-            // delete local files only if using s3
-            if (bucket != null) {
-                String id = removalNotification.getKey();
-                String[] extensions = {".db", ".db.p", ".zip"};
-                // delete local cache files (including zip) when feed removed from cache
-                for (String type : extensions) {
-                    File file = new File(cacheDir, id + type);
-                    file.delete();
-                }
-            }
-        }
-    };
     private LoadingCache<String, GTFSFeed> cache;
 
     /** If bucket is null, work offline and do not use S3 */
@@ -89,8 +73,28 @@ public class GTFSCache {
         createCache(cacheSize);
     }
 
+    /**
+     * Create cache of GTFSFeed objects with variable size.
+     * of
+     * @param cacheSize maximum number of feeds to be stored in cache
+     */
     private void createCache(int cacheSize) {
         this.cacheSize = cacheSize;
+        if (bucket != null) {
+            LOG.warn("Local cache files (including .zip) will be deleted when removed from cache.");
+        }
+        RemovalListener<String, GTFSFeed> removalListener = removalNotification -> {
+            // delete local files ONLY if using s3
+            if (bucket != null) {
+                String id = removalNotification.getKey();
+                String[] extensions = {".db", ".db.p", ".zip"};
+                // delete local cache files (including zip) when feed removed from cache
+                for (String type : extensions) {
+                    File file = new File(cacheDir, id + type);
+                    file.delete();
+                }
+            }
+        };
         this.cache = CacheBuilder.newBuilder()
             .maximumSize(cacheSize)
             .removalListener(removalListener)
