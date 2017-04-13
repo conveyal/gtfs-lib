@@ -242,8 +242,10 @@ public class GTFSCache {
 
         // if we fell through to here, getting the mapdb was unsuccessful
         // grab GTFS from S3 if it is not found locally
-        LOG.info("Loading feed from local cache directory...");
         File feedFile = new File(cacheDir, id + ".zip");
+        if (feedFile.exists()) {
+            LOG.info("Loading feed from local cache directory...");
+        }
 
         if (!feedFile.exists() && bucket != null) {
             LOG.info("Feed not found locally, downloading from S3.");
