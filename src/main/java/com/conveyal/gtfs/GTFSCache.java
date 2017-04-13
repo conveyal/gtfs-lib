@@ -33,25 +33,22 @@ public class GTFSCache {
     public final String bucketFolder;
 
     public final File cacheDir;
-    public int cacheSize;
-    private static final int DEFAULT_CACHE_SIZE = 10;
+    public long cacheSize;
+    private static final long DEFAULT_CACHE_SIZE = 10L;
 
     private static final AmazonS3 s3 = new AmazonS3Client();
     private LoadingCache<String, GTFSFeed> cache;
 
-    /** If bucket is null, work offline and do not use S3 */
     public GTFSCache(String bucket, File cacheDir) {
-        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
-        else LOG.info("Using bucket {} for GTFS Cache", bucket);
-
-        this.bucket = bucket;
-        this.bucketFolder = null;
-
-        this.cacheDir = cacheDir;
-        createCache(DEFAULT_CACHE_SIZE);
+        this(bucket, null, cacheDir);
     }
 
     public GTFSCache(String bucket, String bucketFolder, File cacheDir) {
+        this(bucket, bucketFolder, cacheDir, DEFAULT_CACHE_SIZE);
+    }
+
+    /** If bucket is null, work offline and do not use S3 */
+    public GTFSCache(String bucket, String bucketFolder, File cacheDir, long cacheSize) {
         if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
         else LOG.info("Using bucket {} for GTFS Cache", bucket);
 
@@ -59,27 +56,8 @@ public class GTFSCache {
         this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
 
         this.cacheDir = cacheDir;
-        createCache(DEFAULT_CACHE_SIZE);
-    }
-
-    public GTFSCache(String bucket, String bucketFolder, File cacheDir, int cacheSize) {
-        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
-        else LOG.info("Using bucket {} for GTFS Cache", bucket);
-
-        this.bucket = bucket;
-        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
-
-        this.cacheDir = cacheDir;
-        createCache(cacheSize);
-    }
-
-    /**
-     * Create cache of GTFSFeed objects with variable size.
-     * of
-     * @param cacheSize maximum number of feeds to be stored in cache
-     */
-    private void createCache(int cacheSize) {
         this.cacheSize = cacheSize;
+
         if (bucket != null) {
             LOG.warn("Local cache files (including .zip) will be deleted when removed from cache.");
         }
@@ -96,14 +74,18 @@ public class GTFSCache {
             }
         };
         this.cache = CacheBuilder.newBuilder()
-            .maximumSize(cacheSize)
-            .removalListener(removalListener)
-            .build(new CacheLoader<String, GTFSFeed>() {
-                @Override
-                public GTFSFeed load(String s) throws Exception {
-                    return retrieveFeed(s);
-                }
-            });
+                .maximumSize(cacheSize)
+                .removalListener(removalListener)
+                .build(new CacheLoader<String, GTFSFeed>() {
+                    @Override
+                    public GTFSFeed load(String s) throws Exception {
+                        return retrieveFeed(s);
+                    }
+                });
+    }
+
+    public long getCurrentCacheSize() {
+        return this.cache.size();
     }
 
     /**
