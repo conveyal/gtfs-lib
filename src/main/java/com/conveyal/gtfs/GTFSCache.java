@@ -34,6 +34,8 @@ public class GTFSCache {
     public final String bucketFolder;
 
     public final File cacheDir;
+    public int cacheSize;
+    private static final int DEFAULT_CACHE_SIZE = 10;
 
     private static final AmazonS3 s3 = new AmazonS3Client();
     RemovalListener<String, GTFSFeed> removalListener = new RemovalListener<String, GTFSFeed>() {
@@ -51,15 +53,7 @@ public class GTFSCache {
             }
         }
     };
-    private LoadingCache<String, GTFSFeed> cache = CacheBuilder.newBuilder()
-            .maximumSize(10)
-            .removalListener(removalListener)
-            .build(new CacheLoader<String, GTFSFeed>() {
-                @Override
-                public GTFSFeed load(String s) throws Exception {
-                    return retrieveFeed(s);
-                }
-            });
+    private LoadingCache<String, GTFSFeed> cache;
 
     /** If bucket is null, work offline and do not use S3 */
     public GTFSCache(String bucket, File cacheDir) {
@@ -70,6 +64,7 @@ public class GTFSCache {
         this.bucketFolder = null;
 
         this.cacheDir = cacheDir;
+        createCache(DEFAULT_CACHE_SIZE);
     }
 
     public GTFSCache(String bucket, String bucketFolder, File cacheDir) {
@@ -80,6 +75,31 @@ public class GTFSCache {
         this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
 
         this.cacheDir = cacheDir;
+        createCache(DEFAULT_CACHE_SIZE);
+    }
+
+    public GTFSCache(String bucket, String bucketFolder, File cacheDir, int cacheSize) {
+        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
+        else LOG.info("Using bucket {} for GTFS Cache", bucket);
+
+        this.bucket = bucket;
+        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
+
+        this.cacheDir = cacheDir;
+        createCache(cacheSize);
+    }
+
+    private void createCache(int cacheSize) {
+        this.cacheSize = cacheSize;
+        this.cache = CacheBuilder.newBuilder()
+            .maximumSize(cacheSize)
+            .removalListener(removalListener)
+            .build(new CacheLoader<String, GTFSFeed>() {
+                @Override
+                public GTFSFeed load(String s) throws Exception {
+                    return retrieveFeed(s);
+                }
+            });
     }
 
     /**
@@ -248,6 +268,7 @@ public class GTFSCache {
                 throw new RuntimeException(e);
             }
         } else {
+            LOG.warn("Feed {} found neither locally nor on S3", originalId);
             throw new NoSuchElementException(originalId);
         }
     }
