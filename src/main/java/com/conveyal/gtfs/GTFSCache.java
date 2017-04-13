@@ -176,7 +176,7 @@ public class GTFSCache {
 
 
     /** retrieve a feed from local cache or S3 */
-    private GTFSFeed retrieveFeed (String originalId) {
+    protected GTFSFeed retrieveFeed (String originalId) {
         // see if we have it cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
