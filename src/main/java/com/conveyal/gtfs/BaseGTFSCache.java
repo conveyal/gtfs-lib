@@ -76,7 +76,7 @@ public abstract class BaseGTFSCache<T> {
                 }
             }
         };
-        CacheBuilder.newBuilder()
+        this.cache = CacheBuilder.newBuilder()
                 // we use SoftReferenced values because we have the constraint that we don't want more than one
                 // copy of a particular GTFSFeed object around; that would mean multiple MapDBs are pointing at the same
                 // file, which is bad.
