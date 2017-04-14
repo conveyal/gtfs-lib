@@ -8,7 +8,6 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
 import org.slf4j.Logger;
@@ -34,12 +33,36 @@ public class GTFSCache {
     public final String bucketFolder;
 
     public final File cacheDir;
+    public long cacheSize;
+    private static final long DEFAULT_CACHE_SIZE = 10L;
 
     private static final AmazonS3 s3 = new AmazonS3Client();
-    RemovalListener<String, GTFSFeed> removalListener = new RemovalListener<String, GTFSFeed>() {
-        @Override
-        public void onRemoval(RemovalNotification<String, GTFSFeed> removalNotification) {
-            // delete local files only if using s3
+    private LoadingCache<String, GTFSFeed> cache;
+
+    public GTFSCache(String bucket, File cacheDir) {
+        this(bucket, null, cacheDir);
+    }
+
+    public GTFSCache(String bucket, String bucketFolder, File cacheDir) {
+        this(bucket, bucketFolder, cacheDir, DEFAULT_CACHE_SIZE);
+    }
+
+    /** If bucket is null, work offline and do not use S3 */
+    public GTFSCache(String bucket, String bucketFolder, File cacheDir, long cacheSize) {
+        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
+        else LOG.info("Using bucket {} for GTFS Cache", bucket);
+
+        this.bucket = bucket;
+        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
+
+        this.cacheDir = cacheDir;
+        this.cacheSize = cacheSize;
+
+        if (bucket != null) {
+            LOG.warn("Local cache files (including .zip) will be deleted when removed from cache.");
+        }
+        RemovalListener<String, GTFSFeed> removalListener = removalNotification -> {
+            // delete local files ONLY if using s3
             if (bucket != null) {
                 String id = removalNotification.getKey();
                 String[] extensions = {".db", ".db.p", ".zip"};
@@ -49,37 +72,20 @@ public class GTFSCache {
                     file.delete();
                 }
             }
-        }
-    };
-    private LoadingCache<String, GTFSFeed> cache = CacheBuilder.newBuilder()
-            .maximumSize(10)
-            .removalListener(removalListener)
-            .build(new CacheLoader<String, GTFSFeed>() {
-                @Override
-                public GTFSFeed load(String s) throws Exception {
-                    return retrieveFeed(s);
-                }
-            });
-
-    /** If bucket is null, work offline and do not use S3 */
-    public GTFSCache(String bucket, File cacheDir) {
-        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
-        else LOG.info("Using bucket {} for GTFS Cache", bucket);
-
-        this.bucket = bucket;
-        this.bucketFolder = null;
-
-        this.cacheDir = cacheDir;
+        };
+        this.cache = CacheBuilder.newBuilder()
+                .maximumSize(cacheSize)
+                .removalListener(removalListener)
+                .build(new CacheLoader<String, GTFSFeed>() {
+                    @Override
+                    public GTFSFeed load(String s) throws Exception {
+                        return retrieveFeed(s);
+                    }
+                });
     }
 
-    public GTFSCache(String bucket, String bucketFolder, File cacheDir) {
-        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
-        else LOG.info("Using bucket {} for GTFS Cache", bucket);
-
-        this.bucket = bucket;
-        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
-
-        this.cacheDir = cacheDir;
+    public long getCurrentCacheSize() {
+        return this.cache.size();
     }
 
     /**
@@ -170,7 +176,7 @@ public class GTFSCache {
 
 
     /** retrieve a feed from local cache or S3 */
-    private GTFSFeed retrieveFeed (String originalId) {
+    protected GTFSFeed retrieveFeed (String originalId) {
         // see if we have it cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
@@ -222,8 +228,10 @@ public class GTFSCache {
 
         // if we fell through to here, getting the mapdb was unsuccessful
         // grab GTFS from S3 if it is not found locally
-        LOG.info("Loading feed from local cache directory...");
         File feedFile = new File(cacheDir, id + ".zip");
+        if (feedFile.exists()) {
+            LOG.info("Loading feed from local cache directory...");
+        }
 
         if (!feedFile.exists() && bucket != null) {
             LOG.info("Feed not found locally, downloading from S3.");
@@ -248,6 +256,7 @@ public class GTFSCache {
                 throw new RuntimeException(e);
             }
         } else {
+            LOG.warn("Feed {} not found locally", originalId);
             throw new NoSuchElementException(originalId);
         }
     }

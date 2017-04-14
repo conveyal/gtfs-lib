@@ -865,6 +865,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
+    protected void finalize() throws IOException {
+        close();
+    }
+
     public void close () {
         db.close();
     }
