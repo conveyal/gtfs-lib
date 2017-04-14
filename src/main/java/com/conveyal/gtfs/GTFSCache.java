@@ -13,11 +13,7 @@ public class GTFSCache extends BaseGTFSCache<GTFSFeed> {
     public GTFSCache(String bucket, String bucketFolder, File cacheDir) {
         super(bucket, bucketFolder, cacheDir);
     }
-
-    public GTFSCache(String bucket, String bucketFolder, File cacheDir, long cacheSize) {
-        super(bucket, bucketFolder, cacheDir, cacheSize);
-    }
-
+    
     @Override
     protected GTFSFeed processFeed(GTFSFeed feed) {
         return feed;
