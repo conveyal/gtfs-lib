@@ -17,6 +17,9 @@ import static com.conveyal.gtfs.model.Entity.INT_MISSING;
  * messy. Anectodal evidence suggests this would give about a 1/3 speedup. But other observations show no speedup at all.
  * The main benefit would be grabbing arbitrary extension columns.
  *
+ * TODO associate EntityPopulator more closely with Entity types and Table instances, so you can get one from the other.
+ * e.g. getEntityPopulator() and getTableSpec() on Entity classes.
+ *
  * TODO maybe instantiate EntityCreators with a columnForName map to avoid passing them around and make them implement Iterable<T>
  * Could even initialize with the resultSet and call it a Factory
  */

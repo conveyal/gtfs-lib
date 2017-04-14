@@ -2,7 +2,10 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
+import gnu.trove.map.TObjectIntMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import org.apache.commons.io.input.BOMInputStream;
+import org.hsqldb.result.ResultMetaData;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
@@ -58,33 +61,32 @@ import static com.conveyal.gtfs.model.Entity.human;
 public class CsvLoader {
 
     private static final Logger LOG = LoggerFactory.getLogger(CsvLoader.class);
-    private static final boolean COPY_OVER_NETWORK = true;
+    private static final long INSERT_BATCH_SIZE = 500;
 
     protected Connection connection;
-    protected Statement statement;
     protected CsvReader csvReader;
-    protected long line;
     protected ZipFile zip;
 
     private File tempTextFile;
     private PrintStream tempTextFileStream;
     private PreparedStatement insertStatement = null;
+    private ConnectionSource connectionSource = new ConnectionSource(ConnectionSource.POSTGRES_LOCAL_URL);
 
     public CsvLoader(ZipFile zip) {
         this.zip = zip;
     }
 
-    private final long INSERT_BATCH_SIZE = 500;
+    public void load (Table table) throws Exception {
 
-    /**
-     * @param viaText will only work if the database server process has access to the local filesystem
-     *                It uses the Postgres text format, so it's somewhat tied to that RDBMS.
-     */
-    public void load (Table table, boolean viaText) throws Exception {
         ZipEntry entry = zip.getEntry(table.name + ".txt");
         if (entry == null) {
-            // check for TableInSubdirectoryError and see if table is required
+            // TODO check for TableInSubdirectoryError and see if table is required
+            return;
         }
+
+        // Use the Postgres text load format if we're connected to that database.
+        boolean postgresText = (connection instanceof BaseConnection);
+
         LOG.info("Loading GTFS table {} from {}", table.name, entry);
         InputStream zipInputStream = zip.getInputStream(entry);
         // Skip any byte order mark that may be present. Files must be UTF-8,
@@ -113,14 +115,15 @@ public class CsvLoader {
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
         Table targetTable = new Table(table.name, fields);
 
-        ConnectionSource connectionSource = new ConnectionSource(ConnectionSource.POSTGRES_LOCAL_URL);
-        connection = connectionSource.getConnection("nl");
-        statement = connection.createStatement();
+        // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
+        // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.
+        // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
+        connection = connectionSource.getConnection(null);//"nl");
 
         // Some databases require the table to exist before a statement can be prepared.
         targetTable.createSqlTable(connection);
 
-        if (viaText) {
+        if (postgresText) {
             // No need to output headers to temp text file, our SQL table column order exactly matches our text file.
             tempTextFile = File.createTempFile(targetTable.name, "text");
             tempTextFileStream = new PrintStream(new BufferedOutputStream(new FileOutputStream(tempTextFile)));
@@ -147,15 +150,15 @@ public class CsvLoader {
                 String string = csvReader.get(f);
                 if (string.isEmpty()) { // TODO verify that CSV reader always returns empty strings, not nulls
                     if (field.isRequired()) throw new StorageException("Missing required field."); // TODO record and recover.
-                    if (viaText) transformedStrings[f] = "\\N"; // Represents null in Postgres text format
+                    if (postgresText) transformedStrings[f] = "\\N"; // Represents null in Postgres text format
                     else insertStatement.setNull(f + 1, field.getSqlType().getVendorTypeNumber());
                 } else {
-                    if (viaText) transformedStrings[f] = field.validateAndConvert(string);
-                    // Micro-benchmarks show it's 4-5% faster to call the type-specific parameter setters rather than setObject with a type code.
+                    if (postgresText) transformedStrings[f] = field.validateAndConvert(string);
+                    // Micro-benchmarks show it's 4-5% faster to call typed parameter setter methods rather than setObject with a type code.
                     else field.setParameter(insertStatement, f + 1, string);
                 }
             }
-            if (viaText) {
+            if (postgresText) {
                 tempTextFileStream.printf(String.join("\t", transformedStrings));
                 tempTextFileStream.print('\n');
             } else {
@@ -164,36 +167,36 @@ public class CsvLoader {
             }
         }
 
-        if (viaText) {
+        // Finalize loading the table, either by copying the pre-validated text file into the database (for Postgres)
+        // or inserting any remaining rows (for all others).
+
+        if (postgresText) {
             LOG.info("Loading into database table from temporary text file...");
             tempTextFileStream.close();
-            if (COPY_OVER_NETWORK) {
-                // Allows sending over network, only slightly slower
-                final String copySql = String.format("copy %s from stdin", table.name);
-                InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
-                CopyManager copyManager = new CopyManager((BaseConnection) connection);
-                copyManager.copyIn(copySql, stream, 1024*1024);
-                stream.close();
-            } else {
-                // Load from local file on the database server
-                statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
-            }
+            // Allows sending over network, only slightly slower
+            final String copySql = String.format("copy %s from stdin", table.name);
+            InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
+            CopyManager copyManager = new CopyManager((BaseConnection) connection);
+            copyManager.copyIn(copySql, stream, 1024*1024);
+            stream.close();
+            // It is also possible to load from local file if this code is running on the database server.
+            // statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
         } else {
             insertStatement.executeBatch();
         }
 
         LOG.info("Indexing...");
         // We determine which columns should be indexed based on field order in the GTFS spec model table.
-        // Not sure that's a good idea, this could use some abstraction.
-        String idColumn = table.fields[0].name;
-        String orderColumn = table.fields[1].name;
-        String indexColumns = idColumn;
-        if (orderColumn.contains("_sequence")) indexColumns = String.join(", ", idColumn, orderColumn);
+        // Not sure that's a good idea, this could use some abstraction. TODO getIndexColumns() on each table.
+        String indexColumns = table.getIndexFields();
+        // TODO verify referential integrity and uniqueness of keys
         // TODO create primary key and fall back on plain index (consider not null & unique constraints)
-        String indexSql = String.format("create index on %s (%s)", table.name, indexColumns);
+        // SQLITE requires specifying a name for indexes
+        String indexName = String.join("_", table.name, "idx");
+        String indexSql = String.format("create index %s on %s (%s)", indexName, table.name, indexColumns);
         //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
         LOG.info(indexSql);
-        statement.execute(indexSql);
+        connection.createStatement().execute(indexSql);
         // TODO add foreign key constraints, and recover recording errors as needed.
 
         LOG.info("Committing transaction...");
@@ -222,14 +225,16 @@ public class CsvLoader {
 
         final String pdx_file = "/Users/abyrd/r5/pdx/portland-2016-08-22.gtfs.zip";
         final String nl_file = "/Users/abyrd/geodata/nl/NL-OPENOV-20170322-gtfs.zip";
+        final String etang_file = "/Users/abyrd/r5/mamp-old/ETANG.GTFS.zip";
         try {
-            final ZipFile zip = new ZipFile(nl_file);
+            // There appears to be no advantage to loading these in parallel, as this whole process is I/O bound.
+            final ZipFile zip = new ZipFile(etang_file);
             final CsvLoader loader = new CsvLoader(zip);
-            loader.load(Table.ROUTES, false);
-            loader.load(Table.STOPS, false);
-            loader.load(Table.TRIPS, true);
-            loader.load(Table.SHAPES, true);
-            loader.load(Table.STOP_TIMES, true);
+            loader.load(Table.ROUTES);
+            loader.load(Table.STOPS);
+            loader.load(Table.TRIPS);
+            loader.load(Table.SHAPES);
+            loader.load(Table.STOP_TIMES);
             zip.close();
         } catch (Exception ex) {
             LOG.error("Error loading GTFS: {}", ex.getMessage());

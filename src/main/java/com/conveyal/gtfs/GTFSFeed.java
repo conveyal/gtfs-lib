@@ -3,15 +3,8 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.validator.DuplicateStopsValidator;
-import com.conveyal.gtfs.validator.GTFSValidator;
-import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
-import com.conveyal.gtfs.validator.MisplacedStopValidator;
-import com.conveyal.gtfs.validator.NamesValidator;
-import com.conveyal.gtfs.validator.OverlappingTripsValidator;
-import com.conveyal.gtfs.validator.ReversedTripsValidator;
-import com.conveyal.gtfs.validator.TripTimesValidator;
-import com.conveyal.gtfs.validator.UnusedStopValidator;
+import com.conveyal.gtfs.validator.*;
+import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.*;
@@ -39,11 +32,9 @@ import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
-import java.time.Period;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -267,21 +258,21 @@ public class GTFSFeed implements Cloneable, Closeable {
             throw new RuntimeException(e);
         }
     }
-//    public void validate (EventBus eventBus, GTFSValidator... validators) {
+//    public void validate (EventBus eventBus, Validator... validators) {
 //        if (eventBus == null) {
 //
 //        }
-//        for (GTFSValidator validator : validators) {
+//        for (Validator validator : validators) {
 //            validator.getClass().getSimpleName();
 //            validator.validate(this, false);
 //        }
 //    }
-    public void validate (boolean repair, GTFSValidator... validators) {
+    public void validate (boolean repair, Validator... validators) {
         long startValidation = System.currentTimeMillis();
-        for (GTFSValidator validator : validators) {
+        for (Validator validator : validators) {
             try {
                 long startValidator = System.currentTimeMillis();
-                validator.validate(this, repair);
+//                validator.validate(this, repair);
                 long endValidator = System.currentTimeMillis();
                 long diff = endValidator - startValidator;
                 LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), diff);
@@ -300,7 +291,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public void validate () {
         validate(false,
                 new DuplicateStopsValidator(),
-                new HopSpeedsReasonableValidator(),
+                new NewTripTimesValidator(),
                 new MisplacedStopValidator(),
                 new NamesValidator(),
                 new OverlappingTripsValidator(),
@@ -310,10 +301,11 @@ public class GTFSFeed implements Cloneable, Closeable {
         );
     }
 
+    // FIXME duplicate code, 'repair' should be a boolean method parameter
     public void validateAndRepair () {
         validate(true,
                 new DuplicateStopsValidator(),
-                new HopSpeedsReasonableValidator(),
+                new NewTripTimesValidator(),
                 new MisplacedStopValidator(),
                 new NamesValidator(),
                 new OverlappingTripsValidator(),
@@ -373,7 +365,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     *
+     * TODO rename getStopSpatialIndex to make it clear what the index contains.
      */
     public STRtree getSpatialIndex () {
         if (this.spatialIndex == null) {

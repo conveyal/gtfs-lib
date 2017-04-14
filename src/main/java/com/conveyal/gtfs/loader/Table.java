@@ -126,4 +126,20 @@ public class Table {
         return new StringField(name, UNKNOWN);
     }
 
+    public String getKeyFieldName () {
+        return fields[0].name;
+    }
+
+    public String getOrderFieldName () {
+        String name = fields[1].name;
+        if (name.contains("_sequence")) return name;
+        else return null;
+    }
+
+    public String getIndexFields() {
+        String orderFieldName = getOrderFieldName();
+        if (orderFieldName == null) return getKeyFieldName();
+        else return String.join(",", getKeyFieldName(), orderFieldName);
+    }
+
 }

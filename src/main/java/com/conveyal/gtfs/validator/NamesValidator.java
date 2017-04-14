@@ -2,21 +2,21 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.RouteNameError;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.validator.model.InvalidValue;
 import com.conveyal.gtfs.validator.model.Priority;
-import com.conveyal.gtfs.validator.model.ValidationResult;
 
 /**
  * Created by landon on 5/2/16.
  */
-public class NamesValidator extends GTFSValidator {
+public class NamesValidator extends Validator {
+
     @Override
-    public boolean validate(GTFSFeed feed, boolean repair) {
+    public boolean validate(Feed feed, boolean repair) {
         boolean isValid = true;
 
         ///////// ROUTES
-        for (Route route : feed.routes.values()) {
+        for (Route route : feed.routes) {
             String shortName = "";
             String longName = "";
             String desc = "";

@@ -15,8 +15,8 @@ import static com.conveyal.gtfs.loader.CsvLoader.sanitize;
  */
 public class ConnectionSource {
 
-    public static final String H2_FILE_URL = "jdbc:h2:file:~/test-db";
-    public static final String H2_MEM_URL = "jdbc:h2:mem:";
+    public static final String H2_FILE_URL = "jdbc:h2:file:~/test-db"; // H2 memory does not seem faster than file
+    public static final String SQLITE_FILE_URL = "jdbc:sqlite:/Users/abyrd/test-db";
     public static final String POSTGRES_LOCAL_URL = "jdbc:postgresql://localhost/catalogue";
 
     private static final Logger LOG = LoggerFactory.getLogger(ConnectionSource.class);

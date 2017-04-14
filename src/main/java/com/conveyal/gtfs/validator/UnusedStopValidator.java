@@ -1,35 +1,40 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.UnusedStopError;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.validator.model.InvalidValue;
-import com.conveyal.gtfs.validator.model.Priority;
-import com.conveyal.gtfs.validator.model.ValidationResult;
-import com.google.common.collect.Sets;
-import org.mapdb.Fun;
+import gnu.trove.map.TObjectIntMap;
 
-import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
-import java.util.SortedSet;
-import java.util.stream.Collectors;
 
 /**
- * Created by landon on 5/2/16.
+ * This validator checks for stops that are not referenced by any stop_times.
+ *
+ * REVIEW: this is relying on either a huge index or the histogram functionality in MapDB is lightweight.
+ * but either way we're building those histograms whether or not we're validating the feed. That's making the load
+ * process much slower.
+ * The map is called "stopCountByStopTime" but it's actually a stop time count by stop.
+ * It repairs the feed by removing the unused stop, which seems right, but the iteration structure seems set up
+ * for the case where we're correcting, which is not the common case.
+ *
+ * TODO move this into TripTimesValidator and use counts.adjustOrPutValue(stopId, 1, 1), then loop to remove stops for repair.
  */
-public class UnusedStopValidator extends GTFSValidator {
+public class UnusedStopValidator extends Validator {
+
+    private static final int ERROR_LIMIT = 2000;
+
+    TObjectIntMap<String> counts;
+
     @Override
-    public boolean validate(GTFSFeed feed, boolean repair) {
+    public boolean validate(Feed feed, boolean repair) {
         boolean isValid = true;
-        long index = 1;
         int unusedStopErrorCount = 0;
-        int errorLimit = 2000;
-        // check for unused stops
-        for (Iterator<Stop> iter = feed.stops.values().iterator(); iter.hasNext();) {
+
+        for (Iterator<Stop> iter = feed.stops.iterator(); iter.hasNext();) {
             Stop stop = iter.next();
-            if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
-                if (unusedStopErrorCount < errorLimit) {
+            counts.adjustOrPutValue("X", 1, 1);
+//            if (!feed.stopCountByStopTime.containsKey(stop.stop_id)) {
+                if (unusedStopErrorCount < ERROR_LIMIT) {
                     feed.errors.add(new UnusedStopError(stop));
                     unusedStopErrorCount++;
                 }
@@ -37,14 +42,15 @@ public class UnusedStopValidator extends GTFSValidator {
                 if (repair) {
                     iter.remove();
                 }
-            }
-            index++;
+//
+//          index++;
 
             // break out of validator if error count equals limit and we're not repairing feed
-            if (!repair && unusedStopErrorCount >= errorLimit) {
+            if (!repair && unusedStopErrorCount >= ERROR_LIMIT) {
                 break;
             }
         }
-        return isValid;
+        return false;
     }
+
 }

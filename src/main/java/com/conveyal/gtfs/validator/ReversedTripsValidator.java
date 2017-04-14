@@ -4,12 +4,10 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.MissingShapeError;
 import com.conveyal.gtfs.error.ReversedTripShapeError;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
-import com.conveyal.gtfs.model.Pattern;
-import com.conveyal.gtfs.model.Shape;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.Iterables;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -26,27 +24,26 @@ import java.util.Map;
 /**
  * Created by landon on 5/2/16.
  */
-public class ReversedTripsValidator extends GTFSValidator {
+public class ReversedTripsValidator extends Validator {
     private static Double distanceMultiplier = 1.0;
 
     static GeometryFactory geometryFactory = new GeometryFactory();
 
-    public boolean validate(GTFSFeed feed, boolean repair, Double distanceMultiplier) {
+    public boolean validate(Feed feed, boolean repair, Double distanceMultiplier) {
         this.distanceMultiplier = distanceMultiplier;
         return validate(feed, repair);
     }
 
     @Override
-    public boolean validate(GTFSFeed feed, boolean repair) {
+    public boolean validate(Feed feed, boolean repair) {
         boolean isValid = true;
         int errorLimit = 5000;
         int missingShapeErrorCount = 0;
         int missingCoordinatesErrorCount = 0;
         int reversedTripShapeErrorCount = 0;
-        Collection<Trip> trips = feed.trips.values();
         Map<ShapePoint, List<String>> missingShapesMap = new HashMap<>();
 
-        for(Trip trip : trips) {
+        for(Trip trip : feed.trips) {
 
             String tripId = trip.trip_id;
             if (trip.shape_id == null) {
@@ -58,13 +55,13 @@ public class ReversedTripsValidator extends GTFSValidator {
                 continue;
             }
             String shapeId = trip.shape_id;
-            Iterable<StopTime> stopTimes = feed.getOrderedStopTimesForTrip(tripId);
+            Iterable<StopTime> stopTimes = feed.stopTimes.getOrdered(tripId);
             StopTime firstStop = Iterables.get(stopTimes, 0);
 
             StopTime lastStop = Iterables.getLast(stopTimes);
 
-            ShapePoint firstShape = feed.shape_points.ceilingEntry(Fun.t2(shapeId, null)).getValue();
-            Map.Entry<Fun.Tuple2<String, Integer>, ShapePoint> entry = feed.shape_points.floorEntry(new Fun.Tuple2(shapeId, Fun.HI));
+            ShapePoint firstShape = null; // feed.shape_points.ceilingEntry(Fun.t2(shapeId, null)).getValue();
+            Map.Entry<Fun.Tuple2<String, Integer>, ShapePoint> entry = null; //feed.shape_points.floorEntry(new Fun.Tuple2(shapeId, Fun.HI));
             ShapePoint lastShape = entry.getValue();
 
             Coordinate firstStopCoord;

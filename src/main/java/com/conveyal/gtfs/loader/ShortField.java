@@ -22,7 +22,8 @@ public class ShortField extends Field {
         if (string == null || string.isEmpty()) return 0; // Default numeric fields to zero.
         short s = Short.parseShort(string);
         if (s < 0) throw new StorageException("negative field in " + name  );
-        if (s > maxValue) throw new StorageException("excessively large short integer value in field " + name);
+        // TODO enforce
+        // if (s > maxValue) throw new StorageException("excessively large short integer value in field " + name);
         return s;
     }
 

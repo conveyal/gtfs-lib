@@ -2,11 +2,11 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.OverlappingTripsInBlockError;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.google.common.collect.Iterables;
 
 import java.time.LocalDate;
@@ -17,25 +17,34 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * FIXME what does this validate? There are no docs.
+ * REVIEW
+ * whoa: feed.trips.values().stream().iterator().forEachRemaining(trip -> {})
+ * should be for (Trip trip : feed.trips) {}
+ * We're fetching all the stop times for every trip in at least three different validators.
+ *
  * Created by landon on 5/2/16.
  */
-public class OverlappingTripsValidator extends GTFSValidator {
+public class OverlappingTripsValidator extends Validator {
+
     private static Double distanceMultiplier = 1.0;
 
-    public boolean validate(GTFSFeed feed, boolean repair, Double distanceMultiplier) {
+    // FIXME why are there these additional validate functions that are unused and don't fit the interface?
+    // The settings for the validator should be set in its constructor or with setters on instance fields.
+    public boolean validate(Feed feed, boolean repair, Double distanceMultiplier) {
         this.distanceMultiplier = distanceMultiplier;
         return validate(feed, repair);
     }
 
     @Override
-    public boolean validate(GTFSFeed feed, boolean repair) {
+    public boolean validate (Feed feed, boolean repair) {
         // check for overlapping trips within block
         HashMap<String, ArrayList<BlockInterval>> blockIntervals = new HashMap<String, ArrayList<BlockInterval>>();
 
-        feed.trips.values().stream().iterator().forEachRemaining(trip -> {
-            // store trip intervals by block id
+        for (Trip trip : feed.trips) {
+            // store trip intervals by block id FIXME what is a "trip interval"? Needs documentation.
             if (trip.block_id != null) {
-                Iterable<StopTime> stopTimes = feed.getOrderedStopTimesForTrip(trip.trip_id);
+                Iterable<StopTime> stopTimes = feed.stopTimes.getOrdered(trip.trip_id);
                 BlockInterval blockInterval = new BlockInterval();
                 blockInterval.trip = trip;
                 StopTime firstStopTime = Iterables.get(stopTimes, 0);
@@ -49,7 +58,7 @@ public class OverlappingTripsValidator extends GTFSValidator {
                 blockIntervals.get(trip.block_id).add(blockInterval);
 
             }
-        });
+        }
 
         for(String blockId : blockIntervals.keySet()) {
 
@@ -82,8 +91,8 @@ public class OverlappingTripsValidator extends GTFSValidator {
                         }
 
                         else {
-                            Service s1 = feed.services.get(i1.trip.service_id);
-                            Service s2 = feed.services.get(i2.trip.service_id);
+                            Service s1 = null; //feed.services.get(i1.trip.service_id);
+                            Service s2 = null; //feed.services.get(i2.trip.service_id);
                             boolean overlap = Service.checkOverlap(s1, s2);
 
                             // if trips don't share service id check to see if service dates fall on the same days/day of week

@@ -2,21 +2,24 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.TimeZoneError;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Stop;
 
 import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
+import java.util.ArrayList;
 
 /**
  * Created by landon on 5/11/16.
  */
-public class TimeZoneValidator extends GTFSValidator {
+public class TimeZoneValidator extends Validator {
+
     @Override
-    public boolean validate(GTFSFeed feed, boolean repair) {
+    public boolean validate(Feed feed, boolean repair) {
         int index = 0;
-        for (Agency agency : feed.agency.values()) {
+        for (Agency agency : new ArrayList<Agency>()) { //feed.agency) {
             index++;
             if (agency.agency_timezone == null) {
                 feed.errors.add(new TimeZoneError("agency", agency.sourceFileLine, "agency_timezone", agency.agency_id, "Agency is without timezone"));
@@ -34,7 +37,7 @@ public class TimeZoneValidator extends GTFSValidator {
                 continue;
             }
         }
-        for (Stop stop : feed.stops.values()) {
+        for (Stop stop : feed.stops) {
             index++;
             // stop_timezone is optional field. if null, continue.
             if (stop.stop_timezone == null) {
