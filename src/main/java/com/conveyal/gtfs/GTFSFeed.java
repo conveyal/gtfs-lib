@@ -292,26 +292,11 @@ public class GTFSFeed implements Cloneable, Closeable {
         validate(false,
                 new DuplicateStopsValidator(),
                 new NewTripTimesValidator(),
+                new TimeZoneValidator(),
                 new MisplacedStopValidator(),
                 new NamesValidator(),
-                new OverlappingTripsValidator(),
-                new ReversedTripsValidator(),
-                new TripTimesValidator(),
-                new UnusedStopValidator()
-        );
-    }
-
-    // FIXME duplicate code, 'repair' should be a boolean method parameter
-    public void validateAndRepair () {
-        validate(true,
-                new DuplicateStopsValidator(),
-                new NewTripTimesValidator(),
-                new MisplacedStopValidator(),
-                new NamesValidator(),
-                new OverlappingTripsValidator(),
-                new ReversedTripsValidator(),
-                new TripTimesValidator(),
-                new UnusedStopValidator()
+                new OverlappingTripValidator(),
+                new ReversedTripValidator()
         );
     }
 

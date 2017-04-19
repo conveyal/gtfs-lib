@@ -1,9 +1,15 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.validator.model.Priority;
+
 import java.io.Serializable;
 
 /**
- * Represents an error encountered
+ * Represents an error encountered while loading or validating a GFTS feed.
+ *
+ * TODO de-implement Comparable and Serializable
+ * TODO parameterize with the type of affected entity <T extends Entity>, with pseudo-entity for lines?
  */
 public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
 
@@ -23,6 +29,37 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
         this.field = field;
         this.affectedEntityId = affectedEntityId;
         this.errorType = this.getClass().getSimpleName();
+    }
+
+    /**
+     * New constructor for SQL storage.
+     */
+    public GTFSError (String entityId) {
+        this.file = null;
+        this.line = -1;
+        this.field = null;
+        this.errorType = null;
+        this.affectedEntityId = entityId;
+    }
+
+    /**
+     * @return the name of this class without a package, to be used as a unique identifier for the kind of error.
+     * By putting all these classes in the same package we guarantee they have unique names.
+     */
+    public final String getErrorCode () {
+        return this.getClass().getSimpleName();
+    }
+
+    public Priority getPriority () {
+        return Priority.UNKNOWN;
+    }
+
+    /**
+     * @return a Class object for the class of GTFS entity in which the error was found,
+     *         which also implies a table in the GTFS feed.
+     */
+    public Class<? extends Entity> getAffectedEntityType () {
+        return null;
     }
 
     public String getMessage() {
@@ -67,5 +104,7 @@ public abstract class GTFSError implements Comparable<GTFSError>, Serializable {
     public String toString() {
         return "GTFSError: " + getMessageWithContext();
     }
+
+
 
 }

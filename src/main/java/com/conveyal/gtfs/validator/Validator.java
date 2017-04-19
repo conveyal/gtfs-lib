@@ -1,31 +1,23 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.error.GeneralError;
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.model.Entity;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A Validator examines a GTFS feed in the form of a set of maps, one map per table in the GTFS feed.
- * It adds error messages to that feed, optionally repairing the problems it encounters.
+ * A Validator examines a whole GTFS feed or a single trip within a GTFS feed.
+ * It accumulates error messages for problems it finds in that feed, optionally repairing the problems it encounters.
  */
 public abstract class Validator {
 
-    protected List<GTFSError> errors = new ArrayList<>();
+    protected List<NewGTFSError> errors = new ArrayList<>();
 
-    /**
-     * The main extension point.
-     * TODO return errors themselves rather than a boolean?
-     * @param feed the feed to validate and optionally repair
-     * @param repair if this is true, repair any errors encountered
-     * @return whether any errors were encountered
-     */
-    public abstract boolean validate (Feed feed, boolean repair);
-
-    protected void registerError(String message) {
-        errors.add(new GeneralError("file", 0, "field", message));
+    protected void registerError (NewGTFSErrorType errorType, String badValue, Entity... entities)  {
+        errors.add(new NewGTFSError(errorType, badValue, entities));
     }
 
     public int getErrorCount() {
@@ -33,4 +25,5 @@ public abstract class Validator {
     }
 
     public boolean foundErrors() {return errors.size() > 0; }
+
 }

@@ -53,6 +53,22 @@ public abstract class Entity implements Serializable {
     /* The feed from which this entity was loaded. */
     transient GTFSFeed feed;
 
+    /**
+     * @return a key that according to the GTFS spec should uniquely identify this entity, either alone or together
+     *          with a sequence number. For example stop_times and shapes have no single field that uniquely
+     *          identifies a row, and the stop_sequence or shape_pt_sequence must also be considered.
+     */
+    public String getId () {
+        return null;
+    }
+
+    /**
+     * @return the integer second element of a compound key, for those elements that require one.
+     */
+    public Integer getSequenceNumber () {
+        return null;
+    }
+
     /* A class that can produce Entities from CSV, and record errors that occur in the process. */
     // This is almost a GTFSTable... rename?
     public static abstract class Loader<E extends Entity> {

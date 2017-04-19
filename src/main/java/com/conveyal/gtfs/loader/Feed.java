@@ -3,14 +3,12 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.validator.*;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.index.strtree.STRtree;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.sql.*;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,22 +56,6 @@ public class Feed {
     private STRtree stopSpatialIndex = null;
 
     /**
-     * @return a pre-built STR tree spatial index of all the stops, using their unprojected coordinates.
-     */
-    public synchronized STRtree getStopSpatialIndex() {
-        if (stopSpatialIndex == null) {
-            stopSpatialIndex = new STRtree();
-            for (Stop stop : this.stops) {
-                // Catch any errors that might occur? NaN coordinates?
-                Coordinate coordinate = new Coordinate(stop.stop_lat, stop.stop_lon);
-                stopSpatialIndex.insert(new Envelope(coordinate), stop);
-            }
-            stopSpatialIndex.build();
-        }
-        return stopSpatialIndex;
-    }
-
-    /**
      * This will return a Feed object for the given GTFS feed file. It will load the data from the file into the Feed
      * object as needed, but will first look for a cached database file in the same directory and with the same name as
      * the GTFS feed file. This speeds up uses of the feed after the first time.
@@ -89,7 +71,8 @@ public class Feed {
 
         feed.validate();
 
-        if (params[0].equalsIgnoreCase("test")) {
+        // TODO make this into a unit test
+        if (params.length > 0 && params[0].equalsIgnoreCase("test")) {
             LOG.info("Start.");
             double x = 0;
             for (Route route : feed.routes) {
@@ -120,39 +103,35 @@ public class Feed {
 
     }
 
-    private void validate (boolean repair, Validator... validators) {
+    private void validate (boolean repair, FeedValidator... feedValidators) {
         long validationStartTime = System.currentTimeMillis();
-        for (Validator validator : validators) {
+        for (FeedValidator feedValidator : feedValidators) {
             try {
-                LOG.info("Running {}.", validator.getClass().getSimpleName());
-                long startValidator = System.currentTimeMillis();
-                validator.validate(this, repair);
-                LOG.info("Validator found {} errors.", validator.getErrorCount());
-                long endValidator = System.currentTimeMillis();
-                long diff = endValidator - startValidator;
-                LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), diff);
-
+                LOG.info("Running {}.", feedValidator.getClass().getSimpleName());
+                long startTime = System.currentTimeMillis();
+                feedValidator.validate(this, repair);
+                long endTime = System.currentTimeMillis();
+                long diff = endTime - startTime;
+                LOG.info("{} finished in {} milliseconds.", feedValidator.getClass().getSimpleName(), diff);
+                LOG.info("{} found {} errors.", feedValidator.getClass().getSimpleName(), feedValidator.getErrorCount());
             } catch (Exception e) {
-                LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
+                LOG.error("{} failed.", feedValidator.getClass().getSimpleName());
                 LOG.error(e.toString());
                 e.printStackTrace();
             }
         }
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
-        LOG.info("{} validators completed in {} milliseconds.", validators.length, totalValidationTime);
+        LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
     }
 
     public void validate () {
         validate(false,
                 new MisplacedStopValidator(),
+                new DuplicateStopsValidator(),
+                new TimeZoneValidator(),
                 new NewTripTimesValidator(),
                 new NamesValidator()
-//                new DuplicateStopsValidator(),
-//                new OverlappingTripsValidator(),
-//                new ReversedTripsValidator(),
-//                new TripTimesValidator(),
-//                new UnusedStopValidator()
         );
     }
 

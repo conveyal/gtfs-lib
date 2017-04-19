@@ -1,27 +1,28 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.error.GeneralError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+import static com.conveyal.gtfs.util.Util.fastDistance;
 
 /**
  * Check that the travel times between adjacent stops in trips are reasonable.
  * This is very messy in SQL because it involves computing a function across adjacent rows in an ordered table.
  * So we do it by iterating over the whole table in Java.
  *
- * This is going to replace HopSpeedsReasonableValidator, OverlappingTripsValidator, TripTimesValidator,
- * ReversedTripsValidator and UnusedStopsValidator. ReversedTrips should be considered a shape validation.
+ * This is going to replace HopSpeedsReasonableValidator, OverlappingTripValidator, TripTimesValidator,
+ * ReversedTripValidator and UnusedStopsValidator. ReversedTrips should be considered a shape validation.
  */
-public class NewTripTimesValidator extends Validator {
+public class NewTripTimesValidator extends FeedValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(NewTripTimesValidator.class);
 
@@ -35,27 +36,30 @@ public class NewTripTimesValidator extends Validator {
     Set<String> referencedTrips = new HashSet<>();
     Set<String> referencedRoutes = new HashSet<>();
 
-    // Caching stops and routes gives a massive speed improvement by avoiding database calls. TODO add caching to the table reader class.
+    // Caching stops and trips gives a massive speed improvement by avoiding database calls. TODO add caching to the table reader class.
     Map<String, Stop> stopById = new HashMap<>();
-    Map<String, Route> routeById = new HashMap<>();
+    Map<String, Trip> tripById = new HashMap<>();
+
+    private final TripValidator[] tripValidators = new TripValidator[] {
+        new SpeedTripValidator(),
+        new ReferencesTripValidator(),
+        new OverlappingTripValidator(),
+        new ReversedTripValidator()
+    };
 
     @Override
     public boolean validate(Feed feed, boolean repair) {
         this.feed = feed;
-
-        LOG.info("Cacheing stops and routes...");
+        LOG.info("Cacheing stops and trips...");
         for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
-        for (Route route: feed.routes) routeById.put(route.route_id, route);
+        for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
         LOG.info("Done.");
-
         // Accumulate StopTimes with the same trip_id into a list, then process each trip separately.
         List<StopTime> stopTimesForTrip = new ArrayList<>();
         String previousTripId = null;
         for (StopTime stopTime : feed.stopTimes) {
-            if (stopTime.trip_id == null) {
-                registerError("Stop time missing trip ID");
-                continue;
-            }
+            // FIXME all bad references should already be caught elsewhere, this should just be a continue
+            if (stopTime.trip_id == null) continue;
             if (!stopTime.trip_id.equals(previousTripId) && !stopTimesForTrip.isEmpty()) {
                 processTrip(stopTimesForTrip);
                 stopTimesForTrip.clear();
@@ -65,25 +69,30 @@ public class NewTripTimesValidator extends Validator {
         }
         processTrip(stopTimesForTrip);
         checkUnreferenced();
+        for (TripValidator tripValidator : tripValidators) this.errors.addAll(tripValidator.complete());
         return errors.size() > 0;
     }
 
     /**
-     * Check if any stops or trips were not referenced
+     * Check if any stops, trips, or routes were not referenced.
      */
     private void checkUnreferenced () {
         LOG.info("Finding unreferenced entities...");
-        Set<String> unreferencedStopIds = new HashSet<>(stopById.keySet());
-        unreferencedStopIds.removeAll(referencedStops);
-        // FIXME remove stations, or check that all stations were referenced.
-        for (String stopId : unreferencedStopIds) registerError("Stop was not referenced by any trip times: " + stopId);
-        Set<String> unreferencedTripIds = new HashSet<>();
-        for (Trip trip : feed.trips) unreferencedTripIds.add(trip.trip_id); // FIXME Is this slow?
-        unreferencedTripIds.removeAll(referencedTrips);
-        for (String tripId : unreferencedTripIds) registerError("Trip was not referenced by any trip times: " + tripId);
-        Set<String> unreferencedRouteIds = new HashSet<>(routeById.keySet());
-        unreferencedRouteIds.removeAll(referencedRoutes);
-        for (String routeId : unreferencedRouteIds) registerError("Route was not referenced by any trip times: " + routeId);
+        for (Stop stop : feed.stops) {
+            if (!referencedStops.contains(stop.stop_id)) {
+                registerError(STOP_NOT_REFERENCED_BY_STOP_TIMES, stop.stop_id, stop);
+            }
+        }
+        for (Trip trip : feed.trips) {
+            if (!referencedTrips.contains(trip.trip_id)) {
+                registerError(TRIP_NOT_REFERENCED_BY_STOP_TIMES, trip.trip_id, trip);
+            }
+        }
+        for (Route route : feed.routes) {
+            if (!referencedRoutes.contains(route.route_id)) {
+                registerError(ROUTE_NOT_REFERENCED_BY_STOP_TIMES, route.route_id, route);
+            }
+        }
     }
 
     private static boolean missingEitherTime (StopTime stopTime) {
@@ -113,21 +122,22 @@ public class NewTripTimesValidator extends Validator {
 
     /**
      * This just pulls some of the range checking logic out of the main trip checking loop so it's more readable.
+     * @return true if all values are OK
      */
-    private boolean checkDistanceAndTime (double distanceMeters, double travelTimeSeconds) {
-        boolean bad = false;
+    private boolean checkDistanceAndTime (double distanceMeters, double travelTimeSeconds, StopTime stopTime) {
+        boolean good = true;
         if (distanceMeters == 0) {
-            registerError("Distance between two successive stops is zero.");
-            bad = true;
+            registerError(TRAVEL_DISTANCE_ZERO, null, stopTime);
+            good = false;
         }
         if (travelTimeSeconds < 0) {
-            registerError("Travel time between two successive stops is negative.");
-            bad = true;
+            registerError(TRAVEL_TIME_NEGATIVE, Double.toString(travelTimeSeconds), stopTime);
+            good = false;
         } else if (travelTimeSeconds == 0) {
-            registerError("Travel time between two successive stops is zero.");
-            bad = true;
+            registerError(TRAVEL_TIME_ZERO, null, stopTime);
+            good = false;
         }
-        return bad;
+        return good;
     }
 
     /**
@@ -137,7 +147,7 @@ public class NewTripTimesValidator extends Validator {
      */
     private boolean fixInitialFinal (StopTime stopTime) {
         if (missingEitherTime(stopTime)) {
-            registerError("First and last stops in trip must have both arrival and departure time.");
+            registerError(MISSING_ARRIVAL_OR_DEPARTURE, null, stopTime);
             fixMissingTimes(stopTime);
             if (missingEitherTime(stopTime)) {
                 return true;
@@ -152,11 +162,11 @@ public class NewTripTimesValidator extends Validator {
      */
     private void processTrip (List<StopTime> stopTimes) {
 
-        if (++tripCount % 10_000 == 0) LOG.info("Validating trip {}", tripCount);
+        if (++tripCount % 20_000 == 0) LOG.info("Validating trip {}", tripCount);
 
         // stopTimes should never be null, it's called only by our own code.
         if (stopTimes.size() < 2) {
-            registerError("Trip needs at least two stops.");
+            registerError(TRIP_TOO_FEW_STOP_TIMES, null, null); // TODO get the trip object in here
             return;
         }
 
@@ -167,7 +177,7 @@ public class NewTripTimesValidator extends Validator {
             StopTime stopTime = it.next();
             Stop stop = stopById.get(stopTime.stop_id); //feed.stops.get(stopTime.stop_id); // FIXME this is probably ultraslow
             if (stop == null) {
-                registerError("Stop time references a stop that doesn't exist.");
+                // All bad references should have been recorded at import, we can just remove them from the trips.
                 it.remove();
             } else {
                 referencedStops.add(stopTime.stop_id);
@@ -177,15 +187,18 @@ public class NewTripTimesValidator extends Validator {
         // StopTimes list may have shrunk due to missing stop references.
         if (stopTimes.size() < 2) return;
 
-        Route route = null;
+///        for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(feed, null, stopTimes);
+
         String tripId = stopTimes.get(0).trip_id;
-        Trip trip = feed.trips.get(tripId);
-        if (trip == null) {
-            registerError("stop_times references an unknown trip: " + tripId);
-        } else {
-            referencedTrips.add(trip.trip_id);
-            route = routeById.get(trip.route_id); //feed.routes.get(trip.route_id);
-            if (route != null) referencedRoutes.add(route.route_id);
+        referencedTrips.add(tripId);
+        Trip trip = tripById.get(tripId);
+
+
+        // All bad references should have been recorded at import, we can just ignore nulls.
+        Route route = null;
+        if (trip != null) {
+            referencedRoutes.add(trip.route_id);
+            route = feed.routes.get(trip.route_id);
         }
         // The specific maximum speed for this trip's route's mode of travel.
         double maxSpeed = getMaxSpeed(route);
@@ -211,15 +224,23 @@ public class NewTripTimesValidator extends Validator {
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
             fixMissingTimes(currStopTime);
             if (missingEitherTime(currStopTime)) {
-                // Both arrival or departure time were missing. Other than accumulating distance, skip this StopTime.
+                // Both arrival and departure time were missing. Other than accumulating distance, skip this StopTime.
                 continue;
             }
+            if (currStopTime.departure_time < currStopTime.arrival_time) {
+                registerError(DEPARTURE_BEFORE_ARRIVAL, Integer.toString(currStopTime.departure_time), currStopTime);
+            }
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
-            if (checkDistanceAndTime(distanceMeters, travelTimeSeconds)) {
-                // We've got valid numbers to calculate a travel speed.
+            if (checkDistanceAndTime(distanceMeters, travelTimeSeconds, currStopTime)) {
+                // If distance and time are OK, we've got valid numbers to calculate a travel speed.
                 double metersPerSecond = distanceMeters / travelTimeSeconds;
-                if (metersPerSecond < MIN_SPEED) registerError("Vehicle going too slow.");
-                if (metersPerSecond > maxSpeed) registerError("Vehicle going too fast.");
+                if (metersPerSecond < MIN_SPEED || metersPerSecond > maxSpeed) {
+                    NewGTFSErrorType type = (metersPerSecond < MIN_SPEED) ? TRAVEL_TOO_SLOW : TRAVEL_TOO_FAST;
+                    double threshold = (metersPerSecond < MIN_SPEED) ? MIN_SPEED : maxSpeed;
+                    String badValue = String.format("distance=%.0f meters; time=%.0f seconds; speed=%.1f m/sec; threshold=%.0f m/sec",
+                            distanceMeters, travelTimeSeconds, metersPerSecond, threshold);
+                    registerError(type, badValue, prevStopTime, currStopTime);
+                }
             }
             // Reset accumulated distance, we've processed a stop time with arrival or departure time specified.
             distanceMeters = 0;
@@ -229,18 +250,26 @@ public class NewTripTimesValidator extends Validator {
         }
     }
 
-    private static final double M_PER_DEGREE_LAT = 111111.111; // Using 18th century meters, 10e6 meters / 90 degrees.
+    // FIXME what is this patternId? This seems like a subset of block overlap errors (within a service day).
+//            String patternId = feed.tripPatternMap.get(tripId);
+//            String patternName = feed.patterns.get(patternId).name;
+//            int firstDeparture = Iterables.get(stopTimes, 0).departure_time;
+//            int lastArrival = Iterables.getLast(stopTimes).arrival_time;
+//
+//            String tripKey = trip.service_id + "_"+ blockId + "_" + firstDeparture +"_" + lastArrival + "_" + patternId;
+//
+//            if (duplicateTripHash.containsKey(tripKey)) {
+//                String firstDepartureString = LocalTime.ofSecondOfDay(Iterables.get(stopTimes, 0).departure_time % 86399).toString();
+//                String lastArrivalString = LocalTime.ofSecondOfDay(Iterables.getLast(stopTimes).arrival_time % 86399).toString();
+//                String duplicateTripId = duplicateTripHash.get(tripKey);
+//                Trip duplicateTrip = feed.trips.get(duplicateTripId);
+//                long line = trip.sourceFileLine > duplicateTrip.sourceFileLine ? trip.sourceFileLine : duplicateTrip.sourceFileLine;
+//                feed.errors.add(new DuplicateTripError(trip, line, duplicateTripId, patternName, firstDepartureString, lastArrivalString));
+//                isValid = false;
+//            } else {
+//                duplicateTripHash.put(tripKey, tripId);
+//            }
 
-    /**
-     * @return Equirectangular approximation to distance.
-     */
-    private static double fastDistance (double lat0, double lon0, double lat1, double lon1) {
-        double midLat = (lat0 + lat1) / 2;
-        double xscale = FastMath.cos(FastMath.toRadians(midLat));
-        double dx = xscale * (lon1 - lon0);
-        double dy = (lat1 - lat0);
-        return FastMath.sqrt(dx * dx + dy * dy) * M_PER_DEGREE_LAT;
-    }
 
     private double getMaxSpeed (Route route) {
         int type = -1;

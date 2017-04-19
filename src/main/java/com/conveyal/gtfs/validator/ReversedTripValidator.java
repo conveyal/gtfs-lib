@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.MissingShapeError;
 import com.conveyal.gtfs.error.ReversedTripShapeError;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
@@ -16,25 +15,24 @@ import com.vividsolutions.jts.geom.GeometryFactory;
 import org.mapdb.Fun;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Created by landon on 5/2/16.
+ * TODO re-implement as a TripValidator
  */
-public class ReversedTripsValidator extends Validator {
+public class ReversedTripValidator extends TripValidator {
+
     private static Double distanceMultiplier = 1.0;
 
     static GeometryFactory geometryFactory = new GeometryFactory();
 
-    public boolean validate(Feed feed, boolean repair, Double distanceMultiplier) {
-        this.distanceMultiplier = distanceMultiplier;
-        return validate(feed, repair);
+    @Override
+    public void validateTrip(Feed feed, Trip trip, List<StopTime> stopTimes) {
+        throw new UnsupportedOperationException();
     }
 
-    @Override
     public boolean validate(Feed feed, boolean repair) {
         boolean isValid = true;
         int errorLimit = 5000;

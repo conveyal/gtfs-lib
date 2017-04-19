@@ -100,6 +100,7 @@ public class BooleanAsciiGrid {
         return grid.get(index);
     }
 
+    // TODO make this into a test
     public static void main (String[] args) {
         BooleanAsciiGrid asciiGrid = BooleanAsciiGrid.forEarthPopulation();
         boolean paris = asciiGrid.getValueForCoords(2.352, 48.8566);

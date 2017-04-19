@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.OverlappingTripsInBlockError;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -10,13 +9,10 @@ import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.Iterables;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
+ * TODO re-implement as a TripValidator
  * FIXME what does this validate? There are no docs.
  * REVIEW
  * whoa: feed.trips.values().stream().iterator().forEachRemaining(trip -> {})
@@ -25,18 +21,15 @@ import java.util.Map;
  *
  * Created by landon on 5/2/16.
  */
-public class OverlappingTripsValidator extends Validator {
+public class OverlappingTripValidator extends TripValidator {
 
     private static Double distanceMultiplier = 1.0;
 
-    // FIXME why are there these additional validate functions that are unused and don't fit the interface?
-    // The settings for the validator should be set in its constructor or with setters on instance fields.
-    public boolean validate(Feed feed, boolean repair, Double distanceMultiplier) {
-        this.distanceMultiplier = distanceMultiplier;
-        return validate(feed, repair);
+    @Override
+    public void validateTrip(Feed feed, Trip trip, List<StopTime> stopTimes) {
+        throw new UnsupportedOperationException();
     }
 
-    @Override
     public boolean validate (Feed feed, boolean repair) {
         // check for overlapping trips within block
         HashMap<String, ArrayList<BlockInterval>> blockIntervals = new HashMap<String, ArrayList<BlockInterval>>();
