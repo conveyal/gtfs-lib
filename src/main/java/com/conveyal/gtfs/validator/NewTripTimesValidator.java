@@ -80,17 +80,17 @@ public class NewTripTimesValidator extends FeedValidator {
         LOG.info("Finding unreferenced entities...");
         for (Stop stop : feed.stops) {
             if (!referencedStops.contains(stop.stop_id)) {
-                registerError(STOP_NOT_REFERENCED_BY_STOP_TIMES, stop.stop_id, stop);
+                registerError(STOP_UNUSED, stop.stop_id, stop);
             }
         }
         for (Trip trip : feed.trips) {
             if (!referencedTrips.contains(trip.trip_id)) {
-                registerError(TRIP_NOT_REFERENCED_BY_STOP_TIMES, trip.trip_id, trip);
+                registerError(TRIP_EMPTY, trip.trip_id, trip);
             }
         }
         for (Route route : feed.routes) {
             if (!referencedRoutes.contains(route.route_id)) {
-                registerError(ROUTE_NOT_REFERENCED_BY_STOP_TIMES, route.route_id, route);
+                registerError(ROUTE_UNUSED, route.route_id, route);
             }
         }
     }

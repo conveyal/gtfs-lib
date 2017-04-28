@@ -1,12 +1,13 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.storage.BooleanAsciiGrid;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.GEOGRAPHIC_OUTLIER;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.LOW_POPULATION_DENSITY;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.STOP_GEOGRAPHIC_OUTLIER;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.STOP_LOW_POPULATION_DENSITY;
 import static com.conveyal.gtfs.util.Util.getCoordString;
 
 /**
@@ -42,10 +43,10 @@ public class MisplacedStopValidator extends FeedValidator {
         for (Stop stop : feed.stops) {
             boolean stopInPopulatedArea = populationGrid.getValueForCoords(stop.stop_lon, stop.stop_lat);
             if (!stopInPopulatedArea) {
-                registerError(LOW_POPULATION_DENSITY, getCoordString(stop), stop);
+                registerError(STOP_LOW_POPULATION_DENSITY, getCoordString(stop), stop);
             }
             if (stop.stop_lat < minlat || stop.stop_lat > maxlat || stop.stop_lon < minLon || stop.stop_lon > maxLon) {
-                registerError(GEOGRAPHIC_OUTLIER, getCoordString(stop), stop);
+                registerError(STOP_GEOGRAPHIC_OUTLIER, getCoordString(stop), stop);
             }
         }
 

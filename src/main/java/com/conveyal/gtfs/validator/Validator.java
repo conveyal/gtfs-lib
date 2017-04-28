@@ -20,10 +20,10 @@ public abstract class Validator {
         errors.add(new NewGTFSError(errorType, badValue, entities));
     }
 
-    public int getErrorCount() {
-        return errors.size();
-    }
+    public int getErrorCount() { return errors.size(); }
 
     public boolean foundErrors() {return errors.size() > 0; }
+
+    public Iterable<NewGTFSError> getErrors () { return errors; }
 
 }

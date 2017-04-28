@@ -15,13 +15,13 @@ public class TimeZoneValidator extends FeedValidator {
     public boolean validate(Feed feed, boolean repair) {
         for (Agency agency : new ArrayList<Agency>()) { //feed.agency) {
             if (agency.agency_timezone == null) {
-                registerError(NO_TIME_ZONE, agency.agency_timezone, agency); // Required Field
+                //FIXME missing fields should already be detected
                 continue;
             }
             try {
                 ZoneId.of(agency.agency_timezone);
             } catch (Exception ex) {
-                registerError(BAD_TIME_ZONE, agency.agency_timezone, agency);
+                registerError(TIME_ZONE_FORMAT, agency.agency_timezone, agency);
             }
         }
         for (Stop stop : feed.stops) {
@@ -30,7 +30,7 @@ public class TimeZoneValidator extends FeedValidator {
             try {
                 ZoneId.of(stop.stop_timezone);
             } catch (Exception ex) {
-                registerError(BAD_TIME_ZONE, stop.stop_timezone, stop);
+                registerError(TIME_ZONE_FORMAT, stop.stop_timezone, stop);
             }
         }
         return false;
