@@ -3,6 +3,7 @@ package com.conveyal.gtfs.error;
 import com.conveyal.gtfs.model.Entity;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -26,13 +27,19 @@ public class NewGTFSError {
 
     // TODO methods to add badValues key-value pairs, and to add entities to an existing error.
 
-    public NewGTFSError(NewGTFSErrorType type, String badValues, Entity... entities) {
+    public NewGTFSError (NewGTFSErrorType type, String badValues, Entity... entities) {
         this.type = type;
         this.badValues = badValues;
         this.referencedEntities = new ArrayList<>();
         for (Entity entity : entities) {
             this.referencedEntities.add(new EntityReference(entity));
         }
+    }
+
+    public NewGTFSError (NewGTFSErrorType errorType, String badValues, Class<? extends Entity> entityType, int lineNumber) {
+        this.type = errorType;
+        this.badValues = badValues;
+        this.referencedEntities = Arrays.asList(new EntityReference(entityType, lineNumber));
     }
 
     public static class EntityReference {
@@ -46,6 +53,12 @@ public class NewGTFSError {
             id = entity.getId();
             sequenceNumber = entity.getSequenceNumber();
             lineNumber = (int) entity.sourceFileLine;
+        }
+        public EntityReference (Class<? extends Entity> entityType, int lineNumber) {
+            type = entityType;
+            id = null;
+            sequenceNumber = null;
+            this.lineNumber = lineNumber;
         }
     }
 

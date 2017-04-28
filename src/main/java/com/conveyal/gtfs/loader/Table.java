@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +26,11 @@ public class Table {
 
     String name;
 
+    Class<? extends Entity> entityClass;
+
     Field[] fields;
 
-    public static final Table ROUTES = new Table("routes",
+    public static final Table ROUTES = new Table("routes", Route.class,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
@@ -39,7 +42,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL)
     );
 
-    public static final Table STOPS = new Table("stops",
+    public static final Table STOPS = new Table("stops", Stop.class,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
         new StringField("stop_name",  REQUIRED),
@@ -54,7 +57,7 @@ public class Table {
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
     );
 
-    public static final Table TRIPS = new Table("trips",
+    public static final Table TRIPS = new Table("trips", Trip.class,
         new StringField("trip_id",  REQUIRED),
         new StringField("route_id",  REQUIRED),
         new StringField("service_id",  REQUIRED),
@@ -67,7 +70,7 @@ public class Table {
         new ShortField("bikes_allowed", OPTIONAL, 2)
     );
 
-    public static final Table STOP_TIMES = new Table("stop_times",
+    public static final Table STOP_TIMES = new Table("stop_times", StopTime.class,
         new StringField("trip_id", REQUIRED),
         new IntegerField("stop_sequence", REQUIRED),
         new StringField("stop_id", REQUIRED),
@@ -81,7 +84,7 @@ public class Table {
         new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     );
 
-    public static final Table SHAPES = new Table("shapes",
+    public static final Table SHAPES = new Table("shapes", ShapePoint.class,
         new StringField("shape_id", REQUIRED),
         new IntegerField("shape_pt_sequence", REQUIRED),
         new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
@@ -89,15 +92,20 @@ public class Table {
         new DoubleField("shape_dist_traveled", REQUIRED, 0, Double.POSITIVE_INFINITY)
     );
 
-    public Table (String name, Field... fields) {
+    public Table (String name, Class<? extends Entity> entityClass, Field... fields) {
         this.name = name;
+        this.entityClass = entityClass;
         this.fields = fields;
     }
 
+    /**
+     * Create an SQL table with all the fields specified by this table object,
+     * plus an integer CSV line number field in the first position.
+     */
     public void createSqlTable (Connection connection) {
         String fieldDeclarations = Arrays.stream(fields).map(Field::getSqlDeclaration).collect(Collectors.joining(", "));
         // Adding the unlogged keyword gives about 12 percent speedup, but is non-standard.
-        String createSql = String.format("create table %s (%s)", name, fieldDeclarations);
+        String createSql = String.format("create table %s (csv_line integer, %s)", name, fieldDeclarations);
         try {
             Statement statement = connection.createStatement();
             statement.execute("drop table if exists " + this.name);
@@ -108,10 +116,14 @@ public class Table {
         }
     }
 
+    /**
+     * Create an SQL table that will insert a value into all the fields specified by this table object,
+     * plus an integer CSV line number field in the first position.
+     */
     public String generateInsertSql () {
         String questionMarks = String.join(", ", Collections.nCopies(fields.length, "?"));
         String joinedFieldNames = Arrays.stream(fields).map(f -> f.name).collect(Collectors.joining(", "));
-        return String.format("insert into %s (%s) values (%s)", name, joinedFieldNames, questionMarks);
+        return String.format("insert into %s (csv_line, %s) values (?, %s)", name, joinedFieldNames, questionMarks);
     }
 
     /**
@@ -140,6 +152,10 @@ public class Table {
         String orderFieldName = getOrderFieldName();
         if (orderFieldName == null) return getKeyFieldName();
         else return String.join(",", getKeyFieldName(), orderFieldName);
+    }
+
+    public Class<? extends Entity> getEntityClass() {
+        return entityClass;
     }
 
 }

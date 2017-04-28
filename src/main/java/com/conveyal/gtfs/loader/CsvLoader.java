@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import gnu.trove.map.TObjectIntMap;
@@ -18,6 +20,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS;
 import static com.conveyal.gtfs.model.Entity.human;
 
 /**
@@ -72,8 +75,11 @@ public class CsvLoader {
     private PreparedStatement insertStatement = null;
     private ConnectionSource connectionSource = new ConnectionSource(ConnectionSource.POSTGRES_LOCAL_URL);
 
+    private SQLErrorStorage errorStorage;
+
     public CsvLoader(ZipFile zip) {
         this.zip = zip;
+        this.errorStorage = new SQLErrorStorage(connectionSource);
     }
 
     public void load (Table table) throws Exception {
@@ -113,7 +119,7 @@ public class CsvLoader {
         }
 
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
-        Table targetTable = new Table(table.name, fields);
+        Table targetTable = new Table(table.name, table.entityClass, fields);
 
         // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
         // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.
@@ -123,6 +129,7 @@ public class CsvLoader {
         // Some databases require the table to exist before a statement can be prepared.
         targetTable.createSqlTable(connection);
 
+        // TODO are we loading with or without a header row in our Postgres text file?
         if (postgresText) {
             // No need to output headers to temp text file, our SQL table column order exactly matches our text file.
             tempTextFile = File.createTempFile(targetTable.name, "text");
@@ -134,28 +141,40 @@ public class CsvLoader {
         }
 
         // When outputting text, accumulate transformed strings to allow skipping rows when errors are encountered.
-        String[] transformedStrings = new String[fields.length];
+        // One extra position in the array for the CSV line number.
+        String[] transformedStrings = new String[fields.length + 1];
 
         while (csvReader.readRecord()) {
             // The CSV reader's current record is zero-based and does not include the header line.
             // Convert to a CSV file line number that will make more sense to people reading error messages.
-            long lineNumber = csvReader.getCurrentRecord() + 2;
+            if (csvReader.getCurrentRecord() + 2 > Integer.MAX_VALUE) {
+                LOG.error("Too many lines in CSV file, we can't represent the line numbers in an integer field.");
+                // TODO record real GTFS error
+                break;
+            }
+            int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
             if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
             if (csvReader.getColumnCount() != fields.length) {
-                LOG.error("Wrong number of fields in CSV row. Skipping it.");
+                String badValues = String.format("expected=%d; found=%d", fields.length, csvReader.getColumnCount());
+                new NewGTFSError(WRONG_NUMBER_OF_FIELDS, badValues, table.getEntityClass(), lineNumber);
                 continue;
             }
+            // The first field is the line number of the CSV file.
+            if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
+            else insertStatement.setInt(1, lineNumber);
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 String string = csvReader.get(f);
                 if (string.isEmpty()) { // TODO verify that CSV reader always returns empty strings, not nulls
                     if (field.isRequired()) throw new StorageException("Missing required field."); // TODO record and recover.
-                    if (postgresText) transformedStrings[f] = "\\N"; // Represents null in Postgres text format
-                    else insertStatement.setNull(f + 1, field.getSqlType().getVendorTypeNumber());
+                    if (postgresText) transformedStrings[f + 1] = "\\N"; // Represents null in Postgres text format
+                    // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
+                    else insertStatement.setNull(f + 2, field.getSqlType().getVendorTypeNumber());
                 } else {
-                    if (postgresText) transformedStrings[f] = field.validateAndConvert(string);
-                    // Micro-benchmarks show it's 4-5% faster to call typed parameter setter methods rather than setObject with a type code.
-                    else field.setParameter(insertStatement, f + 1, string);
+                    if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
+                    // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
+                    // rather than setObject with a type code. I think some databases don't have setObject though.
+                    else field.setParameter(insertStatement, f + 2, string);
                 }
             }
             if (postgresText) {
@@ -173,7 +192,7 @@ public class CsvLoader {
         if (postgresText) {
             LOG.info("Loading into database table from temporary text file...");
             tempTextFileStream.close();
-            // Allows sending over network, only slightly slower
+            // Allows sending over network. This is only slightly slower than a local file copy.
             final String copySql = String.format("copy %s from stdin", table.name);
             InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
             CopyManager copyManager = new CopyManager((BaseConnection) connection);
@@ -191,7 +210,8 @@ public class CsvLoader {
         String indexColumns = table.getIndexFields();
         // TODO verify referential integrity and uniqueness of keys
         // TODO create primary key and fall back on plain index (consider not null & unique constraints)
-        // SQLITE requires specifying a name for indexes
+        // TODO use line number as primary key
+        // Note: SQLITE requires specifying a name for indexes.
         String indexName = String.join("_", table.name, "idx");
         String indexSql = String.format("create index %s on %s (%s)", indexName, table.name, indexColumns);
         //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
