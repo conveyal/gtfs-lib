@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Stop;
@@ -11,8 +12,12 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 
 public class TimeZoneValidator extends FeedValidator {
 
+    public TimeZoneValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
+
     @Override
-    public boolean validate(Feed feed, boolean repair) {
+    public void validate() {
         for (Agency agency : new ArrayList<Agency>()) { //feed.agency) {
             if (agency.agency_timezone == null) {
                 //FIXME missing fields should already be detected
@@ -33,6 +38,5 @@ public class TimeZoneValidator extends FeedValidator {
                 registerError(TIME_ZONE_FORMAT, stop.stop_timezone, stop);
             }
         }
-        return false;
     }
 }

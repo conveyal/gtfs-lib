@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -22,7 +23,7 @@ public class IntegerField extends Field {
         this.maxValue = maxValue;
     }
 
-    private int validate(String string) {
+    private int validate (String string) {
         int i = Integer.parseInt(string);
         if (i < 0) throw new StorageException("negative field");
         if (i > maxValue) throw new StorageException("excessively large integer value");
@@ -30,7 +31,7 @@ public class IntegerField extends Field {
     }
 
     @Override
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             preparedStatement.setInt(oneBasedIndex, validate(string));
         } catch (Exception ex) {
@@ -39,7 +40,7 @@ public class IntegerField extends Field {
     }
 
     @Override
-    public String validateAndConvert(String string) {
+    public String validateAndConvert (String string) {
         validate(string);
         return string;
     }

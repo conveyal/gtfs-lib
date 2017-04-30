@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
 
@@ -7,8 +8,12 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 
 public class NamesValidator extends FeedValidator {
 
+    public NamesValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
+
     @Override
-    public boolean validate(Feed feed, boolean repair) {
+    public void validate() {
         // Check routes
         for (Route route : feed.routes) {
             String shortName = normalize(route.route_short_name);
@@ -37,7 +42,6 @@ public class NamesValidator extends FeedValidator {
             }
         }
         // TODO Check trips and all other tables.
-        return this.foundErrors();
     }
 
     /** @return a non-null String that is lower case and has no leading or trailing whitespace */

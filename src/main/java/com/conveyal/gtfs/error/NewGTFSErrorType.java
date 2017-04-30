@@ -12,10 +12,13 @@ public enum NewGTFSErrorType {
     URL_FORMAT, // Format should be <scheme>://<authority><path>?<query>#<fragment>
     INTEGER_FORMAT,
     FLOATING_FORMAT,
+    TABLE_NAME_FORMAT,
+    NUMBER_NEGATIVE,
     NUMBER_RANGE, // Number %s outside of acceptable range
     DUPLICATE_ID,
     DUPLICATE_TRIP,
     DUPLICATE_STOP,
+    DUPLICATE_HEADER,
     MISSING_TABLE, // This table is required by the GTFS specification but is missing
     MISSING_COLUMN,
     MISSING_SHAPE,
@@ -25,6 +28,7 @@ public enum NewGTFSErrorType {
     SHAPE_REVERSED,
     SHAPE_MISSING_COORDINATE,
     TABLE_IN_SUBDIRECTORY, // All GTFS files (including %s.txt) should be at root of zipfile, not nested in subdirectory
+    TABLE_TOO_LONG, // Table is too long to record line numbers with an integer, overflow will occur.
     TIME_ZONE_FORMAT,
     ROUTE_DESCRIPTION_SAME_AS_NAME,
     ROUTE_LONG_NAME_CONTAINS_SHORT_NAME,

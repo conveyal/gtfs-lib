@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 
 /**
@@ -8,8 +9,14 @@ import com.conveyal.gtfs.loader.Feed;
  * Created by landon on 5/26/16.
  */
 public class DatesValidator extends FeedValidator {
+
+    public DatesValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
+
     @Override
-    public boolean validate(Feed feed, boolean repair) {
+    public void validate() {
         throw new UnsupportedOperationException();
     }
+
 }

@@ -2,11 +2,10 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.MissingShapeError;
 import com.conveyal.gtfs.error.ReversedTripShapeError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.model.ShapePoint;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.Iterables;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -26,11 +25,15 @@ public class ReversedTripValidator extends TripValidator {
 
     private static Double distanceMultiplier = 1.0;
 
-    static GeometryFactory geometryFactory = new GeometryFactory();
+    private static GeometryFactory geometryFactory = new GeometryFactory();
+
+    public ReversedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
 
     @Override
-    public void validateTrip(Feed feed, Trip trip, List<StopTime> stopTimes) {
-        throw new UnsupportedOperationException();
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+        // TODO implement
     }
 
     public boolean validate(Feed feed, boolean repair) {

@@ -24,13 +24,15 @@ public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
 
-    String name;
+    final String name;
 
-    Class<? extends Entity> entityClass;
+    final Class<? extends Entity> entityClass;
 
-    Field[] fields;
+    final boolean required;
 
-    public static final Table ROUTES = new Table("routes", Route.class,
+    final Field[] fields;
+
+    public static final Table ROUTES = new Table("routes", Route.class, true,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
@@ -42,7 +44,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL)
     );
 
-    public static final Table STOPS = new Table("stops", Stop.class,
+    public static final Table STOPS = new Table("stops", Stop.class, true,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
         new StringField("stop_name",  REQUIRED),
@@ -57,7 +59,7 @@ public class Table {
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
     );
 
-    public static final Table TRIPS = new Table("trips", Trip.class,
+    public static final Table TRIPS = new Table("trips", Trip.class, true,
         new StringField("trip_id",  REQUIRED),
         new StringField("route_id",  REQUIRED),
         new StringField("service_id",  REQUIRED),
@@ -70,7 +72,7 @@ public class Table {
         new ShortField("bikes_allowed", OPTIONAL, 2)
     );
 
-    public static final Table STOP_TIMES = new Table("stop_times", StopTime.class,
+    public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, true,
         new StringField("trip_id", REQUIRED),
         new IntegerField("stop_sequence", REQUIRED),
         new StringField("stop_id", REQUIRED),
@@ -84,7 +86,7 @@ public class Table {
         new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     );
 
-    public static final Table SHAPES = new Table("shapes", ShapePoint.class,
+    public static final Table SHAPES = new Table("shapes", ShapePoint.class, false,
         new StringField("shape_id", REQUIRED),
         new IntegerField("shape_pt_sequence", REQUIRED),
         new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
@@ -92,9 +94,10 @@ public class Table {
         new DoubleField("shape_dist_traveled", REQUIRED, 0, Double.POSITIVE_INFINITY)
     );
 
-    public Table (String name, Class<? extends Entity> entityClass, Field... fields) {
+    public Table (String name, Class<? extends Entity> entityClass, boolean required, Field... fields) {
         this.name = name;
         this.entityClass = entityClass;
+        this.required = required;
         this.fields = fields;
     }
 
@@ -156,6 +159,10 @@ public class Table {
 
     public Class<? extends Entity> getEntityClass() {
         return entityClass;
+    }
+
+    public boolean isRequired () {
+        return required;
     }
 
 }

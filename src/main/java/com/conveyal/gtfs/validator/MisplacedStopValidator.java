@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.storage.BooleanAsciiGrid;
@@ -16,9 +17,12 @@ import static com.conveyal.gtfs.util.Util.getCoordString;
  */
 public class MisplacedStopValidator extends FeedValidator {
 
-    @Override
-    public boolean validate(Feed feed, boolean repair) {
+    public MisplacedStopValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
 
+    @Override
+    public void validate() {
         // Look for outliers
         DescriptiveStatistics latStats = new DescriptiveStatistics();
         DescriptiveStatistics lonStats = new DescriptiveStatistics();
@@ -26,7 +30,6 @@ public class MisplacedStopValidator extends FeedValidator {
             latStats.addValue(stop.stop_lat);
             lonStats.addValue(stop.stop_lon);
         }
-
         double latLoP = latStats.getPercentile(10);
         double latHiP = latStats.getPercentile(90);
         double latRange = latHiP - latLoP;
@@ -49,8 +52,5 @@ public class MisplacedStopValidator extends FeedValidator {
                 registerError(STOP_GEOGRAPHIC_OUTLIER, getCoordString(stop), stop);
             }
         }
-
-        return foundErrors();
-
     }
 }

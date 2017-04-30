@@ -1,11 +1,9 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.OverlappingTripsInBlockError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.model.*;
 import com.google.common.collect.Iterables;
 
 import java.time.LocalDate;
@@ -25,9 +23,13 @@ public class OverlappingTripValidator extends TripValidator {
 
     private static Double distanceMultiplier = 1.0;
 
+    public OverlappingTripValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
+
     @Override
-    public void validateTrip(Feed feed, Trip trip, List<StopTime> stopTimes) {
-        throw new UnsupportedOperationException();
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+        // TODO implement
     }
 
     public boolean validate (Feed feed, boolean repair) {
@@ -127,5 +129,29 @@ public class OverlappingTripValidator extends TripValidator {
             return new Integer(a.startTime).compareTo(new Integer(b.startTime));
         }
     }
+
+
+    // FIXME what is this patternId? This seems like a subset of block overlap errors (within a service day).
+//            String patternId = feed.tripPatternMap.get(tripId);
+//            String patternName = feed.patterns.get(patternId).name;
+//            int firstDeparture = Iterables.get(stopTimes, 0).departure_time;
+//            int lastArrival = Iterables.getLast(stopTimes).arrival_time;
+//
+//            String tripKey = trip.service_id + "_"+ blockId + "_" + firstDeparture +"_" + lastArrival + "_" + patternId;
+//
+//            if (duplicateTripHash.containsKey(tripKey)) {
+//                String firstDepartureString = LocalTime.ofSecondOfDay(Iterables.get(stopTimes, 0).departure_time % 86399).toString();
+//                String lastArrivalString = LocalTime.ofSecondOfDay(Iterables.getLast(stopTimes).arrival_time % 86399).toString();
+//                String duplicateTripId = duplicateTripHash.get(tripKey);
+//                Trip duplicateTrip = feed.trips.get(duplicateTripId);
+//                long line = trip.sourceFileLine > duplicateTrip.sourceFileLine ? trip.sourceFileLine : duplicateTrip.sourceFileLine;
+//                feed.errors.add(new DuplicateTripError(trip, line, duplicateTripId, patternName, firstDepartureString, lastArrivalString));
+//                isValid = false;
+//            } else {
+//                duplicateTripHash.put(tripKey, tripId);
+//            }
+
+
+
 }
 

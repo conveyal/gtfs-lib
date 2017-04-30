@@ -6,8 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.*;
 
-import static com.conveyal.gtfs.loader.CsvLoader.sanitize;
-
 /**
  * This will provide JDBC connections to components that need to execute SQL on the database server.
  * We need to be able to generate or re-generate multiple connections to the same server.
@@ -40,7 +38,7 @@ public class ConnectionSource {
             Connection connection = DriverManager.getConnection(url);
             if (schema != null) {
                 Statement statement = connection.createStatement();
-                String sql = String.format("create schema if not exists %s", sanitize(schema));
+                String sql = String.format("create schema if not exists %s", sanitizeSchemaName(schema));
                 LOG.info(sql);
                 statement.execute(sql);
                 // We could also just prefix the table names with the feedVersionId and a dot, but this is a bit cleaner.
@@ -54,6 +52,22 @@ public class ConnectionSource {
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
+    }
+
+    /**
+     * Protect against SQL injection.
+     * The only place we include arbitrary input in SQL is the column names of tables.
+     * Implicitly (looking at all existing table names) these should consist entirely of
+     * lowercase letters and underscores.
+     *
+     * TODO add a test including SQL injection text (quote and semicolon)
+     */
+    public String sanitizeSchemaName (String string) throws SQLException {
+        String clean = string.replaceAll("[^\\p{Alnum}_-]", "");
+        if (!clean.equals(string)) {
+            throw new StorageException("Schema name contains forbidden characters.");
+        }
+        return clean;
     }
 
 }

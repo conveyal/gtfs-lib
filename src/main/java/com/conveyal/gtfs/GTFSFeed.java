@@ -289,15 +289,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     // validate function call that should explicitly list each validator to run on GTFSFeed
     public void validate () {
-        validate(false,
-                new DuplicateStopsValidator(),
-                new NewTripTimesValidator(),
-                new TimeZoneValidator(),
-                new MisplacedStopValidator(),
-                new NamesValidator(),
-                new OverlappingTripValidator(),
-                new ReversedTripValidator()
-        );
+/////////////////
     }
 
     public FeedStats calculateStats() {

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Entity;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -42,10 +43,16 @@ public class NewGTFSError {
         this.referencedEntities = Arrays.asList(new EntityReference(entityType, lineNumber));
     }
 
+    public NewGTFSError (NewGTFSErrorType errorType, String badValues) {
+        this.type = errorType;
+        this.badValues = badValues;
+        referencedEntities = Collections.EMPTY_LIST;
+    }
+
     public static class EntityReference {
         public final Class<? extends Entity> type;
         // 31 bits is enough, unlikely we'll see files with over 2 billion lines (3 orders of magnitude greater than NL)
-        public final int lineNumber;
+        public final Integer lineNumber;
         public final String id;
         public final Integer sequenceNumber; // Use Integer object because this is often missing (null)
         public EntityReference (Entity entity) {
@@ -54,7 +61,7 @@ public class NewGTFSError {
             sequenceNumber = entity.getSequenceNumber();
             lineNumber = (int) entity.sourceFileLine;
         }
-        public EntityReference (Class<? extends Entity> entityType, int lineNumber) {
+        public EntityReference (Class<? extends Entity> entityType, Integer lineNumber) {
             type = entityType;
             id = null;
             sequenceNumber = null;

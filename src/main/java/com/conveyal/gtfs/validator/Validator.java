@@ -2,9 +2,11 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,16 +16,17 @@ import java.util.List;
  */
 public abstract class Validator {
 
-    protected List<NewGTFSError> errors = new ArrayList<>();
+    Feed feed;
 
-    protected void registerError (NewGTFSErrorType errorType, String badValue, Entity... entities)  {
-        errors.add(new NewGTFSError(errorType, badValue, entities));
+    SQLErrorStorage errorStorage;
+
+    public Validator(Feed feed, SQLErrorStorage errorStorage) {
+        this.feed = feed;
+        this.errorStorage = errorStorage;
     }
 
-    public int getErrorCount() { return errors.size(); }
-
-    public boolean foundErrors() {return errors.size() > 0; }
-
-    public Iterable<NewGTFSError> getErrors () { return errors; }
+    public void registerError (NewGTFSErrorType errorType, String badValue, Entity... entity) {
+        errorStorage.storeError(new NewGTFSError(errorType, badValue, entity));
+    }
 
 }

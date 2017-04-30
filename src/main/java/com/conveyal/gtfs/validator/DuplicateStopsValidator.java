@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.util.Util;
@@ -23,9 +24,12 @@ public class DuplicateStopsValidator extends FeedValidator {
 
     private static final double BUFFER_METERS = 2.0;
 
-    @Override
-    public boolean validate (Feed feed, boolean repair) {
+    public DuplicateStopsValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
 
+    @Override
+    public void validate () {
         // Project all stop coordinates and put them in a spatial index
         HashMap<Stop, Coordinate> projectedCoordinateForStop = new HashMap<>();
         STRtree stopSpatialIndex = new STRtree();
@@ -53,7 +57,6 @@ public class DuplicateStopsValidator extends FeedValidator {
                 reportedStops.addAll(nearby);
             }
         });
-        return foundErrors();
     }
 
 }

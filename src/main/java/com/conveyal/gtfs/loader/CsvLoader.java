@@ -4,10 +4,7 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import org.apache.commons.io.input.BOMInputStream;
-import org.hsqldb.result.ResultMetaData;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
@@ -20,7 +17,7 @@ import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 import static com.conveyal.gtfs.model.Entity.human;
 
 /**
@@ -77,20 +74,34 @@ public class CsvLoader {
 
     private SQLErrorStorage errorStorage;
 
-    public CsvLoader(ZipFile zip) {
+    public CsvLoader (ZipFile zip) {
         this.zip = zip;
-        this.errorStorage = new SQLErrorStorage(connectionSource);
+        this.connection = connectionSource.getConnection(null);
+        this.errorStorage = new SQLErrorStorage(connection, true);
     }
 
     public void load (Table table) throws Exception {
-
-        ZipEntry entry = zip.getEntry(table.name + ".txt");
+        final String tableFileName = table.name + ".txt";
+        ZipEntry entry = zip.getEntry(tableFileName);
         if (entry == null) {
-            // TODO check for TableInSubdirectoryError and see if table is required
+            // Table was not found, check if it is in a subdirectory.
+            Enumeration<? extends ZipEntry> entries = zip.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry e = entries.nextElement();
+                if (e.getName().endsWith(tableFileName)) {
+                    entry = e;
+                    errorStorage.storeError(new NewGTFSError(TABLE_IN_SUBDIRECTORY, e.getName()));
+                    break;
+                }
+            }
+        }
+        if (entry == null) {
+            // This GTFS table did not exist in the zip, even in a subdirectory.
+            if (table.isRequired()) errorStorage.storeError(new NewGTFSError(MISSING_TABLE, tableFileName));
             return;
         }
 
-        // Use the Postgres text load format if we're connected to that database.
+        // Use the Postgres text load format if we're connected to that DBMS.
         boolean postgresText = (connection instanceof BaseConnection);
 
         LOG.info("Loading GTFS table {} from {}", table.name, entry);
@@ -101,7 +112,7 @@ public class CsvLoader {
         csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
         csvReader.readHeaders();
 
-        // TODO Strip out line returns, tabs.
+        // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
 
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
@@ -110,7 +121,9 @@ public class CsvLoader {
         for (int h = 0; h < csvReader.getHeaderCount(); h++) {
             String header = sanitize(csvReader.getHeader(h));
             if (fieldsSeen.contains(header)) {
-                // Error: duplicate field name TODO deal with missing (null) Field object below
+                String badValues = String.format("file=%s; header=%s", tableFileName, header);
+                errorStorage.storeError(new NewGTFSError(DUPLICATE_HEADER, badValues));
+                // TODO deal with missing (null) Field object below
                 fields[h] = null;
             } else {
                 fields[h] = table.getFieldForName(header);
@@ -119,7 +132,8 @@ public class CsvLoader {
         }
 
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
-        Table targetTable = new Table(table.name, table.entityClass, fields);
+        // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
+        Table targetTable = new Table(table.name, table.entityClass, table.isRequired(), fields);
 
         // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
         // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.
@@ -148,33 +162,43 @@ public class CsvLoader {
             // The CSV reader's current record is zero-based and does not include the header line.
             // Convert to a CSV file line number that will make more sense to people reading error messages.
             if (csvReader.getCurrentRecord() + 2 > Integer.MAX_VALUE) {
-                LOG.error("Too many lines in CSV file, we can't represent the line numbers in an integer field.");
-                // TODO record real GTFS error
+                errorStorage.storeError(new NewGTFSError(TABLE_TOO_LONG, table.name));
                 break;
             }
             int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
             if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
             if (csvReader.getColumnCount() != fields.length) {
                 String badValues = String.format("expected=%d; found=%d", fields.length, csvReader.getColumnCount());
-                new NewGTFSError(WRONG_NUMBER_OF_FIELDS, badValues, table.getEntityClass(), lineNumber);
+                errorStorage.storeError(new NewGTFSError(WRONG_NUMBER_OF_FIELDS, badValues, table.getEntityClass(), lineNumber));
                 continue;
             }
-            // The first field is the line number of the CSV file.
+            // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
             if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
             else insertStatement.setInt(1, lineNumber);
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 String string = csvReader.get(f);
-                if (string.isEmpty()) { // TODO verify that CSV reader always returns empty strings, not nulls
-                    if (field.isRequired()) throw new StorageException("Missing required field."); // TODO record and recover.
+                if (string.isEmpty()) {
+                    // TODO verify that CSV reader always returns empty strings, not nulls
+                    if (field.isRequired()) {
+                        errorStorage.storeError(new NewGTFSError(MISSING_FIELD, field.name, table.getEntityClass(), lineNumber));
+                    }
                     if (postgresText) transformedStrings[f + 1] = "\\N"; // Represents null in Postgres text format
                     // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
                     else insertStatement.setNull(f + 2, field.getSqlType().getVendorTypeNumber());
                 } else {
-                    if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
                     // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
                     // rather than setObject with a type code. I think some databases don't have setObject though.
-                    else field.setParameter(insertStatement, f + 2, string);
+                    // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
+                    try {
+                        // FIXME we need to set the transformed string element even when an error occurs.
+                        // This means the validation and insertion step need to happen separately.
+                        if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
+                        else field.setParameter(insertStatement, f + 2, string);
+                    } catch (StorageException ex) {
+                        String badValues = String.format("table=%s, line=%d", table.name, lineNumber);
+                        errorStorage.storeError(new NewGTFSError(ex.errorType, badValues));
+                    }
                 }
             }
             if (postgresText) {
@@ -221,6 +245,7 @@ public class CsvLoader {
 
         LOG.info("Committing transaction...");
         connection.commit();
+        errorStorage.finish();
         LOG.info("Done.");
     }
 
@@ -230,14 +255,11 @@ public class CsvLoader {
      * Implicitly (looking at all existing table names) these should consist entirely of
      * lowercase letters and underscores.
      *
-     * TODO test including SQL injection text (quote and semicolon)
+     * TODO add a test including SQL injection text (quote and semicolon)
      */
-    public static String sanitize (String string) {
+    public String sanitize (String string) throws SQLException {
         String clean = string.replaceAll("[^\\p{Alnum}_-]", "");
-        if (!clean.equals(string)) {
-            // TODO recover and record error.
-            throw new StorageException("String includes illegal (non alphanumeric or dash) characters: " + string);
-        }
+        if (!clean.equals(string)) errorStorage.storeError(new NewGTFSError(TABLE_NAME_FORMAT, string));
         return clean;
     }
 

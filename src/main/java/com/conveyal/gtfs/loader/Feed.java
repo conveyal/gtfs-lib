@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.validator.*;
 import org.slf4j.Logger;
@@ -88,40 +89,37 @@ public class Feed {
             LOG.info("Done. {}", x);
             return;
         }
-
-
     }
 
-    private void validate (boolean repair, FeedValidator... feedValidators) {
+    private void validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
         long validationStartTime = System.currentTimeMillis();
         for (FeedValidator feedValidator : feedValidators) {
             try {
                 LOG.info("Running {}.", feedValidator.getClass().getSimpleName());
-                long startTime = System.currentTimeMillis();
-                feedValidator.validate(this, repair);
-                long endTime = System.currentTimeMillis();
-                long diff = endTime - startTime;
-                LOG.info("{} finished in {} milliseconds.", feedValidator.getClass().getSimpleName(), diff);
-                LOG.info("{} found {} errors.", feedValidator.getClass().getSimpleName(), feedValidator.getErrorCount());
-                LOG.info("Storing {} errors...", feedValidator.getErrorCount());
+                int errorCountBefore = errorStorage.getErrorCount();
+                feedValidator.validate();
+                LOG.info("Found {} errors.", errorStorage.getErrorCount() - errorCountBefore);
             } catch (Exception e) {
                 LOG.error("{} failed.", feedValidator.getClass().getSimpleName());
                 LOG.error(e.toString());
                 e.printStackTrace();
             }
         }
+        errorStorage.finish();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
         LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
     }
 
     public void validate () {
-        validate(false,
-                new MisplacedStopValidator(),
-                new DuplicateStopsValidator(),
-                new TimeZoneValidator(),
-                new NewTripTimesValidator(),
-                new NamesValidator()
+        // Error tables should already be present from the initial load.
+        SQLErrorStorage errorStorage = new SQLErrorStorage(connection, false);
+        validate (errorStorage,
+            new MisplacedStopValidator(this, errorStorage),
+            new DuplicateStopsValidator(this, errorStorage),
+            new TimeZoneValidator(this, errorStorage),
+            new NewTripTimesValidator(this, errorStorage),
+            new NamesValidator(this, errorStorage)
         );
     }
 
