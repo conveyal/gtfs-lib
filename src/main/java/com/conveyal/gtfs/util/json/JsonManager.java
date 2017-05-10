@@ -24,30 +24,30 @@ import java.util.Map;
  *
  */
 public class JsonManager<T> {
-    private ObjectWriter ow;
-    private ObjectMapper om;
+    private ObjectWriter writer;
+    private ObjectMapper mapper;
+    SimpleFilterProvider filters;
 
     /**
      * Create a new JsonManager
      * @param theClass The class to create a json manager for (yes, also in the diamonds).
-     * @param view The view to use
      */
     public JsonManager (Class<T> theClass) {
         this.theClass = theClass;
-        this.om = new ObjectMapper();
-        om.addMixInAnnotations(Rectangle2D.class, Rectangle2DMixIn.class);
-        om.registerModule(new GeoJsonModule());
+        this.mapper = new ObjectMapper();
+        mapper.addMixInAnnotations(Rectangle2D.class, Rectangle2DMixIn.class);
+        mapper.registerModule(new GeoJsonModule());
         SimpleModule deser = new SimpleModule();
 
         deser.addDeserializer(LocalDate.class, new JacksonSerializers.LocalDateStringDeserializer());
         deser.addSerializer(LocalDate.class, new JacksonSerializers.LocalDateStringSerializer());
 
         deser.addDeserializer(Rectangle2D.class, new Rectangle2DDeserializer());
-        om.registerModule(deser);
-        om.getSerializerProvider().setNullKeySerializer(new JacksonSerializers.MyDtoNullKeySerializer());
-        SimpleFilterProvider filters = new SimpleFilterProvider();
+        mapper.registerModule(deser);
+        mapper.getSerializerProvider().setNullKeySerializer(new JacksonSerializers.MyDtoNullKeySerializer());
+        filters = new SimpleFilterProvider();
         filters.addFilter("bbox", SimpleBeanPropertyFilter.filterOutAllExcept("west", "east", "south", "north"));
-        this.ow = om.writer(filters);
+        this.writer = mapper.writer(filters);
     }
 
     private Class<T> theClass;
@@ -56,21 +56,21 @@ public class JsonManager<T> {
      * Add an additional mixin for serialization with this object mapper.
      */
     public void addMixin(Class target, Class mixin) {
-        om.addMixInAnnotations(target, mixin);
+        mapper.addMixInAnnotations(target, mixin);
     }
 
     public String write(Object o) throws JsonProcessingException {
         if (o instanceof String) {
             return (String) o;
         }
-        return ow.writeValueAsString(o);
+        return writer.writeValueAsString(o);
     }
 
     public String writePretty(Object o) throws JsonProcessingException {
         if (o instanceof String) {
             return (String) o;
         }
-        return om.writerWithDefaultPrettyPrinter().writeValueAsString(o);
+        return mapper.writerWithDefaultPrettyPrinter().with(filters).writeValueAsString(o);
     }
 
     /**
@@ -80,7 +80,7 @@ public class JsonManager<T> {
      * @throws JsonProcessingException
      */
     /*public String write (T o) throws JsonProcessingException {
-        return ow.writeValueAsString(o);
+        return writer.writeValueAsString(o);
     }*/
 
     /**
@@ -90,22 +90,22 @@ public class JsonManager<T> {
      * @throws JsonProcessingException
      */
     public String write (Collection<T> c) throws JsonProcessingException {
-        return ow.writeValueAsString(c);
+        return writer.writeValueAsString(c);
     }
 
     public String write (Map<String, T> map) throws JsonProcessingException {
-        return ow.writeValueAsString(map);
+        return writer.writeValueAsString(map);
     }
 
     public T read (String s) throws JsonParseException, JsonMappingException, IOException {
-        return om.readValue(s, theClass);
+        return mapper.readValue(s, theClass);
     }
 
     public T read (JsonParser p) throws JsonParseException, JsonMappingException, IOException {
-        return om.readValue(p, theClass);
+        return mapper.readValue(p, theClass);
     }
 
     public T read(JsonNode asJson) {
-        return om.convertValue(asJson, theClass);
+        return mapper.convertValue(asJson, theClass);
     }
 }
