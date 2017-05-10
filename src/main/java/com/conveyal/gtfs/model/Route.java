@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.NoOperatorInFeedError;
 
 import java.io.IOException;
 import java.net.URL;
@@ -49,12 +50,16 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_id = getStringField("route_id", true);
             Agency agency = getRefField("agency_id", false, feed.agency);
 
-            // if there is only one agency, associate with it automatically
-            // TODO: what will this do if the agency and the route have agency_ids but they do not match?
-            if (agency == null && feed.agency.size() == 1)
-                agency = feed.agency.values().iterator().next();
-
-            r.agency_id = agency.agency_id;
+            if (agency == null) {
+                // if there is only one agency, associate with it automatically
+                if (feed.agency.size() == 1) {
+                    r.agency_id = feed.agency.values().iterator().next().agency_id;
+                } else if (feed.agency.isEmpty()) {
+                    feed.errors.add(new NoOperatorInFeedError());
+                }
+            } else {
+                r.agency_id = agency.agency_id;
+            }
 
             r.route_short_name = getStringField("route_short_name", false); // one or the other required, needs a special validator
             r.route_long_name = getStringField("route_long_name", false);
