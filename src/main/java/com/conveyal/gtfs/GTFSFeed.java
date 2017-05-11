@@ -48,6 +48,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -277,23 +278,23 @@ public class GTFSFeed implements Cloneable, Closeable {
 //        }
 //    }
     public void validate (boolean repair, GTFSValidator... validators) {
-        long startValidation = System.currentTimeMillis();
+        long startValidation = System.nanoTime();
         for (GTFSValidator validator : validators) {
             try {
-                long startValidator = System.currentTimeMillis();
+                long startValidator = System.nanoTime();
                 validator.validate(this, repair);
-                long endValidator = System.currentTimeMillis();
+                long endValidator = System.nanoTime();
                 long diff = endValidator - startValidator;
-                LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), diff);
+                LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(diff));
             } catch (Exception e) {
                 LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
 //                LOG.error(e.toString());
                 e.printStackTrace();
             }
         }
-        long endValidation = System.currentTimeMillis();
+        long endValidation = System.nanoTime();
         long total = endValidation - startValidation;
-        LOG.info("{} validators completed in {} milliseconds.", validators.length, total);
+        LOG.info("{} validators completed in {} milliseconds.", validators.length, TimeUnit.NANOSECONDS.toMillis(total));
     }
 
     // validate function call that should explicitly list each validator to run on GTFSFeed
