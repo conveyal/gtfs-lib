@@ -14,7 +14,7 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.NoOperatorInFeedError;
+import com.conveyal.gtfs.error.NoAgencyInFeedError;
 
 import java.io.IOException;
 import java.net.URL;
@@ -65,7 +65,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
                 if (feed.agency.size() == 1) {
                     r.agency_id = feed.agency.values().iterator().next().agency_id;
                 } else if (feed.agency.isEmpty()) {
-                    feed.errors.add(new NoOperatorInFeedError());
+                    feed.errors.add(new NoAgencyInFeedError());
                 }
             } else {
                 r.agency_id = agency.agency_id;
