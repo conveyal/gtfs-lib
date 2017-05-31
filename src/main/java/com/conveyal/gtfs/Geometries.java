@@ -500,4 +500,8 @@ public class Geometries {
         return getNetherlands().difference(getTexel());
     }
 
+    public static Geometry getZuidHolland() {
+        return geometryFactory.toGeometry(new Envelope(4.002074, 4.98848, 51.696796, 52.278661));
+    }
+
 }
