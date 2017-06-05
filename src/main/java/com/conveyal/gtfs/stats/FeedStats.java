@@ -26,7 +26,6 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.AgencyStatistic;
 import com.vividsolutions.jts.geom.Geometry;
-import org.mapdb.Fun;
 
 /**
  * Retrieves a base set of statistics from the GTFS.

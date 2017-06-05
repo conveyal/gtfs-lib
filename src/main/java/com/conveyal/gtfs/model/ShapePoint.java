@@ -5,7 +5,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import java.io.IOException;
 import java.util.Iterator;
 
-import org.mapdb.Fun.Tuple2;
+import org.mapdb.tuple.Tuple2;
 
 public class ShapePoint extends Entity {
 

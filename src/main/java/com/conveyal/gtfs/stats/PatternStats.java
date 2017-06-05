@@ -8,7 +8,7 @@ import gnu.trove.list.TDoubleList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
-import org.mapdb.Fun;
+import org.mapdb.tuple.Tuple2;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -57,7 +57,7 @@ public class PatternStats {
         TDoubleList speeds = new TDoubleArrayList();
 
         for (Trip trip : trips) {
-            StopTime firstStopTime = feed.stop_times.ceilingEntry(Fun.t2(trip.trip_id, null)).getValue();
+            StopTime firstStopTime = (StopTime)feed.stop_times.ceilingEntry(new Tuple2(trip.trip_id, null)).getValue();
             LocalTime tripBeginTime = LocalTime.ofSecondOfDay(firstStopTime.departure_time % 86399); // convert 24hr+ seconds to 0 - 86399
 
             // skip trip if begin time is before or after specified time period

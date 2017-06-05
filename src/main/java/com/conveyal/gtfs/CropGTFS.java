@@ -5,16 +5,13 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.base.Strings;
-import com.vividsolutions.jts.geom.*;
-import org.mapdb.Fun;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import org.mapdb.tuple.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Remove all stops outside the bounding box,
@@ -75,7 +72,7 @@ public class CropGTFS {
 
         if (MERGE_STATIONS) {
             System.out.println("Replacing stop_ids in stop_times with those of their parent stations...");
-            for (Fun.Tuple2 key : feed.stop_times.keySet()) {
+            for (Tuple2 key : feed.stop_times.keySet()) {
                 StopTime stopTime = feed.stop_times.get(key);
                 String replacementStopId = stopIdReplacements.get(stopTime.stop_id);
                 if (replacementStopId != null) {

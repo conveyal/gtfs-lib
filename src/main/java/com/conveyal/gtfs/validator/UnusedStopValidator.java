@@ -3,17 +3,8 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.UnusedStopError;
 import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.validator.model.InvalidValue;
-import com.conveyal.gtfs.validator.model.Priority;
-import com.conveyal.gtfs.validator.model.ValidationResult;
-import com.google.common.collect.Sets;
-import org.mapdb.Fun;
 
-import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
-import java.util.SortedSet;
-import java.util.stream.Collectors;
 
 /**
  * Created by landon on 5/2/16.

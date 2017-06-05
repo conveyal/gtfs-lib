@@ -8,19 +8,12 @@ import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.TransferPerformanceSummary;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import org.mapdb.Fun;
+import org.mapdb.tuple.Tuple2;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.SortedSet;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Created by landon on 9/2/16.
@@ -207,8 +200,8 @@ public class StopStats {
                         routeStopTimeMap.put(route.route_id, times);
                     }
                 });
-        Map<Fun.Tuple2<String, String>, TIntList> waitTimesByRoute = new HashMap<>();
-        Map<Fun.Tuple2<String, String>, Set<Fun.Tuple2<StopTime, StopTime>>> missedTransfers = new HashMap<>();
+        Map<Tuple2<String, String>, TIntList> waitTimesByRoute = new HashMap<>();
+        Map<Tuple2<String, String>, Set<Tuple2<StopTime, StopTime>>> missedTransfers = new HashMap<>();
         // iterate over every entry in route -> list of stopTimes map
         for (Map.Entry<String, List<StopTime>> entry : routeStopTimeMap.entrySet()) {
             final int MISSED_TRANSFER_THRESHOLD = 60 * 10;
@@ -223,7 +216,7 @@ public class StopStats {
 
                         List<StopTime> compareTimes = entry2.getValue();
                         String compareRoute = entry2.getKey();
-                        Fun.Tuple2<String, String> routeKey = new Fun.Tuple2(currentRoute, compareRoute);
+                        Tuple2<String, String> routeKey = new Tuple2(currentRoute, compareRoute);
                         if (compareRoute.equals(currentRoute)) {
                             continue;
                         }
@@ -244,7 +237,7 @@ public class StopStats {
                                 // otherwise, check for missed near-transfer opportunities
                                 else {
                                     if (waitTime < 0 && waitTime * -1 <= MISSED_TRANSFER_THRESHOLD) {
-                                        Fun.Tuple2<StopTime, StopTime> missedTransfer = new Fun.Tuple2(compareTime, currentTime);
+                                        Tuple2<StopTime, StopTime> missedTransfer = new Tuple2(compareTime, currentTime);
 //                                        missedTransfer.add(currentTime);
 //                                        missedTransfer.add(compareTime);
                                         if (!missedTransfers.containsKey(routeKey)) {
@@ -262,8 +255,8 @@ public class StopStats {
                 }
             }
         }
-        for (Map.Entry<Fun.Tuple2<String, String>, TIntList> entry : waitTimesByRoute.entrySet()) {
-            Fun.Tuple2<String, String> routeKey = entry.getKey();
+        for (Map.Entry<Tuple2<String, String>, TIntList> entry : waitTimesByRoute.entrySet()) {
+            Tuple2<String, String> routeKey = entry.getKey();
             TIntList waitTimes = entry.getValue();
             if (waitTimes.isEmpty()) {
                 continue;

@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.deser.std.StdScalarDeserializer;
 import com.fasterxml.jackson.databind.ser.std.StdScalarSerializer;
 import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.google.common.io.BaseEncoding;
-import org.mapdb.Fun.Tuple2;
+import org.mapdb.tuple.Tuple2;
 
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;

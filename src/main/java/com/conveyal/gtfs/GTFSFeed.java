@@ -3,18 +3,13 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.validator.DuplicateStopsValidator;
-import com.conveyal.gtfs.validator.GTFSValidator;
-import com.conveyal.gtfs.validator.HopSpeedsReasonableValidator;
-import com.conveyal.gtfs.validator.MisplacedStopValidator;
-import com.conveyal.gtfs.validator.NamesValidator;
-import com.conveyal.gtfs.validator.OverlappingTripsValidator;
-import com.conveyal.gtfs.validator.ReversedTripsValidator;
-import com.conveyal.gtfs.validator.TripTimesValidator;
-import com.conveyal.gtfs.validator.UnusedStopValidator;
 import com.conveyal.gtfs.stats.FeedStats;
+import com.conveyal.gtfs.validator.*;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.google.common.collect.*;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.ExecutionError;
 import com.vividsolutions.jts.algorithm.ConvexHull;
@@ -23,27 +18,18 @@ import com.vividsolutions.jts.index.strtree.STRtree;
 import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
 import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.BTreeMap;
-import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
-import org.mapdb.Fun;
-import org.mapdb.Fun.Tuple2;
 import org.mapdb.Serializer;
+import org.mapdb.tuple.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOError;
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 import java.time.LocalDate;
-import java.time.Period;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -81,7 +67,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Route> routes;
     public final Map<String, Stop> stops;
     public final Map<String, Transfer> transfers;
-    public final BTreeMap<String, Trip> trips;
+    public final NavigableMap<String, Trip> trips;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -91,12 +77,12 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
 
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
-    public final BTreeMap<Tuple2, StopTime> stop_times;
+    public final NavigableMap<Tuple2<String, Integer>, StopTime> stop_times;
 
 //    public final ConcurrentMap<String, Long> stopCountByStopTime;
 
     /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
-    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
+    public final NavigableSet<Tuple3<String, String, StopTime>> stopStopTimeSet;
     public final ConcurrentMap<String, Long> stopCountByStopTime;
 
     public final NavigableSet<Tuple2<String, String>> tripsPerService;
@@ -107,7 +93,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Fare> fares;
 
     /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
-    public final BTreeMap<String, Service> services;
+    public final NavigableMap<String, Service> services;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     public final NavigableSet<GTFSError> errors;
@@ -158,7 +144,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         // of the zip file, so that's not a problem.
         checksum = zip.stream().mapToLong(ZipEntry::getCrc).reduce((l1, l2) -> l1 ^ l2).getAsLong();
 
-        db.getAtomicLong("checksum").set(checksum);
+        db.atomicLong("checksum").open().set(checksum);
 
         new FeedInfo.Loader(this).loadTable(zip);
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
@@ -174,7 +160,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.info("Feed ID is '{}'.", feedId);
         }
 
-        db.getAtomicString("feed_id").set(feedId);
+        db.atomicString("feed_id").open().set(feedId);
 
         new Agency.Loader(this).loadTable(zip);
 
@@ -365,10 +351,9 @@ public class GTFSFeed implements Cloneable, Closeable {
      * This is an efficient iteration over a tree map.
      */
     public Iterable<StopTime> getOrderedStopTimesForTrip (String trip_id) {
-        Map<Fun.Tuple2, StopTime> tripStopTimes =
+        Map<Tuple2, StopTime> tripStopTimes =
                 stop_times.subMap(
-                        Fun.t2(trip_id, null),
-                        Fun.t2(trip_id, Fun.HI)
+                        new Tuple2(trip_id, null), new Tuple2(trip_id, Tuple.HI)
                 );
         return tripStopTimes.values();
     }
@@ -502,7 +487,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public Collection<Frequency> getFrequencies (String trip_id) {
         // IntelliJ tells me all these casts are unnecessary, and that's also my feeling, but the code won't compile
         // without them
-        return (List<Frequency>) frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
+        return (List<Frequency>) frequencies.subSet(new Tuple2(trip_id, null), new Tuple2(trip_id, Tuple.HI)).stream()
                 .map(t2 -> ((Tuple2<String, Frequency>) t2).b)
                 .collect(Collectors.toList());
     }
@@ -741,8 +726,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Get trip speed in meters per second. */
     public double getTripSpeed (String trip_id, boolean straightLine) {
 
-        StopTime firstStopTime = this.stop_times.ceilingEntry(Fun.t2(trip_id, null)).getValue();
-        StopTime lastStopTime = this.stop_times.floorEntry(Fun.t2(trip_id, Fun.HI)).getValue();
+        StopTime firstStopTime = (StopTime) this.stop_times.ceilingEntry(new Tuple2(trip_id, null)).getValue();
+        StopTime lastStopTime = (StopTime) this.stop_times.floorEntry(new Tuple2(trip_id, Tuple.HI)).getValue();
 
         // ensure that stopTime returned matches trip id (i.e., that the trip has stoptimes)
         if (!firstStopTime.trip_id.equals(trip_id) || !lastStopTime.trip_id.equals(trip_id)) {
@@ -759,17 +744,18 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /** Get list of stop_times for a given stop_id. */
     public List<StopTime> getStopTimesForStop (String stop_id) {
-        SortedSet<Tuple2<String, Tuple2>> index = this.stopStopTimeSet
-                .subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.stop_times.get(tuple.b))
+        return this.stopStopTimeSet
+                .subSet(
+                        new Tuple3(stop_id, null, null),
+                        new Tuple3(stop_id, Tuple.HI, Tuple.HI)
+                ).stream()
+                .map(tuple -> (StopTime) this.stop_times.get(((Tuple3)tuple).c))
                 .collect(Collectors.toList());
     }
 
     public List<Trip> getTripsForService (String service_id) {
         SortedSet<Tuple2<String, String>> index = this.tripsPerService
-                .subSet(new Tuple2<>(service_id, null), new Tuple2(service_id, Fun.HI));
+                .subSet(new Tuple2<>(service_id, null), new Tuple2(service_id, Tuple.HI));
 
         return index.stream()
                 .map(tuple -> this.trips.get(tuple.b))
@@ -780,7 +766,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public List<Service> getServicesForDate (LocalDate date) {
         String dateString = date.format(dateFormatter);
         SortedSet<Tuple2<String, String>> index = this.servicesPerDate
-                .subSet(new Tuple2<>(dateString, null), new Tuple2(dateString, Fun.HI));
+                .subSet(new Tuple2<>(dateString, null), new Tuple2(dateString, Tuple.HI));
 
         return index.stream()
                 .map(tuple -> this.services.get(tuple.b))
@@ -894,12 +880,12 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Create a GTFS feed in a temp file */
     public GTFSFeed () {
         // calls to this must be first operation in constructor - why, Java?
-        this(DBMaker.newTempFileDB()
-                .transactionDisable()
-                .mmapFileEnable()
-                .asyncWriteEnable()
-                .deleteFilesAfterClose()
-                .compressionEnable()
+        this(DBMaker.tempFileDB()
+                .fileMmapEnable()
+                //FIXME perf settings
+//                .asyncWriteEnable()
+                .fileDeleteAfterClose()
+//                .compressionEnable()
                 // .cacheSize(1024 * 1024) this bloats memory consumption
                 .make()); // TODO db.close();
     }
@@ -912,12 +898,12 @@ public class GTFSFeed implements Cloneable, Closeable {
     private static DB constructDB(String dbFile) {
         DB db;
         try{
-            DBMaker dbMaker = DBMaker.newFileDB(new File(dbFile));
-            db = dbMaker
-                    .transactionDisable()
-                    .mmapFileEnable()
-                    .asyncWriteEnable()
-                    .compressionEnable()
+            db = DBMaker
+                    .fileDB(new File(dbFile))
+                    .fileMmapEnable()
+                    //FIXME settings
+//                    .asyncWriteEnable()
+//                    .compressionEnable()
 //                     .cacheSize(1024 * 1024) this bloats memory consumption
                     .make();
             return db;
@@ -930,34 +916,35 @@ public class GTFSFeed implements Cloneable, Closeable {
     private GTFSFeed (DB db) {
         this.db = db;
 
-        agency = db.getTreeMap("agency");
-        feedInfo = db.getTreeMap("feed_info");
-        routes = db.getTreeMap("routes");
-        trips = db.getTreeMap("trips");
-        stop_times = db.getTreeMap("stop_times");
-        frequencies = db.getTreeSet("frequencies");
-        transfers = db.getTreeMap("transfers");
-        stops = db.getTreeMap("stops");
-        fares = db.getTreeMap("fares");
-        services = db.getTreeMap("services");
-        shape_points = db.getTreeMap("shape_points");
+        agency = db.treeMap("agency", String.class, Agency.class).createOrOpen();
+        feedInfo = db.treeMap("feed_info", String.class, FeedInfo.class).createOrOpen();
+        routes = db.treeMap("routes", String.class, Route.class).createOrOpen();
+        trips = db.treeMap("trips", String.class, Trip.class).createOrOpen();
+        stop_times = db.treeMap("stop_times", new Tuple2Serializer(Serializer.STRING, Serializer.INTEGER), db.getDefaultSerializer()/*TODO StopTime.class*/).createOrOpen();
+        frequencies = db.treeSet("frequencies", new Tuple2Serializer(Serializer.STRING, db.getDefaultSerializer())).createOrOpen();
+        transfers = db.treeMap("transfers", String.class, Transfer.class).createOrOpen();
+        stops = db.treeMap("stops", String.class, Stop.class).createOrOpen();
+        fares = db.treeMap("fares", String.class, Fare.class).createOrOpen();
+        services = db.treeMap("services", String.class, Service.class).createOrOpen();
+        shape_points = db.treeMap("shape_points", new Tuple2Serializer(Serializer.STRING, db.getDefaultSerializer()), db.getDefaultSerializer()).createOrOpen();
 
-        feedId = db.getAtomicString("feed_id").get();
-        checksum = db.getAtomicLong("checksum").get();
+        feedId = db.atomicString("feed_id").createOrOpen().get();
+        checksum = db.atomicLong("checksum").createOrOpen().get();
 
+        // TODO mapdb 1x serializer used array-ref-resolver, 3.1 uses hashmap to resolve refs, this should be solved
         // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
         // nothing else contains JTS objects
-        patterns = db.createTreeMap("patterns")
-                .valueSerializer(Serializer.JAVA)
-                .makeOrGet();
+//        patterns = db.createTreeMap("patterns")
+//                .valueSerializer(Serializer.JAVA)
+//                .makeOrGet();
 
-        tripPatternMap = db.getTreeMap("patternForTrip");
+        tripPatternMap = db.treeMap("patternForTrip", String.class, String.class).createOrOpen();
 
-        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
-        stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
-        tripsPerService = db.getTreeSet("tripsPerService");
-        servicesPerDate = db.getTreeSet("servicesPerDate");
+        stopCountByStopTime = db.treeMap("stopCountByStopTime", String.class, Long.class).createOrOpen();
+        stopStopTimeSet = db.treeSet("stopStopTimeSet", new Tuple3Serializer(Serializer.STRING, Serializer.STRING, db.getDefaultSerializer())).createOrOpen();
+        tripsPerService = db.treeSet("tripsPerService", new Tuple2Serializer(Serializer.STRING, Serializer.STRING)).createOrOpen();
+        servicesPerDate = db.treeSet("servicesPerDate", new Tuple2Serializer(Serializer.STRING, Serializer.STRING)).createOrOpen();
 
-        errors = db.getTreeSet("errors");
+        errors = db.treeSet("errors", GTFSError.class).createOrOpen();
     }
 }

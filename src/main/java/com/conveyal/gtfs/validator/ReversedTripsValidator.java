@@ -4,24 +4,18 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.MissingShapeError;
 import com.conveyal.gtfs.error.ReversedTripShapeError;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
-import com.conveyal.gtfs.model.Pattern;
-import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.model.ValidationResult;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.Iterables;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
-import org.mapdb.Fun;
+import org.mapdb.tuple.Tuple;
+import org.mapdb.tuple.Tuple2;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Created by landon on 5/2/16.
@@ -63,8 +57,8 @@ public class ReversedTripsValidator extends GTFSValidator {
 
             StopTime lastStop = Iterables.getLast(stopTimes);
 
-            ShapePoint firstShape = feed.shape_points.ceilingEntry(Fun.t2(shapeId, null)).getValue();
-            Map.Entry<Fun.Tuple2<String, Integer>, ShapePoint> entry = feed.shape_points.floorEntry(new Fun.Tuple2(shapeId, Fun.HI));
+            ShapePoint firstShape = feed.shape_points.ceilingEntry(new Tuple2(shapeId, null)).getValue();
+            Map.Entry<Tuple2<String, Integer>, ShapePoint> entry = feed.shape_points.floorEntry(new Tuple2(shapeId, Tuple.HI));
             ShapePoint lastShape = entry.getValue();
 
             Coordinate firstStopCoord;

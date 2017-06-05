@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.stats.model;
 
 import com.conveyal.gtfs.model.StopTime;
-import org.mapdb.Fun;
+import org.mapdb.tuple.Tuple2;
 
 import java.io.Serializable;
 import java.util.Set;
@@ -15,7 +15,7 @@ public class TransferPerformanceSummary implements Serializable {
     public int bestCase;
     public int worstCase;
     public int typicalCase;
-    public Set<Fun.Tuple2<StopTime, StopTime>> missedOpportunities;
+    public Set<Tuple2<StopTime, StopTime>> missedOpportunities;
 
     /**
      *
@@ -26,7 +26,7 @@ public class TransferPerformanceSummary implements Serializable {
      * @param avgWaitTime
      * @param missedTransfers
      */
-    public TransferPerformanceSummary (String fromRoute, String toRoute, int minWaitTime, int maxWaitTime, int avgWaitTime, Set<Fun.Tuple2<StopTime, StopTime>> missedTransfers) {
+    public TransferPerformanceSummary (String fromRoute, String toRoute, int minWaitTime, int maxWaitTime, int avgWaitTime, Set<Tuple2<StopTime, StopTime>> missedTransfers) {
         this.fromRoute = fromRoute;
         this.toRoute = toRoute;
         bestCase = minWaitTime;
