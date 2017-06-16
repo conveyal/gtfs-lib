@@ -37,8 +37,8 @@ $ git clone https://github.com/conveyal/gtfs-lib.git
 $ cd gtfs-lib
 ## build the jar
 $ mvn package
-## run the validation suite on a GTFS file and save the result to result.json
-$ java -jar -validate target/gtfs-lib-shaded.jar /path/to/gtfs.zip /path/to/result.json
+## run the validation suite on a GTFS file and save the result to result.json - change the version number to match file name in /target
+$ java -jar target/gtfs-lib-2.2.0-SNAPSHOT-shaded.jar -validate /path/to/gtfs.zip /path/to/result.json
 ```
 
 ### Validation result
