@@ -62,9 +62,9 @@ import static com.conveyal.gtfs.model.Entity.human;
  * - field contents can be converted to the target data types and are in range
  * - TODO referential integrity
  */
-public class CsvLoader {
+public class JdbcGtfsLoader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(CsvLoader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
     private static final long INSERT_BATCH_SIZE = 500;
 
     protected ZipFile zip;
@@ -77,7 +77,7 @@ public class CsvLoader {
     private final SQLErrorStorage errorStorage;
     private final String tablePrefix;
 
-    public CsvLoader (ZipFile zip, DataSource dataSource) {
+    public JdbcGtfsLoader(ZipFile zip, DataSource dataSource) {
         this.zip = zip;
         this.dataSource = dataSource;
         this.tablePrefix = makeTablePrefix(); // TODO handle case where we don't want any prefix. Method must still run to create feed_info table.
@@ -369,7 +369,7 @@ public class CsvLoader {
      */
     public static void main (String[] args) {
         if (args.length != 2) {
-            LOG.info("usage: gtfs.zip database_URL");
+            LOG.info("usage: JdbcGtfsLoader gtfs.zip database_URL");
             return;
         }
         final String file = args[0];
@@ -378,7 +378,7 @@ public class CsvLoader {
         try {
             // There appears to be no advantage to loading tables in parallel, as this whole process is I/O bound.
             final ZipFile zip = new ZipFile(file);
-            final CsvLoader loader = new CsvLoader(zip, dataSource);
+            final JdbcGtfsLoader loader = new JdbcGtfsLoader(zip, dataSource);
             loader.load(Table.ROUTES);
             loader.load(Table.STOPS);
             loader.load(Table.TRIPS);

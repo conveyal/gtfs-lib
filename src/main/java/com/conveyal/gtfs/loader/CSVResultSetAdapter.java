@@ -12,7 +12,7 @@ import java.util.Map;
  * This makes an incoming row of a CSV file resemble a Result object.
  * All methods are unsupported except the ones that grab a value by column index.
  * This allows us to short-circuit putting the data into an SQL database and just stuff it into maps:
- * new CSVResultSetAdapter(transformedStrings); in CsvLoader.
+ * new CSVResultSetAdapter(transformedStrings); in JdbcGtfsLoader.
  * Things get complicated though, and the benefit might be minor since we then need to handle our own ordering of
  * stop times and indexing etc.
  *

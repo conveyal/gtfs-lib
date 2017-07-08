@@ -1,13 +1,10 @@
 package com.conveyal.gtfs.error;
 
-import com.conveyal.gtfs.loader.CsvLoader;
-import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import javax.xml.crypto.Data;
 import java.sql.*;
 
 /**
