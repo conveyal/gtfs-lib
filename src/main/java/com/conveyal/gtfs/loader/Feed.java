@@ -3,11 +3,16 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.storage.SqlLibrary;
+import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.validator.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
+import javax.xml.crypto.Data;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -18,7 +23,7 @@ public class Feed {
 
     private static final Logger LOG = LoggerFactory.getLogger(Feed.class);
 
-    private final Connection connection;
+    private final DataSource dataSource;
 
     private final String tablePrefix; // including any separator character, may be the empty string.
 
@@ -37,14 +42,14 @@ public class Feed {
      * schema within the database.
      * @param tablePrefix including any separator character, may be null or empty string
      */
-    public Feed (Connection connection, String tablePrefix) {
-        this.connection = connection; // Should probably be a connection source.
+    public Feed (DataSource dataSource, String tablePrefix) {
+        this.dataSource = dataSource;
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
-        routes      = new JDBCTableReader(Table.ROUTES,     connection, tablePrefix, EntityPopulator.ROUTE);
-        stops       = new JDBCTableReader(Table.STOPS,      connection, tablePrefix, EntityPopulator.STOP);
-        trips       = new JDBCTableReader(Table.TRIPS,      connection, tablePrefix, EntityPopulator.TRIP);
-        shapePoints = new JDBCTableReader(Table.SHAPES,     connection, tablePrefix, EntityPopulator.SHAPE_POINT);
-        stopTimes   = new JDBCTableReader(Table.STOP_TIMES, connection, tablePrefix, EntityPopulator.STOP_TIME);
+        routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
+        stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
+        trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
+        shapePoints = new JDBCTableReader(Table.SHAPES, dataSource, tablePrefix, EntityPopulator.SHAPE_POINT);
+        stopTimes = new JDBCTableReader(Table.STOP_TIMES, dataSource, tablePrefix, EntityPopulator.STOP_TIME);
     }
 
     /**
@@ -78,7 +83,7 @@ public class Feed {
 
     public void validate () {
         // Error tables should already be present from the initial load.
-        SQLErrorStorage errorStorage = new SQLErrorStorage(connection, tablePrefix, false);
+        SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
         validate (errorStorage,
             new MisplacedStopValidator(this, errorStorage),
             new DuplicateStopsValidator(this, errorStorage),
@@ -92,21 +97,20 @@ public class Feed {
      * Example main method that validates an already-loaded feed, given its unique prefix (SQL schema name).
      */
     public static void main (String[] params) {
-        if (params.length != 2 || !params[0].equals("validate")) {
-            LOG.info("Usage: main validate <unique_feed_prefix>");
+        if (params.length != 3) {
+            LOG.info("Usage: main validate unique_feed_prefix database_URL");
         }
         String tablePrefix = params[1];
+        String databaseUrl = params[2];
+
         // Ensure separator dot is present
         if (!tablePrefix.endsWith(".")) tablePrefix += ".";
 
-        Connection connection = ConnectionSource.getConnection();
-
-        Feed feed = new Feed(connection, tablePrefix);
-
+        DataSource dataSource = SqlLibrary.createDataSource(databaseUrl);
+        Feed feed = new Feed(dataSource, tablePrefix);
         feed.validate();
-
-        // TODO make this into a unit test
-        if (params.length > 0 && params[0].equalsIgnoreCase("test")) {
+        if (params[0].equalsIgnoreCase("test")) {
+            // TODO make this into a unit test
             LOG.info("Start.");
             double x = 0;
             for (Route route : feed.routes) {
@@ -131,7 +135,6 @@ public class Feed {
                 x += stopTime.shape_dist_traveled;
             }
             LOG.info("Done. {}", x);
-            return;
         }
     }
 

@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import javax.xml.crypto.Data;
 import java.sql.*;
 
 /**
@@ -32,11 +33,15 @@ public class SQLErrorStorage {
 
     private static final long INSERT_BATCH_SIZE = 500;
 
-    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
+    public SQLErrorStorage (DataSource dataSource, String tablePrefix, boolean createTables) {
         // TablePrefix should always be internally generated so doesn't need to be sanitized.
-        this.connection = connection;
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         errorCount = 0;
+        try {
+            this.connection = dataSource.getConnection();
+        } catch (SQLException e) {
+            throw new StorageException(e);
+        }
         if (createTables) createErrorTables();
         else reconnectErrorTables();
         createPreparedStatements();

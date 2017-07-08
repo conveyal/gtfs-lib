@@ -7,6 +7,7 @@ import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.*;
 import java.util.Iterator;
 
@@ -29,13 +30,17 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     EntityPopulator<T> entityPopulator;
     TObjectIntMap<String> columnForName;
 
+    private final DataSource dataSource;
+
     /**
      * @param tablePrefix must not be null, can be empty string, should include any separator character
      */
-    public JDBCTableReader(Table specTable, Connection connection, String tablePrefix, EntityPopulator<T> entityPopulator) {
+    public JDBCTableReader(Table specTable, DataSource dataSource, String tablePrefix, EntityPopulator<T> entityPopulator) {
         String qualifiedTableName = tablePrefix + specTable.name;
+        this.dataSource = dataSource;
         this.entityPopulator = entityPopulator;
         try {
+            Connection connection = dataSource.getConnection();
             String selectAllSql = "select * from " + qualifiedTableName;
             selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
             // Setting fetchSize to something other than zero enables server-side cursor use.
@@ -61,6 +66,7 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
                 selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
                 selectAll.setFetchSize(1000);
             }
+            // FIXME Note that the connection is being left open here, with attached prepared statements!
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }

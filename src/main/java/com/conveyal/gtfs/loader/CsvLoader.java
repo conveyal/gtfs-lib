@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.storage.SqlLibrary;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import org.apache.commons.dbutils.DbUtils;
@@ -12,6 +13,7 @@ import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.io.*;
 import java.nio.charset.Charset;
 import java.sql.*;
@@ -71,14 +73,15 @@ public class CsvLoader {
     private PrintStream tempTextFileStream;
     private PreparedStatement insertStatement = null;
 
+    private final DataSource dataSource;
     private final SQLErrorStorage errorStorage;
-
     private final String tablePrefix;
 
-    public CsvLoader (ZipFile zip) {
+    public CsvLoader (ZipFile zip, DataSource dataSource) {
         this.zip = zip;
+        this.dataSource = dataSource;
         this.tablePrefix = makeTablePrefix(); // TODO handle case where we don't want any prefix. Method must still run to create feed_info table.
-        this.errorStorage = new SQLErrorStorage(ConnectionSource.getConnection(), tablePrefix, true);
+        this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
     }
 
     private String makeTablePrefix () {
@@ -102,8 +105,9 @@ public class CsvLoader {
         // feed_id and feed_version based schema names get messy. We'll just use random unique IDs for now.
         // FIXME do this in a loop just in case there's an ID collision.
         // We don't want to use an auto-increment primary key because as table names these need to be alphabetical.
-        Connection connection = ConnectionSource.getConnection();
+        Connection connection = null;
         try {
+            connection = dataSource.getConnection();
             Statement statement = connection.createStatement();
             // FIXME do this only on databases that support schemas.
             // SQLite does not support them. Is there any advantage of schemas over flat tables?
@@ -193,7 +197,7 @@ public class CsvLoader {
             return;
         }
         LOG.info("Loading GTFS table {}", table.name);
-        Connection connection = ConnectionSource.getConnection();
+        Connection connection = dataSource.getConnection();
         // Use the Postgres text load format if we're connected to that DBMS.
         boolean postgresText = (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL"));
 
@@ -358,21 +362,23 @@ public class CsvLoader {
     /**
      * This is a command line main method that loads the given GTFS feed into a database.
      *
+     * Here are some sample database URLs
+     * H2_FILE_URL = "jdbc:h2:file:~/test-db"; // H2 memory does not seem faster than file
+     * SQLITE_FILE_URL = "jdbc:sqlite:/Users/abyrd/test-db";
+     * POSTGRES_LOCAL_URL = "jdbc:postgresql://localhost/catalogue";
      */
     public static void main (String[] args) {
-        if (args.length < 1) {
-            LOG.info("usage: command fileToLoad.gtfs.zip [feedId] [feedVersion]");
+        if (args.length != 2) {
+            LOG.info("usage: gtfs.zip database_URL");
             return;
         }
         final String file = args[0];
-        String feedIdHint = null;
-        String feedVersionHint = null;
-        if (args.length > 1) feedIdHint = args[1];
-        if (args.length > 2) feedVersionHint = args[2];
+        final String databaseUrl = args[1];
+        DataSource dataSource = SqlLibrary.createDataSource(databaseUrl);
         try {
             // There appears to be no advantage to loading tables in parallel, as this whole process is I/O bound.
             final ZipFile zip = new ZipFile(file);
-            final CsvLoader loader = new CsvLoader(zip);
+            final CsvLoader loader = new CsvLoader(zip, dataSource);
             loader.load(Table.ROUTES);
             loader.load(Table.STOPS);
             loader.load(Table.TRIPS);

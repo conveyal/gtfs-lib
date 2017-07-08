@@ -1,5 +1,12 @@
 package com.conveyal.gtfs.storage;
 
+import org.apache.commons.dbcp2.ConnectionFactory;
+import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
+import org.apache.commons.dbcp2.PoolableConnectionFactory;
+import org.apache.commons.dbcp2.PoolingDataSource;
+import org.apache.commons.pool2.impl.GenericObjectPool;
+
+import javax.sql.DataSource;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.HashMap;
@@ -69,6 +76,32 @@ public class SqlLibrary {
             throw new StorageException(ex);
         }
         return preparedStatements;
+    }
+
+
+    /**
+     * This will provide JDBC connections to components that need to execute SQL on the database server.
+     * The JDBC in Java 7 and 8 support connection pooling.
+     * "The key point with connection pooling is to avoid creating new connections where possible,
+     * since it's usually an expensive operation. Reusing connections is critical for performance."
+     * The JDBC DataSource is probably more appropriate than our custom connectionSource.
+     * "Creating a new connection for each user can be time consuming (often requiring multiple seconds of clock time), in order to perform a database transaction that might take milliseconds."
+     * http://commons.apache.org/proper/commons-dbcp/
+     * There is a Tomcat DBCP which is a fork/repackage of Commons DBCP. It's not clear if they're substantially different.
+     */
+    public static DataSource createDataSource (String url) {
+        // Connection factory will correctly handle null username and password
+        ConnectionFactory connectionFactory =
+                new DriverManagerConnectionFactory(url, null, null);
+        PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory, null);
+        GenericObjectPool connectionPool = new GenericObjectPool(poolableConnectionFactory);
+        poolableConnectionFactory.setPool(connectionPool);
+        // Fetches are super-slow with auto-commit turned on. Apparently it interferes with result cursors.
+        // We also want auto-commit switched off for bulk inserts.
+        poolableConnectionFactory.setDefaultAutoCommit(false);
+        return new PoolingDataSource(connectionPool);
+//        connection.setReadOnly();
+//        connection.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT); // will this help? https://stackoverflow.com/a/18300252
     }
 
 }
