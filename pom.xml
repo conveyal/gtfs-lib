@@ -264,6 +264,11 @@
     	<version>2.4</version>
     </dependency>
     <dependency>
+      <groupId>commons-dbutils</groupId>
+      <artifactId>commons-dbutils</artifactId>
+      <version>1.6</version>
+    </dependency>
+    <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-api</artifactId>
       <version>${geotools.version}</version>
@@ -318,6 +323,12 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
       <version>3.0</version>
+    </dependency>
+    <!-- Database connection pooling, implements interfaces in JDBC -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-dbcp2</artifactId>
+      <version>2.1.1</version>
     </dependency>
   </dependencies>
 </project>

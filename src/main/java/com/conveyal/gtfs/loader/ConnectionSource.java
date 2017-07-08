@@ -1,15 +1,30 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.storage.StorageException;
+import org.apache.commons.dbcp2.ConnectionFactory;
+import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
+import org.apache.commons.dbcp2.PoolableConnectionFactory;
+import org.apache.commons.dbcp2.PoolingDataSource;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
+import javax.xml.crypto.Data;
 import java.sql.*;
 
 /**
  * This will provide JDBC connections to components that need to execute SQL on the database server.
- * We need to be able to generate or re-generate multiple connections to the same server.
- * Created by abyrd on 2017-04-06
+ * The JDBC in Java 7 and 8 support connection pooling.
+ * "The key point with connection pooling is to avoid creating new connections where possible,
+ * since it's usually an expensive operation. Reusing connections is critical for performance."
+ * The JDBC DataSource is probably more appropriate than our custom connectionSource.
+ * "Creating a new connection for each user can be time consuming (often requiring multiple seconds of clock time), in order to perform a database transaction that might take milliseconds."
+ * http://commons.apache.org/proper/commons-dbcp/
+ *
+ * There is a Tomcat DBCP which is a fork/repackage of Commons DBCP. It's not clear if they're substantially different.
+ *
+ * TODO allow configuring this with an arbitrary URL
  */
 public class ConnectionSource {
 
@@ -21,53 +36,35 @@ public class ConnectionSource {
 
     String url;
 
-    /**
-     * @param url the JDBC connection URL. (could add schema here too but it's not standard)
-     */
-    public ConnectionSource (String url) {
-        this.url = url;
-    }
+    private static DataSource dataSource = null;
 
-    /**
-     * @param schema the unique identifier of the GTFS feed version that you want to access.
-     *               This will be prefixed on the GTFS table names. If null, uses the public schema.
-     */
-    public Connection getConnection (String schema) {
-        // JODBC drivers should auto-register these days. You used to have to trick the class loader into loading them.
-        try {
-            Connection connection = DriverManager.getConnection(url);
-            if (schema != null) {
-                Statement statement = connection.createStatement();
-                String sql = String.format("create schema if not exists %s", sanitizeSchemaName(schema));
-                LOG.info(sql);
-                statement.execute(sql);
-                // We could also just prefix the table names with the feedVersionId and a dot, but this is a bit cleaner.
-                connection.setSchema(schema);
-            }
+    private static DataSource getDataSource () {
+        if (dataSource == null) {
+            LOG.info("Setting up database connection pool.");
+            // Connection factory will correctly handle null username and password
+            ConnectionFactory connectionFactory =
+                    new DriverManagerConnectionFactory(POSTGRES_LOCAL_URL, null, null);
+            PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory, null);
+            GenericObjectPool connectionPool = new GenericObjectPool(poolableConnectionFactory);
+            poolableConnectionFactory.setPool(connectionPool);
             // Fetches are super-slow with auto-commit turned on. Apparently it interferes with result cursors.
             // We also want auto-commit switched off for bulk inserts.
-            connection.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT);
-            connection.setAutoCommit(false);
-            return connection;
-        } catch (SQLException ex) {
-            throw new StorageException(ex);
+            poolableConnectionFactory.setDefaultAutoCommit(false);
+            dataSource = new PoolingDataSource(connectionPool);
         }
+        return dataSource;
     }
 
-    /**
-     * Protect against SQL injection.
-     * The only place we include arbitrary input in SQL is the column names of tables.
-     * Implicitly (looking at all existing table names) these should consist entirely of
-     * lowercase letters and underscores.
-     *
-     * TODO add a test including SQL injection text (quote and semicolon)
-     */
-    public String sanitizeSchemaName (String string) throws SQLException {
-        String clean = string.replaceAll("[^\\p{Alnum}_-]", "");
-        if (!clean.equals(string)) {
-            throw new StorageException("Schema name contains forbidden characters.");
+    public static Connection getConnection () {
+
+//        connection.setReadOnly();
+//        connection.setHoldability(ResultSet.CLOSE_CURSORS_AT_COMMIT); // will this help? https://stackoverflow.com/a/18300252
+
+        try {
+            return getDataSource().getConnection();
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-        return clean;
     }
 
 }

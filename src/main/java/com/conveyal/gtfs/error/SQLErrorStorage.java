@@ -1,10 +1,12 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.loader.CsvLoader;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.*;
 
 /**
@@ -16,7 +18,7 @@ public class SQLErrorStorage {
 
     private static final Logger LOG = LoggerFactory.getLogger(SQLErrorStorage.class);
 
-    private Connection connection;
+    private Connection connection; // FIXME should we really be holding on to a single connection from a pool? Pooling prepared statements.
 
     private int errorCount; // This serves as a unique ID, so it must persist across multiple validator runs.
 
@@ -24,10 +26,16 @@ public class SQLErrorStorage {
     private PreparedStatement insertRef;
     private PreparedStatement insertInfo;
 
+    // A string to prepend to all table names. This is a unique identifier for the particular feed that is being loaded.
+    // Should include any dot or other separator. May also be the empty string if you want no prefix added.
+    private String tablePrefix;
+
     private static final long INSERT_BATCH_SIZE = 500;
 
-    public SQLErrorStorage (Connection connection, boolean createTables) {
+    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
+        // TablePrefix should always be internally generated so doesn't need to be sanitized.
         this.connection = connection;
+        this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         errorCount = 0;
         if (createTables) createErrorTables();
         else reconnectErrorTables();
@@ -85,14 +93,15 @@ public class SQLErrorStorage {
     private void createErrorTables() {
         try {
             Statement statement = connection.createStatement();
-            // Order in which tables are dropped matters because of foreign keys.
-            statement.execute("drop table if exists error_info");
-            statement.execute("drop table if exists error_refs");
-            statement.execute("drop table if exists errors");
-            statement.execute("create table errors (error_id integer primary key, type varchar, problems varchar)");
-            statement.execute("create table error_refs (error_id integer, entity_type varchar, line_number integer, entity_id varchar, sequence_number integer)");
-            statement.execute("create table error_info (error_id integer, key varchar, value varchar)");
+            // If tables are dropped, order matters because of foreign keys.
+            statement.execute(String.format("create table %serrors (error_id integer primary key, " +
+                    "type varchar, problems varchar)", tablePrefix));
+            statement.execute(String.format("create table %serror_refs (error_id integer, entity_type varchar, " +
+                    "line_number integer, entity_id varchar, sequence_number integer)", tablePrefix));
+            statement.execute(String.format("create table %serror_info (error_id integer, key varchar, value varchar)",
+                    tablePrefix));
             connection.commit();
+            // Keep connection open, closing nulls the wrapped connection and allows it to be reused in the pool.
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
@@ -100,9 +109,12 @@ public class SQLErrorStorage {
 
     private void createPreparedStatements () {
         try {
-            insertError = connection.prepareStatement("insert into errors values (?, ?, ?)");
-            insertRef =   connection.prepareStatement("insert into error_refs values (?, ?, ?, ?, ?)");
-            insertInfo =  connection.prepareStatement("insert into error_info values (?, ?, ?)");
+            insertError = connection.prepareStatement(
+                    String.format("insert into %serrors values (?, ?, ?)", tablePrefix));
+            insertRef = connection.prepareStatement(
+                    String.format("insert into %serror_refs values (?, ?, ?, ?, ?)", tablePrefix));
+            insertInfo = connection.prepareStatement(
+                    String.format("insert into %serror_info values (?, ?, ?)", tablePrefix));
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
@@ -111,7 +123,7 @@ public class SQLErrorStorage {
     private void reconnectErrorTables () {
         try {
             Statement statement = connection.createStatement();
-            statement.execute("select max(error_id) from errors");
+            statement.execute(String.format("select max(error_id) from %serrors", tablePrefix));
             ResultSet resultSet = statement.getResultSet();
             resultSet.next();
             errorCount = resultSet.getInt(1);

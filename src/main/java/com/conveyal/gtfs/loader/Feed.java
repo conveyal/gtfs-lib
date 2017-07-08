@@ -12,15 +12,15 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * This connects to an SQL RDBMS containing GTFS data and lets you fetch things out of it.
- *
- * Created by abyrd on 2017-04-04
+ * This connects to an SQL RDBMS containing GTFS data and lets you fetch elements out of it.
  */
 public class Feed {
 
     private static final Logger LOG = LoggerFactory.getLogger(Feed.class);
 
     private final Connection connection;
+
+    private final String tablePrefix; // including any separator character, may be the empty string.
 
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
@@ -35,14 +35,16 @@ public class Feed {
     /**
      * Create a feed that reads tables over a JDBC connection. The connection should already be set to the right
      * schema within the database.
+     * @param tablePrefix including any separator character, may be null or empty string
      */
-    public Feed (Connection connection) {
+    public Feed (Connection connection, String tablePrefix) {
         this.connection = connection; // Should probably be a connection source.
-        routes      = new JDBCTableReader(Table.ROUTES,     connection, EntityPopulator.ROUTE);
-        stops       = new JDBCTableReader(Table.STOPS,      connection, EntityPopulator.STOP);
-        trips       = new JDBCTableReader(Table.TRIPS,      connection, EntityPopulator.TRIP);
-        shapePoints = new JDBCTableReader(Table.SHAPES,     connection, EntityPopulator.SHAPE_POINT);
-        stopTimes   = new JDBCTableReader(Table.STOP_TIMES, connection, EntityPopulator.STOP_TIME);
+        this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
+        routes      = new JDBCTableReader(Table.ROUTES,     connection, tablePrefix, EntityPopulator.ROUTE);
+        stops       = new JDBCTableReader(Table.STOPS,      connection, tablePrefix, EntityPopulator.STOP);
+        trips       = new JDBCTableReader(Table.TRIPS,      connection, tablePrefix, EntityPopulator.TRIP);
+        shapePoints = new JDBCTableReader(Table.SHAPES,     connection, tablePrefix, EntityPopulator.SHAPE_POINT);
+        stopTimes   = new JDBCTableReader(Table.STOP_TIMES, connection, tablePrefix, EntityPopulator.STOP_TIME);
     }
 
     /**
@@ -52,43 +54,6 @@ public class Feed {
      */
     public Feed loadOrUseCached (String gtfsFilePath) {
         return null;
-    }
-
-    public static void main (String[] params) {
-        ConnectionSource connectionSource = new ConnectionSource(ConnectionSource.POSTGRES_LOCAL_URL);
-        Connection connection = connectionSource.getConnection(null);
-        Feed feed = new Feed(connection);
-
-        feed.validate();
-
-        // TODO make this into a unit test
-        if (params.length > 0 && params[0].equalsIgnoreCase("test")) {
-            LOG.info("Start.");
-            double x = 0;
-            for (Route route : feed.routes) {
-                x += route.route_type;
-            }
-            LOG.info("Done. {}", x);
-            for (Stop stop : feed.stops) {
-                x += stop.stop_lat;
-            }
-            LOG.info("Done. {}", x);
-            for (Trip trip : feed.trips) {
-                x += trip.direction_id;
-            }
-            LOG.info("Done. {}", x);
-    //        for (ShapePoint shapePoint : feed.shapePoints) {
-    //            x += shapePoint.shape_dist_traveled;
-    //        }
-    //        LOG.info("Done. {}", x);
-            // It takes about 25 seconds to iterate over all stop times,
-            // as opposed to 83 seconds to iterate over all stop times in order for each trip.
-            for (StopTime stopTime : feed.stopTimes) {
-                x += stopTime.shape_dist_traveled;
-            }
-            LOG.info("Done. {}", x);
-            return;
-        }
     }
 
     private void validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
@@ -113,7 +78,7 @@ public class Feed {
 
     public void validate () {
         // Error tables should already be present from the initial load.
-        SQLErrorStorage errorStorage = new SQLErrorStorage(connection, false);
+        SQLErrorStorage errorStorage = new SQLErrorStorage(connection, tablePrefix, false);
         validate (errorStorage,
             new MisplacedStopValidator(this, errorStorage),
             new DuplicateStopsValidator(this, errorStorage),
@@ -122,5 +87,53 @@ public class Feed {
             new NamesValidator(this, errorStorage)
         );
     }
+
+    /**
+     * Example main method that validates an already-loaded feed, given its unique prefix (SQL schema name).
+     */
+    public static void main (String[] params) {
+        if (params.length != 2 || !params[0].equals("validate")) {
+            LOG.info("Usage: main validate <unique_feed_prefix>");
+        }
+        String tablePrefix = params[1];
+        // Ensure separator dot is present
+        if (!tablePrefix.endsWith(".")) tablePrefix += ".";
+
+        Connection connection = ConnectionSource.getConnection();
+
+        Feed feed = new Feed(connection, tablePrefix);
+
+        feed.validate();
+
+        // TODO make this into a unit test
+        if (params.length > 0 && params[0].equalsIgnoreCase("test")) {
+            LOG.info("Start.");
+            double x = 0;
+            for (Route route : feed.routes) {
+                x += route.route_type;
+            }
+            LOG.info("Done. {}", x);
+            for (Stop stop : feed.stops) {
+                x += stop.stop_lat;
+            }
+            LOG.info("Done. {}", x);
+            for (Trip trip : feed.trips) {
+                x += trip.direction_id;
+            }
+            LOG.info("Done. {}", x);
+            //        for (ShapePoint shapePoint : feed.shapePoints) {
+            //            x += shapePoint.shape_dist_traveled;
+            //        }
+            //        LOG.info("Done. {}", x);
+            // It takes about 25 seconds to iterate over all stop times,
+            // as opposed to 83 seconds to iterate over all stop times in order for each trip.
+            for (StopTime stopTime : feed.stopTimes) {
+                x += stopTime.shape_dist_traveled;
+            }
+            LOG.info("Done. {}", x);
+            return;
+        }
+    }
+
 
 }

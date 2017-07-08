@@ -4,7 +4,9 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
+import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.io.input.BOMInputStream;
+import org.apache.commons.math3.random.MersenneTwister;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
@@ -63,25 +65,96 @@ public class CsvLoader {
     private static final Logger LOG = LoggerFactory.getLogger(CsvLoader.class);
     private static final long INSERT_BATCH_SIZE = 500;
 
-    protected Connection connection;
-    protected CsvReader csvReader;
     protected ZipFile zip;
 
     private File tempTextFile;
     private PrintStream tempTextFileStream;
     private PreparedStatement insertStatement = null;
-    private ConnectionSource connectionSource = new ConnectionSource(ConnectionSource.POSTGRES_LOCAL_URL);
 
-    private SQLErrorStorage errorStorage;
+    private final SQLErrorStorage errorStorage;
+
+    private final String tablePrefix;
 
     public CsvLoader (ZipFile zip) {
         this.zip = zip;
-        this.connection = connectionSource.getConnection(null);
-        this.errorStorage = new SQLErrorStorage(connection, true);
+        this.tablePrefix = makeTablePrefix(); // TODO handle case where we don't want any prefix. Method must still run to create feed_info table.
+        this.errorStorage = new SQLErrorStorage(ConnectionSource.getConnection(), tablePrefix, true);
     }
 
-    public void load (Table table) throws Exception {
-        final String tableFileName = table.name + ".txt";
+    private String makeTablePrefix () {
+        // First inspect feed_info.txt to extract some information.
+        CsvReader csvReader = getCsvReader("feed_info.txt");
+        String feedId = "", feedVersion = "";
+        if (csvReader != null) {
+            // feed_info.txt has been found and opened.
+            try {
+                csvReader.readRecord();
+                // csvReader.get() returns the empty string for missing columns
+                feedId = csvReader.get("feed_id");
+                feedVersion = csvReader.get("feed_version");
+            } catch (IOException e) {
+                LOG.error("Exception while inspecting feed_info: {}", e);
+            }
+            csvReader.close();
+        }
+        // Now create a row for this feed
+        String tablePrefix = randomIdString();
+        // feed_id and feed_version based schema names get messy. We'll just use random unique IDs for now.
+        // FIXME do this in a loop just in case there's an ID collision.
+        // We don't want to use an auto-increment primary key because as table names these need to be alphabetical.
+        Connection connection = ConnectionSource.getConnection();
+        try {
+            Statement statement = connection.createStatement();
+            // FIXME do this only on databases that support schemas.
+            // SQLite does not support them. Is there any advantage of schemas over flat tables?
+            statement.execute("create schema " + tablePrefix);
+            // TODO load more stuff from feed_info and essentially flatten all feed_infos from all loaded feeds into one table
+            // This should include date range etc. Can we reuse any code from Table for this?
+            // This makes sense since the file should only have one line.
+            // current_timestamp seems to be the only standard way to get the current time across all common databases.
+            statement.execute("create table if not exists feed_info (namespace varchar primary key, " +
+                    "feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp)");
+            PreparedStatement insertStatement = connection.prepareStatement(
+                    "insert into feed_info values (?, ?, ?, ?, current_timestamp)");
+            insertStatement.setString(1, tablePrefix);
+            insertStatement.setString(2, feedId); // TODO set null when missing
+            insertStatement.setString(3, feedVersion); // TODO set null when missing
+            insertStatement.setString(4, zip.getName());
+            insertStatement.execute();
+            connection.commit();
+            // Close all statements, results, and prepared statements, returning the connection to the pool.
+            connection.close();
+            LOG.info("Created new feed namespace: {}", insertStatement);
+            tablePrefix += ".";
+        } catch (SQLException e) {
+            LOG.error("Exception while creating unique prefix for new feed: {}", e.getMessage());
+        } finally {
+            DbUtils.closeQuietly(connection);
+        }
+        return tablePrefix;
+    }
+
+    /**
+     * Generate a random unique prefix of N lowercase letters.
+     * (we can't count on sql table or schema names being case sensitive)
+     */
+    private String randomIdString() {
+        MersenneTwister twister = new MersenneTwister();
+        final int length = 10;
+        char[] chars = new char[length];
+        for (int i = 0; i < length; i++) {
+            chars[i] = (char) ('a' + twister.nextInt(26));
+        }
+        return new String(chars);
+    }
+
+    /**
+     * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
+     * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
+     * It records an error if the entry is in a subdirectory.
+     * It then creates a CSV reader for that table if it's found.
+     */
+    private CsvReader getCsvReader (String tableFileName) {
         ZipEntry entry = zip.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.
@@ -95,26 +168,37 @@ public class CsvLoader {
                 }
             }
         }
-        if (entry == null) {
-            // This GTFS table did not exist in the zip, even in a subdirectory.
+        if (entry == null) return null;
+        try {
+            InputStream zipInputStream = zip.getInputStream(entry);
+            // Skip any byte order mark that may be present. Files must be UTF-8,
+            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
+            InputStream bomInputStream = new BOMInputStream(zipInputStream);
+            CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
+            csvReader.readHeaders();
+            return csvReader;
+        } catch (IOException e) {
+            LOG.error("Exception while opening zip entry: {}", e);
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public void load (Table table) throws Exception {
+        final String tableFileName = table.name + ".txt";
+        CsvReader csvReader = getCsvReader(tableFileName);
+        if (csvReader == null) {
+            // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(new NewGTFSError(MISSING_TABLE, tableFileName));
             return;
         }
-
+        LOG.info("Loading GTFS table {}", table.name);
+        Connection connection = ConnectionSource.getConnection();
         // Use the Postgres text load format if we're connected to that DBMS.
-        boolean postgresText = (connection instanceof BaseConnection);
-
-        LOG.info("Loading GTFS table {} from {}", table.name, entry);
-        InputStream zipInputStream = zip.getInputStream(entry);
-        // Skip any byte order mark that may be present. Files must be UTF-8,
-        // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
-        InputStream bomInputStream = new BOMInputStream(zipInputStream);
-        csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
-        csvReader.readHeaders();
+        boolean postgresText = (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL"));
 
         // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
-
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
         Field[] fields = new Field[csvReader.getHeaderCount()];
         Set<String> fieldsSeen = new HashSet<>();
@@ -133,12 +217,12 @@ public class CsvLoader {
 
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
         // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
-        Table targetTable = new Table(table.name, table.entityClass, table.isRequired(), fields);
+        Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.isRequired(), fields);
 
         // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
         // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.
         // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
-        connection = connectionSource.getConnection(null);//"nl");
+        // We'll just literally prepend feed indentifiers to table names when supplied.
 
         // Some databases require the table to exist before a statement can be prepared.
         targetTable.createSqlTable(connection);
@@ -217,9 +301,10 @@ public class CsvLoader {
             LOG.info("Loading into database table from temporary text file...");
             tempTextFileStream.close();
             // Allows sending over network. This is only slightly slower than a local file copy.
-            final String copySql = String.format("copy %s from stdin", table.name);
+            final String copySql = String.format("copy %s from stdin", targetTable.name);
             InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
-            CopyManager copyManager = new CopyManager((BaseConnection) connection);
+            // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
+            CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
             copyManager.copyIn(copySql, stream, 1024*1024);
             stream.close();
             // It is also possible to load from local file if this code is running on the database server.
@@ -236,8 +321,8 @@ public class CsvLoader {
         // TODO create primary key and fall back on plain index (consider not null & unique constraints)
         // TODO use line number as primary key
         // Note: SQLITE requires specifying a name for indexes.
-        String indexName = String.join("_", table.name, "idx");
-        String indexSql = String.format("create index %s on %s (%s)", indexName, table.name, indexColumns);
+        String indexName = String.join("_", targetTable.name.replace(".", "_"), "idx");
+        String indexSql = String.format("create index %s on %s (%s)", indexName, targetTable.name, indexColumns);
         //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
         LOG.info(indexSql);
         connection.createStatement().execute(indexSql);
@@ -245,6 +330,7 @@ public class CsvLoader {
 
         LOG.info("Committing transaction...");
         connection.commit();
+        connection.close();
         errorStorage.finish();
         LOG.info("Done.");
     }
@@ -258,19 +344,34 @@ public class CsvLoader {
      * TODO add a test including SQL injection text (quote and semicolon)
      */
     public String sanitize (String string) throws SQLException {
-        String clean = string.replaceAll("[^\\p{Alnum}_-]", "");
-        if (!clean.equals(string)) errorStorage.storeError(new NewGTFSError(TABLE_NAME_FORMAT, string));
+        String clean = string.replaceAll("[^\\p{Alnum}_]", "");
+        if (!clean.equals(string)) {
+            LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);
+            if (errorStorage != null) {
+                errorStorage.storeError(new NewGTFSError(TABLE_NAME_FORMAT, string));
+            }
+        }
         return clean;
     }
 
-    public static void main (String[] args) {
 
-        final String pdx_file = "/Users/abyrd/r5/pdx/portland-2016-08-22.gtfs.zip";
-        final String nl_file = "/Users/abyrd/geodata/nl/NL-OPENOV-20170322-gtfs.zip";
-        final String etang_file = "/Users/abyrd/r5/mamp-old/ETANG.GTFS.zip";
+    /**
+     * This is a command line main method that loads the given GTFS feed into a database.
+     *
+     */
+    public static void main (String[] args) {
+        if (args.length < 1) {
+            LOG.info("usage: command fileToLoad.gtfs.zip [feedId] [feedVersion]");
+            return;
+        }
+        final String file = args[0];
+        String feedIdHint = null;
+        String feedVersionHint = null;
+        if (args.length > 1) feedIdHint = args[1];
+        if (args.length > 2) feedVersionHint = args[2];
         try {
-            // There appears to be no advantage to loading these in parallel, as this whole process is I/O bound.
-            final ZipFile zip = new ZipFile(etang_file);
+            // There appears to be no advantage to loading tables in parallel, as this whole process is I/O bound.
+            final ZipFile zip = new ZipFile(file);
             final CsvLoader loader = new CsvLoader(zip);
             loader.load(Table.ROUTES);
             loader.load(Table.STOPS);

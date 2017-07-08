@@ -29,11 +29,14 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     EntityPopulator<T> entityPopulator;
     TObjectIntMap<String> columnForName;
 
-    public JDBCTableReader(Table specTable, Connection connection, EntityPopulator<T> entityPopulator) {
-        String tableName = specTable.name;
+    /**
+     * @param tablePrefix must not be null, can be empty string, should include any separator character
+     */
+    public JDBCTableReader(Table specTable, Connection connection, String tablePrefix, EntityPopulator<T> entityPopulator) {
+        String qualifiedTableName = tablePrefix + specTable.name;
         this.entityPopulator = entityPopulator;
         try {
-            String selectAllSql = "select * from " + tableName;
+            String selectAllSql = "select * from " + qualifiedTableName;
             selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
             // Setting fetchSize to something other than zero enables server-side cursor use.
             // This will only be effective if autoCommit=false though. Otherwise it fills up the memory with all rows.
@@ -47,14 +50,14 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
             columnForName = new TObjectIntHashMap<>(nColumns);
             for (int c = 1; c <= nColumns; c++) columnForName.put(metaData.getColumnName(c), c);
             String idField = specTable.getKeyFieldName();
-            String selectOneSql = String.format("select * from %s where %s = ?", tableName, idField);
+            String selectOneSql = String.format("select * from %s where %s = ?", qualifiedTableName, idField);
             String orderByField = specTable.getOrderFieldName();
             if (orderByField != null) selectOneSql += " order by " + orderByField;
             select = connection.prepareStatement(selectOneSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
             select.setFetchSize(0); // Do not use cursor
             // Redefine select all to be ordered TODO pull this into a separate statement
             if (orderByField != null) {
-                selectAllSql = String.format("select * from %s order by %s, %s", tableName, idField, orderByField);
+                selectAllSql = String.format("select * from %s order by %s, %s", qualifiedTableName, idField, orderByField);
                 selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
                 selectAll.setFetchSize(1000);
             }

@@ -41,6 +41,13 @@ public class SqlLibrary {
         }
     }
 
+    /**
+     * Read a bunch of SQL scripts out of a file on the classpath.
+     * Each script begins with a comment (line beginning with two dashes).
+     * The first whitespace-delimited token in that comment is the identifier of the script.
+     * @param scriptName the resource to load on the classpath
+     * @return a map from Strings to prepared statements for scripts
+     */
     public Map<String, PreparedStatement> loadStatements (String scriptName) {
         Map<String, PreparedStatement> preparedStatements = new HashMap<>();
         try {

@@ -14,7 +14,7 @@ import static com.conveyal.gtfs.model.Entity.INT_MISSING;
  *
  * We could also have entity cursors with accessor functions that move along the results, and only look at
  * the fields we need. We could even select only the required fields from the backend database but that gets
- * messy. Anectodal evidence suggests this would give about a 1/3 speedup. But other observations show no speedup at all.
+ * messy. Anecdotal evidence suggests this would give about a 1/3 speedup. But other observations show no speedup at all.
  * The main benefit would be grabbing arbitrary extension columns.
  *
  * TODO associate EntityPopulator more closely with Entity types and Table instances, so you can get one from the other.
@@ -98,6 +98,13 @@ public interface EntityPopulator<T> {
         stopTime.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
         return stopTime;
     };
+
+    // The reason we're passing in the columnForName map is that resultSet.getX(columnName) throws an exception
+    // when the column is not present.
+    // Exceptions should only be used in exceptional circumstances (ones that should be logged as errors).
+    // Conceivably we could iterate over the fields present using ResultSetMetaData and set the object fields only
+    // for those fields present. Or we could create cursor objects that allow accessing the fields of the ResultSet
+    // in a typed way. Those cursor objects would make their own columnForName map when constructed.
 
     public static String getStringIfPresent (ResultSet resultSet, String columnName,
                                              TObjectIntMap<String> columnForName) throws SQLException {

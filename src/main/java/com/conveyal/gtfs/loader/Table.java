@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,7 +32,25 @@ public class Table {
     final boolean required;
 
     final Field[] fields;
-
+/*
+-- FeedInfo table is pulled outside per-feed schema.
+-- Supply feed_id hint from outside.
+-- CreateFeedsTable
+create table feed_info (
+    pkey number -- for schemaname
+    -- required fields
+    feed_publisher_name varchar,
+    feed_publisher_url varchar,
+    feed_lang varchar,
+    -- optional fields
+    feed_start_date date,
+    feed_end_date date,
+    feed_version varchar
+    -- extension fields
+    feed_id varchar,
+    filename varchar,
+)
+ */
     public static final Table ROUTES = new Table("routes", Route.class, true,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL),
@@ -107,11 +126,13 @@ public class Table {
      */
     public void createSqlTable (Connection connection) {
         String fieldDeclarations = Arrays.stream(fields).map(Field::getSqlDeclaration).collect(Collectors.joining(", "));
-        // Adding the unlogged keyword gives about 12 percent speedup, but is non-standard.
+        String dropSql = String.format("drop table if exists %s", name);
+        // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
         String createSql = String.format("create table %s (csv_line integer, %s)", name, fieldDeclarations);
         try {
             Statement statement = connection.createStatement();
-            statement.execute("drop table if exists " + this.name);
+            statement.execute(dropSql);
+            LOG.info(dropSql);
             statement.execute(createSql);
             LOG.info(createSql);
         } catch (Exception ex) {
