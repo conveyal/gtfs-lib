@@ -125,6 +125,7 @@ public class JdbcGtfsLoader {
             insertStatement.setString(3, feedVersion); // TODO set null when missing
             insertStatement.setString(4, zip.getName());
             insertStatement.execute();
+            // TODO add feed checksum to this table
             connection.commit();
             // Close all statements, results, and prepared statements, returning the connection to the pool.
             connection.close();

@@ -22,6 +22,8 @@ import static com.conveyal.gtfs.model.Entity.INT_MISSING;
  *
  * TODO maybe instantiate EntityCreators with a columnForName map to avoid passing them around and make them implement Iterable<T>
  * Could even initialize with the resultSet and call it a Factory
+ *
+ * This might also be useable with Commons DBUtils as a result row processor.
  */
 public interface EntityPopulator<T> {
 

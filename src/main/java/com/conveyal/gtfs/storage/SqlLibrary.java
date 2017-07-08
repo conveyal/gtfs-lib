@@ -88,6 +88,11 @@ public class SqlLibrary {
      * "Creating a new connection for each user can be time consuming (often requiring multiple seconds of clock time), in order to perform a database transaction that might take milliseconds."
      * http://commons.apache.org/proper/commons-dbcp/
      * There is a Tomcat DBCP which is a fork/repackage of Commons DBCP. It's not clear if they're substantially different.
+     *
+     * Here are some sample database URLs
+     * H2_FILE_URL = "jdbc:h2:file:~/test-db"; // H2 memory does not seem faster than file
+     * SQLITE_FILE_URL = "jdbc:sqlite:/Users/abyrd/test-db";
+     * POSTGRES_LOCAL_URL = "jdbc:postgresql://localhost/catalogue";
      */
     public static DataSource createDataSource (String url) {
         // Connection factory will correctly handle null username and password
