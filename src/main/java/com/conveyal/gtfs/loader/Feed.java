@@ -40,10 +40,12 @@ public class Feed {
     /**
      * Create a feed that reads tables over a JDBC connection. The connection should already be set to the right
      * schema within the database.
-     * @param tablePrefix including any separator character, may be null or empty string
+     * @param tablePrefix the unique prefix for the table (may be null for no prefix)
      */
     public Feed (DataSource dataSource, String tablePrefix) {
         this.dataSource = dataSource;
+        // Ensure separator dot is present
+        if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
@@ -81,8 +83,12 @@ public class Feed {
         LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
     }
 
+    /**
+     * TODO check whether validation has already occurred, overwrite results.
+     */
     public void validate () {
         // Error tables should already be present from the initial load.
+        // Reconnect to the existing error tables.
         SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
         validate (errorStorage,
             new MisplacedStopValidator(this, errorStorage),
@@ -92,6 +98,5 @@ public class Feed {
             new NamesValidator(this, errorStorage)
         );
     }
-
 
 }

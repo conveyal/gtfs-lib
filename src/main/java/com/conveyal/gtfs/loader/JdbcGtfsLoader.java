@@ -5,6 +5,9 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.SqlLibrary;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
+import com.google.common.hash.HashCode;
+import com.google.common.hash.Hashing;
+import com.google.common.io.Files;
 import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.math3.random.MersenneTwister;
@@ -67,6 +70,7 @@ public class JdbcGtfsLoader {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
     private static final long INSERT_BATCH_SIZE = 500;
 
+    private String gtfsFilePath;
     protected ZipFile zip;
 
     private File tempTextFile;
@@ -74,15 +78,58 @@ public class JdbcGtfsLoader {
     private PreparedStatement insertStatement = null;
 
     private final DataSource dataSource;
-    private final SQLErrorStorage errorStorage;
-    private final String tablePrefix;
+    private SQLErrorStorage errorStorage;
+    private String tablePrefix;
 
-    public JdbcGtfsLoader(ZipFile zip, DataSource dataSource) {
-        this.zip = zip;
+    public JdbcGtfsLoader(String gtfsFilePath, DataSource dataSource) {
+        this.gtfsFilePath = gtfsFilePath;
         this.dataSource = dataSource;
-        this.tablePrefix = makeTablePrefix(); // TODO handle case where we don't want any prefix. Method must still run to create feed_info table.
-        this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
     }
+
+
+    // Hash to uniquely identify files.
+    // We can't use CRC32, the probability of collision on 10k items is about 1%.
+    // https://stackoverflow.com/a/1867252
+    // http://preshing.com/20110504/hash-collision-probabilities/
+    // On the full NL feed:
+    // MD5 took 820 msec,    cabb18e43798f92c52d5d0e49f52c988
+    // Murmur took 317 msec, 5e5968f9bf5e1cdf711f6f48fcd94355
+    // SHA1 took 1072 msec,  9fb356af4be2750f20955203787ec6f95d32ef22
+
+    // There appears to be no advantage to loading tables in parallel, as the whole loading process is I/O bound.
+    public String loadTables () {
+        try {
+            File gtfsFile = new File(gtfsFilePath);
+
+            long startTime = System.currentTimeMillis();
+            HashCode md5 = Files.hash(gtfsFile, Hashing.md5());
+            String md5Hex = md5.toString();
+            LOG.info("MD5 took {} msec, {}", System.currentTimeMillis() - startTime, md5Hex);
+
+            startTime = System.currentTimeMillis();
+            HashCode sha1 = Files.hash(gtfsFile, Hashing.sha1());
+            String shaHex = sha1.toString();
+            LOG.info("SHA1 took {} msec, {}", System.currentTimeMillis() - startTime, shaHex);
+
+            this.zip = new ZipFile(gtfsFilePath);
+            this.tablePrefix = makeTablePrefix(); // TODO handle case where we don't want any prefix. Method must still run to create feed_info table.
+            this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
+
+            load(Table.ROUTES);
+            load(Table.STOPS);
+            load(Table.TRIPS);
+            load(Table.SHAPES);
+            load(Table.STOP_TIMES);
+            zip.close();
+        } catch (Exception ex) {
+            LOG.error("Exception while loading GTFS file: {}", ex.toString());
+            ex.printStackTrace();
+            return null;
+        }
+        return tablePrefix;
+    }
+
+
 
     private String makeTablePrefix () {
         // First inspect feed_info.txt to extract some information.
@@ -189,7 +236,7 @@ public class JdbcGtfsLoader {
         }
     }
 
-    public void load (Table table) throws Exception {
+    private void load (Table table) throws Exception {
         final String tableFileName = table.name + ".txt";
         CsvReader csvReader = getCsvReader(tableFileName);
         if (csvReader == null) {
@@ -357,40 +404,6 @@ public class JdbcGtfsLoader {
             }
         }
         return clean;
-    }
-
-
-    /**
-     * This is a command line main method that loads the given GTFS feed into a database.
-     *
-     * Here are some sample database URLs
-     * H2_FILE_URL = "jdbc:h2:file:~/test-db"; // H2 memory does not seem faster than file
-     * SQLITE_FILE_URL = "jdbc:sqlite:/Users/abyrd/test-db";
-     * POSTGRES_LOCAL_URL = "jdbc:postgresql://localhost/catalogue";
-     */
-    public static void main (String[] args) {
-        if (args.length != 2) {
-            LOG.info("usage: JdbcGtfsLoader gtfs.zip database_URL");
-            return;
-        }
-        final String file = args[0];
-        final String databaseUrl = args[1];
-        DataSource dataSource = SqlLibrary.createDataSource(databaseUrl);
-        try {
-            // There appears to be no advantage to loading tables in parallel, as this whole process is I/O bound.
-            final ZipFile zip = new ZipFile(file);
-            final JdbcGtfsLoader loader = new JdbcGtfsLoader(zip, dataSource);
-            loader.load(Table.ROUTES);
-            loader.load(Table.STOPS);
-            loader.load(Table.TRIPS);
-            loader.load(Table.SHAPES);
-            loader.load(Table.STOP_TIMES);
-            zip.close();
-        } catch (Exception ex) {
-            LOG.error("Error loading GTFS: {}", ex.getMessage());
-            throw new RuntimeException(ex);
-        }
-
     }
 
 }

@@ -11,6 +11,7 @@ import java.sql.*;
  * This is an abstraction for something that stores GTFS loading and validation errors one by one.
  * Currently there's only one implementation, which uses SQL tables.
  * We used to store the errors in plain old Lists, and could make an alternative implementation to do so.
+ * We may need to in order to output JSON reports.
  */
 public class SQLErrorStorage {
 
@@ -130,6 +131,7 @@ public class SQLErrorStorage {
             resultSet.next();
             errorCount = resultSet.getInt(1);
             LOG.info("Reconnected to errors table, max error ID is {}.", errorCount);
+            errorCount += 1; // Error count is zero based, add one to avoid duplicate error key
         } catch (SQLException ex) {
             throw new StorageException("Could not connect to errors table.");
         }
