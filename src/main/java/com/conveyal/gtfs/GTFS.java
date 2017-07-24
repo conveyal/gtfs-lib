@@ -51,7 +51,7 @@ public abstract class GTFS {
 
 
     /**
-     * Create an automatically managed pool of database connections to the supplied JDBC URL.
+     * Create an automatically managed pool of database connections to the supplied JDBC database URL.
      *
      * Creating new database connections is usually an expensive operation,
      * taking up to seconds to prepare for a transaction that only lasts milliseconds.
