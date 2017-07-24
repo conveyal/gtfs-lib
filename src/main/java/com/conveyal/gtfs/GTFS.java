@@ -96,6 +96,7 @@ public abstract class GTFS {
             cmd = new DefaultParser().parse(options, args);
         } catch (ParseException e) {
             LOG.error("Error parsing command line: " + e.getMessage());
+            printHelp(options);
             return;
         }
 
@@ -106,6 +107,13 @@ public abstract class GTFS {
 
         if (!cmd.getArgList().isEmpty()) {
             LOG.error("Extraneous arguments present: {}", cmd.getArgs());
+            printHelp(options);
+            return;
+        }
+
+        if (!(cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
+            LOG.error("Must specify one of 'load', 'validate', or 'graphql'.");
+            printHelp(options);
             return;
         }
 
