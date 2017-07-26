@@ -3,16 +3,11 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
-import com.conveyal.gtfs.storage.SqlLibrary;
-import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.validator.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import javax.xml.crypto.Data;
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +22,7 @@ public class Feed {
 
     private final String tablePrefix; // including any separator character, may be the empty string.
 
+//    public final TableReader<Agency> agencies;
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
     public final TableReader<Trip>  trips;
@@ -47,6 +43,7 @@ public class Feed {
         // Ensure separator dot is present
         if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
+//        agencies = new JDBCTableReader(Table.AG, dataSource, tablePrefix, EntityPopulator.ROUTE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
@@ -97,6 +94,15 @@ public class Feed {
             new NewTripTimesValidator(this, errorStorage),
             new NamesValidator(this, errorStorage)
         );
+    }
+
+    public void close () {
+        LOG.info("Closing feed connections for {}", tablePrefix);
+        routes.close();
+        stops.close();
+        trips.close();
+        shapePoints.close();
+        stopTimes.close();
     }
 
 }

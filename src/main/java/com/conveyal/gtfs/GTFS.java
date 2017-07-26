@@ -47,6 +47,7 @@ public abstract class GTFS {
     public static void validate (String feedId, DataSource dataSource) {
         Feed feed = new Feed(dataSource, feedId);
         feed.validate();
+        feed.close();
     }
 
 

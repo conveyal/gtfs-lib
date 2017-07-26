@@ -31,6 +31,8 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     TObjectIntMap<String> columnForName;
 
     private final DataSource dataSource;
+    private String tablePrefix;
+    private Connection connection;
 
     /**
      * @param tablePrefix must not be null, can be empty string, should include any separator character
@@ -38,9 +40,11 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     public JDBCTableReader(Table specTable, DataSource dataSource, String tablePrefix, EntityPopulator<T> entityPopulator) {
         String qualifiedTableName = tablePrefix + specTable.name;
         this.dataSource = dataSource;
+        this.tablePrefix = tablePrefix;
         this.entityPopulator = entityPopulator;
         try {
-            Connection connection = dataSource.getConnection();
+            connection = this.dataSource.getConnection();
+            LOG.info("Connected to {}", tablePrefix);
             String selectAllSql = "select * from " + qualifiedTableName;
             selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
             // Setting fetchSize to something other than zero enables server-side cursor use.
@@ -71,6 +75,15 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
             throw new StorageException(ex);
         }
 
+    }
+
+    public void close () {
+        try {
+            connection.close();
+            LOG.info("Disconnected from table for {}", tablePrefix);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
     @Override

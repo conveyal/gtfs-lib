@@ -17,4 +17,6 @@ public interface TableReader <T extends Entity> extends Iterable<T> {
 
     public Iterable<T> getOrdered (String id);
 
+    public void close ();
+
 }
