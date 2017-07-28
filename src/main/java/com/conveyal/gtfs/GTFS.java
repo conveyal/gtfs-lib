@@ -72,6 +72,8 @@ public abstract class GTFS {
         ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, username, password);
         PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory, null);
         GenericObjectPool connectionPool = new GenericObjectPool(poolableConnectionFactory);
+        // TODO: set other options on connectionPool?
+        connectionPool.setMaxTotal(300);
         poolableConnectionFactory.setPool(connectionPool);
         // We also want auto-commit switched off for bulk inserts, and also because fetches are super-slow with
         // auto-commit turned on. Apparently it interferes with result cursors.

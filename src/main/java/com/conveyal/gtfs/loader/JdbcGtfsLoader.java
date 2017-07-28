@@ -120,6 +120,7 @@ public class JdbcGtfsLoader {
             load(Table.TRIPS);
             load(Table.SHAPES);
             load(Table.STOP_TIMES);
+            errorStorage.commitAndClose();
             zip.close();
             LOG.info("Loading tables took {} sec", (System.currentTimeMillis() - startTime) / 1000);
         } catch (Exception ex) {
@@ -402,7 +403,6 @@ public class JdbcGtfsLoader {
         LOG.info("Committing transaction...");
         connection.commit();
         connection.close();
-        errorStorage.finish();
         LOG.info("Done.");
     }
 

@@ -74,7 +74,7 @@ public class Feed {
                 e.printStackTrace();
             }
         }
-        errorStorage.finish();
+        errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
         LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);

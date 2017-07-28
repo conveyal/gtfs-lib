@@ -81,13 +81,20 @@ public class SQLErrorStorage {
         return errorCount;
     }
 
-    public void finish() {
+    /**
+     * This commits any remaining inserts, commits the transaction, and closes the connection permanently.
+     * commitAndClose() should only be called when access to SQLErrorStorage is no longer needed.
+     */
+    public void commitAndClose() {
         try {
             // Execute any remaining batch inserts and commit the transaction.
             insertError.executeBatch();
             insertRef.executeBatch();
             insertInfo.executeBatch();
             connection.commit();
+
+            // Close the connection permanently (should be called only after errorStorage instance no longer needed).
+            connection.close();
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
