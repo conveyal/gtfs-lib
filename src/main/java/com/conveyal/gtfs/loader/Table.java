@@ -51,6 +51,17 @@ create table feed_info (
     filename varchar,
 )
  */
+    public static final Table AGENCIES = new Table("agency", Agency.class, true,
+            new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
+            new StringField("agency_name",  REQUIRED),
+            new URLField("agency_url",  REQUIRED),
+            new StringField("agency_timezone",  REQUIRED), // FIXME new type?
+            new StringField("agency_lang", OPTIONAL), // FIXME new type?
+            new StringField("agency_phone",  OPTIONAL),
+            new URLField("agency_fare_url",  OPTIONAL),
+            new StringField("agency_email",  OPTIONAL) // FIXME new type?
+    );
+
     public static final Table ROUTES = new Table("routes", Route.class, true,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL),

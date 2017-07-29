@@ -22,7 +22,8 @@ public class Feed {
 
     private final String tablePrefix; // including any separator character, may be the empty string.
 
-//    public final TableReader<Agency> agencies;
+    public final TableReader<Agency> agencies;
+//    public final TableReader<Fare> fares;
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
     public final TableReader<Trip>  trips;
@@ -43,7 +44,8 @@ public class Feed {
         // Ensure separator dot is present
         if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
-//        agencies = new JDBCTableReader(Table.AG, dataSource, tablePrefix, EntityPopulator.ROUTE);
+        agencies = new JDBCTableReader(Table.AGENCIES, dataSource, tablePrefix, EntityPopulator.AGENCY);
+//        fares = new JDBCTableReader(Table.FARES, dataSource, tablePrefix, EntityPopulator.FARE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);

@@ -115,6 +115,8 @@ public class JdbcGtfsLoader {
             this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
 
             startTime = System.currentTimeMillis();
+            // FIXME: load remaining tables
+            load(Table.AGENCIES);
             load(Table.ROUTES);
             load(Table.STOPS);
             load(Table.TRIPS);

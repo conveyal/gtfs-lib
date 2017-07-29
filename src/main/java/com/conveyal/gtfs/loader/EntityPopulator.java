@@ -23,11 +23,26 @@ import static com.conveyal.gtfs.model.Entity.INT_MISSING;
  * TODO maybe instantiate EntityCreators with a columnForName map to avoid passing them around and make them implement Iterable<T>
  * Could even initialize with the resultSet and call it a Factory
  *
+ * // FIXME URLs?
+ *
  * This might also be useable with Commons DBUtils as a result row processor.
  */
 public interface EntityPopulator<T> {
 
     public T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
+
+    public static final EntityPopulator<Agency> AGENCY = (result, columnForName) -> {
+        Agency agency = new Agency();
+        agency.agency_id       = getStringIfPresent(result, "agency_id", columnForName);
+        agency.agency_name     = getStringIfPresent(result, "agency_name", columnForName);
+        agency.agency_url      = null;
+        agency.agency_timezone = getStringIfPresent(result, "agency_timezone", columnForName);
+        agency.agency_lang     = getStringIfPresent(result, "agency_lang", columnForName);
+        agency.agency_phone    = getStringIfPresent(result, "agency_phone", columnForName);
+        agency.agency_fare_url = null;
+        agency.agency_email    = getStringIfPresent(result, "agency_email", columnForName);
+        return agency;
+    };
 
     public static final EntityPopulator<Route> ROUTE = (result, columnForName) -> {
         Route route = new Route();
