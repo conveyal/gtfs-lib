@@ -32,6 +32,7 @@ public class NewTripTimesValidator extends FeedValidator {
     // Caching stops and trips gives a massive speed improvement by avoiding database calls. TODO add caching to the table reader class.
     Map<String, Stop> stopById = new HashMap<>();
     Map<String, Trip> tripById = new HashMap<>();
+    Map<String, Route> routeById = new HashMap<>();
 
     // As an optimization, these validators are fed the stoptimes for each trip to avoid repeated iteration and grouping.
     private final TripValidator[] tripValidators;
@@ -49,9 +50,10 @@ public class NewTripTimesValidator extends FeedValidator {
     @Override
     public void validate () {
         // TODO cache automatically in feed or table object
-        LOG.info("Cacheing stops and trips...");
+        LOG.info("Cacheing stops, trips, and routes...");
         for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
         for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
+        for (Route route: feed.routes) routeById.put(route.route_id, route);
         LOG.info("Done.");
         // Accumulate StopTimes with the same trip_id into a list, then process each trip separately.
         List<StopTime> stopTimesForTrip = new ArrayList<>();
@@ -154,7 +156,7 @@ public class NewTripTimesValidator extends FeedValidator {
         // TODO check characteristics of timepoints
         // All bad references should have been recorded at import, we can just ignore nulls.
         Route route = null;
-        if (trip != null) route = feed.routes.get(trip.route_id);
+        if (trip != null) route = routeById.get(trip.route_id);
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
     }
