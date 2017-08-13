@@ -25,10 +25,10 @@ public class DateField extends Field {
         if (year < 2000 || year > 2100) {
             throw new StorageException("Date year out of range 2000-2100: " + year);
         }
-        if (month < 1 || year > 12) {
+        if (month < 1 || month > 12) {
             throw new StorageException("Date month out of range 1-12: " + month);
         }
-        if (day < 1 || year > 31) {
+        if (day < 1 || day > 31) {
             throw new StorageException("Date day out of range 1-31: " + day);
         }
         return Integer.parseInt(string);
