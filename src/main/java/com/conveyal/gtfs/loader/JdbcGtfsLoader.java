@@ -376,6 +376,7 @@ public class JdbcGtfsLoader {
             tempTextFileStream.close();
             // Allows sending over network. This is only slightly slower than a local file copy.
             final String copySql = String.format("copy %s from stdin", targetTable.name);
+            // FIXME we should be reading the COPY text from a stream in parallel, not from a temporary text file.
             InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
             // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
             CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));

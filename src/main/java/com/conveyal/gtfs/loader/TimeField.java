@@ -31,6 +31,9 @@ public class TimeField extends Field {
     }
 
     private static int getSeconds (String hhmmss) {
+        if (hhmmss.length() != 8) {
+            throw new StorageException("Time field should be 8 characters long.");
+        }
         String[] fields = hhmmss.split(":");
         int h = Integer.parseInt(fields[0]);
         int m = Integer.parseInt(fields[1]);

@@ -1,7 +1,9 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
+import com.sun.org.apache.regexp.internal.RE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,14 +54,77 @@ create table feed_info (
 )
  */
     public static final Table AGENCIES = new Table("agency", Agency.class, true,
-            new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
-            new StringField("agency_name",  REQUIRED),
-            new URLField("agency_url",  REQUIRED),
-            new StringField("agency_timezone",  REQUIRED), // FIXME new type?
-            new StringField("agency_lang", OPTIONAL), // FIXME new type?
-            new StringField("agency_phone",  OPTIONAL),
-            new URLField("agency_fare_url",  OPTIONAL),
-            new StringField("agency_email",  OPTIONAL) // FIXME new type?
+        new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
+        new StringField("agency_name",  REQUIRED),
+        new URLField("agency_url",  REQUIRED),
+        new StringField("agency_timezone",  REQUIRED), // FIXME new field type for time zones?
+        new StringField("agency_lang", OPTIONAL), // FIXME new field type for languages?
+        new StringField("agency_phone",  OPTIONAL),
+        new URLField("agency_fare_url",  OPTIONAL),
+        new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
+    );
+
+    // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
+    public static final Table CALENDAR = new Table("calendar", Calendar.class, false,
+        new StringField("service_id",  REQUIRED),
+        new BooleanField("monday", REQUIRED),
+        new BooleanField("tuesday", REQUIRED),
+        new BooleanField("wednesday", REQUIRED),
+        new BooleanField("thursday", REQUIRED),
+        new BooleanField("friday", REQUIRED),
+        new BooleanField("saturday", REQUIRED),
+        new BooleanField("sunday", REQUIRED),
+        new DateField("start_date", REQUIRED), // FIXME New field type for dates? Split string and check each part.
+        new DateField("end_date", REQUIRED)
+    );
+
+    public static final Table CALENDAR_DATES = new Table("calendar_dates", Calendar.class, false,
+        new StringField("service_id", REQUIRED),
+        new IntegerField("date", REQUIRED),
+        new IntegerField("exception_type", REQUIRED, 1, 2)
+    );
+
+    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", Calendar.class, true,
+        new StringField("fare_id", REQUIRED),
+        new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
+        new CurrencyField("currency_type", REQUIRED),
+        new ShortField("payment_method", REQUIRED, 1),
+        new ShortField("transfers", REQUIRED, 2),
+        new IntegerField("transfer_duration", OPTIONAL)
+    );
+
+
+    public static final Table FARE_RULES = new Table("fare_rules", Calendar.class, true,
+        new StringField("fare_id", REQUIRED),
+        new StringField("route_id", OPTIONAL),
+        new StringField("origin_id", OPTIONAL),
+        new StringField("destination_id", OPTIONAL),
+        new StringField("contains_id", OPTIONAL)
+    );
+
+    public static final Table FEED_INFO = new Table("feed_info", Calendar.class, true,
+        new StringField("feed_publisher_name", REQUIRED),
+        new StringField("feed_publisher_url", REQUIRED),
+        new LanguageField("feed_lang", REQUIRED),
+        new DateField("feed_start_date", OPTIONAL),
+        new DateField("feed_end_date", OPTIONAL),
+        new IntegerField("feed_version", OPTIONAL)
+
+    );
+
+    public static final Table FREQUENCIES = new Table("frequencies", Calendar.class, true,
+        new StringField("trip_id", REQUIRED),
+        new TimeField("start_time", REQUIRED),
+        new TimeField("end_time", REQUIRED),
+        new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
+        new IntegerField("exact_times", OPTIONAL, 1)
+    );
+
+    public static final Table TRANSFERS = new Table("transfers", Calendar.class, true,
+        new StringField("from_stop_id", REQUIRED),
+        new StringField("to_stop_id", REQUIRED),
+        new StringField("transfer_type", REQUIRED),
+        new StringField("min_transfer_time", OPTIONAL)
     );
 
     public static final Table ROUTES = new Table("routes", Route.class, true,
