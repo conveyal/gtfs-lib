@@ -31,7 +31,7 @@ public class Table {
 
     final Class<? extends Entity> entityClass;
 
-    final boolean required;
+    final Requirement required;
 
     final Field[] fields;
 /*
@@ -53,7 +53,7 @@ create table feed_info (
     filename varchar,
 )
  */
-    public static final Table AGENCIES = new Table("agency", Agency.class, true,
+    public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
         new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
         new StringField("agency_name",  REQUIRED),
         new URLField("agency_url",  REQUIRED),
@@ -65,7 +65,7 @@ create table feed_info (
     );
 
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
-    public static final Table CALENDAR = new Table("calendar", Calendar.class, false,
+    public static final Table CALENDAR = new Table("calendar", Calendar.class, OPTIONAL,
         new StringField("service_id",  REQUIRED),
         new BooleanField("monday", REQUIRED),
         new BooleanField("tuesday", REQUIRED),
@@ -78,13 +78,13 @@ create table feed_info (
         new DateField("end_date", REQUIRED)
     );
 
-    public static final Table CALENDAR_DATES = new Table("calendar_dates", Calendar.class, false,
+    public static final Table CALENDAR_DATES = new Table("calendar_dates", Calendar.class, OPTIONAL,
         new StringField("service_id", REQUIRED),
         new IntegerField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
     );
 
-    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", Calendar.class, true,
+    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", Calendar.class, REQUIRED,
         new StringField("fare_id", REQUIRED),
         new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
         new CurrencyField("currency_type", REQUIRED),
@@ -94,7 +94,7 @@ create table feed_info (
     );
 
 
-    public static final Table FARE_RULES = new Table("fare_rules", Calendar.class, true,
+    public static final Table FARE_RULES = new Table("fare_rules", Calendar.class, REQUIRED,
         new StringField("fare_id", REQUIRED),
         new StringField("route_id", OPTIONAL),
         new StringField("origin_id", OPTIONAL),
@@ -102,17 +102,17 @@ create table feed_info (
         new StringField("contains_id", OPTIONAL)
     );
 
-    public static final Table FEED_INFO = new Table("feed_info", Calendar.class, true,
+    public static final Table FEED_INFO = new Table("feed_info", Calendar.class, REQUIRED,
         new StringField("feed_publisher_name", REQUIRED),
         new StringField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
-        new IntegerField("feed_version", OPTIONAL)
+        new StringField("feed_version", OPTIONAL)
 
     );
 
-    public static final Table FREQUENCIES = new Table("frequencies", Calendar.class, true,
+    public static final Table FREQUENCIES = new Table("frequencies", Calendar.class, REQUIRED,
         new StringField("trip_id", REQUIRED),
         new TimeField("start_time", REQUIRED),
         new TimeField("end_time", REQUIRED),
@@ -120,14 +120,7 @@ create table feed_info (
         new IntegerField("exact_times", OPTIONAL, 1)
     );
 
-    public static final Table TRANSFERS = new Table("transfers", Calendar.class, true,
-        new StringField("from_stop_id", REQUIRED),
-        new StringField("to_stop_id", REQUIRED),
-        new StringField("transfer_type", REQUIRED),
-        new StringField("min_transfer_time", OPTIONAL)
-    );
-
-    public static final Table ROUTES = new Table("routes", Route.class, true,
+    public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
@@ -139,7 +132,15 @@ create table feed_info (
         new ColorField("route_text_color",  OPTIONAL)
     );
 
-    public static final Table STOPS = new Table("stops", Stop.class, true,
+    public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
+            new StringField("shape_id", REQUIRED),
+            new IntegerField("shape_pt_sequence", REQUIRED),
+            new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
+            new DoubleField("shape_pt_lon", REQUIRED, -180, 180),
+            new DoubleField("shape_dist_traveled", REQUIRED, 0, Double.POSITIVE_INFINITY)
+    );
+
+    public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
         new StringField("stop_name",  REQUIRED),
@@ -154,7 +155,28 @@ create table feed_info (
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
     );
 
-    public static final Table TRIPS = new Table("trips", Trip.class, true,
+    public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
+            new StringField("trip_id", REQUIRED),
+            new IntegerField("stop_sequence", REQUIRED),
+            new StringField("stop_id", REQUIRED),
+            new TimeField("arrival_time", REQUIRED),
+            new TimeField("departure_time", REQUIRED),
+            new StringField("stop_headsign", OPTIONAL),
+            new ShortField("pickup_type", OPTIONAL, 2),
+            new ShortField("drop_off_type", OPTIONAL, 2),
+            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY),
+            new ShortField("timepoint", OPTIONAL, 1),
+            new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
+    );
+
+    public static final Table TRANSFERS = new Table("transfers", Calendar.class, OPTIONAL,
+            new StringField("from_stop_id", REQUIRED),
+            new StringField("to_stop_id", REQUIRED),
+            new StringField("transfer_type", REQUIRED),
+            new StringField("min_transfer_time", OPTIONAL)
+    );
+
+    public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
         new StringField("route_id",  REQUIRED),
         new StringField("service_id",  REQUIRED),
@@ -167,29 +189,7 @@ create table feed_info (
         new ShortField("bikes_allowed", OPTIONAL, 2)
     );
 
-    public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, true,
-        new StringField("trip_id", REQUIRED),
-        new IntegerField("stop_sequence", REQUIRED),
-        new StringField("stop_id", REQUIRED),
-        new TimeField("arrival_time", REQUIRED),
-        new TimeField("departure_time", REQUIRED),
-        new StringField("stop_headsign", OPTIONAL),
-        new ShortField("pickup_type", OPTIONAL, 2),
-        new ShortField("drop_off_type", OPTIONAL, 2),
-        new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY),
-        new ShortField("timepoint", OPTIONAL, 1),
-        new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
-    );
-
-    public static final Table SHAPES = new Table("shapes", ShapePoint.class, false,
-        new StringField("shape_id", REQUIRED),
-        new IntegerField("shape_pt_sequence", REQUIRED),
-        new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
-        new DoubleField("shape_pt_lon", REQUIRED, -180, 180),
-        new DoubleField("shape_dist_traveled", REQUIRED, 0, Double.POSITIVE_INFINITY)
-    );
-
-    public Table (String name, Class<? extends Entity> entityClass, boolean required, Field... fields) {
+    public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         this.name = name;
         this.entityClass = entityClass;
         this.required = required;
@@ -259,7 +259,7 @@ create table feed_info (
     }
 
     public boolean isRequired () {
-        return required;
+        return required == REQUIRED;
     }
 
 }

@@ -115,13 +115,19 @@ public class JdbcGtfsLoader {
             this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
 
             startTime = System.currentTimeMillis();
-            // FIXME: load remaining tables
-            load(Table.AGENCIES);
+            load(Table.AGENCY);
+            load(Table.CALENDAR);
+            load(Table.CALENDAR_DATES);
+            load(Table.FARE_ATTRIBUTES);
+            load(Table.FARE_RULES);
+            load(Table.FEED_INFO);
+            load(Table.FREQUENCIES);
             load(Table.ROUTES);
-            load(Table.STOPS);
-            load(Table.TRIPS);
             load(Table.SHAPES);
+            load(Table.STOPS);
             load(Table.STOP_TIMES);
+            load(Table.TRANSFERS);
+            load(Table.TRIPS);
             errorStorage.commitAndClose();
             zip.close();
             LOG.info("Loading tables took {} sec", (System.currentTimeMillis() - startTime) / 1000);
@@ -291,7 +297,7 @@ public class JdbcGtfsLoader {
 
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
         // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
-        Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.isRequired(), fields);
+        Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.required, fields);
 
         // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
         // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.

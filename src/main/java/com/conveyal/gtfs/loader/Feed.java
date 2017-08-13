@@ -44,7 +44,7 @@ public class Feed {
         // Ensure separator dot is present
         if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
-        agencies = new JDBCTableReader(Table.AGENCIES, dataSource, tablePrefix, EntityPopulator.AGENCY);
+        agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
 //        fares = new JDBCTableReader(Table.FARES, dataSource, tablePrefix, EntityPopulator.FARE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
