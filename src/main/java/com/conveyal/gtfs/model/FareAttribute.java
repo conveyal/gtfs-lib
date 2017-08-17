@@ -10,6 +10,7 @@ import java.util.Map;
 public class FareAttribute extends Entity {
 
     private static final long serialVersionUID = 2157859372072056891L;
+    public static final int UNLIMITED_TRANSFERS = 3;
     public String fare_id;
     public double price;
     public String currency_type;
@@ -46,7 +47,7 @@ public class FareAttribute extends Entity {
                 fa.price = getDoubleField("price", true, 0, Integer.MAX_VALUE);
                 fa.currency_type = getStringField("currency_type", true);
                 fa.payment_method = getIntField("payment_method", true, 0, 1);
-                fa.transfers = getIntField("transfers", false, 0, 10, 3); // missing means "unlimited" in this case (rather than 0), supply default value 3 to mean unlimited
+                fa.transfers = getIntField("transfers", false, 0, 10, UNLIMITED_TRANSFERS); // missing means "unlimited" in this case (rather than 0), supply default value 3 to mean unlimited
                 fa.transfer_duration = getIntField("transfer_duration", false, 0, 24 * 60 * 60);
                 fa.feed = feed;
                 fa.feed_id = feed.feedId;
