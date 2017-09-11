@@ -60,13 +60,13 @@ public class Table {
         new DateField("end_date", REQUIRED)
     );
 
-    public static final Table CALENDAR_DATES = new Table("calendar_dates", Calendar.class, OPTIONAL,
+    public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
         new StringField("service_id", REQUIRED),
         new IntegerField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
     );
 
-    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", Calendar.class, REQUIRED,
+    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", FareAttribute.class, REQUIRED,
         new StringField("fare_id", REQUIRED),
         new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
         new CurrencyField("currency_type", REQUIRED),
@@ -76,7 +76,7 @@ public class Table {
     );
 
 
-    public static final Table FARE_RULES = new Table("fare_rules", Calendar.class, REQUIRED,
+    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, REQUIRED,
         new StringField("fare_id", REQUIRED),
         new StringField("route_id", OPTIONAL),
         new StringField("origin_id", OPTIONAL),
@@ -84,7 +84,7 @@ public class Table {
         new StringField("contains_id", OPTIONAL)
     );
 
-    public static final Table FEED_INFO = new Table("feed_info", Calendar.class, REQUIRED,
+    public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, REQUIRED,
         new StringField("feed_publisher_name", REQUIRED),
         new StringField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
@@ -94,7 +94,7 @@ public class Table {
 
     );
 
-    public static final Table FREQUENCIES = new Table("frequencies", Calendar.class, OPTIONAL,
+    public static final Table FREQUENCIES = new Table("frequencies", Frequency.class, OPTIONAL,
         new StringField("trip_id", REQUIRED),
         new TimeField("start_time", REQUIRED),
         new TimeField("end_time", REQUIRED),
@@ -151,7 +151,7 @@ public class Table {
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     );
 
-    public static final Table TRANSFERS = new Table("transfers", Calendar.class, OPTIONAL,
+    public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
             new StringField("from_stop_id", REQUIRED),
             new StringField("to_stop_id", REQUIRED),
             new StringField("transfer_type", REQUIRED),
