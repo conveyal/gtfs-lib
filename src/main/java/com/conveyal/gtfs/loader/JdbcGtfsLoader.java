@@ -99,22 +99,19 @@ public class JdbcGtfsLoader {
     public String loadTables () {
         try {
             File gtfsFile = new File(gtfsFilePath);
-
-            long startTime = System.currentTimeMillis();
-            HashCode md5 = Files.hash(gtfsFile, Hashing.md5());
-            String md5Hex = md5.toString();
-            LOG.info("MD5 took {} msec, {}", System.currentTimeMillis() - startTime, md5Hex);
-
-            startTime = System.currentTimeMillis();
-            HashCode sha1 = Files.hash(gtfsFile, Hashing.sha1());
-            String shaHex = sha1.toString();
-            LOG.info("SHA1 took {} msec, {}", System.currentTimeMillis() - startTime, shaHex);
-
             this.zip = new ZipFile(gtfsFilePath);
-            this.tablePrefix = makeTablePrefix(); // TODO handle case where we don't want any prefix. Method must still run to create feed_info table.
+            // Generate a unique prefix that will identify this feed.
+            // Prefixes ("schema" names) based on feed_id and feed_version get very messy, so we use random unique IDs.
+            // We don't want to use an auto-increment numeric primary key because these need to be alphabetical.
+            // FIXME do this in a loop just in case there's an ID collision (though that'll be extremely rare).
+            // TODO handle the case where we don't want any prefix.
+            this.tablePrefix = randomIdString();
+            registerFeed(gtfsFile);
+            // Include the dot separator in the table prefix.
+            // This allows everything to work even when there's no prefix.
+            this.tablePrefix += ".";
             this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
-
-            startTime = System.currentTimeMillis();
+            long startTime = System.currentTimeMillis();
             load(Table.AGENCY);
             load(Table.CALENDAR);
             load(Table.CALENDAR_DATES);
@@ -141,11 +138,21 @@ public class JdbcGtfsLoader {
 
 
     /**
+     * Add a line to the list of loaded feeds showing that this feed has been loaded.
+     * We used to inspect feed_info here so we could make our table prefix based on feed ID and version.
+     * Now we just load feed_info like any other table.
+     *         // Create a row in the table of loaded feeds for this feed
      * Really this is not just making the table prefix - it's loading the feed_info and should also calculate hashes.
+     *
+     * Originally we were flattening all feed_info files into one root-level table, but that forces us to drop any
+     * custom fields in feed_info.
      */
-    private String makeTablePrefix () {
-        // First inspect feed_info.txt to extract some information.
-        CsvReader csvReader = getCsvReader("feed_info.txt");
+    private String registerFeed (File gtfsFile) {
+
+        // FIXME is this extra CSV reader used anymore? Check comment below.
+        // First, inspect feed_info.txt to extract the ID and version.
+        // We could get this with SQL after loading, but feed_info, feed_id and feed_version are all optional.
+        CsvReader csvReader = getCsvReader(Table.FEED_INFO);
         String feedId = "", feedVersion = "";
         if (csvReader != null) {
             // feed_info.txt has been found and opened.
@@ -159,40 +166,43 @@ public class JdbcGtfsLoader {
             }
             csvReader.close();
         }
-        // Now create a row for this feed
-        String tablePrefix = randomIdString();
-        // feed_id and feed_version based schema names get messy. We'll just use random unique IDs for now.
-        // FIXME do this in a loop just in case there's an ID collision.
-        // We don't want to use an auto-increment primary key because as table names these need to be alphabetical.
+
         Connection connection = null;
         try {
+            HashCode md5 = Files.hash(gtfsFile, Hashing.md5());
+            String md5Hex = md5.toString();
+            HashCode sha1 = Files.hash(gtfsFile, Hashing.sha1());
+            String shaHex = sha1.toString();
             connection = dataSource.getConnection();
             Statement statement = connection.createStatement();
-            // FIXME do this only on databases that support schemas.
+            // TODO try to get the feed_id and feed_version out of the feed_info table
+            // statement.execute("select * from feed_info");
+
+            // FIXME do the following only on databases that support schemas.
             // SQLite does not support them. Is there any advantage of schemas over flat tables?
             statement.execute("create schema " + tablePrefix);
             // TODO load more stuff from feed_info and essentially flatten all feed_infos from all loaded feeds into one table
             // This should include date range etc. Can we reuse any code from Table for this?
             // This makes sense since the file should only have one line.
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
-            statement.execute("create table if not exists feed_info (namespace varchar primary key, " +
-                    "feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp)");
+            // Record total load processing time?
+            statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
+                    "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp)");
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feed_info values (?, ?, ?, ?, current_timestamp)");
+                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp)");
             insertStatement.setString(1, tablePrefix);
-            insertStatement.setString(2, feedId); // TODO set null when missing
-            insertStatement.setString(3, feedVersion); // TODO set null when missing
-            insertStatement.setString(4, zip.getName());
+            insertStatement.setString(2, md5Hex);
+            insertStatement.setString(3, shaHex);
+            insertStatement.setString(4, feedId.isEmpty() ? null : feedId);
+            insertStatement.setString(5, feedVersion.isEmpty() ? null : feedVersion);
+            insertStatement.setString(6, zip.getName());
             insertStatement.execute();
-            // TODO add feed checksum to this table
             connection.commit();
-            // Close all statements, results, and prepared statements, returning the connection to the pool.
-            connection.close();
             LOG.info("Created new feed namespace: {}", insertStatement);
-            tablePrefix += ".";
-        } catch (SQLException e) {
-            LOG.error("Exception while creating unique prefix for new feed: {}", e.getMessage());
+        } catch (Exception ex) {
+            LOG.error("Exception while creating unique prefix for new feed: {}", ex.getMessage());
         } finally {
+            // If non-null, close all statements, results, and prepared statements, returning the connection to the pool.
             DbUtils.closeQuietly(connection);
         }
         return tablePrefix;
@@ -215,6 +225,8 @@ public class JdbcGtfsLoader {
      * generating IDs sequentially or with little randomness is that when multiple databases are created we'll have
      * feeds with the same IDs as older or other databases, allowing possible accidental collisions with strange
      * failure modes.
+     *
+     *
      */
     private String randomIdString() {
         MersenneTwister twister = new MersenneTwister();
@@ -234,7 +246,8 @@ public class JdbcGtfsLoader {
      * It records an error if the entry is in a subdirectory.
      * It then creates a CSV reader for that table if it's found.
      */
-    private CsvReader getCsvReader (String tableFileName) {
+    private CsvReader getCsvReader (Table table) {
+        final String tableFileName = table.name + ".txt";
         ZipEntry entry = zip.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.
@@ -243,7 +256,7 @@ public class JdbcGtfsLoader {
                 ZipEntry e = entries.nextElement();
                 if (e.getName().endsWith(tableFileName)) {
                     entry = e;
-                    errorStorage.storeError(new NewGTFSError(TABLE_IN_SUBDIRECTORY, e.getName()));
+                    errorStorage.storeError(NewGTFSError.forTable(table, TABLE_IN_SUBDIRECTORY));
                     break;
                 }
             }
@@ -265,11 +278,10 @@ public class JdbcGtfsLoader {
     }
 
     private void load (Table table) throws Exception {
-        final String tableFileName = table.name + ".txt";
-        CsvReader csvReader = getCsvReader(tableFileName);
+        CsvReader csvReader = getCsvReader(table);
         if (csvReader == null) {
             // This GTFS table could not be opened in the zip, even in a subdirectory.
-            if (table.isRequired()) errorStorage.storeError(new NewGTFSError(MISSING_TABLE, tableFileName));
+            if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
             return;
         }
         LOG.info("Loading GTFS table {}", table.name);
@@ -285,8 +297,7 @@ public class JdbcGtfsLoader {
         for (int h = 0; h < csvReader.getHeaderCount(); h++) {
             String header = sanitize(csvReader.getHeader(h));
             if (fieldsSeen.contains(header)) {
-                String badValues = String.format("file=%s; header=%s", tableFileName, header);
-                errorStorage.storeError(new NewGTFSError(DUPLICATE_HEADER, badValues));
+                errorStorage.storeError(NewGTFSError.forTable(table, DUPLICATE_HEADER).setBadValue(header));
                 // TODO deal with missing (null) Field object below
                 fields[h] = null;
             } else {
@@ -326,14 +337,14 @@ public class JdbcGtfsLoader {
             // The CSV reader's current record is zero-based and does not include the header line.
             // Convert to a CSV file line number that will make more sense to people reading error messages.
             if (csvReader.getCurrentRecord() + 2 > Integer.MAX_VALUE) {
-                errorStorage.storeError(new NewGTFSError(TABLE_TOO_LONG, table.name));
+                errorStorage.storeError(NewGTFSError.forTable(table, TABLE_TOO_LONG));
                 break;
             }
             int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
             if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
             if (csvReader.getColumnCount() != fields.length) {
                 String badValues = String.format("expected=%d; found=%d", fields.length, csvReader.getColumnCount());
-                errorStorage.storeError(new NewGTFSError(WRONG_NUMBER_OF_FIELDS, badValues, table.getEntityClass(), lineNumber));
+                errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, WRONG_NUMBER_OF_FIELDS, badValues));
                 continue;
             }
             // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
@@ -345,7 +356,7 @@ public class JdbcGtfsLoader {
                 if (string.isEmpty()) {
                     // TODO verify that CSV reader always returns empty strings, not nulls
                     if (field.isRequired()) {
-                        errorStorage.storeError(new NewGTFSError(MISSING_FIELD, field.name, table.getEntityClass(), lineNumber));
+                        errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, MISSING_FIELD, field.name));
                     }
                     if (postgresText) transformedStrings[f + 1] = "\\N"; // Represents null in Postgres text format
                     // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
@@ -357,11 +368,11 @@ public class JdbcGtfsLoader {
                     try {
                         // FIXME we need to set the transformed string element even when an error occurs.
                         // This means the validation and insertion step need to happen separately.
+                        // or the errors should not be signaled with exceptions.
                         if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
                         else field.setParameter(insertStatement, f + 2, string);
                     } catch (StorageException ex) {
-                        String badValues = String.format("table=%s, line=%d", table.name, lineNumber);
-                        errorStorage.storeError(new NewGTFSError(ex.errorType, badValues));
+                        errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.getMessage()));
                     }
                 }
             }
@@ -428,7 +439,7 @@ public class JdbcGtfsLoader {
         if (!clean.equals(string)) {
             LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);
             if (errorStorage != null) {
-                errorStorage.storeError(new NewGTFSError(TABLE_NAME_FORMAT, string));
+                errorStorage.storeError(NewGTFSError.forFeed(TABLE_NAME_FORMAT, string));
             }
         }
         return clean;

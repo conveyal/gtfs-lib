@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
@@ -51,7 +52,7 @@ public class SpeedTripValidator extends TripValidator {
                 continue;
             }
             if (currStopTime.departure_time < currStopTime.arrival_time) {
-                registerError(DEPARTURE_BEFORE_ARRIVAL, Integer.toString(currStopTime.departure_time), currStopTime);
+                registerError(currStopTime, DEPARTURE_BEFORE_ARRIVAL);
             }
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
             if (checkDistanceAndTime(distanceMeters, travelTimeSeconds, currStopTime)) {
@@ -62,7 +63,11 @@ public class SpeedTripValidator extends TripValidator {
                     double threshold = (metersPerSecond < MIN_SPEED) ? MIN_SPEED : maxSpeed;
                     String badValue = String.format("distance=%.0f meters; time=%.0f seconds; speed=%.1f m/sec; threshold=%.0f m/sec",
                             distanceMeters, travelTimeSeconds, metersPerSecond, threshold);
-                    registerError(type, badValue, prevStopTime, currStopTime);
+                    registerError(currStopTime, type, metersPerSecond + " m/sec");
+//                            .addInfo("distance", distanceMeters + "meters")
+//                            .addInfo("time", travelTimeSeconds + "seconds")
+//                            .addInfo("speed", metersPerSecond + "m/sec")
+//                            .addInfo("threshold", threshold + "m/sec"));
                 }
             }
             // Reset accumulated distance, we've processed a stop time with arrival or departure time specified.
@@ -80,14 +85,14 @@ public class SpeedTripValidator extends TripValidator {
     private boolean checkDistanceAndTime (double distanceMeters, double travelTimeSeconds, StopTime stopTime) {
         boolean good = true;
         if (distanceMeters == 0) {
-            registerError(TRAVEL_DISTANCE_ZERO, null, stopTime);
+            registerError(stopTime, TRAVEL_DISTANCE_ZERO);
             good = false;
         }
         if (travelTimeSeconds < 0) {
-            registerError(TRAVEL_TIME_NEGATIVE, Double.toString(travelTimeSeconds), stopTime);
+            registerError(stopTime, TRAVEL_TIME_NEGATIVE, travelTimeSeconds);
             good = false;
         } else if (travelTimeSeconds == 0) {
-            registerError(TRAVEL_TIME_ZERO, null, stopTime);
+            registerError(stopTime, TRAVEL_TIME_ZERO);
             good = false;
         }
         return good;

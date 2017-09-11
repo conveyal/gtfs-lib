@@ -46,10 +46,10 @@ public class MisplacedStopValidator extends FeedValidator {
         for (Stop stop : feed.stops) {
             boolean stopInPopulatedArea = populationGrid.getValueForCoords(stop.stop_lon, stop.stop_lat);
             if (!stopInPopulatedArea) {
-                registerError(STOP_LOW_POPULATION_DENSITY, getCoordString(stop), stop);
+                registerError(stop, STOP_LOW_POPULATION_DENSITY, getCoordString(stop));
             }
             if (stop.stop_lat < minlat || stop.stop_lat > maxlat || stop.stop_lon < minLon || stop.stop_lon > maxLon) {
-                registerError(STOP_GEOGRAPHIC_OUTLIER, getCoordString(stop), stop);
+                registerError(stop, STOP_GEOGRAPHIC_OUTLIER, getCoordString(stop));
             }
         }
     }

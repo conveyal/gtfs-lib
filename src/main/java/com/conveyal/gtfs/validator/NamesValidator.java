@@ -22,19 +22,19 @@ public class NamesValidator extends FeedValidator {
             // At least one of route_long_name and route_short_name must be supplied.
             // According to the GTFS spec these fields are required, but the logic is more complicated than for other fields.
             if (longName.isEmpty() && shortName.isEmpty()) {
-                registerError(ROUTE_SHORT_AND_LONG_NAME_MISSING, null, route);
+                registerError(route, ROUTE_SHORT_AND_LONG_NAME_MISSING);
             }
             // Route_short_name should be really short, so it fits in a compact display e.g. on a mobile device.
             if (shortName.length() > 6) {
-                registerError(ROUTE_SHORT_NAME_TOO_LONG, shortName, route);
+                registerError(route, ROUTE_SHORT_NAME_TOO_LONG, shortName);
             }
             // The long name should not contain the short name, it should contain different information.
             if (!longName.isEmpty() && !shortName.isEmpty() && longName.contains(shortName)) {
-                registerError(ROUTE_LONG_NAME_CONTAINS_SHORT_NAME, longName, route);
+                registerError(route, ROUTE_LONG_NAME_CONTAINS_SHORT_NAME, longName);
             }
             // If provided, the description of a route should be more informative than its names.
             if (!desc.isEmpty() && (desc.equals(shortName) || desc.equals(longName))) {
-                registerError(ROUTE_DESCRIPTION_SAME_AS_NAME, desc, route);
+                registerError(route, ROUTE_DESCRIPTION_SAME_AS_NAME, desc);
             }
             // Special range check for route_type.
             if (route.route_type < 0 || route.route_type > 7){

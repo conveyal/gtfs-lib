@@ -49,7 +49,7 @@ public abstract class Entity implements Serializable {
 
     private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
-    public long sourceFileLine;
+    public int sourceFileLine;
 
     /* The feed from which this entity was loaded. */
     transient GTFSFeed feed;
@@ -82,7 +82,7 @@ public abstract class Entity implements Serializable {
         protected final Set<String> missingRequiredColumns = Sets.newHashSet();
 
         protected CsvReader reader;
-        protected long      row;
+        protected int       row;
         // TODO "String column" that is set before any calls to avoid passing around the column name
 
         public Loader(GTFSFeed feed, String tableName) {

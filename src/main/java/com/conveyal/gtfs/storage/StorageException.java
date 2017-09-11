@@ -22,4 +22,8 @@ public class StorageException extends RuntimeException {
         super(message);
     }
 
+    public StorageException(String message, Exception ex) {
+        super(message, ex);
+    }
+
 }

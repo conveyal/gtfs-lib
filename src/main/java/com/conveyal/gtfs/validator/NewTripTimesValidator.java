@@ -103,7 +103,7 @@ public class NewTripTimesValidator extends FeedValidator {
      */
     private boolean fixInitialFinal (StopTime stopTime) {
         if (missingEitherTime(stopTime)) {
-            registerError(MISSING_ARRIVAL_OR_DEPARTURE, null, stopTime);
+            registerError(stopTime, MISSING_ARRIVAL_OR_DEPARTURE);
             fixMissingTimes(stopTime);
             if (missingEitherTime(stopTime)) {
                 return true;
@@ -128,7 +128,7 @@ public class NewTripTimesValidator extends FeedValidator {
         }
         // Our code should only call this method with non-null stopTimes.
         if (stopTimes.size() < 2) {
-            registerError(TRIP_TOO_FEW_STOP_TIMES, null, trip); // TODO get the trip object in here
+            registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
             return;
         }
         // Make a parallel list of stops based on the stop_times for this trip.

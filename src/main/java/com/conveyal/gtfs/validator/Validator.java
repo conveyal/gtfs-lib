@@ -11,8 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A Validator examines a whole GTFS feed or a single trip within a GTFS feed.
- * It accumulates error messages for problems it finds in that feed, optionally repairing the problems it encounters.
+ * A Validator examines a whole GTFS feed or a single trip within a GTFS feed. It accumulates error messages for
+ * problems it finds in that feed, optionally repairing the problems it encounters.
  */
 public abstract class Validator {
 
@@ -25,8 +25,41 @@ public abstract class Validator {
         this.errorStorage = errorStorage;
     }
 
-    public void registerError (NewGTFSErrorType errorType, String badValue, Entity... entity) {
-        errorStorage.storeError(new NewGTFSError(errorType, badValue, entity));
+    /**
+     * Store an error that affects the entire feed or an entire file. Wraps the underlying error constructor.
+     */
+//    public void registerError (Class<? extends Entity> entityType, NewGTFSErrorType errorType) {
+//        errorStorage.storeError(new NewGTFSError(entityType, errorType));
+//    }
+
+    /**
+     * Store an error that affects a single line of a single table. Wraps the underlying error factory method.
+     */
+    public void registerError(Entity entity, NewGTFSErrorType errorType) {
+        errorStorage.storeError(NewGTFSError.forEntity(entity, errorType));
+    }
+
+//    /**
+//     * Store an error that affects a single line of a single table. Add a single key-value pair to it. Wraps the
+//     * underlying error constructor.
+//     */
+//    public void registerError(Entity entity, NewGTFSErrorType errorType, String key, String value) {
+//        errorStorage.storeError(new NewGTFSError(entity, errorType).addInfo(key, value));
+//    }
+
+    /**
+     * Store an error that affects a single line of a single table.
+     * Add a bad value to it.
+     */
+    public void registerError(Entity entity, NewGTFSErrorType errorType, Object badValue) {
+        errorStorage.storeError(NewGTFSError.forEntity(entity, errorType).setBadValue(badValue.toString()));
+    }
+
+    /**
+     * Basic storage of user-constructed error.
+     */
+    public void registerError (NewGTFSError error) {
+        errorStorage.storeError(error);
     }
 
 }

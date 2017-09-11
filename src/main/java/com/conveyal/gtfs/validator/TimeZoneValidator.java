@@ -26,7 +26,7 @@ public class TimeZoneValidator extends FeedValidator {
             try {
                 ZoneId.of(agency.agency_timezone);
             } catch (Exception ex) {
-                registerError(TIME_ZONE_FORMAT, agency.agency_timezone, agency);
+                registerError(agency, TIME_ZONE_FORMAT, agency.agency_timezone);
             }
         }
         for (Stop stop : feed.stops) {
@@ -35,7 +35,7 @@ public class TimeZoneValidator extends FeedValidator {
             try {
                 ZoneId.of(stop.stop_timezone);
             } catch (Exception ex) {
-                registerError(TIME_ZONE_FORMAT, stop.stop_timezone, stop);
+                registerError(stop, TIME_ZONE_FORMAT, stop.stop_timezone);
             }
         }
     }

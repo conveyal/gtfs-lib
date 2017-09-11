@@ -37,17 +37,17 @@ public class ReferencesTripValidator extends TripValidator {
     public void complete() {
         for (Stop stop : feed.stops) {
             if (!referencedStops.contains(stop.stop_id)) {
-                registerError(STOP_UNUSED, stop.stop_id, stop);
+                registerError(stop, STOP_UNUSED, stop.stop_id);
             }
         }
         for (Trip trip : feed.trips) {
             if (!referencedTrips.contains(trip.trip_id)) {
-                registerError(TRIP_EMPTY, trip.trip_id, trip);
+                registerError(trip, TRIP_EMPTY);
             }
         }
         for (Route route : feed.routes) {
             if (!referencedRoutes.contains(route.route_id)) {
-                registerError(ROUTE_UNUSED, route.route_id, route);
+                registerError(route, ROUTE_UNUSED);
             }
         }
     }

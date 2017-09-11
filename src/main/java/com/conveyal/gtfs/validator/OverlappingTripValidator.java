@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.OverlappingTripsInBlockError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
@@ -71,7 +72,7 @@ public class OverlappingTripValidator extends TripValidator {
                     }
                     if (i1.trip.service_id.equals(i2.trip.service_id)) {
                         // Trips overlap. If they have the same service_id they overlap.
-                        registerError(TRIP_OVERLAP_IN_BLOCK, "block_id="+i1.trip.block_id, i1.trip, i2.trip);
+                        registerError(i1.trip, TRIP_OVERLAP_IN_BLOCK, i2.trip.trip_id);
                     } else {
                         // Trips overlap but don't have the same service_id.
                         // Check to see if service days fall on the same days of the week.
@@ -83,7 +84,7 @@ public class OverlappingTripValidator extends TripValidator {
                             LocalDate date = d1.getKey();
                             boolean activeOnDate = s1.activeOn(date) && s2.activeOn(date);
                             if (activeOnDate || overlap) { // FIXME this will always be true if overlap is true.
-                                registerError(TRIP_OVERLAP_IN_BLOCK, "block_id=" + blockId, i1.trip, i2.trip);
+                                registerError(i1.trip, TRIP_OVERLAP_IN_BLOCK, i2.trip.trip_id);
                                 break;
                             }
                         }

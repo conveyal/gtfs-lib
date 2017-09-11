@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
@@ -53,7 +54,16 @@ public class DuplicateStopsValidator extends FeedValidator {
             // The nearby stops list will include at least one stop, the one for which we're performing the query.
             // We want to include that one in the referenced entities along with the duplicates.
             if (nearby.size() > 1) {
-                registerError(DUPLICATE_STOP, getCoordString(stop), nearby.toArray(new Stop[nearby.size()]));
+                // TODO including bad_value and info entries - settle on one or the other
+                String badStopIds = nearby.stream().map(Stop::getId).filter(s -> !s.equals(stop.stop_id))
+                        .map(sid -> "stopId=" + sid).collect(Collectors.joining("; "));
+                NewGTFSError error = NewGTFSError.forEntity(stop, DUPLICATE_STOP).setBadValue(badStopIds);
+                int i = 1;
+                for (Stop nearbyStop : nearby) {
+                    error.addInfo("stop_id " + i, nearbyStop.stop_id);
+                    i += 1;
+                }
+                registerError(error);
                 reportedStops.addAll(nearby);
             }
         });

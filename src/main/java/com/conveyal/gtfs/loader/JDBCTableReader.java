@@ -71,7 +71,8 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
             }
             // FIXME Note that the connection is being left open here, with attached prepared statements!
         } catch (SQLException ex) {
-            throw new StorageException(ex);
+            LOG.info("Could not connect to table " + qualifiedTableName);
+            // TODO signal to caller that this table does not exist, check if required
         }
 
     }
@@ -121,6 +122,21 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
                 throw new StorageException(ex);
             }
         };
+    }
+
+    public int getRowCount() {
+        try {
+            Connection connection = dataSource.getConnection();
+            Statement statement = connection.createStatement();
+            statement.execute("select count(*) from " + qualifiedTableName);
+            ResultSet resultSet = statement.getResultSet();
+            resultSet.next();
+            int nRows = resultSet.getInt(1);
+            connection.close();
+            return nRows;
+        } catch (SQLException ex) {
+            throw new StorageException(ex);
+        }
     }
 
     private class EntityIterator implements Iterator<T> {
