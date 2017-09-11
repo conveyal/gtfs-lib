@@ -52,8 +52,8 @@ public class SQLErrorStorage {
             // Insert one row for the error itself
             insertError.setInt(1, errorCount);
             insertError.setString(2, error.errorType.name());
-            insertError.setString(3, error.entityType.getSimpleName());
             // Using SetObject to allow null values, do all target DBs support this?
+            insertError.setObject(3, error.entityType == null ? null : error.entityType.getSimpleName());
             insertError.setObject(4, error.lineNumber);
             insertError.setObject(5, error.entityId);
             insertError.setObject(6, error.entitySequenceNumber);
