@@ -84,6 +84,7 @@ public class SpeedTripValidator extends TripValidator {
      */
     private boolean checkDistanceAndTime (double distanceMeters, double travelTimeSeconds, StopTime stopTime) {
         boolean good = true;
+        // TODO Use Epsilon for very tiny travel e.g. < 5 meters
         if (distanceMeters == 0) {
             registerError(stopTime, TRAVEL_DISTANCE_ZERO);
             good = false;
