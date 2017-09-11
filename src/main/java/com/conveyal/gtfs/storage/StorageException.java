@@ -8,7 +8,7 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
  */
 public class StorageException extends RuntimeException {
 
-    public NewGTFSErrorType errorType;
+    public NewGTFSErrorType errorType = NewGTFSErrorType.OTHER;
 
     public StorageException(NewGTFSErrorType errorType) {
         this.errorType = errorType;

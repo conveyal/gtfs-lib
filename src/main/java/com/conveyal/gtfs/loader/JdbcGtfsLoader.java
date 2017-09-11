@@ -372,6 +372,7 @@ public class JdbcGtfsLoader {
                         if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
                         else field.setParameter(insertStatement, f + 2, string);
                     } catch (StorageException ex) {
+                        // FIXME many exceptions don't have an error type
                         errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.getMessage()));
                     }
                 }
