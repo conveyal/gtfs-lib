@@ -34,25 +34,7 @@ public class Table {
     final Requirement required;
 
     final Field[] fields;
-/*
--- FeedInfo table is pulled outside per-feed schema.
--- Supply feed_id hint from outside.
--- CreateFeedsTable
-create table feed_info (
-    pkey number -- for schemaname
-    -- required fields
-    feed_publisher_name varchar,
-    feed_publisher_url varchar,
-    feed_lang varchar,
-    -- optional fields
-    feed_start_date date,
-    feed_end_date date,
-    feed_version varchar
-    -- extension fields
-    feed_id varchar,
-    filename varchar,
-)
- */
+
     public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
         new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
         new StringField("agency_name",  REQUIRED),
@@ -112,7 +94,7 @@ create table feed_info (
 
     );
 
-    public static final Table FREQUENCIES = new Table("frequencies", Calendar.class, REQUIRED,
+    public static final Table FREQUENCIES = new Table("frequencies", Calendar.class, OPTIONAL,
         new StringField("trip_id", REQUIRED),
         new TimeField("start_time", REQUIRED),
         new TimeField("end_time", REQUIRED),
