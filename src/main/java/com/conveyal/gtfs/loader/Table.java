@@ -66,7 +66,7 @@ public class Table {
         new IntegerField("exception_type", REQUIRED, 1, 2)
     );
 
-    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", FareAttribute.class, REQUIRED,
+    public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", FareAttribute.class, OPTIONAL,
         new StringField("fare_id", REQUIRED),
         new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
         new CurrencyField("currency_type", REQUIRED),
@@ -76,7 +76,7 @@ public class Table {
     );
 
 
-    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, REQUIRED,
+    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
         new StringField("fare_id", REQUIRED),
         new StringField("route_id", OPTIONAL),
         new StringField("origin_id", OPTIONAL),
@@ -84,7 +84,7 @@ public class Table {
         new StringField("contains_id", OPTIONAL)
     );
 
-    public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, REQUIRED,
+    public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         new StringField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
@@ -141,8 +141,9 @@ public class Table {
             new StringField("trip_id", REQUIRED),
             new IntegerField("stop_sequence", REQUIRED),
             new StringField("stop_id", REQUIRED),
-            new TimeField("arrival_time", REQUIRED),
-            new TimeField("departure_time", REQUIRED),
+            // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are reqiured
+            new TimeField("arrival_time", OPTIONAL),
+            new TimeField("departure_time", OPTIONAL),
             new StringField("stop_headsign", OPTIONAL),
             new ShortField("pickup_type", OPTIONAL, 2),
             new ShortField("drop_off_type", OPTIONAL, 2),
