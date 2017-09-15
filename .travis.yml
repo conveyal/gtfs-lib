@@ -15,6 +15,8 @@ before_install: |
     openssl aes-256-cbc -K $encrypted_c5b9f071c998_key -iv $encrypted_c5b9f071c998_iv -in maven-artifact-signing-key.asc.enc -out maven-artifact-signing-key.asc -d
     gpg --import --batch maven-artifact-signing-key.asc
   fi
+
+before_script:
   - psql -U postgres -c 'CREATE DATABASE gtfs_lib_test;'
   - psql -U postgres -c "CREATE USER gtfs_test PASSWORD 'gtfs_test';"
   - psql -U postgres -c 'CREATE ROLE gtfs_test_role;'
