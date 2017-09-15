@@ -20,7 +20,7 @@ import static com.conveyal.gtfs.validator.NewTripTimesValidator.*;
  */
 public class SpeedTripValidator extends TripValidator {
 
-    public static final double MIN_SPEED = 0.1;
+    public static final double MIN_SPEED_KPH = 0.5;
 
     public SpeedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
@@ -29,7 +29,7 @@ public class SpeedTripValidator extends TripValidator {
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         // The specific maximum speed for this trip's route's mode of travel.
-        double maxSpeed = getMaxSpeed(route);
+        double maxSpeedKph = getMaxSpeedKph(route);
         // Skip over any initial stop times that won't allow calculating speeds.
         int beginIndex = 0;
         while (missingBothTimes(stopTimes.get(beginIndex))) {
@@ -57,17 +57,11 @@ public class SpeedTripValidator extends TripValidator {
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
             if (checkDistanceAndTime(distanceMeters, travelTimeSeconds, currStopTime)) {
                 // If distance and time are OK, we've got valid numbers to calculate a travel speed.
-                double metersPerSecond = distanceMeters / travelTimeSeconds;
-                if (metersPerSecond < MIN_SPEED || metersPerSecond > maxSpeed) {
-                    NewGTFSErrorType type = (metersPerSecond < MIN_SPEED) ? TRAVEL_TOO_SLOW : TRAVEL_TOO_FAST;
-                    double threshold = (metersPerSecond < MIN_SPEED) ? MIN_SPEED : maxSpeed;
-                    String badValue = String.format("distance=%.0f meters; time=%.0f seconds; speed=%.1f m/sec; threshold=%.0f m/sec",
-                            distanceMeters, travelTimeSeconds, metersPerSecond, threshold);
-                    registerError(currStopTime, type, metersPerSecond + " m/sec");
-//                            .addInfo("distance", distanceMeters + "meters")
-//                            .addInfo("time", travelTimeSeconds + "seconds")
-//                            .addInfo("speed", metersPerSecond + "m/sec")
-//                            .addInfo("threshold", threshold + "m/sec"));
+                double kph = (distanceMeters / 1000D) / (travelTimeSeconds / 60D / 60D);
+                if (kph < MIN_SPEED_KPH) {
+                    registerError(currStopTime, TRAVEL_TOO_SLOW, kph + " km/h");
+                } else if (kph > maxSpeedKph) {
+                    registerError(currStopTime, TRAVEL_TOO_FAST, kph + " km/h");
                 }
             }
             // Reset accumulated distance, we've processed a stop time with arrival or departure time specified.
@@ -100,20 +94,20 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * @return max speed in meters/second.
+     * @return max speed in km/hour.
      */
-    private double getMaxSpeed (Route route) {
+    private double getMaxSpeedKph (Route route) {
         int type = -1;
         if (route != null) type = route.route_type;
         switch (type) {
             case Route.SUBWAY:
-                return 40; // 40 m/sec is about 140 kph, speed of HK airport line
+                return 140; // Speed of HK airport line.
             case Route.RAIL:
-                return 84; // HSR max speed is around 300kph, about 84 m/sec. *Chinese HSR runs at about 310kph.
+                return 310; // European HSR max speed is around 300kph, Chinese HSR runs at about 310kph.
             case Route.FERRY:
-                return 30; // World's fastest ferry is 107kph or 30 m/sec
+                return 107; // World's fastest ferry is 107kph.
             default:
-                return 36; // 130 kph is max highway speed, about 36 m/sec
+                return 130; // 130 kph is max highway speed.
         }
     }
 
