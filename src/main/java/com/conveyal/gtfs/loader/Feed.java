@@ -69,13 +69,14 @@ public class Feed {
                 LOG.info("Running {}.", feedValidator.getClass().getSimpleName());
                 int errorCountBefore = errorStorage.getErrorCount();
                 feedValidator.validate();
-                LOG.info("Found {} errors.", errorStorage.getErrorCount() - errorCountBefore);
+                LOG.info("{} found {} errors.", feedValidator.getClass().getSimpleName(), errorStorage.getErrorCount() - errorCountBefore);
             } catch (Exception e) {
                 LOG.error("{} failed.", feedValidator.getClass().getSimpleName());
                 LOG.error(e.toString());
                 e.printStackTrace();
             }
         }
+        LOG.info("Total number of errors found by all validators: {}", errorStorage.getErrorCount());
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
