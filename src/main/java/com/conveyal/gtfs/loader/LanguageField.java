@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -7,6 +8,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLType;
 import java.util.Locale;
 import java.util.regex.Pattern;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.LANGUAGE_FORMAT;
 
 /**
  * Checks a BCP47 language tag.
@@ -22,7 +25,7 @@ public class LanguageField extends Field {
         String generatedTag = locale.toLanguageTag();
         // This works except for hierarchical sublanguages like zh-cmn and zh-yue which get flattened to the sublanguage.
         if (!generatedTag.equalsIgnoreCase(string)) {
-            throw new StorageException("unrecognized language tag");
+            throw new StorageException(LANGUAGE_FORMAT, string);
         }
         return string;
     }
@@ -36,7 +39,7 @@ public class LanguageField extends Field {
         try {
             preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
         } catch (Exception ex) {
-            throw new StorageException(ex);
+            throw new StorageException(LANGUAGE_FORMAT, string);
         }
     }
 

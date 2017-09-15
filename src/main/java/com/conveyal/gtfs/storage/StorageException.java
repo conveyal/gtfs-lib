@@ -10,8 +10,12 @@ public class StorageException extends RuntimeException {
 
     public NewGTFSErrorType errorType = NewGTFSErrorType.OTHER;
 
-    public StorageException(NewGTFSErrorType errorType) {
+    public String badValue = null;
+
+    public StorageException(NewGTFSErrorType errorType, String badValue) {
+        super(errorType.englishMessage);
         this.errorType = errorType;
+        this.badValue = badValue;
     }
 
     public StorageException(Exception ex) {

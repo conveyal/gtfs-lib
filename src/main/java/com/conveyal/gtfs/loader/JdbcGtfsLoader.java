@@ -369,11 +369,14 @@ public class JdbcGtfsLoader {
                         // FIXME we need to set the transformed string element even when an error occurs.
                         // This means the validation and insertion step need to happen separately.
                         // or the errors should not be signaled with exceptions.
+                        // Also, we should probably not be converting any GTFS field values.
+                        // We should be saving it as-is in the database and converting upon load into our model objects.
                         if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
                         else field.setParameter(insertStatement, f + 2, string);
                     } catch (StorageException ex) {
                         // FIXME many exceptions don't have an error type
-                        errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.getMessage()));
+                        errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.badValue));
+                        // FIXME should set transformedStrings or prepared statement param to null
                     }
                 }
             }
@@ -440,7 +443,7 @@ public class JdbcGtfsLoader {
         if (!clean.equals(string)) {
             LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);
             if (errorStorage != null) {
-                errorStorage.storeError(NewGTFSError.forFeed(TABLE_NAME_FORMAT, string));
+                errorStorage.storeError(NewGTFSError.forFeed(COLUMN_NAME_UNSAFE, string));
             }
         }
         return clean;

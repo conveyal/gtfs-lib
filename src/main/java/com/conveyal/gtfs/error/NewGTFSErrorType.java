@@ -7,11 +7,13 @@ public enum NewGTFSErrorType {
     DATE_FORMAT(Priority.MEDIUM, "Date format should be YYYYMMDD."),
     TIME_FORMAT(Priority.MEDIUM, "Time format should be HH:MM:SS."),
     URL_FORMAT(Priority.MEDIUM, "URL format should be <scheme>://<authority><path>?<query>#<fragment>"),
+    LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     FLOATING_FORMAT(Priority.MEDIUM, "Incorrect floating point number format."),
-    TABLE_NAME_FORMAT(Priority.MEDIUM, "Incorrect table name format."), // What is this?
+    COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),
     NUMBER_NEGATIVE(Priority.MEDIUM, "Number was expected to be non-negative."),
-    NUMBER_RANGE(Priority.MEDIUM, "Number was outside of allowed range."),
+    NUMBER_TOO_SMALL(Priority.MEDIUM, "Number was below the allowed range."),
+    NUMBER_TOO_LARGE(Priority.MEDIUM, "Number was above the allowed range."),
     DUPLICATE_ID(Priority.MEDIUM, "More than one entity in a table had the same ID."),
     DUPLICATE_TRIP(Priority.MEDIUM, "More than one trip had an identical schedule and stops."),
     DUPLICATE_STOP(Priority.MEDIUM, "More than one stop was located in exactly the same place."),
@@ -48,8 +50,8 @@ public enum NewGTFSErrorType {
     REFERENTIAL_INTEGRITY(Priority.HIGH, "This line references an ID that does not exist in the target table."),
     OTHER(Priority.LOW, "Other errors.");
 
-    final Priority priority;
-    final String englishMessage;
+    public final Priority priority;
+    public final String englishMessage;
 
     NewGTFSErrorType(Priority priority, String englishMessage) {
         this.priority = priority;

@@ -1,10 +1,14 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_LARGE;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_SMALL;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -23,8 +27,8 @@ public class DoubleField extends Field {
 
     private double validate(String string) {
         double d = Double.parseDouble(string);
-        if (d < minValue) throw new StorageException("negative field");
-        if (d > maxValue) throw new StorageException("excessively large value");
+        if (d < minValue) throw new StorageException(NUMBER_TOO_SMALL, Double.toString(d));
+        if (d > maxValue) throw new StorageException(NUMBER_TOO_LARGE, Double.toString(d));
         return d;
     }
 
