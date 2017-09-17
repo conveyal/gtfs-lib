@@ -40,15 +40,32 @@ public class GTFSTest {
         assertThat(outContent.toString(), containsString("usage: java"));
     }
 
+    /**
+     * Tests whether or not a super simple 2-stop, 1-route, 1-trip, valid gtfs can be loaded
+     */
     @Test
     public void canLoadSimpleAgency() {
-        String[] args = {
-            "-load",
-            resourcesDir + "fake-agency.zip",
-            "-d", "jdbc:postgresql://localhost/gtfs_lib_test",
-            "-u", "gtfs_test",
-            "-p", "gtfs_test"
-        };
-        GTFS.main(args);
+        runSimpleIntegrationTest("fake-agency.zip");
+    }
+
+    /**
+     * Run GTFS.main with a certain zip file.
+     *
+     * @param zipFileName
+     */
+    private void runSimpleIntegrationTest(String zipFileName) {
+        String newDBName = TestUtils.generateNewDB();
+        try {
+            String[] args = {
+                "-load",
+                resourcesDir + zipFileName,
+                "-d", "jdbc:postgresql://localhost/" + newDBName,
+                "-u", "gtfs_test",
+                "-p", "gtfs_test"
+            };
+            GTFS.main(args);
+        } finally {
+            TestUtils.dropDB(newDBName);
+        }
     }
 }
