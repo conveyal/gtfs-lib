@@ -12,8 +12,6 @@ import static org.hamcrest.Matchers.containsString;
 public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
-    String resourcesDir = "./src/test/resources/";
-
     @Before
     public void setUpStreams() {
         System.setOut(new PrintStream(outContent));
@@ -58,7 +56,7 @@ public class GTFSTest {
         try {
             String[] args = {
                 "-load",
-                resourcesDir + zipFileName,
+                TestUtils.getResourceFileName(zipFileName),
                 "-d", "jdbc:postgresql://localhost/" + newDBName,
                 "-u", "gtfs_test",
                 "-p", "gtfs_test"

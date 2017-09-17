@@ -15,20 +15,6 @@ public class TestUtils {
     private static String pgUrl = "jdbc:postgresql://localhost/gtfs_lib_test?user=gtfs_test&password=gtfs_test";
 
     /**
-     * Generate a new database for isolating a test.
-     *
-     * @return The name of the name database, or null if creation unsucessful
-     */
-    public static String generateNewDB() {
-        String newDBName = randomIdString();
-        if (executeAndClose("CREATE DATABASE " + newDBName)) {
-            return newDBName;
-        } else {
-            return null;
-        }
-    }
-
-    /**
      * Forcefully drops a database even if other users are connected to it.
      *
      * @param dbName
@@ -75,5 +61,29 @@ public class TestUtils {
             LOG.error("Error closing connection!");
             return false;
         }
+    }
+
+    /**
+     * Generate a new database for isolating a test.
+     *
+     * @return The name of the name database, or null if creation unsucessful
+     */
+    public static String generateNewDB() {
+        String newDBName = randomIdString();
+        if (executeAndClose("CREATE DATABASE " + newDBName)) {
+            return newDBName;
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Helper to return the relative path to a test resource file
+     *
+     * @param fileName
+     * @return
+     */
+    public static String getResourceFileName(String fileName) {
+        return "./src/test/resources/" + fileName;
     }
 }
