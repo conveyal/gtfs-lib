@@ -12,7 +12,7 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
 public class TestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-    private static String pgUrl = "jdbc:postgresql://localhost/gtfs_lib_test?user=gtfs_test&password=gtfs_test";
+    private static String pgUrl = "jdbc:postgresql://localhost/postgres";
 
     /**
      * Forcefully drops a database even if other users are connected to it.

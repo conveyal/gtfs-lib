@@ -16,13 +16,6 @@ before_install: |
     gpg --import --batch maven-artifact-signing-key.asc
   fi
 
-before_script:
-  - psql -U postgres -c 'CREATE DATABASE gtfs_lib_test;'
-  - psql -U postgres -c "CREATE USER gtfs_test PASSWORD 'gtfs_test' CREATEDB;"
-  - psql -U postgres -c 'CREATE ROLE gtfs_test_role;'
-  - psql -U postgres -c 'GRANT gtfs_test_role TO gtfs_test;'
-  - psql -U postgres -c 'GRANT ALL ON DATABASE gtfs_lib_test TO gtfs_test_role;'
-
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
 script: |
