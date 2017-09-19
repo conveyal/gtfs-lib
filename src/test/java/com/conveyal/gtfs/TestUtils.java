@@ -6,12 +6,14 @@ import org.slf4j.LoggerFactory;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
 public class TestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
+    private static final AtomicInteger UNIQUE_ID = new AtomicInteger(0);
     private static String pgUrl = "jdbc:postgresql://localhost/postgres";
 
     /**
@@ -69,7 +71,7 @@ public class TestUtils {
      * @return The name of the name database, or null if creation unsucessful
      */
     public static String generateNewDB() {
-        String newDBName = randomIdString();
+        String newDBName = uniqueString();
         if (executeAndClose("CREATE DATABASE " + newDBName)) {
             return newDBName;
         } else {
@@ -85,5 +87,12 @@ public class TestUtils {
      */
     public static String getResourceFileName(String fileName) {
         return "./src/test/resources/" + fileName;
+    }
+
+    /**
+     * Generate a unique string.  Mostly copied from the uniqueId method of https://github.com/javadev/underscore-java
+     */
+    public static String uniqueString() {
+        return "test_db_" + UNIQUE_ID.incrementAndGet();
     }
 }
