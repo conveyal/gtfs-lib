@@ -8,7 +8,14 @@ import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+/**
+ * Test suite for the GTFSFeed class.
+ */
 public class GTFSFeedTest {
+
+    /**
+     * Make sure a roundtrip of loading a GTFS zip file and then writing another zip file can be performed.
+     */
     @Test
     public void canDoRoundtripLoadAndWriteToZipFile() {
         String outZip = getResourceFileName("fake-agency-output.zip");
