@@ -9,14 +9,23 @@ import java.io.PrintStream;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 
+/**
+ * A test suite for the GTFS Class
+ */
 public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
+    // setup a stream to capture the output from the program
     @Before
     public void setUpStreams() {
         System.setOut(new PrintStream(outContent));
     }
 
+    /**
+     * Make sure that help can be printed.
+     *
+     * @throws Exception
+     */
     @Test
     public void canPrintHelp() throws Exception {
         String[] args = {"-help"};
@@ -24,6 +33,11 @@ public class GTFSTest {
         assertThat(outContent.toString(), containsString("usage: java"));
     }
 
+    /**
+     * Make sure that help is printed if no recognizable arguments are provided.
+     *
+     * @throws Exception
+     */
     @Test
     public void handlesUnknownArgs() throws Exception {
         String[] args = {"-blah"};
@@ -31,6 +45,11 @@ public class GTFSTest {
         assertThat(outContent.toString(), containsString("usage: java"));
     }
 
+    /**
+     * Make sure that help is printed if not enough key arguments are provided.
+     *
+     * @throws Exception
+     */
     @Test
     public void requiresActionCommand() throws Exception {
         String[] args = {"-u", "blah"};
@@ -47,7 +66,8 @@ public class GTFSTest {
     }
 
     /**
-     * Run GTFS.main with a certain zip file.
+     * A helper method that will run GTFS.main with a certain zip file.
+     * This tests whether a GTFS zip file can be loaded without any errors.
      *
      * @param zipFileName
      */
