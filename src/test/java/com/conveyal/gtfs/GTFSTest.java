@@ -78,8 +78,6 @@ public class GTFSTest {
                 "-load",
                 TestUtils.getResourceFileName(zipFileName),
                 "-d", "jdbc:postgresql://localhost/" + newDBName,
-                "-u", "gtfs_test",
-                "-p", "gtfs_test",
                 "-validate"
             };
             GTFS.main(args);
