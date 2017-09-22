@@ -272,6 +272,8 @@ public abstract class BaseGTFSCache<T> {
     /** Convert a GTFSFeed into whatever this cache holds */
     protected abstract T processFeed (GTFSFeed feed);
 
+    public abstract GTFSFeed getFeed (String id);
+
     private void deleteLocalDBFiles(String id) {
         String[] extensions = {".db", ".db.p"};
         // delete ONLY local cache db files
