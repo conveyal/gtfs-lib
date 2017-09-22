@@ -100,20 +100,4 @@ public class BooleanAsciiGrid {
         return grid.get(index);
     }
 
-    // TODO make this into a test
-    public static void main (String[] args) {
-        BooleanAsciiGrid asciiGrid = BooleanAsciiGrid.forEarthPopulation();
-        boolean paris = asciiGrid.getValueForCoords(2.352, 48.8566);
-        boolean tokyo = asciiGrid.getValueForCoords(139.6917,35.6895);
-        boolean nullIsland = asciiGrid.getValueForCoords(0, 0);
-        boolean hongKong = asciiGrid.getValueForCoords(114.175911, 22.272639);
-        boolean antarctica = asciiGrid.getValueForCoords(75.502410, -79.204778);
-        boolean southAtlantic = asciiGrid.getValueForCoords(-15.554475, -28.306585);
-        boolean hyderabad = asciiGrid.getValueForCoords(78.1271653, 17.4128074);
-        boolean buenosAires = asciiGrid.getValueForCoords(-58.4428545, -34.6202982);
-        boolean maui = asciiGrid.getValueForCoords(-156.4915454, 20.8751302);
-        boolean southPacific = asciiGrid.getValueForCoords(-149.7023417, -44.7672362);
-        return;
-    }
-
 }
