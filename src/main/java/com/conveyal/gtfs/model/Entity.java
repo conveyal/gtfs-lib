@@ -55,6 +55,7 @@ public abstract class Entity implements Serializable {
     transient GTFSFeed feed;
 
     /**
+     * This method should be overridden by each Entity subtype to return the proper key field for that subtype.
      * @return a key that according to the GTFS spec should uniquely identify this entity, either alone or together
      *          with a sequence number. For example stop_times and shapes have no single field that uniquely
      *          identifies a row, and the stop_sequence or shape_pt_sequence must also be considered.
@@ -64,6 +65,7 @@ public abstract class Entity implements Serializable {
     }
 
     /**
+     * This method should be overridden by each Entity subtype to return the proper sequence field for that subtype.
      * @return the integer second element of a compound key, for those elements that require one.
      */
     public Integer getSequenceNumber () {
