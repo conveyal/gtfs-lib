@@ -298,10 +298,19 @@ public class GTFSFeed implements Cloneable, Closeable {
         return feedStats;
     }
 
+    /**
+     * Static factory method returning a new instance of GTFSFeed containing the contents of
+     * the GTFS file at the supplied filesystem path.
+     */
     public static GTFSFeed fromFile(String file) {
         return fromFile(file, null);
     }
 
+    /**
+     * Static factory method returning a new instance of GTFSFeed containing the contents of
+     * the GTFS file at the supplied filesystem path. Forces the feedId to the
+     * supplied value if the parameter is non-null.
+     */
     public static GTFSFeed fromFile(String file, String feedId) {
         GTFSFeed feed = new GTFSFeed();
         ZipFile zip;
