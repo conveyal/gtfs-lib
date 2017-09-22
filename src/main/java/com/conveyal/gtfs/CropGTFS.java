@@ -32,8 +32,8 @@ public class CropGTFS {
     // Logger is not super useful because as a library, gtfs-lib has no logger implementation defined by default.
     private static final Logger LOG = LoggerFactory.getLogger(CropGTFS.class);
 
-    private static final String inputFile = "/Users/abyrd/geodata/nl/NL-2016-08-23.gtfs.zip";
-    private static final String outputFile = "/Users/abyrd/geodata/nl/NL-2016-08-23-noplatforms-noshapes.gtfs.zip";
+    private static final String inputFile = "/Users/abyrd/test-est/gtfs_fr-cha_pourOAD.zip";
+    private static final String outputFile = ""; //"/Users/abyrd/geodata/nl/NL-2016-08-23-noplatforms-noshapes.gtfs.zip";
 
     // Replace all stops with their parent stations to simplify trip patterns.
     private static final boolean MERGE_STATIONS = true;

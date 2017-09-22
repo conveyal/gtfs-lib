@@ -1,5 +1,13 @@
 package com.conveyal.gtfs.stats;
 
+import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.stats.model.AgencyStatistic;
+import com.vividsolutions.jts.geom.Geometry;
+
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.time.DayOfWeek;
@@ -7,26 +15,9 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.OptionalDouble;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-
-import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.Agency;
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.stats.model.AgencyStatistic;
-import com.vividsolutions.jts.geom.Geometry;
-import org.mapdb.Fun;
 
 /**
  * Retrieves a base set of statistics from the GTFS.
@@ -199,6 +190,9 @@ public class FeedStats {
                     return isWeekday;
                 })
                 .collect(Collectors.toList());
+        if (dates.size() == 0) {
+            return 0;
+        }
         return getRevenueTimeForDates(dates) / dates.size();
     }
     public long getRevenueTimeForDates (List<LocalDate> dates) {

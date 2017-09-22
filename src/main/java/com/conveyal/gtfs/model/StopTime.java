@@ -27,6 +27,16 @@ public class StopTime extends Entity implements Cloneable, Serializable {
     public double shape_dist_traveled;
     public int    timepoint = INT_MISSING;
 
+    @Override
+    public String getId() {
+        return trip_id; // Needs sequence number to be unique
+    }
+
+    @Override
+    public Integer getSequenceNumber() {
+        return stop_sequence; // Compound key of StopTime is (trip_id, stop_sequence)
+    }
+
     public static class Loader extends Entity.Loader<StopTime> {
 
         public Loader(GTFSFeed feed) {

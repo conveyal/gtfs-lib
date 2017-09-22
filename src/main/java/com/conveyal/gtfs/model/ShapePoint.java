@@ -10,11 +10,13 @@ import org.mapdb.Fun.Tuple2;
 public class ShapePoint extends Entity {
 
     private static final long serialVersionUID = 6751814959971086070L;
-    public final String shape_id;
-    public final double shape_pt_lat;
-    public final double shape_pt_lon;
-    public final int    shape_pt_sequence;
-    public final double shape_dist_traveled;
+    public String shape_id;
+    public double shape_pt_lat;
+    public double shape_pt_lon;
+    public int    shape_pt_sequence;
+    public double shape_dist_traveled;
+
+    public ShapePoint () { }
 
     // Similar to stoptime, we have to have a constructor, because fields are final so as to be immutable for storage in MapDB.
     public ShapePoint(String shape_id, double shape_pt_lat, double shape_pt_lon, int shape_pt_sequence, double shape_dist_traveled) {

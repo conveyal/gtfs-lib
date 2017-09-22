@@ -18,4 +18,8 @@ public class GTFSCache extends BaseGTFSCache<GTFSFeed> {
     protected GTFSFeed processFeed(GTFSFeed feed) {
         return feed;
     }
+
+    @Override public GTFSFeed getFeed (String id) {
+        return this.get(id);
+    }
 }

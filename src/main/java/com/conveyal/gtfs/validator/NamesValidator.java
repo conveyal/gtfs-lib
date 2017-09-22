@@ -1,62 +1,53 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.RouteNameError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.validator.model.InvalidValue;
-import com.conveyal.gtfs.validator.model.Priority;
-import com.conveyal.gtfs.validator.model.ValidationResult;
 
-/**
- * Created by landon on 5/2/16.
- */
-public class NamesValidator extends GTFSValidator {
+import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+
+public class NamesValidator extends FeedValidator {
+
+    public NamesValidator(Feed feed, SQLErrorStorage errorStorage) {
+        super(feed, errorStorage);
+    }
+
     @Override
-    public boolean validate(GTFSFeed feed, boolean repair) {
-        boolean isValid = true;
-
-        ///////// ROUTES
-        for (Route route : feed.routes.values()) {
-            String shortName = "";
-            String longName = "";
-            String desc = "";
-
-            if (route.route_short_name != null)
-                shortName = route.route_short_name.trim().toLowerCase();
-
-            if (route.route_long_name != null)
-                longName = route.route_long_name.trim().toLowerCase();
-
-            if (route.route_desc != null)
-                desc = route.route_desc.toLowerCase();
-
-
-            //RouteShortAndLongNamesAreBlank
+    public void validate() {
+        // Check routes
+        for (Route route : feed.routes) {
+            String shortName = normalize(route.route_short_name);
+            String longName = normalize(route.route_long_name);
+            String desc = normalize(route.route_desc);
+            // At least one of route_long_name and route_short_name must be supplied.
+            // According to the GTFS spec these fields are required, but the logic is more complicated than for other fields.
             if (longName.isEmpty() && shortName.isEmpty()) {
-                feed.errors.add(new RouteNameError(route, "route_short_name,route_long_name", "RouteShortAndLongNamesAreBlank", route, Priority.HIGH));
-                isValid = false;
+                registerError(route, ROUTE_SHORT_AND_LONG_NAME_MISSING);
             }
-            //ValidateRouteShortNameIsTooLong
+            // Route_short_name should be really short, so it fits in a compact display e.g. on a mobile device.
             if (shortName.length() > 6) {
-                feed.errors.add(new RouteNameError(route, "route_short_name", "ValidateRouteShortNameIsTooLong", route, Priority.MEDIUM));
-                isValid = false;
+                registerError(route, ROUTE_SHORT_NAME_TOO_LONG, shortName);
             }
-            //ValidateRouteLongNameContainShortName
+            // The long name should not contain the short name, it should contain different information.
             if (!longName.isEmpty() && !shortName.isEmpty() && longName.contains(shortName)) {
-                feed.errors.add(new RouteNameError(route, "route_short_name,route_long_name", "ValidateRouteLongNameContainShortName", route, Priority.MEDIUM));
-                isValid = false;
+                registerError(route, ROUTE_LONG_NAME_CONTAINS_SHORT_NAME, longName);
             }
-            //ValidateRouteDescriptionSameAsRouteName
+            // If provided, the description of a route should be more informative than its names.
             if (!desc.isEmpty() && (desc.equals(shortName) || desc.equals(longName))) {
-                feed.errors.add(new RouteNameError(route, "route_short_name,route_long_name,route_desc", "ValidateRouteDescriptionSameAsRouteName", route, Priority.MEDIUM));
-                isValid = false;
+                registerError(route, ROUTE_DESCRIPTION_SAME_AS_NAME, desc);
             }
-            //ValidateRouteTypeInvalidValid
+            // Special range check for route_type.
             if (route.route_type < 0 || route.route_type > 7){
-                feed.errors.add(new RouteNameError(route, "route_type", "ValidateRouteTypeInvalidValid", route, Priority.HIGH));
-                isValid = false;
+                // TODO we want some additional checking for extended route types.
             }
         }
-        return isValid;
+        // TODO Check trips and all other tables.
     }
+
+    /** @return a non-null String that is lower case and has no leading or trailing whitespace */
+    private String normalize (String string) {
+        if (string == null) return "";
+        return string.trim().toLowerCase();
+    }
+
 }

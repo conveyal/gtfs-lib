@@ -49,10 +49,28 @@ public abstract class Entity implements Serializable {
 
     private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
-    public long sourceFileLine;
+    public int sourceFileLine;
 
     /* The feed from which this entity was loaded. */
     transient GTFSFeed feed;
+
+    /**
+     * This method should be overridden by each Entity subtype to return the proper key field for that subtype.
+     * @return a key that according to the GTFS spec should uniquely identify this entity, either alone or together
+     *          with a sequence number. For example stop_times and shapes have no single field that uniquely
+     *          identifies a row, and the stop_sequence or shape_pt_sequence must also be considered.
+     */
+    public String getId () {
+        return null;
+    }
+
+    /**
+     * This method should be overridden by each Entity subtype to return the proper sequence field for that subtype.
+     * @return the integer second element of a compound key, for those elements that require one.
+     */
+    public Integer getSequenceNumber () {
+        return null;
+    }
 
     /* A class that can produce Entities from CSV, and record errors that occur in the process. */
     // This is almost a GTFSTable... rename?
@@ -66,7 +84,7 @@ public abstract class Entity implements Serializable {
         protected final Set<String> missingRequiredColumns = Sets.newHashSet();
 
         protected CsvReader reader;
-        protected long      row;
+        protected int       row;
         // TODO "String column" that is set before any calls to avoid passing around the column name
 
         public Loader(GTFSFeed feed, String tableName) {
@@ -451,7 +469,7 @@ public abstract class Entity implements Serializable {
 
 
     // shared code between reading and writing
-    private static final String human (long n) {
+    public static final String human (long n) {
         if (n >= 1000000) return String.format("%.1fM", n/1000000.0);
         if (n >= 1000) return String.format("%.1fk", n/1000.0);
         else return String.format("%d", n);
