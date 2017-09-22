@@ -8,8 +8,8 @@
 
   <groupId>com.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
-  <!-- the release version 3.0.0 will include SQL support -->
-  <version>3.0.0-SNAPSHOT</version>
+  <!-- The release version 3.0.0 includes preliminary SQL support -->
+  <version>3.0.0</version>
   <packaging>jar</packaging>
 
   <licenses>
