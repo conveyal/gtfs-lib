@@ -5,6 +5,7 @@ import com.conveyal.gtfs.validator.model.Priority;
 public enum NewGTFSErrorType {
 
     DATE_FORMAT(Priority.MEDIUM, "Date format should be YYYYMMDD."),
+    DATE_RANGE(Priority.MEDIUM, "Date should is extremely far in the future or past."),
     TIME_FORMAT(Priority.MEDIUM, "Time format should be HH:MM:SS."),
     URL_FORMAT(Priority.MEDIUM, "URL format should be <scheme>://<authority><path>?<query>#<fragment>"),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),

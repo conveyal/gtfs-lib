@@ -1,36 +1,43 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.Date;
 
 /**
  * A GTFS date in the numeric format YYYYMMDD
  */
 public class DateField extends Field {
 
+    private static final DateTimeFormatter gtfsDateFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
+
     public DateField (String name, Requirement requirement) {
         super(name, requirement);
     }
 
     private int validate (String string) {
-        if (string.length() != 8) {
-            throw new StorageException("Date field should be exactly 8 characters long.");
+        // Parse the date out of the supplied string.
+        LocalDate date = null;
+        try {
+            date = LocalDate.parse(string, gtfsDateFormat);
+        } catch (DateTimeParseException ex) {
+            throw new StorageException(NewGTFSErrorType.DATE_FORMAT, string);
         }
-        int year = Integer.parseInt(string.substring(0, 4));
-        int month = Integer.parseInt(string.substring(4, 6));
-        int day = Integer.parseInt(string.substring(6, 8));
+        // Range check on year. Parsing operation above should already have checked month and day ranges.
+        int year = date.getYear();
         if (year < 2000 || year > 2100) {
-            throw new StorageException("Date year out of range 2000-2100: " + year);
+            throw new StorageException(NewGTFSErrorType.DATE_RANGE, string);
         }
-        if (month < 1 || month > 12) {
-            throw new StorageException("Date month out of range 1-12: " + month);
-        }
-        if (day < 1 || day > 31) {
-            throw new StorageException("Date day out of range 1-31: " + day);
-        }
+        // Finally store as int (is that really a good idea?)
         return Integer.parseInt(string);
     }
 
