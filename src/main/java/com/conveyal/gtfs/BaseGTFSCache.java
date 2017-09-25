@@ -205,7 +205,7 @@ public abstract class BaseGTFSCache<T> {
 
         if (bucket != null) {
             try {
-                LOG.info("Attempting to download cached GTFS MapDB.");
+                LOG.info("Attempting to download cached GTFS MapDB from S3: {}/{}.db", bucket, key);
                 S3Object db = s3.getObject(bucket, key + ".db");
                 InputStream is = db.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(dbFile);
@@ -226,13 +226,11 @@ public abstract class BaseGTFSCache<T> {
                     return processFeed(feed);
                 }
             } catch (AmazonS3Exception e) {
-                LOG.warn("DB file for key {} does not exist on S3.", key);
+                LOG.warn("MapDB file for key '{}' does not exist on S3.", key);
             } catch (ExecutionException | IOException e) {
-                LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
+                LOG.warn("Error retrieving MapDB file from S3, will re-create one from the original GTFS.", e);
             }
         }
-
-        // see if the
 
         // if we fell through to here, getting the mapdb was unsuccessful
         // grab GTFS from S3 if it is not found locally
@@ -269,7 +267,7 @@ public abstract class BaseGTFSCache<T> {
         }
     }
 
-    /** Convert a GTFSFeed into whatever this cache holds */
+    /** Convert a GTFSFeed into whatever this cache holds. */
     protected abstract T processFeed (GTFSFeed feed);
 
     public abstract GTFSFeed getFeed (String id);
