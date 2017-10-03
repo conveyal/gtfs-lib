@@ -1,7 +1,9 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
+import com.conveyal.gtfs.validator.ValidationResult;
 import org.apache.commons.cli.*;
 import org.apache.commons.dbcp2.ConnectionFactory;
 import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
@@ -38,16 +40,20 @@ public abstract class GTFS {
      *
      * @return a unique identifier for the newly loaded feed in the database
      */
-    public static String load (String filePath, DataSource dataSource) {
+    public static FeedLoadResult load (String filePath, DataSource dataSource) {
         JdbcGtfsLoader loader = new JdbcGtfsLoader(filePath, dataSource);
-        String uniqueId = loader.loadTables();
-        return uniqueId;
+        FeedLoadResult result = loader.loadTables();
+        return result;
     }
 
-    public static void validate (String feedId, DataSource dataSource) {
+    /**
+     * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
+     */
+    public static ValidationResult validate (String feedId, DataSource dataSource) {
         Feed feed = new Feed(dataSource, feedId);
-        feed.validate();
+        ValidationResult result = feed.validate();
         feed.close();
+        return result;
     }
 
 
@@ -131,20 +137,21 @@ public abstract class GTFS {
         DataSource dataSource = createDataSource(databaseUrl, databaseUser, databasePassword);
 
         // Record the unique identifier of the newly loaded feed
-        String loadedFeed = null;
+        FeedLoadResult loadResult = null;
         if (cmd.hasOption("load")) {
             String filePath = cmd.getOptionValue("load");
-            loadedFeed = load(filePath, dataSource);
-            LOG.info("The unique identifier for this feed is: {}", loadedFeed);
+            loadResult = load(filePath, dataSource);
+            LOG.info("The unique identifier for this feed is: {}", loadResult.uniqueIdentifier);
         }
 
         if (cmd.hasOption("validate")) {
             String feedToValidate = cmd.getOptionValue("validate");
-            if (feedToValidate != null && loadedFeed != null) {
-                LOG.warn("Validating the specified feed {} instead of {} (just loaded)", feedToValidate, loadedFeed);
+            if (feedToValidate != null && loadResult != null) {
+                LOG.warn("Validating the specified feed {} instead of {} (just loaded)",
+                        feedToValidate, loadResult.uniqueIdentifier);
             }
-            if (feedToValidate == null && loadedFeed != null) {
-                feedToValidate = loadedFeed;
+            if (feedToValidate == null && loadResult != null) {
+                feedToValidate = loadResult.uniqueIdentifier;
             }
             if (feedToValidate != null) {
                 LOG.info("Validating feed with unique identifier {}", feedToValidate);

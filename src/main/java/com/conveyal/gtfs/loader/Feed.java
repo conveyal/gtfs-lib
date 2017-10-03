@@ -62,7 +62,7 @@ public class Feed {
         return null;
     }
 
-    private void validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
+    private ValidationResult validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
         long validationStartTime = System.currentTimeMillis();
         for (FeedValidator feedValidator : feedValidators) {
             try {
@@ -81,22 +81,24 @@ public class Feed {
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
         LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
+        return new ValidationResult(); // <<< FIXME
     }
 
     /**
      * TODO check whether validation has already occurred, overwrite results.
      */
-    public void validate () {
+    public ValidationResult validate () {
         // Error tables should already be present from the initial load.
         // Reconnect to the existing error tables.
         SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
-        validate (errorStorage,
+        ValidationResult result = validate (errorStorage,
             new MisplacedStopValidator(this, errorStorage),
             new DuplicateStopsValidator(this, errorStorage),
             new TimeZoneValidator(this, errorStorage),
             new NewTripTimesValidator(this, errorStorage),
             new NamesValidator(this, errorStorage)
         );
+        return result;
     }
 
     public void close () {

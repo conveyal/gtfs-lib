@@ -96,7 +96,8 @@ public class JdbcGtfsLoader {
     // SHA1 took 1072 msec,  9fb356af4be2750f20955203787ec6f95d32ef22
 
     // There appears to be no advantage to loading tables in parallel, as the whole loading process is I/O bound.
-    public String loadTables () {
+    public FeedLoadResult loadTables () {
+        FeedLoadResult result = new FeedLoadResult();
         try {
             File gtfsFile = new File(gtfsFilePath);
             this.zip = new ZipFile(gtfsFilePath);
@@ -106,34 +107,38 @@ public class JdbcGtfsLoader {
             // FIXME do this in a loop just in case there's an ID collision (though that'll be extremely rare).
             // TODO handle the case where we don't want any prefix.
             this.tablePrefix = randomIdString();
+            result.uniqueIdentifier = tablePrefix;
             registerFeed(gtfsFile);
             // Include the dot separator in the table prefix.
             // This allows everything to work even when there's no prefix.
             this.tablePrefix += ".";
             this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
             long startTime = System.currentTimeMillis();
-            load(Table.AGENCY);
-            load(Table.CALENDAR);
-            load(Table.CALENDAR_DATES);
-            load(Table.FARE_ATTRIBUTES);
-            load(Table.FARE_RULES);
-            load(Table.FEED_INFO);
-            load(Table.FREQUENCIES);
-            load(Table.ROUTES);
-            load(Table.SHAPES);
-            load(Table.STOPS);
-            load(Table.STOP_TIMES);
-            load(Table.TRANSFERS);
-            load(Table.TRIPS);
+            // Load each table in turn, saving some summary information about what happened during each table load
+            result.agency = load(Table.AGENCY);
+            result.calendar = load(Table.CALENDAR);
+            result.calendarDates = load(Table.CALENDAR_DATES);
+            result.fareAttributes = load(Table.FARE_ATTRIBUTES);
+            result.fareRules = load(Table.FARE_RULES);
+            result.feedInfo = load(Table.FEED_INFO);
+            result.frequencies = load(Table.FREQUENCIES);
+            result.routes = load(Table.ROUTES);
+            result.shapes = load(Table.SHAPES);
+            result.stops = load(Table.STOPS);
+            result.stopTimes = load(Table.STOP_TIMES);
+            result.transfers = load(Table.TRANSFERS);
+            result.trips = load(Table.TRIPS);
+            result.errorCount = errorStorage.getErrorCount();
             errorStorage.commitAndClose();
             zip.close();
             LOG.info("Loading tables took {} sec", (System.currentTimeMillis() - startTime) / 1000);
         } catch (Exception ex) {
+            // TODO catch exceptions separately while loading each table so load can continue, store in TableLoadResult
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
             ex.printStackTrace();
-            return null;
+            result.fatalException = ex;
         }
-        return tablePrefix;
+        return result;
     }
 
 
@@ -245,12 +250,32 @@ public class JdbcGtfsLoader {
         }
     }
 
-    private void load (Table table) throws Exception {
+    /**
+     * This wraps the main internal table loader method to catch exceptions and figure out how many errors happened.
+     */
+    private TableLoadResult load (Table table) {
+        TableLoadResult tableLoadResult = new TableLoadResult();
+        int initialErrorCount = errorStorage.getErrorCount();
+        try {
+            tableLoadResult.rowCount = loadInternal(table);
+        } catch (Exception ex) {
+            tableLoadResult.fatalException = ex;
+        }
+        int finalErrorCount = errorStorage.getErrorCount();
+        tableLoadResult.errorCount = finalErrorCount - initialErrorCount;
+        return tableLoadResult;
+    }
+
+    /**
+     * This function will throw any exception that occurs. Those exceptions will be handled by the outer load method.
+     * @return number of rows that were loaded.
+     */
+    private int loadInternal (Table table) throws Exception {
         CsvReader csvReader = getCsvReader(table);
         if (csvReader == null) {
             // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
-            return;
+            return 0;
         }
         LOG.info("Loading GTFS table {}", table.name);
         Connection connection = dataSource.getConnection();
@@ -356,10 +381,13 @@ public class JdbcGtfsLoader {
                 if (lineNumber % INSERT_BATCH_SIZE == 0) insertStatement.executeBatch();
             }
         }
+        // Record number is zero based but includes the header record, which we don't want to count.
+        // Iteration over all rows has finished, so We are now one record past the end of the file.
+        int numberOfRecordsLoaded = (int) csvReader.getCurrentRecord() - 1;
+        csvReader.close();
 
         // Finalize loading the table, either by copying the pre-validated text file into the database (for Postgres)
         // or inserting any remaining rows (for all others).
-
         if (postgresText) {
             LOG.info("Loading into database table from temporary text file...");
             tempTextFileStream.close();
@@ -396,6 +424,7 @@ public class JdbcGtfsLoader {
         connection.commit();
         connection.close();
         LOG.info("Done.");
+        return numberOfRecordsLoaded;
     }
 
     /**
