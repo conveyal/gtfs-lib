@@ -136,7 +136,7 @@ public class JdbcGtfsLoader {
             // TODO catch exceptions separately while loading each table so load can continue, store in TableLoadResult
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
             ex.printStackTrace();
-            result.fatalException = ex;
+            result.fatalException = ex.getMessage();
         }
         return result;
     }
@@ -259,7 +259,7 @@ public class JdbcGtfsLoader {
         try {
             tableLoadResult.rowCount = loadInternal(table);
         } catch (Exception ex) {
-            tableLoadResult.fatalException = ex;
+            tableLoadResult.fatalException = ex.getMessage();
         }
         int finalErrorCount = errorStorage.getErrorCount();
         tableLoadResult.errorCount = finalErrorCount - initialErrorCount;

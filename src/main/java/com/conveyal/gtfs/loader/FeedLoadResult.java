@@ -1,16 +1,19 @@
 package com.conveyal.gtfs.loader;
 
+import java.io.Serializable;
+
 /**
  * An instance of this class is returned by the GTFS feed loading method.
  * It provides a summary of what happened during the loading process.
  * It also provides the unique name that was assigned to this feed by the loader.
  * That unique name is the name of a database schema including all the tables loaded from this feed.
  */
-public class FeedLoadResult {
+public class FeedLoadResult implements Serializable {
 
+    private static final long serialVersionUID = 1L;
     public String uniqueIdentifier;
     public int errorCount;
-    public Exception fatalException;
+    public String fatalException;
 
     public TableLoadResult agency;
     public TableLoadResult calendar;

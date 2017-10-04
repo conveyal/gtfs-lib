@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.validator;
 
+import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.time.LocalDate;
 
 /**
@@ -8,26 +10,33 @@ import java.time.LocalDate;
  * Detailed lists of errors can be found in database tables created by the validator, but this class provides
  * immediate summary information.
  */
-public class ValidationResult {
+public class ValidationResult implements Serializable {
 
-    public Exception fatalException = null;
+    private static final long serialVersionUID = 1L;
+    public String fatalException = null;
 
     public int errorCount;
     public LocalDate declaredStartDate;
     public LocalDate declaredEndDate;
     public LocalDate firstCalendarDate;
     public LocalDate lastCalendarDate;
-    public int[] dailyTravelTime;
-    public int[] dailyStopTimes;
-    public int[] dailyTrips;
+//    public int[] dailyTravelTime;
+//    public int[] dailyStopTimes;
+//    public int[] dailyTrips;
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
 
-    public static class GeographicBounds {
+    public static class GeographicBounds implements Serializable {
+        private static final long serialVersionUID = 1L;
         public double minLon;
         public double minLat;
         public double maxLon;
         public double maxLat;
+
+        public Rectangle2D.Double toRectangle2D () {
+            return new Rectangle2D.Double(minLon, minLat,
+                    maxLon - minLon, maxLat - minLat);
+        }
     }
 
 }
