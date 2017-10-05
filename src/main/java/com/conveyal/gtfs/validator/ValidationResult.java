@@ -20,9 +20,9 @@ public class ValidationResult implements Serializable {
     public LocalDate declaredEndDate;
     public LocalDate firstCalendarDate;
     public LocalDate lastCalendarDate;
-//    public int[] dailyTravelTime;
-//    public int[] dailyStopTimes;
-//    public int[] dailyTrips;
+    public int[] dailyTravelTime;
+    public int[] dailyStopTimes;
+    public int[] dailyTrips;
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
 
