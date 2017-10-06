@@ -38,6 +38,14 @@ public class ValidationResult implements Serializable {
             return new Rectangle2D.Double(minLon, minLat,
                     maxLon - minLon, maxLat - minLat);
         }
+
+        // FIXME: use JTS instead?
+        public void expandToInclude(double stop_lat, double stop_lon) {
+//            if (stop_lat < minLat) {
+//                minLat = stop_lat;
+//            } else if (stop_lat > )
+
+        }
     }
 
 }

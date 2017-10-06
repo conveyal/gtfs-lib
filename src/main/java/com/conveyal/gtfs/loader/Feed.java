@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
@@ -26,6 +27,8 @@ public class Feed {
     private final String tablePrefix; // including any separator character, may be the empty string.
 
     public final TableReader<Agency> agencies;
+    public final TableReader<Calendar> calendars;
+    public final TableReader<CalendarDate> calendarDates;
 //    public final TableReader<Fare> fares;
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
@@ -34,8 +37,6 @@ public class Feed {
 //    public final TableReader<CalendarDate> calendarDates;
     public final TableReader<ShapePoint> shapePoints;
     public final TableReader<StopTime>   stopTimes;
-
-    public ValidationResult validationResult;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     // TODO remove this and use only NewGTFSErrors in Validators, loaded into a JDBC table
@@ -53,8 +54,8 @@ public class Feed {
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
 //        fares = new JDBCTableReader(Table.FARES, dataSource, tablePrefix, EntityPopulator.FARE);
-//        calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
-//        calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
+        calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
+        calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
@@ -71,10 +72,24 @@ public class Feed {
         return null;
     }
 
-    private ValidationResult validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
+    /**
+     * TODO check whether validation has already occurred, overwrite results.
+     */
+    public ValidationResult validate () {
         long validationStartTime = System.currentTimeMillis();
+        // Create an empty validation result that will have its fields populated by certain validators.
+        ValidationResult validationResult = new ValidationResult();
+        // Error tables should already be present from the initial load.
+        // Reconnect to the existing error tables.
+        SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
         int errorCountBeforeValidation = errorStorage.getErrorCount();
-        validationResult = new ValidationResult(); // <<< FIXME
+
+        List<FeedValidator> feedValidators = Arrays.asList(
+                new MisplacedStopValidator(this, errorStorage, validationResult),
+                new DuplicateStopsValidator(this, errorStorage),
+                new TimeZoneValidator(this, errorStorage),
+                new NewTripTimesValidator(this, errorStorage),
+                new NamesValidator(this, errorStorage));
         for (FeedValidator feedValidator : feedValidators) {
             String validatorName = feedValidator.getClass().getSimpleName();
             try {
@@ -96,31 +111,14 @@ public class Feed {
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
-        LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
+        LOG.info("{} validators completed in {} milliseconds.", feedValidators.size(), totalValidationTime);
 
         // update validation result fields
         validationResult.errorCount = totalValidationErrors;
         validationResult.validationTime = totalValidationTime;
+
         // FIXME: Validation result date and int[] fields need to be set somewhere.
-
         return validationResult;
-    }
-
-    /**
-     * TODO check whether validation has already occurred, overwrite results.
-     */
-    public ValidationResult validate () {
-        // Error tables should already be present from the initial load.
-        // Reconnect to the existing error tables.
-        SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
-        ValidationResult result = validate (errorStorage,
-            new MisplacedStopValidator(this, errorStorage),
-            new DuplicateStopsValidator(this, errorStorage),
-            new TimeZoneValidator(this, errorStorage),
-            new NewTripTimesValidator(this, errorStorage),
-            new NamesValidator(this, errorStorage)
-        );
-        return result;
     }
 
 }

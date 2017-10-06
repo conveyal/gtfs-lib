@@ -6,6 +6,7 @@ import gnu.trove.map.TObjectIntMap;
 import java.net.URL;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 
@@ -41,7 +42,25 @@ public interface EntityPopulator<T> {
         agency.agency_phone    = getStringIfPresent(result, "agency_phone", columnForName);
         agency.agency_fare_url = null;
         agency.agency_email    = getStringIfPresent(result, "agency_email", columnForName);
+        agency.agency_branding_url = null; // FIXME
         return agency;
+    };
+
+    public static final EntityPopulator<Calendar> CALENDAR = (result, columnForName) -> {
+        Calendar calendar = new Calendar();
+        calendar.service_id      = getStringIfPresent(result, "service_id", columnForName);
+        calendar.start_date      = -1; // FIXME: add start/end dates
+        calendar.end_date        = -1;
+//        calendar.monday          = // FIXME: add days of week.
+        return calendar;
+    };
+
+    public static final EntityPopulator<CalendarDate> CALENDAR_DATE = (result, columnForName) -> {
+        CalendarDate calendarDate = new CalendarDate();
+        calendarDate.service_id       = getStringIfPresent(result, "service_id", columnForName);
+        calendarDate.date     = null; // FIXME: add LocalDate
+        calendarDate.exception_type      = getIntIfPresent(result, "exception_type", columnForName);
+        return calendarDate;
     };
 
     public static final EntityPopulator<Route> ROUTE = (result, columnForName) -> {
@@ -129,6 +148,14 @@ public interface EntityPopulator<T> {
         if (columnIndex == 0) return null;
         else return resultSet.getString(columnIndex);
     }
+
+    // FIXME: Do we need a method to get LocalDate for calendar tables?
+//    public static LocalDate getDateIfPresent (ResultSet resultSet, String columnName,
+//                                              TObjectIntMap<String> columnForName) throws SQLException {
+//        int columnIndex = columnForName.get(columnName);
+//        if (columnIndex == 0) return -1;
+//        else return resultSet.get(columnIndex);
+//    }
 
     public static double getDoubleIfPresent (ResultSet resultSet, String columnName,
                                              TObjectIntMap<String> columnForName) throws SQLException {
