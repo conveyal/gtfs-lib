@@ -91,7 +91,7 @@ public class Feed {
                 e.printStackTrace();
             }
         }
-        int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation
+        int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation;
         LOG.info("Total number of errors found by all validators: {}", totalValidationErrors);
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
