@@ -32,7 +32,8 @@ public class Calendar extends Entity implements Serializable {
 
         /**
          * Create a loader. The map parameter should be an in-memory map that will be modified. We can't write directly
-         * to MapDB because we modify services as we load calendar dates, and this creates concurrentmodificationexceptions.
+         * to MapDB because we modify services as we load calendar dates, and this creates
+         * ConcurrentModificationExceptions.
          */
         public Loader(GTFSFeed feed, Map<String, Service> services) {
             super(feed, "calendar");

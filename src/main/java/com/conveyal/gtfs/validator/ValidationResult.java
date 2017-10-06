@@ -1,9 +1,6 @@
 package com.conveyal.gtfs.validator;
 
-import javafx.geometry.Bounds;
-
 import java.time.LocalDate;
-import java.util.Collection;
 
 /**
  * An instance of this class is returned by the validator.

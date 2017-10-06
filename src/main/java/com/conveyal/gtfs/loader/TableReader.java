@@ -11,12 +11,10 @@ public interface TableReader <T extends Entity> extends Iterable<T> {
 
     public T get (String id);
 
-    // public Iterable<T> getAll ();
-
-    // public Iterable<T> getAllOrdered ();
-
     public Iterable<T> getOrdered (String id);
 
-    public void close ();
+    public Iterable<T> getAll ();
+
+    public Iterable<T> getAllOrdered ();
 
 }

@@ -15,6 +15,7 @@ import static java.time.DayOfWeek.*;
  * This table does not exist in GTFS. It is a join of calendars and calendar_dates on service_id.
  * There should only be one Calendar per service_id. There should only be one calendar_date per tuple of
  * (service_id, date), which means there can be many calendar_dates per service_id.
+ * TODO verify that the same service ID is not allowed to appear more than once in calendar.txt
  */
 public class Service implements Serializable {
 

@@ -52,10 +52,8 @@ public abstract class GTFS {
     public static ValidationResult validate (String feedId, DataSource dataSource) {
         Feed feed = new Feed(dataSource, feedId);
         ValidationResult result = feed.validate();
-        feed.close();
         return result;
     }
-
 
     /**
      * Create an automatically managed pool of database connections to the supplied JDBC database URL.

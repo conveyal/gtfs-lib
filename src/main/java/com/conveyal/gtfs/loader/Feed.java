@@ -27,6 +27,8 @@ public class Feed {
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
     public final TableReader<Trip>  trips;
+//    public final TableReader<Calendar> calendars;
+//    public final TableReader<CalendarDate> calendarDates;
     public final TableReader<ShapePoint> shapePoints;
     public final TableReader<StopTime>   stopTimes;
 
@@ -46,6 +48,8 @@ public class Feed {
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
 //        fares = new JDBCTableReader(Table.FARES, dataSource, tablePrefix, EntityPopulator.FARE);
+//        calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
+//        calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
@@ -99,15 +103,6 @@ public class Feed {
             new NamesValidator(this, errorStorage)
         );
         return result;
-    }
-
-    public void close () {
-        LOG.info("Closing feed connections for {}", tablePrefix);
-        routes.close();
-        stops.close();
-        trips.close();
-        shapePoints.close();
-        stopTimes.close();
     }
 
 }
