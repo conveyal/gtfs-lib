@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
@@ -33,8 +32,8 @@ public class MisplacedStopValidator extends FeedValidator {
         double latLoP = latStats.getPercentile(10);
         double latHiP = latStats.getPercentile(90);
         double latRange = latHiP - latLoP;
-        double minlat = latLoP - latRange;
-        double maxlat = latHiP + latRange;
+        double minLat = latLoP - latRange;
+        double maxLat = latHiP + latRange;
 
         double lonLoP = lonStats.getPercentile(10);
         double lonHiP = lonStats.getPercentile(90);
@@ -42,13 +41,33 @@ public class MisplacedStopValidator extends FeedValidator {
         double minLon = lonLoP - lonRange;
         double maxLon = lonHiP + lonRange;
 
+        // store full bounds in validation result
+        ValidationResult.GeographicBounds fullBounds = new ValidationResult.GeographicBounds();
+        fullBounds.minLat = latStats.getMin();
+        fullBounds.maxLat = latStats.getMax();
+        fullBounds.minLon = lonStats.getMin();
+        fullBounds.maxLon = lonStats.getMax();
+
+        feed.validationResult.fullBounds = fullBounds;
+
+        // store bounds without outliers in validation result
+        ValidationResult.GeographicBounds boundsWithoutOutliers = new ValidationResult.GeographicBounds();
+        boundsWithoutOutliers.minLat = minLat;
+        boundsWithoutOutliers.maxLat = maxLat;
+        boundsWithoutOutliers.minLon = minLon;
+        boundsWithoutOutliers.maxLon = maxLon;
+
+        feed.validationResult.boundsWithoutOutliers = boundsWithoutOutliers;
+
+
+        // determine if a stop is in a low population grid cell or is an outlier
         BooleanAsciiGrid populationGrid = BooleanAsciiGrid.forEarthPopulation();
         for (Stop stop : feed.stops) {
             boolean stopInPopulatedArea = populationGrid.getValueForCoords(stop.stop_lon, stop.stop_lat);
             if (!stopInPopulatedArea) {
                 registerError(stop, STOP_LOW_POPULATION_DENSITY, getCoordString(stop));
             }
-            if (stop.stop_lat < minlat || stop.stop_lat > maxlat || stop.stop_lon < minLon || stop.stop_lon > maxLon) {
+            if (stop.stop_lat < minLat || stop.stop_lat > maxLat || stop.stop_lon < minLon || stop.stop_lon > maxLon) {
                 registerError(stop, STOP_GEOGRAPHIC_OUTLIER, getCoordString(stop));
             }
         }

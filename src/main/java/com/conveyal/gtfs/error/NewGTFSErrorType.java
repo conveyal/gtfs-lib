@@ -47,6 +47,7 @@ public enum NewGTFSErrorType {
     TRIP_OVERLAP_IN_BLOCK(Priority.MEDIUM, "Blocks"),
     TRAVEL_TOO_SLOW(Priority.MEDIUM, "The vehicle is traveling very slowly to reach this stop from the previous one."),
     TRAVEL_TOO_FAST(Priority.MEDIUM, "The vehicle travels extremely fast to reach this stop from the previous one."),
+    VALIDATOR_FAILED(Priority.HIGH, "???"),
     DEPARTURE_BEFORE_ARRIVAL(Priority.MEDIUM, "The vehicle departs from this stop before it arrives."),
     REFERENTIAL_INTEGRITY(Priority.HIGH, "This line references an ID that does not exist in the target table."),
     OTHER(Priority.LOW, "Other errors.");
