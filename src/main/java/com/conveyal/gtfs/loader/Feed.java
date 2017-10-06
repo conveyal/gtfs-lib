@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.validator.*;
@@ -10,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
 
 /**
  * This connects to an SQL RDBMS containing GTFS data and lets you fetch elements out of it.
@@ -31,6 +34,8 @@ public class Feed {
 //    public final TableReader<CalendarDate> calendarDates;
     public final TableReader<ShapePoint> shapePoints;
     public final TableReader<StopTime>   stopTimes;
+
+    public ValidationResult validationResult;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     // TODO remove this and use only NewGTFSErrors in Validators, loaded into a JDBC table
@@ -68,24 +73,37 @@ public class Feed {
 
     private ValidationResult validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
         long validationStartTime = System.currentTimeMillis();
+        int errorCountBeforeValidation = errorStorage.getErrorCount();
+        validationResult = new ValidationResult(); // <<< FIXME
         for (FeedValidator feedValidator : feedValidators) {
+            String validatorName = feedValidator.getClass().getSimpleName();
             try {
-                LOG.info("Running {}.", feedValidator.getClass().getSimpleName());
+                LOG.info("Running {}.", validatorName);
                 int errorCountBefore = errorStorage.getErrorCount();
                 feedValidator.validate();
-                LOG.info("{} found {} errors.", feedValidator.getClass().getSimpleName(), errorStorage.getErrorCount() - errorCountBefore);
+                LOG.info("{} found {} errors.", validatorName, errorStorage.getErrorCount() - errorCountBefore);
             } catch (Exception e) {
-                LOG.error("{} failed.", feedValidator.getClass().getSimpleName());
+                // store an error if the validator fails
+                // FIXME: should the exception be stored?
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, validatorName));
+                LOG.error("{} failed.", validatorName);
                 LOG.error(e.toString());
                 e.printStackTrace();
             }
         }
-        LOG.info("Total number of errors found by all validators: {}", errorStorage.getErrorCount());
+        int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation
+        LOG.info("Total number of errors found by all validators: {}", totalValidationErrors);
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
         LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
-        return new ValidationResult(); // <<< FIXME
+
+        // update validation result fields
+        validationResult.errorCount = totalValidationErrors;
+        validationResult.validationTime = totalValidationTime;
+        // FIXME: Validation result date and int[] fields need to be set somewhere.
+
+        return validationResult;
     }
 
     /**

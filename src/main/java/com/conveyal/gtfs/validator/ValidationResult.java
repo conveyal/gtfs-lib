@@ -25,6 +25,7 @@ public class ValidationResult implements Serializable {
     public int[] dailyTrips;
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
+    public long validationTime;
 
     public static class GeographicBounds implements Serializable {
         private static final long serialVersionUID = 1L;
