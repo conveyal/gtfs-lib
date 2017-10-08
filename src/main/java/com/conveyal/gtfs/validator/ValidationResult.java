@@ -2,7 +2,9 @@ package com.conveyal.gtfs.validator;
 
 import java.awt.geom.Rectangle2D;
 import java.io.Serializable;
+import com.conveyal.gtfs.model.Pattern;
 import java.time.LocalDate;
+import java.util.List;
 
 /**
  * An instance of this class is returned by the validator.
@@ -26,6 +28,7 @@ public class ValidationResult implements Serializable {
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
     public long validationTime;
+    public List<Pattern> patterns;
 
     public static class GeographicBounds implements Serializable {
         private static final long serialVersionUID = 1L;

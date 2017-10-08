@@ -29,7 +29,8 @@ public class NewTripTimesValidator extends FeedValidator {
 
     int tripCount = 0;
 
-    // Caching stops and trips gives a massive speed improvement by avoiding database calls. TODO add caching to the table reader class.
+    // Caching stops and trips gives a massive speed improvement by avoiding database calls.
+    // TODO build this same kind of caching into the table reader class.
     Map<String, Stop> stopById = new HashMap<>();
     Map<String, Trip> tripById = new HashMap<>();
     Map<String, Route> routeById = new HashMap<>();
@@ -43,13 +44,15 @@ public class NewTripTimesValidator extends FeedValidator {
             new SpeedTripValidator(feed, errorStorage),
             new ReferencesTripValidator(feed, errorStorage),
             new OverlappingTripValidator(feed, errorStorage),
-            new ReversedTripValidator(feed, errorStorage)
+            new ReversedTripValidator(feed, errorStorage),
+            new ServiceValidator(feed, errorStorage),
+            new PatternFinderValidator(feed, errorStorage)
         };
     }
 
     @Override
     public void validate () {
-        // TODO cache automatically in feed or table object
+        // TODO cache automatically in feed or TableReader object
         LOG.info("Cacheing stops, trips, and routes...");
         for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
         for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
@@ -160,6 +163,15 @@ public class NewTripTimesValidator extends FeedValidator {
         if (trip != null) route = routeById.get(trip.route_id);
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
+    }
+
+    /**
+     * Completing this feed validator means completing each of its constituent trip validators.
+     */
+    public void complete (ValidationResult validationResult) {
+        for (TripValidator tripValidator : tripValidators) {
+            tripValidator.complete(validationResult);
+        }
     }
 
 }

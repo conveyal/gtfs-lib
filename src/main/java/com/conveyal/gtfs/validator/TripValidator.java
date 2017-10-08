@@ -27,12 +27,4 @@ public abstract class TripValidator extends Validator {
      */
     public abstract void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops);
 
-    /**
-     * This method will be called after validateTrip has been called on the last trip in the feed.
-     * This allows the TripValidator implementation to perform any analysis or checking that uses information
-     * accumulated across all the trips.
-     */
-    public void complete () { }
-
-
 }

@@ -4,7 +4,7 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 
 /**
- * Created by abyrd on 2017-04-19
+ * A subtype of validator that can validate the entire feed at once.
  */
 public abstract class FeedValidator extends Validator {
 
@@ -12,7 +12,7 @@ public abstract class FeedValidator extends Validator {
         super(feed, errorStorage);
     }
 
-    /** The main extension point. */
+    /** The main extension point. Each subsclass must define this method. */
     public abstract void validate ();
 
 }

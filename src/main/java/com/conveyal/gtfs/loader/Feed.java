@@ -24,7 +24,9 @@ public class Feed {
 
     private final DataSource dataSource;
 
-    private final String tablePrefix; // including any separator character, may be the empty string.
+    // The unique database schema name for this particular feed, including the separator charater (dot).
+    // This may be the empty string if the feed is stored in the root ("public") schema.
+    private final String tablePrefix;
 
     public final TableReader<Agency> agencies;
     public final TableReader<Calendar> calendars;
@@ -64,15 +66,6 @@ public class Feed {
     }
 
     /**
-     * This will return a Feed object for the given GTFS feed file. It will load the data from the file into the Feed
-     * object as needed, but will first look for a cached database file in the same directory and with the same name as
-     * the GTFS feed file. This speeds up uses of the feed after the first time.
-     */
-    public Feed loadOrUseCached (String gtfsFilePath) {
-        return null;
-    }
-
-    /**
      * TODO check whether validation has already occurred, overwrite results.
      */
     public ValidationResult validate () {
@@ -90,11 +83,13 @@ public class Feed {
                 new TimeZoneValidator(this, errorStorage),
                 new NewTripTimesValidator(this, errorStorage),
                 new NamesValidator(this, errorStorage));
+
         for (FeedValidator feedValidator : feedValidators) {
             String validatorName = feedValidator.getClass().getSimpleName();
             try {
                 LOG.info("Running {}.", validatorName);
                 int errorCountBefore = errorStorage.getErrorCount();
+                // todo why not just pass the feed and errorstorage in here?
                 feedValidator.validate();
                 LOG.info("{} found {} errors.", validatorName, errorStorage.getErrorCount() - errorCountBefore);
             } catch (Exception e) {
@@ -105,6 +100,10 @@ public class Feed {
                 LOG.error(e.toString());
                 e.printStackTrace();
             }
+        }
+        // Signal to all validators that validation is complete and allow them to report on results / status.
+        for (FeedValidator feedValidator : feedValidators) {
+            feedValidator.complete(validationResult);
         }
         int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation;
         LOG.info("Total number of errors found by all validators: {}", totalValidationErrors);
