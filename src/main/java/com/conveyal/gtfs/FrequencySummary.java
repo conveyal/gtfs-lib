@@ -29,7 +29,7 @@ public class FrequencySummary {
 
     public static void main(String... args) throws IOException {
         GTFSFeed feed = GTFSFeed.fromFile(args[0]);
-        feed.findPatterns();
+
         FeedStats fs = new FeedStats(feed);
         RouteStats stats = new RouteStats(feed, fs);
 
