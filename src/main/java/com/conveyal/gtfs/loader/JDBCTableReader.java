@@ -43,21 +43,23 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
         this.specTable = specTable;
         // Prepare a mapping from column names to indexes. This allows us to avoid throwing exceptions on missing columns.
         // We do this in the constructor to avoid rebuilding the mapping every time we fetch a single entity from the table.
+        // No entry value defaults to zero, and SQL columns are 1-based.
+        columnForName = new TObjectIntHashMap<>();
+        selectClause = "select * from " + qualifiedTableName;
         // Try-with-resources will automatically close the connection when the try block exits.
         try (Connection connection = dataSource.getConnection()) {
-            selectClause = "select * from " + qualifiedTableName;
             LOG.info("Connected to {}", qualifiedTableName);
             PreparedStatement selectAll = connection.prepareStatement(
                     selectClause, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
             ResultSetMetaData metaData = selectAll.getMetaData();
             int nColumns = metaData.getColumnCount();
-            // No entry value defaults to zero, and SQL columns are 1-based.
-            columnForName = new TObjectIntHashMap<>(nColumns);
             for (int c = 1; c <= nColumns; c++) {
                 columnForName.put(metaData.getColumnName(c), c);
             }
         } catch (SQLException e) {
-            throw new RuntimeException(e);
+            if (specTable.isRequired()) {
+                LOG.warn("Could not connect to required table " + qualifiedTableName);
+            }
         }
     }
 
