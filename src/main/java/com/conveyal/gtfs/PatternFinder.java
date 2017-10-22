@@ -1,6 +1,7 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.HashMultimap;
@@ -38,10 +39,9 @@ public class PatternFinder {
     private int nTripsProessed = 0;
 
     /**
-     *  Bin all trips by the sequence of stops they visit.
+     * Bin all trips by the sequence of stops they visit.
      * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
      */
-
 //    public void findPatterns(Feed feed) {
 //
 //        for (Trip trip : trips) {
@@ -72,17 +72,29 @@ public class PatternFinder {
      * unique sequences of stops encountered.
      */
     public List<Pattern> createPatternObjects () {
+        int nextPatternId = 0;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
         List<Pattern> patterns = new ArrayList<>();
-        tripsForPattern.asMap().forEach((key, trips) -> patterns.add(new Pattern(key.stops, trips, null)));
-        // Attempt to assign more human-readable names to all these patterns.
-        renamePatterns(patterns);
+        // TODO assign patterns sequential small integer IDs (may include route)
+        for (TripPatternKey key : tripsForPattern.keySet()) {
+            Collection<Trip> trips = tripsForPattern.get(key);
+            Pattern pattern = new Pattern(key.stops, trips, null);
+            // Overwrite long UUID with sequential integer pattern ID
+            pattern.pattern_id = Integer.toString(nextPatternId++);
+            patterns.add(pattern);
+        }
+        // TODO Attempt to assign more human-readable names to all these patterns.
+        // renamePatterns(patterns, stopById);
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
         return patterns;
     }
 
-    /** destructively rename passed in patterns */
-    private void renamePatterns(Collection<Pattern> patterns) {
+    /**
+     * Destructively rename the supplied collection of patterns.
+     * This process requires access to all the stops in the feed.
+     * Some validators already cache a map of all the stops. There's probably a cleaner way to do this.
+     */
+    private void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
         LOG.info("Generating unique names for patterns");
 
         Map<String, PatternNamingInfo> namingInfoForRoute = new HashMap<>();
@@ -90,31 +102,29 @@ public class PatternFinder {
         for (Pattern pattern : patterns) {
             if (pattern.associatedTrips.isEmpty() || pattern.orderedStops.isEmpty()) continue;
 
-            Trip trip = trips.get(pattern.associatedTrips.get(0));
+            // Each pattern within a route has a unique name (within that route, not across the entire feed)
 
-            // TODO this assumes there is only one route associated with a pattern
-            String route = trip.route_id;
+            PatternNamingInfo namingInfo = namingInfoForRoute.get(pattern.route_id);
+            if (namingInfo == null) {
+                namingInfo = new PatternNamingInfo();
+                namingInfoForRoute.put(pattern.route_id, namingInfo);
+            }
 
-            // names are unique at the route level
-            if (!namingInfoForRoute.containsKey(route)) namingInfoForRoute.put(route, new PatternNamingInfo());
-            PatternNamingInfo namingInfo = namingInfoForRoute.get(route);
+            // Pattern names are built using stop names rather than stop IDs.
+            // Stop names, unlike IDs, are not guaranteed to be unique.
+            // Therefore we must track used names carefully to avoid duplicates.
 
-            if (trip.trip_headsign != null)
-                namingInfo.headsigns.put(trip.trip_headsign, pattern);
-
-            // use stop names not stop IDs as stops may have duplicate names and we want unique pattern names
-            String fromName = stops.get(pattern.orderedStops.get(0)).stop_name;
-            String toName = stops.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
+            String fromName = stopById.get(pattern.orderedStops.get(0)).stop_name;
+            String toName = stopById.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
 
             namingInfo.fromStops.put(fromName, pattern);
             namingInfo.toStops.put(toName, pattern);
 
-            pattern.orderedStops.stream().map(stops::get).forEach(stop -> {
-                if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) return;
-
+            for (String stopId : pattern.orderedStops) {
+                Stop stop = stopById.get(stopId);
+                if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) continue;
                 namingInfo.vias.put(stop.stop_name, pattern);
-            });
-
+            }
             namingInfo.patternsOnRoute.add(pattern);
         }
 
@@ -122,11 +132,8 @@ public class PatternFinder {
         for (PatternNamingInfo info : namingInfoForRoute.values()) {
             for (Pattern pattern : info.patternsOnRoute) {
                 pattern.name = null; // clear this now so we don't get confused later on
-
-                String headsign = trips.get(pattern.associatedTrips.get(0)).trip_headsign;
-
-                String fromName = stops.get(pattern.orderedStops.get(0)).stop_name;
-                String toName = stops.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
+                String fromName = stopById.get(pattern.orderedStops.get(0)).stop_name;
+                String toName = stopById.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
 
                 // check if combination from, to is unique
                 Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
@@ -138,7 +145,7 @@ public class PatternFinder {
                 }
 
                 // check for unique via stop
-                pattern.orderedStops.stream().map(stops::get).forEach(stop -> {
+                pattern.orderedStops.stream().map(stopById::get).forEach(stop -> {
                     Set<Pattern> viaIntersection = new HashSet<>(intersection);
                     viaIntersection.retainAll(info.vias.get(stop.stop_name));
 
@@ -184,7 +191,6 @@ public class PatternFinder {
     private static class PatternNamingInfo {
         // These are all maps from ?
         // FIXME For type safety and clarity maybe we should have a parameterized ID type, i.e. EntityId<Stop> stopId.
-        Multimap<String, Pattern> headsigns = HashMultimap.create();
         Multimap<String, Pattern> fromStops = HashMultimap.create();
         Multimap<String, Pattern> toStops = HashMultimap.create();
         Multimap<String, Pattern> vias = HashMultimap.create();

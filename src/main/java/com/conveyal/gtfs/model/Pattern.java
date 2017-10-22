@@ -61,7 +61,7 @@ public class Pattern implements Serializable {
         // Here we're using only the first one as an exemplar.
         String trip_id = associatedTrips.get(0);
 
-        Trip exemplarTrip = trips.get(0);
+        Trip exemplarTrip = trips.iterator().next();
         this.geometry = patternGeometry;
 
         // feed.getTripGeometry(exemplarTrip.trip_id);

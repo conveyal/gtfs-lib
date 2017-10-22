@@ -43,7 +43,7 @@ public class NewTripTimesValidator extends FeedValidator {
         tripValidators = new TripValidator[] {
             new SpeedTripValidator(feed, errorStorage),
             new ReferencesTripValidator(feed, errorStorage),
-            new OverlappingTripValidator(feed, errorStorage),
+            //new OverlappingTripValidator(feed, errorStorage),
             new ReversedTripValidator(feed, errorStorage),
             new ServiceValidator(feed, errorStorage),
             new PatternFinderValidator(feed, errorStorage)
