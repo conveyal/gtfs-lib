@@ -18,7 +18,9 @@ public class SQLErrorStorage {
 
     private static final Logger LOG = LoggerFactory.getLogger(SQLErrorStorage.class);
 
-    // FIXME should we really be holding on to a single connection from a pool? Look into pooling prepared statements.
+    // TODO Look into pooling prepared statements.
+
+    // FIXME We should probably not be holding a single connection from a pool open. But how slow is fetching a pooled connection?
     private Connection connection;
 
     private int errorCount; // This serves as a unique ID, so it must persist across multiple validator runs.

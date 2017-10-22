@@ -28,9 +28,4 @@ public class ServiceValidator extends TripValidator {
     }
 
 
-    @Override
-    public void complete() {
-
-    }
-
 }

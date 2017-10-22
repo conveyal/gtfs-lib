@@ -47,9 +47,6 @@ public class Pattern implements Serializable {
      */
     public Pattern (List<String> orderedStops, Collection<Trip> trips, LineString patternGeometry){
 
-        // TODO do we need to store a feed ID?
-        //this.feed_id = feed.feedId;
-
         // Temporarily make a random ID for the pattern, which might be overwritten in a later step ?
         this.pattern_id = UUID.randomUUID().toString();
 
