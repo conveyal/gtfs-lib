@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +28,7 @@ public class Feed {
 
     // The unique database schema name for this particular feed, including the separator charater (dot).
     // This may be the empty string if the feed is stored in the root ("public") schema.
-    private final String tablePrefix;
+    public final String tablePrefix;
 
     public final TableReader<Agency> agencies;
     public final TableReader<Calendar> calendars;
@@ -118,6 +120,13 @@ public class Feed {
 
         // FIXME: Validation result date and int[] fields need to be set somewhere.
         return validationResult;
+    }
+
+    /**
+     * @return a JDBC connection to the database underlying this Feed.
+     */
+    public Connection getConnection() throws SQLException {
+        return dataSource.getConnection();
     }
 
 }
