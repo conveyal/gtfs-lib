@@ -56,7 +56,7 @@ public class Table {
         new BooleanField("friday", REQUIRED),
         new BooleanField("saturday", REQUIRED),
         new BooleanField("sunday", REQUIRED),
-        new DateField("start_date", REQUIRED), // FIXME New field type for dates? Split string and check each part.
+        new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED)
     );
 

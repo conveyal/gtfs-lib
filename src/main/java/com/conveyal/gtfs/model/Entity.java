@@ -13,6 +13,7 @@ import com.conveyal.gtfs.error.ReferentialIntegrityError;
 import com.conveyal.gtfs.error.TableInSubdirectoryError;
 import com.conveyal.gtfs.error.TimeParseError;
 import com.conveyal.gtfs.error.URLParseError;
+import com.conveyal.gtfs.loader.DateField;
 import com.conveyal.gtfs.util.Deduplicator;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
@@ -51,7 +52,7 @@ public abstract class Entity implements Serializable {
     public static final int INT_MISSING = Integer.MIN_VALUE;
     public int sourceFileLine;
 
-    /* The feed from which this entity was loaded. */
+    /* The feed from which this entity was loaded. TODO is this really necessary in every entity? */
     transient GTFSFeed feed;
 
     /**
@@ -109,7 +110,7 @@ public abstract class Entity implements Serializable {
          * Therefore the missing-field behavior is this separate function.
          * @return null if column was missing or field is empty
          */
-        private String getFieldCheckRequired(String column, boolean required) throws IOException {
+        private String getFieldCheckRequired (String column, boolean required) throws IOException {
             String str = reader.get(column);
             if (str == null) {
                 if (!missingRequiredColumns.contains(column)) {
@@ -126,17 +127,17 @@ public abstract class Entity implements Serializable {
         }
 
         /** @return the given column from the current row as a deduplicated String. */
-        protected String getStringField(String column, boolean required) throws IOException {
+        protected String getStringField (String column, boolean required) throws IOException {
             String str = getFieldCheckRequired(column, required);
             str = deduplicator.deduplicateString(str);
             return str;
         }
 
-        protected int getIntField(String column, boolean required, int min, int max) throws IOException {
+        protected int getIntField (String column, boolean required, int min, int max) throws IOException {
             return getIntField(column, required, min, max, 0);
         }
 
-        protected int getIntField(String column, boolean required, int min, int max, int defaultValue) throws IOException {
+        protected int getIntField (String column, boolean required, int min, int max, int defaultValue) throws IOException {
             String str = getFieldCheckRequired(column, required);
             int val = INT_MISSING;
             if (str == null) {
@@ -182,13 +183,14 @@ public abstract class Entity implements Serializable {
 
         /**
          * Fetch the given column of the current row, and interpret it as a date in the format YYYYMMDD.
+         * While Postgres has a date type, SQLite does not have any date types, let alone a specific timezone free one.
          * @return the date value as Java LocalDate, or null if it could not be parsed.
          */
         protected LocalDate getDateField(String column, boolean required) throws IOException {
             String str = getFieldCheckRequired(column, required);
             LocalDate dateTime = null;
             if (str != null) try {
-                dateTime = LocalDate.parse(str, DateTimeFormatter.BASIC_ISO_DATE);
+                dateTime = LocalDate.parse(str, DateField.GTFS_DATE_FORMATTER);
                 checkRangeInclusive(2000, 2100, dateTime.getYear());
             } catch (IllegalArgumentException iae) {
                 feed.errors.add(new DateParseError(tableName, row, column));

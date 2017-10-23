@@ -98,11 +98,8 @@ public class Service implements Serializable {
             return false;
 
         else {
-            int gtfsDate = date.getYear() * 10000 + date.getMonthValue() * 100 + date.getDayOfMonth();
-            boolean withinValidityRange = calendar.end_date >= gtfsDate && calendar.start_date <= gtfsDate;
-
-            if (!withinValidityRange) return false;
-
+            boolean outsideValidityRange = date.isAfter(calendar.end_date) || date.isBefore(calendar.start_date);
+            if (outsideValidityRange) return false;
             switch (date.getDayOfWeek()) {
                 case MONDAY:
                     return calendar.monday == 1;

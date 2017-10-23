@@ -3,10 +3,12 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.model.*;
 import gnu.trove.map.TObjectIntMap;
 
+import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.LocalDate;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDate;
 
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 
@@ -27,6 +29,8 @@ import static com.conveyal.gtfs.model.Entity.INT_MISSING;
  * // FIXME URLs?
  *
  * This might also be useable with Commons DBUtils as a result row processor.
+ *
+ * // FIXME add this interface to Entity itself. And add reader / writer functions to entity as well?
  */
 public interface EntityPopulator<T> {
 
@@ -36,11 +40,11 @@ public interface EntityPopulator<T> {
         Agency agency = new Agency();
         agency.agency_id       = getStringIfPresent(result, "agency_id", columnForName);
         agency.agency_name     = getStringIfPresent(result, "agency_name", columnForName);
-        agency.agency_url      = null;
+        agency.agency_url      = getUrlIfPresent   (result, "agency_url", columnForName);
         agency.agency_timezone = getStringIfPresent(result, "agency_timezone", columnForName);
         agency.agency_lang     = getStringIfPresent(result, "agency_lang", columnForName);
         agency.agency_phone    = getStringIfPresent(result, "agency_phone", columnForName);
-        agency.agency_fare_url = null;
+        agency.agency_fare_url = getUrlIfPresent   (result, "agency_fare_url", columnForName);
         agency.agency_email    = getStringIfPresent(result, "agency_email", columnForName);
         agency.agency_branding_url = null; // FIXME
         return agency;
@@ -48,49 +52,55 @@ public interface EntityPopulator<T> {
 
     public static final EntityPopulator<Calendar> CALENDAR = (result, columnForName) -> {
         Calendar calendar = new Calendar();
-        calendar.service_id      = getStringIfPresent(result, "service_id", columnForName);
-        calendar.start_date      = -1; // FIXME: add start/end dates
-        calendar.end_date        = -1;
-//        calendar.monday          = // FIXME: add days of week.
+        calendar.service_id = getStringIfPresent(result, "service_id", columnForName);
+        calendar.start_date = getDateIfPresent  (result, "start_date", columnForName);
+        calendar.end_date   = getDateIfPresent  (result, "end_date",   columnForName);
+        calendar.monday     = getIntIfPresent   (result, "monday",     columnForName);
+        calendar.tuesday    = getIntIfPresent   (result, "tuesday",    columnForName);
+        calendar.wednesday  = getIntIfPresent   (result, "wednesday",  columnForName);
+        calendar.thursday   = getIntIfPresent   (result, "thursday",   columnForName);
+        calendar.friday     = getIntIfPresent   (result, "friday",     columnForName);
+        calendar.saturday   = getIntIfPresent   (result, "saturday",   columnForName);
+        calendar.sunday     = getIntIfPresent   (result, "sunday",     columnForName);
         return calendar;
     };
 
     public static final EntityPopulator<CalendarDate> CALENDAR_DATE = (result, columnForName) -> {
-        CalendarDate calendarDate = new CalendarDate();
-        calendarDate.service_id       = getStringIfPresent(result, "service_id", columnForName);
-        calendarDate.date     = null; // FIXME: add LocalDate
-        calendarDate.exception_type      = getIntIfPresent(result, "exception_type", columnForName);
+        CalendarDate calendarDate   = new CalendarDate();
+        calendarDate.service_id     = getStringIfPresent(result, "service_id",     columnForName);
+        calendarDate.date           = getDateIfPresent  (result, "date",           columnForName);
+        calendarDate.exception_type = getIntIfPresent   (result, "exception_type", columnForName);
         return calendarDate;
     };
 
     public static final EntityPopulator<Route> ROUTE = (result, columnForName) -> {
         Route route = new Route();
-        route.route_id         = getStringIfPresent(result, "route_id", columnForName);
-        route.agency_id        = getStringIfPresent(result, "agency_id", columnForName);
-        route.route_short_name = getStringIfPresent(result, "route_short_name", columnForName);
-        route.route_long_name  = getStringIfPresent(result, "route_long_name", columnForName);
-        route.route_desc       = getStringIfPresent(result, "route_desc", columnForName);
-        route.route_type       = getIntIfPresent   (result, "route_type", columnForName);
-        route.route_color      = getStringIfPresent(result, "route_color", columnForName);
-        route.route_text_color = getStringIfPresent(result, "route_text_color", columnForName);
-        route.route_url          = null;
-        route.route_branding_url = null;
+        route.route_id         = getStringIfPresent(result, "route_id",           columnForName);
+        route.agency_id        = getStringIfPresent(result, "agency_id",          columnForName);
+        route.route_short_name = getStringIfPresent(result, "route_short_name",   columnForName);
+        route.route_long_name  = getStringIfPresent(result, "route_long_name",    columnForName);
+        route.route_desc       = getStringIfPresent(result, "route_desc",         columnForName);
+        route.route_type       = getIntIfPresent   (result, "route_type",         columnForName);
+        route.route_color      = getStringIfPresent(result, "route_color",        columnForName);
+        route.route_text_color = getStringIfPresent(result, "route_text_color",   columnForName);
+        route.route_url          = getUrlIfPresent (result, "route_url",          columnForName);;
+        route.route_branding_url = getUrlIfPresent (result, "route_branding_url", columnForName);;
         return route;
     };
 
     public static final EntityPopulator<Stop> STOP = (result, columnForName) -> {
         Stop stop = new Stop();
-        stop.stop_id        = getStringIfPresent(result, "stop_id", columnForName);
-        stop.stop_code      = getStringIfPresent(result, "stop_code", columnForName);
-        stop.stop_name      = getStringIfPresent(result, "stop_name", columnForName);
-        stop.stop_desc      = getStringIfPresent(result, "stop_desc", columnForName);
-        stop.stop_lat       = getDoubleIfPresent(result, "stop_lat", columnForName);
-        stop.stop_lon       = getDoubleIfPresent(result, "stop_lon", columnForName);
-        stop.zone_id        = getStringIfPresent(result, "zone_id", columnForName);
+        stop.stop_id        = getStringIfPresent(result, "stop_id",        columnForName);
+        stop.stop_code      = getStringIfPresent(result, "stop_code",      columnForName);
+        stop.stop_name      = getStringIfPresent(result, "stop_name",      columnForName);
+        stop.stop_desc      = getStringIfPresent(result, "stop_desc",      columnForName);
+        stop.stop_lat       = getDoubleIfPresent(result, "stop_lat",       columnForName);
+        stop.stop_lon       = getDoubleIfPresent(result, "stop_lon",       columnForName);
+        stop.zone_id        = getStringIfPresent(result, "zone_id",        columnForName);
         stop.parent_station = getStringIfPresent(result, "parent_station", columnForName);
-        stop.stop_timezone  = getStringIfPresent(result, "stop_timezone", columnForName);
-        stop.stop_url = null; //new URL(getStringIfPresent(result, "stop_url",  columnForName));
-        stop.location_type = getIntIfPresent(result, "location_type", columnForName);
+        stop.stop_timezone  = getStringIfPresent(result, "stop_timezone",  columnForName);
+        stop.stop_url       = getUrlIfPresent   (result, "stop_url",       columnForName);
+        stop.location_type  = getIntIfPresent   (result, "location_type",  columnForName);
         stop.wheelchair_boarding = Integer.toString(getIntIfPresent(result, "wheelchair_boarding", columnForName));
         return stop;
     };
@@ -147,6 +157,25 @@ public interface EntityPopulator<T> {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return null;
         else return resultSet.getString(columnIndex);
+    }
+
+    public static LocalDate getDateIfPresent (ResultSet resultSet, String columnName,
+                                             TObjectIntMap<String> columnForName) throws SQLException {
+        int columnIndex = columnForName.get(columnName);
+        if (columnIndex == 0) return null;
+        else return LocalDate.parse(resultSet.getString(columnIndex), DateField.GTFS_DATE_FORMATTER);
+    }
+
+    public static URL getUrlIfPresent (ResultSet resultSet, String columnName,
+                                       TObjectIntMap<String> columnForName) throws SQLException {
+        int columnIndex = columnForName.get(columnName);
+        if (columnIndex == 0) return null;
+        try {
+            URL url = new URL(resultSet.getString(columnIndex));
+            return url;
+        } catch (MalformedURLException e) {
+            return null;
+        }
     }
 
     // FIXME: Do we need a method to get LocalDate for calendar tables?

@@ -3,6 +3,7 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.PatternFinder;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
@@ -72,6 +73,7 @@ public class PatternFinderValidator extends TripValidator {
             PreparedStatement insertPatternStopStatement = connection.prepareStatement(
                     String.format("insert into %s values (?, ?, ?)", patternStopsTableName));
             int batchSize = 0;
+            // TODO update to use batch trackers
             for (Pattern pattern : validationResult.patterns) {
                 // First, create a pattern relation.
                 insertPatternStatement.setString(1, pattern.pattern_id);
@@ -95,10 +97,11 @@ public class PatternFinderValidator extends TripValidator {
                     batchSize += 1;
                 }
                 // If we've accumulated a lot of prepared statement calls, pass them on to the database backend.
-                if (batchSize % 1000 == 0) {
+                if (batchSize > JdbcGtfsLoader.INSERT_BATCH_SIZE) {
                     updateTripStatement.executeBatch();
                     insertPatternStatement.executeBatch();
                     insertPatternStopStatement.executeBatch();
+                    batchSize = 0;
                 }
             }
             // Send any remaining prepared statement calls to the database backend.

@@ -8,12 +8,19 @@ import com.google.common.collect.Iterators;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.Iterator;
 import java.util.Map;
 
 public class Calendar extends Entity implements Serializable {
 
     private static final long serialVersionUID = 6634236680822635875L;
+
+    public String service_id;
+
+    public LocalDate start_date;
+    public LocalDate end_date;
+
     public int monday;
     public int tuesday;
     public int wednesday;
@@ -21,10 +28,8 @@ public class Calendar extends Entity implements Serializable {
     public int friday;
     public int saturday;
     public int sunday;
-    public int start_date;
-    public int end_date;
+
     public String feed_id;
-    public String service_id;
 
     public static class Loader extends Entity.Loader<Calendar> {
 
@@ -65,8 +70,8 @@ public class Calendar extends Entity implements Serializable {
                 c.saturday = getIntField("saturday", true, 0, 1);
                 c.sunday = getIntField("sunday", true, 0, 1);
                 // TODO check valid dates
-                c.start_date = getIntField("start_date", true, 18500101, 22001231);
-                c.end_date = getIntField("end_date", true, 18500101, 22001231);
+                c.start_date = getDateField("start_date", true);
+                c.end_date = getDateField("end_date", true);
                 c.feed = feed;
                 c.feed_id = feed.feedId;
                 service.calendar = c;
@@ -95,8 +100,8 @@ public class Calendar extends Entity implements Serializable {
             writeIntField(c.friday);
             writeIntField(c.saturday);
             writeIntField(c.sunday);
-            writeIntField(c.start_date);
-            writeIntField(c.end_date);
+            writeDateField(c.start_date);
+            writeDateField(c.end_date);
             endRecord();
         }
 

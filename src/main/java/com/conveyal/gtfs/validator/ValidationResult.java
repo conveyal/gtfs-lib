@@ -22,9 +22,11 @@ public class ValidationResult implements Serializable {
     public LocalDate declaredEndDate;
     public LocalDate firstCalendarDate;
     public LocalDate lastCalendarDate;
-    public int[] dailyTravelTime;
-    public int[] dailyStopTimes;
-    public int[] dailyTrips;
+    public int[] dailyBusSeconds;
+    public int[] dailyTramSeconds;
+    public int[] dailyMetroSeconds;
+    public int[] dailyRailSeconds;
+    public int[] dailyTotalSeconds;
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
     public long validationTime;

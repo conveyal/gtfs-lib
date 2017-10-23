@@ -66,8 +66,8 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
  */
 public class JdbcGtfsLoader {
 
+    public static final long INSERT_BATCH_SIZE = 500;
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
-    private static final long INSERT_BATCH_SIZE = 500;
 
     private String gtfsFilePath;
     protected ZipFile zip;

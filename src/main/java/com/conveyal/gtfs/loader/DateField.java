@@ -6,29 +6,31 @@ import com.conveyal.gtfs.storage.StorageException;
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.Date;
 
 /**
- * A GTFS date in the numeric format YYYYMMDD
+ * A GTFS date in the format YYYYMMDD.
+ * While Postgres has a date type, SQLite does not have any date types, let alone a specific timezone free one.
+ * Therefore we just save this as a string. Alternatively we could save an integer, but then we'd lose some detail
+ * about malformed strings.
  */
 public class DateField extends Field {
 
-    private static final DateTimeFormatter gtfsDateFormat = DateTimeFormatter.ofPattern("yyyyMMdd");
+    // DateTimeFormatter.BASIC_ISO_DATE is also yyyyMMdd with no separator,
+    // but allows timezones which are not part of GTFS dates.
+    public static final DateTimeFormatter GTFS_DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     public DateField (String name, Requirement requirement) {
         super(name, requirement);
     }
 
-    private int validate (String string) {
+    private String validate (String string) {
         // Parse the date out of the supplied string.
         LocalDate date = null;
         try {
-            date = LocalDate.parse(string, gtfsDateFormat);
+            date = LocalDate.parse(string, GTFS_DATE_FORMATTER);
         } catch (DateTimeParseException ex) {
             throw new StorageException(NewGTFSErrorType.DATE_FORMAT, string);
         }
@@ -37,14 +39,13 @@ public class DateField extends Field {
         if (year < 2000 || year > 2100) {
             throw new StorageException(NewGTFSErrorType.DATE_RANGE, string);
         }
-        // Finally store as int (is that really a good idea?)
-        return Integer.parseInt(string);
+        return string;
     }
 
     @Override
     public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setInt(oneBasedIndex, validate(string));
+            preparedStatement.setString(oneBasedIndex, validate(string));
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
@@ -52,12 +53,12 @@ public class DateField extends Field {
 
     @Override
     public String validateAndConvert (String string) {
-        return Integer.toString(validate(string));
+        return validate(string);
     }
 
     @Override
     public SQLType getSqlType () {
-        return JDBCType.INTEGER;
+        return JDBCType.VARCHAR;
     }
 
 }

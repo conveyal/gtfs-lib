@@ -33,6 +33,7 @@ public abstract class Field {
     /**
      * Check the supplied string to see if it can be parsed as the proper data type.
      * Perform any conversion (I think this is only done for times, to integer numbers of seconds).
+     * TODO should we really be converting times and dates to numbers or storing them as strings to simplify things?
      * @param original a non-null String
      * @return a string that is parseable as this field's type, or null if it is not parseable
      */
