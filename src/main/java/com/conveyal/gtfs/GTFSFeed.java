@@ -1,6 +1,7 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.loader.DateField;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.*;
@@ -205,10 +206,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
 
             LocalDate startDate = service.calendar != null
-                    ? LocalDate.parse(String.valueOf(service.calendar.start_date), dateFormatter)
+                    ? service.calendar.start_date
                     : service.calendar_dates.keySet().stream().sorted().findFirst().get();
             LocalDate endDate = service.calendar != null
-                    ? LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter)
+                    ? service.calendar.end_date
                     : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
             // end date for Period.between is not inclusive
             int daysOfService = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
