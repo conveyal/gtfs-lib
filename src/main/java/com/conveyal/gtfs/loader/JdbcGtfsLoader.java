@@ -382,8 +382,12 @@ public class JdbcGtfsLoader {
             }
         }
         // Record number is zero based but includes the header record, which we don't want to count.
+        // But if we are working with Postgres text file (without a header row) we have to add 1
         // Iteration over all rows has finished, so We are now one record past the end of the file.
-        int numberOfRecordsLoaded = (int) csvReader.getCurrentRecord() - 1;
+        int numberOfRecordsLoaded = (int) csvReader.getCurrentRecord();
+        if (postgresText) {
+          numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
+        }
         csvReader.close();
 
         // Finalize loading the table, either by copying the pre-validated text file into the database (for Postgres)
