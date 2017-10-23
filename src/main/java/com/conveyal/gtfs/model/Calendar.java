@@ -21,6 +21,7 @@ public class Calendar extends Entity implements Serializable {
     public LocalDate start_date;
     public LocalDate end_date;
 
+    // Should these be booleans? Oh... the implications.
     public int monday;
     public int tuesday;
     public int wednesday;

@@ -49,13 +49,13 @@ public class Table {
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
     public static final Table CALENDAR = new Table("calendar", Calendar.class, OPTIONAL,
         new StringField("service_id",  REQUIRED),
-        new BooleanField("monday", REQUIRED),
-        new BooleanField("tuesday", REQUIRED),
-        new BooleanField("wednesday", REQUIRED),
-        new BooleanField("thursday", REQUIRED),
-        new BooleanField("friday", REQUIRED),
-        new BooleanField("saturday", REQUIRED),
-        new BooleanField("sunday", REQUIRED),
+        new IntegerField("monday", REQUIRED, 0, 1),
+        new IntegerField("tuesday", REQUIRED, 0, 1),
+        new IntegerField("wednesday", REQUIRED, 0, 1),
+        new IntegerField("thursday", REQUIRED, 0, 1),
+        new IntegerField("friday", REQUIRED, 0, 1),
+        new IntegerField("saturday", REQUIRED, 0, 1),
+        new IntegerField("sunday", REQUIRED, 0, 1),
         new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED)
     );

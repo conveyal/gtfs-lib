@@ -200,4 +200,11 @@ public interface EntityPopulator<T> {
         else return resultSet.getInt(columnIndex);
     }
 
+    // This really crushes incorrect values... maybe we should just be using int.
+    public static boolean getBooleanIfPresent (ResultSet resultSet, String columnName,
+                                       TObjectIntMap<String> columnForName) throws SQLException {
+        int columnIndex = columnForName.get(columnName);
+        if (columnIndex == 0) return false;
+        else return resultSet.getBoolean(columnIndex);
+    }
 }
