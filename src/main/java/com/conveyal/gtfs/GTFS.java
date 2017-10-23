@@ -153,7 +153,8 @@ public abstract class GTFS {
             }
             if (feedToValidate != null) {
                 LOG.info("Validating feed with unique identifier {}", feedToValidate);
-                validate (feedToValidate, dataSource);
+                ValidationResult validationResult = validate (feedToValidate, dataSource);
+                LOG.info("Done validating.");
             } else {
                 LOG.error("No feed to validate. Specify one, or load a feed in the same command.");
             }
