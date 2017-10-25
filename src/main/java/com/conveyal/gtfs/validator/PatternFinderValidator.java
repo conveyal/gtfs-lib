@@ -48,7 +48,7 @@ public class PatternFinderValidator extends TripValidator {
         // The thing is, in a relational database this would require at least two tables and extra columns in the trips.
         // patterns, stopsInPatterns, patternForTrip. Though we could in fact get the stop sequence from any example trip in the pattern.
         // FIXME In the editor we need patterns to exist separately from and before trips themselves, so me make another table.
-        validationResult.patterns = patternFinder.createPatternObjects();
+        List<Pattern> patterns = patternFinder.createPatternObjects();
         try {
             // TODO this assumes gtfs-lib is using an SQL database and not a MapDB.
             // Maybe we should just create patterns in a separate step, but that would mean iterating over the stop_times twice.
@@ -74,7 +74,7 @@ public class PatternFinderValidator extends TripValidator {
                     String.format("insert into %s values (?, ?, ?)", patternStopsTableName));
             int batchSize = 0;
             // TODO update to use batch trackers
-            for (Pattern pattern : validationResult.patterns) {
+            for (Pattern pattern : patterns) {
                 // First, create a pattern relation.
                 insertPatternStatement.setString(1, pattern.pattern_id);
                 insertPatternStatement.setString(2, pattern.route_id);
