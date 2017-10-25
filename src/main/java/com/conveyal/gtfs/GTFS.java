@@ -129,6 +129,7 @@ public abstract class GTFS {
         String databaseUrl = cmd.getOptionValue("database", DEFAULT_DATABASE_URL);
         String databaseUser = cmd.getOptionValue("user");
         String databasePassword = cmd.getOptionValue("password");
+        LOG.info("Connecting to {} as user {}", databaseUrl, databaseUser);
 
         // Create a JDBC connection pool for the specified database.
         // Missing (null) username and password will fall back on host-based authentication.
