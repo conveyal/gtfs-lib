@@ -27,6 +27,7 @@ public class ValidationResult implements Serializable {
     public int[] dailyMetroSeconds;
     public int[] dailyRailSeconds;
     public int[] dailyTotalSeconds;
+    public int[] dailyTripCounts;
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
     public long validationTime;

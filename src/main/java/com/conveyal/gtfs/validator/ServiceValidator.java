@@ -29,6 +29,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
@@ -182,32 +183,37 @@ public class ServiceValidator extends TripValidator {
                 if (date.isBefore(firstDate)) firstDate = date;
                 if (date.isAfter(lastDate)) lastDate = date;
             }
-            TIntList busSeconds = new TIntArrayList();
-            TIntList tramSeconds = new TIntArrayList();
-            TIntList metroSeconds = new TIntArrayList();
-            TIntList railSeconds = new TIntArrayList();
-            TIntList totalSeconds = new TIntArrayList();
-            for (LocalDate date = firstDate; date.isBefore(lastDate) || date.isEqual(lastDate); date = date.plusDays(1)) {
+            // Copy some useful information into the ValidationResult object to return to the caller.
+            validationResult.firstCalendarDate = firstDate;
+            validationResult.lastCalendarDate = lastDate;
+            // Is this any different? firstDate.until(lastDate, ChronoUnit.DAYS);
+            int nDays = (int) ChronoUnit.DAYS.between(firstDate, lastDate) + 1;
+            validationResult.dailyBusSeconds = new int[nDays];
+            validationResult.dailyTramSeconds = new int[nDays];
+            validationResult.dailyMetroSeconds = new int[nDays];
+            validationResult.dailyRailSeconds = new int[nDays];
+            validationResult.dailyTotalSeconds = new int[nDays];
+            validationResult.dailyTripCounts = new int[nDays];
+            for (int d = 0; d < nDays; d++) {
+                LocalDate date = firstDate.plusDays(d); // current date being processed
                 // Add one value per day. Trove map returns zero for missing keys.
                 DateInfo dateInfo = dateInfoForDate.get(date);
                 if (dateInfo == null) {
-                    registerError(NewGTFSError.forFeed(NewGTFSErrorType.DATE_NO_SERVICE, DateField.GTFS_DATE_FORMATTER.format(date)));
                     dateInfo = new DateInfo(date); // new empty object to get empty durations map.
                 }
-                busSeconds.add(dateInfo.durationByRouteType.get(3));
-                tramSeconds.add(dateInfo.durationByRouteType.get(0));
-                metroSeconds.add(dateInfo.durationByRouteType.get(1));
-                railSeconds.add(dateInfo.durationByRouteType.get(2));
-                totalSeconds.add(dateInfo.getTotalServiceDurationSeconds());
-                // TODO check for low or zero service, which seems to happen even when services are defined.
+                validationResult.dailyBusSeconds[d] = dateInfo.durationByRouteType.get(3);
+                validationResult.dailyTramSeconds[d] = dateInfo.durationByRouteType.get(0);
+                validationResult.dailyMetroSeconds[d] = dateInfo.durationByRouteType.get(1);
+                validationResult.dailyRailSeconds[d] = dateInfo.durationByRouteType.get(2);
+                validationResult.dailyTotalSeconds[d] = dateInfo.getTotalServiceDurationSeconds();
+                validationResult.dailyTripCounts[d] = dateInfo.tripCount;
+                if (dateInfo.getTotalServiceDurationSeconds() <= 0) {
+                    // Check for low or zero service, which seems to happen even when services are defined.
+                    // This will also catch cases where dateInfo was null and the new instance contains no service.
+                    registerError(NewGTFSError.forFeed(NewGTFSErrorType.DATE_NO_SERVICE,
+                            DateField.GTFS_DATE_FORMATTER.format(date)));
+                }
             }
-            validationResult.firstCalendarDate = firstDate;
-            validationResult.lastCalendarDate = lastDate;
-            validationResult.dailyBusSeconds = busSeconds.toArray();
-            validationResult.dailyTramSeconds = tramSeconds.toArray();
-            validationResult.dailyMetroSeconds = metroSeconds.toArray();
-            validationResult.dailyRailSeconds = railSeconds.toArray();
-            validationResult.dailyTotalSeconds = totalSeconds.toArray();
         }
 
         // Now write all these calendar-date relations out to the database.
@@ -216,21 +222,30 @@ public class ServiceValidator extends TripValidator {
             connection = feed.getConnection();
             Statement statement = connection.createStatement();
 
-            // Create a table summarizing all known service IDs
+            // Create a table summarizing all known service IDs.
+            // This is almost just a view joining two sub-selects:
+            // select * from
+            //     (select service_id, count(service_date) from x.service_dates group by service_id) as days
+            //   join
+            //     (select service_id, sum(duration_seconds) from x.service_durations group by service_id) as durations
+            //   on days.service_id = durations.service_id;
+            // Except that some service IDs may have no trips on them, or may not be referenced in any calendar or
+            // calendar exception, which would keep them from appearing in either of those tables. So we just create
+            // this somewhat redundant materialized view to serve as a master list of all services.
             String servicesTableName = feed.tablePrefix + "services";
-            String sql = String.format("create table %s (service_id varchar, days_active integer, duration_seconds integer)", servicesTableName);
+            String sql = String.format("create table %s (service_id varchar, n_days_active integer, duration_seconds integer, n_trips integer)", servicesTableName);
             statement.execute(sql);
-            sql = String.format("insert into %s values (?, ?, ?)", servicesTableName);
+            sql = String.format("insert into %s values (?, ?, ?, ?)", servicesTableName);
             PreparedStatement serviceStatement = connection.prepareStatement(sql);
             final BatchTracker serviceTracker = new BatchTracker(serviceStatement);
             for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
                 serviceStatement.setString(1, serviceInfo.serviceId);
                 serviceStatement.setInt(2, serviceInfo.datesActive.size());
                 serviceStatement.setInt(3, serviceInfo.getTotalServiceDurationSeconds());
+                serviceStatement.setInt(4, serviceInfo.tripIds.size());
                 serviceTracker.addBatch();
             }
             serviceTracker.executeRemaining();
-
 
             // Create a table that shows on which dates each service is active.
             String serviceDatesTableName = feed.tablePrefix + "service_dates";
@@ -257,14 +272,13 @@ public class ServiceValidator extends TripValidator {
             statement.execute(String.format("create index service_dates_service_date on %s (service_date)", serviceDatesTableName));
             statement.execute(String.format("create index service_dates_service_id on %s (service_id)", serviceDatesTableName));
 
-            // Save total trip durations per service_id and per transit mode into the database.
-            /*
-               -- Get total service duration by mode (route_type) per day, joining tables in database
-               select service_date, route_type, sum(duration_seconds)
-               from urhv_ghsubqdkatryosfaaeebdp.service_dates as dates, urhv_ghsubqdkatryosfaaeebdp.service_durations as durations
-               where dates.service_id = durations.service_id
-               group by service_date, route_type order by service_date, route_type;
-            */
+            // Create a table containing the total trip durations per service_id and per transit mode.
+            // Using this table you can get total service duration by mode (route_type) per day, joining tables:
+            // select service_date, route_type, sum(duration_seconds)
+            // from x.service_dates as dates, x.service_durations as durations
+            // where dates.service_id = durations.service_id
+            // group by service_date, route_type order by service_date, route_type;
+
             String serviceDurationsTableName = feed.tablePrefix + "service_durations";
             sql = String.format("create table %s (service_id varchar, route_type integer, " +
                     "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
@@ -317,6 +331,7 @@ public class ServiceValidator extends TripValidator {
 
         final LocalDate date;
         TIntIntHashMap durationByRouteType = new TIntIntHashMap();
+        int tripCount = 0; // Trip count could also in theory be broken down by route type.
         Set<String> servicesActive = new HashSet<>();
 
         public DateInfo(LocalDate date) {
@@ -333,6 +348,7 @@ public class ServiceValidator extends TripValidator {
                 durationByRouteType.adjustOrPutValue(routeType, serviceDurationSeconds, serviceDurationSeconds);
                 return true; // Continue iteration.
             });
+            tripCount += serviceInfo.tripIds.size();
         }
     }
 
