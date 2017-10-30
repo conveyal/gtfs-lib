@@ -260,6 +260,12 @@ public class JdbcGtfsLoader {
             tableLoadResult.rowCount = loadInternal(table);
         } catch (Exception ex) {
             tableLoadResult.fatalException = ex.getMessage();
+        } finally {
+            // Explicitly delete the tmp file now that load is finished (either success or failure).
+            // Otherwise these multi-GB files clutter the drive.
+            if (tempTextFile != null) {
+                tempTextFile.delete();
+            }
         }
         int finalErrorCount = errorStorage.getErrorCount();
         tableLoadResult.errorCount = finalErrorCount - initialErrorCount;
