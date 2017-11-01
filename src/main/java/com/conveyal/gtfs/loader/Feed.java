@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.validator.*;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Multimaps;
@@ -42,8 +43,6 @@ public class Feed {
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
     public final TableReader<Trip>  trips;
-//    public final TableReader<Calendar> calendars;
-//    public final TableReader<CalendarDate> calendarDates;
     public final TableReader<ShapePoint> shapePoints;
     public final TableReader<StopTime>   stopTimes;
 
@@ -74,6 +73,8 @@ public class Feed {
 
     /**
      * TODO check whether validation has already occurred, overwrite results.
+     * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
+     * That would also avoid having to reconnect the error storage to the DB.
      */
     public ValidationResult validate () {
         long validationStartTime = System.currentTimeMillis();
@@ -81,7 +82,12 @@ public class Feed {
         ValidationResult validationResult = new ValidationResult();
         // Error tables should already be present from the initial load.
         // Reconnect to the existing error tables.
-        SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
+        SQLErrorStorage errorStorage = null;
+        try {
+            errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
+        } catch (SQLException e) {
+            throw new StorageException(e);
+        }
         int errorCountBeforeValidation = errorStorage.getErrorCount();
 
         List<FeedValidator> feedValidators = Arrays.asList(
