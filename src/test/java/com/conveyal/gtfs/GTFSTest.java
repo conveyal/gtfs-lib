@@ -7,7 +7,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.*;
 
 /**
  * A test suite for the GTFS Class
@@ -73,6 +73,8 @@ public class GTFSTest {
      */
     private void runSimpleIntegrationTest(String zipFileName) {
         String newDBName = TestUtils.generateNewDB();
+        assertThat(newDBName, not(nullValue()));
+
         try {
             String[] args = {
                 "-load",

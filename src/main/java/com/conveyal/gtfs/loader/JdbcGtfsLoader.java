@@ -186,6 +186,8 @@ public class JdbcGtfsLoader {
             csvReader.close();
         }
 
+        createFeedTable();
+
         try {
             HashCode md5 = Files.hash(gtfsFile, Hashing.md5());
             String md5Hex = md5.toString();
@@ -203,8 +205,6 @@ public class JdbcGtfsLoader {
             // This makes sense since the file should only have one line.
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
-            statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                    "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp)");
             PreparedStatement insertStatement = connection.prepareStatement(
                     "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp)");
             insertStatement.setString(1, tablePrefix);
@@ -219,6 +219,31 @@ public class JdbcGtfsLoader {
         } catch (Exception ex) {
             LOG.error("Exception while creating unique prefix for new feed: {}", ex.getMessage());
             DbUtils.closeQuietly(connection);
+        }
+    }
+
+    private void createFeedTable() {
+        boolean feedTableCreated = false;
+        while(!feedTableCreated) {
+            try {
+                Statement statement = connection.createStatement();
+                statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
+                    "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp)");
+                feedTableCreated = true;
+            } catch (SQLException se) {
+                if (se.getMessage().contains("duplicate key value violates unique constraint")) {
+                    // this might happen with concurrent transactions
+                    // see https://stackoverflow.com/a/29908840/269834
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ie) {
+                        ie.printStackTrace();
+                    }
+                } else {
+                    LOG.error("Exception while creating feed table: " + se.getMessage());
+                    break;
+                }
+            }
         }
     }
 

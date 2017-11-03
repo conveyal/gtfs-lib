@@ -8,8 +8,6 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static com.conveyal.gtfs.util.Util.randomIdString;
-
 public class TestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
@@ -43,7 +41,7 @@ public class TestUtils {
             connection = DriverManager.getConnection(pgUrl);
         } catch (SQLException e) {
             e.printStackTrace();
-            LOG.error("Error creating new database!");
+            LOG.error("Error connecting to the database!");
             return false;
         }
 
@@ -51,7 +49,7 @@ public class TestUtils {
             connection.prepareStatement(statement).execute();
         } catch (SQLException e) {
             e.printStackTrace();
-            LOG.error("Error creating new database!");
+            LOG.error("Error executing statement!");
             return false;
         }
 
