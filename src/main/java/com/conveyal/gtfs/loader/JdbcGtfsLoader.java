@@ -155,7 +155,6 @@ public class JdbcGtfsLoader {
         return result;
     }
 
-
     /**
      * Add a line to the list of loaded feeds showing that this feed has been loaded.
      * We used to inspect feed_info here so we could make our table prefix based on feed ID and version.
@@ -437,6 +436,18 @@ public class JdbcGtfsLoader {
         LOG.info(indexSql);
         connection.createStatement().execute(indexSql);
         // TODO add foreign key constraints, and recover recording errors as needed.
+
+
+        // More indexing
+        // TODO integrate with the above indexing code, iterating over a List<String> of index column expressions
+        for (Field field : fields) {
+            if (field.shouldBeIndexed()) {
+                Statement statement = connection.createStatement();
+                String sql = String.format("create index %s_%s_idx on %s (%s)", table.name, field.name, tablePrefix + table.name, field.name);
+                LOG.info(sql);
+                statement.execute(sql);
+            }
+        }
 
         LOG.info("Committing transaction...");
         connection.commit();
