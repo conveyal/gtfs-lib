@@ -18,7 +18,13 @@ public class SQLErrorStorage {
 
     private static final Logger LOG = LoggerFactory.getLogger(SQLErrorStorage.class);
 
-    // FIXME should we really be holding on to a single connection from a pool? Look into pooling prepared statements.
+    // TODO Look into pooling prepared statements.
+
+    // It is debatable whether we should be holding a single connection from a pool open.
+    // Fetching a pooled connection might slow things down in sections where many thousands of errors are saved.
+    // By reusing the exact same connection as the GTFS table loader, we ensure that the newly created schema is
+    // visible to the connection when it creates the error tables, but we have to be careful where in the code we
+    // record errors.
     private Connection connection;
 
     private int errorCount; // This serves as a unique ID, so it must persist across multiple validator runs.
@@ -33,15 +39,11 @@ public class SQLErrorStorage {
     // How many errors to insert at a time in a batch, for efficiency.
     private static final long INSERT_BATCH_SIZE = 500;
 
-    public SQLErrorStorage (DataSource dataSource, String tablePrefix, boolean createTables) {
+    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
         // TablePrefix should always be internally generated so doesn't need to be sanitized.
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         errorCount = 0;
-        try {
-            this.connection = dataSource.getConnection();
-        } catch (SQLException e) {
-            throw new StorageException(e);
-        }
+        this.connection = connection;
         if (createTables) createErrorTables();
         else reconnectErrorTables();
         createPreparedStatements();

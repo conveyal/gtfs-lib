@@ -8,6 +8,7 @@ import java.sql.SQLType;
 
 /**
  * A GTFS boolean field, coded as a single character string 0 or 1.
+ * It is stored in an SQL integer field.
  */
 public class BooleanField extends Field {
 

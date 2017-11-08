@@ -49,7 +49,7 @@ public class OverlappingTripValidator extends TripValidator {
     }
 
     @Override
-    public void complete() {
+    public void complete (ValidationResult validationResult) {
         for (String blockId : blockIntervals.keySet()) {
             List<BlockInterval> intervals = blockIntervals.get(blockId);
             Collections.sort(intervals, Comparator.comparingInt(i -> i.startTime));

@@ -38,8 +38,6 @@ public class GTFSMain {
         GTFSFeed feed = new GTFSFeed(tempFile.getAbsolutePath());
         feed.loadFromFile(new ZipFile(arguments[0]));
 
-        feed.findPatterns();
-        // TODO: add way to run only specific validators
         if(cmd.hasOption("validate")) {
             feed.validate();
             JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class);

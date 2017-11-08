@@ -3,12 +3,10 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
-import com.sun.org.apache.regexp.internal.RE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -49,14 +47,14 @@ public class Table {
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
     public static final Table CALENDAR = new Table("calendar", Calendar.class, OPTIONAL,
         new StringField("service_id",  REQUIRED),
-        new BooleanField("monday", REQUIRED),
-        new BooleanField("tuesday", REQUIRED),
-        new BooleanField("wednesday", REQUIRED),
-        new BooleanField("thursday", REQUIRED),
-        new BooleanField("friday", REQUIRED),
-        new BooleanField("saturday", REQUIRED),
-        new BooleanField("sunday", REQUIRED),
-        new DateField("start_date", REQUIRED), // FIXME New field type for dates? Split string and check each part.
+        new IntegerField("monday", REQUIRED, 0, 1),
+        new IntegerField("tuesday", REQUIRED, 0, 1),
+        new IntegerField("wednesday", REQUIRED, 0, 1),
+        new IntegerField("thursday", REQUIRED, 0, 1),
+        new IntegerField("friday", REQUIRED, 0, 1),
+        new IntegerField("saturday", REQUIRED, 0, 1),
+        new IntegerField("sunday", REQUIRED, 0, 1),
+        new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED)
     );
 
@@ -161,7 +159,7 @@ public class Table {
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
-        new StringField("route_id",  REQUIRED),
+        new StringField("route_id",  REQUIRED).indexThisColumn(),
         new StringField("service_id",  REQUIRED),
         new StringField("trip_headsign",  OPTIONAL),
         new StringField("trip_short_name",  OPTIONAL),

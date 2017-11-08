@@ -34,7 +34,7 @@ public class ReferencesTripValidator extends TripValidator {
     }
 
     @Override
-    public void complete() {
+    public void complete (ValidationResult validationResult) {
         for (Stop stop : feed.stops) {
             if (!referencedStops.contains(stop.stop_id)) {
                 registerError(stop, STOP_UNUSED, stop.stop_id);

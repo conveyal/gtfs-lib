@@ -73,9 +73,9 @@ public class FeedStats {
         for (Service service : feed.services.values()) {
             if (service.calendar == null)
                 continue;
-            if (startDate == 0 || service.calendar.start_date < startDate) {
-                startDate = service.calendar.start_date;
-            }
+//            if (startDate == 0 || service.calendar.start_date < startDate) {
+//                startDate = service.calendar.start_date;
+//            }
         }
         if (startDate == 0)
             return null;
@@ -92,9 +92,9 @@ public class FeedStats {
             if (service.calendar == null)
                 continue;
 
-            if (endDate == 0 || service.calendar.end_date > endDate) {
-                endDate = service.calendar.end_date;
-            }
+//            if (endDate == 0 || service.calendar.end_date > endDate) {
+//                endDate = service.calendar.end_date;
+//            }
         }
         if (endDate == 0)
             return null;

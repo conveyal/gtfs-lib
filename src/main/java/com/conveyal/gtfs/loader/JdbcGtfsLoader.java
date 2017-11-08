@@ -66,8 +66,8 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
  */
 public class JdbcGtfsLoader {
 
+    public static final long INSERT_BATCH_SIZE = 500;
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
-    private static final long INSERT_BATCH_SIZE = 500;
 
     private String gtfsFilePath;
     protected ZipFile zip;
@@ -77,8 +77,11 @@ public class JdbcGtfsLoader {
     private PreparedStatement insertStatement = null;
 
     private final DataSource dataSource;
-    private SQLErrorStorage errorStorage;
+
+    // These fields will be filled in once feed loading begins.
+    private Connection connection;
     private String tablePrefix;
+    private SQLErrorStorage errorStorage;
 
     public JdbcGtfsLoader(String gtfsFilePath, DataSource dataSource) {
         this.gtfsFilePath = gtfsFilePath;
@@ -96,46 +99,61 @@ public class JdbcGtfsLoader {
     // SHA1 took 1072 msec,  9fb356af4be2750f20955203787ec6f95d32ef22
 
     // There appears to be no advantage to loading tables in parallel, as the whole loading process is I/O bound.
-    public String loadTables () {
+    public FeedLoadResult loadTables () {
+
+        // This result object will be returned to the caller to summarize the feed and report any critical errors.
+        FeedLoadResult result = new FeedLoadResult();
+
         try {
+            // We get a single connection object and share it across several different methods.
+            // This ensures that actions taken in one method are visible to all subsequent SQL statements.
+            // If we create a schema or table on one connection, then access it in a separate connection, we have no
+            // guarantee that it exists when the accessing statement is executed.
+            connection = dataSource.getConnection();
             File gtfsFile = new File(gtfsFilePath);
             this.zip = new ZipFile(gtfsFilePath);
             // Generate a unique prefix that will identify this feed.
             // Prefixes ("schema" names) based on feed_id and feed_version get very messy, so we use random unique IDs.
             // We don't want to use an auto-increment numeric primary key because these need to be alphabetical.
-            // FIXME do this in a loop just in case there's an ID collision (though that'll be extremely rare).
+            // Although ID collisions are theoretically possible, they are improbable in the extreme because our IDs
+            // are long enough to have as much entropy as a UUID. So we don't really need to check for uniqueness and
+            // retry in a loop.
             // TODO handle the case where we don't want any prefix.
             this.tablePrefix = randomIdString();
+            result.uniqueIdentifier = tablePrefix;
             registerFeed(gtfsFile);
             // Include the dot separator in the table prefix.
             // This allows everything to work even when there's no prefix.
             this.tablePrefix += ".";
-            this.errorStorage = new SQLErrorStorage(dataSource, tablePrefix, true);
+            this.errorStorage = new SQLErrorStorage(connection, tablePrefix, true);
             long startTime = System.currentTimeMillis();
-            load(Table.AGENCY);
-            load(Table.CALENDAR);
-            load(Table.CALENDAR_DATES);
-            load(Table.FARE_ATTRIBUTES);
-            load(Table.FARE_RULES);
-            load(Table.FEED_INFO);
-            load(Table.FREQUENCIES);
-            load(Table.ROUTES);
-            load(Table.SHAPES);
-            load(Table.STOPS);
-            load(Table.STOP_TIMES);
-            load(Table.TRANSFERS);
-            load(Table.TRIPS);
+            // Load each table in turn, saving some summary information about what happened during each table load
+            result.agency = load(Table.AGENCY);
+            result.calendar = load(Table.CALENDAR);
+            result.calendarDates = load(Table.CALENDAR_DATES);
+            result.fareAttributes = load(Table.FARE_ATTRIBUTES);
+            result.fareRules = load(Table.FARE_RULES);
+            result.feedInfo = load(Table.FEED_INFO);
+            result.frequencies = load(Table.FREQUENCIES);
+            result.routes = load(Table.ROUTES);
+            result.shapes = load(Table.SHAPES);
+            result.stops = load(Table.STOPS);
+            result.stopTimes = load(Table.STOP_TIMES);
+            result.transfers = load(Table.TRANSFERS);
+            result.trips = load(Table.TRIPS);
+            result.errorCount = errorStorage.getErrorCount();
+            // This will commit and close the single connection that has been shared between all preceding load steps.
             errorStorage.commitAndClose();
             zip.close();
             LOG.info("Loading tables took {} sec", (System.currentTimeMillis() - startTime) / 1000);
         } catch (Exception ex) {
+            // TODO catch exceptions separately while loading each table so load can continue, store in TableLoadResult
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
             ex.printStackTrace();
-            return null;
+            result.fatalException = ex.getMessage();
         }
-        return tablePrefix;
+        return result;
     }
-
 
     /**
      * Add a line to the list of loaded feeds showing that this feed has been loaded.
@@ -147,7 +165,7 @@ public class JdbcGtfsLoader {
      * Originally we were flattening all feed_info files into one root-level table, but that forces us to drop any
      * custom fields in feed_info.
      */
-    private String registerFeed (File gtfsFile) {
+    private void registerFeed (File gtfsFile) {
 
         // FIXME is this extra CSV reader used anymore? Check comment below.
         // First, inspect feed_info.txt to extract the ID and version.
@@ -167,13 +185,11 @@ public class JdbcGtfsLoader {
             csvReader.close();
         }
 
-        Connection connection = null;
         try {
             HashCode md5 = Files.hash(gtfsFile, Hashing.md5());
             String md5Hex = md5.toString();
             HashCode sha1 = Files.hash(gtfsFile, Hashing.sha1());
             String shaHex = sha1.toString();
-            connection = dataSource.getConnection();
             Statement statement = connection.createStatement();
             // TODO try to get the feed_id and feed_version out of the feed_info table
             // statement.execute("select * from feed_info");
@@ -201,11 +217,8 @@ public class JdbcGtfsLoader {
             LOG.info("Created new feed namespace: {}", insertStatement);
         } catch (Exception ex) {
             LOG.error("Exception while creating unique prefix for new feed: {}", ex.getMessage());
-        } finally {
-            // If non-null, close all statements, results, and prepared statements, returning the connection to the pool.
             DbUtils.closeQuietly(connection);
         }
-        return tablePrefix;
     }
 
     /**
@@ -245,15 +258,41 @@ public class JdbcGtfsLoader {
         }
     }
 
-    private void load (Table table) throws Exception {
+    /**
+     * This wraps the main internal table loader method to catch exceptions and figure out how many errors happened.
+     */
+    private TableLoadResult load (Table table) {
+        // This object will be returned to the caller to summarize the contents of the table and any errors.
+        TableLoadResult tableLoadResult = new TableLoadResult();
+        int initialErrorCount = errorStorage.getErrorCount();
+        try {
+            tableLoadResult.rowCount = loadInternal(table);
+        } catch (Exception ex) {
+            tableLoadResult.fatalException = ex.getMessage();
+        } finally {
+            // Explicitly delete the tmp file now that load is finished (either success or failure).
+            // Otherwise these multi-GB files clutter the drive.
+            if (tempTextFile != null) {
+                tempTextFile.delete();
+            }
+        }
+        int finalErrorCount = errorStorage.getErrorCount();
+        tableLoadResult.errorCount = finalErrorCount - initialErrorCount;
+        return tableLoadResult;
+    }
+
+    /**
+     * This function will throw any exception that occurs. Those exceptions will be handled by the outer load method.
+     * @return number of rows that were loaded.
+     */
+    private int loadInternal (Table table) throws Exception {
         CsvReader csvReader = getCsvReader(table);
         if (csvReader == null) {
             // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
-            return;
+            return 0;
         }
         LOG.info("Loading GTFS table {}", table.name);
-        Connection connection = dataSource.getConnection();
         // Use the Postgres text load format if we're connected to that DBMS.
         boolean postgresText = (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL"));
 
@@ -282,7 +321,6 @@ public class JdbcGtfsLoader {
         // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.
         // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
         // We'll just literally prepend feed indentifiers to table names when supplied.
-
         // Some databases require the table to exist before a statement can be prepared.
         targetTable.createSqlTable(connection);
 
@@ -356,10 +394,17 @@ public class JdbcGtfsLoader {
                 if (lineNumber % INSERT_BATCH_SIZE == 0) insertStatement.executeBatch();
             }
         }
+        // Record number is zero based but includes the header record, which we don't want to count.
+        // But if we are working with Postgres text file (without a header row) we have to add 1
+        // Iteration over all rows has finished, so We are now one record past the end of the file.
+        int numberOfRecordsLoaded = (int) csvReader.getCurrentRecord();
+        if (postgresText) {
+          numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
+        }
+        csvReader.close();
 
         // Finalize loading the table, either by copying the pre-validated text file into the database (for Postgres)
         // or inserting any remaining rows (for all others).
-
         if (postgresText) {
             LOG.info("Loading into database table from temporary text file...");
             tempTextFileStream.close();
@@ -392,10 +437,22 @@ public class JdbcGtfsLoader {
         connection.createStatement().execute(indexSql);
         // TODO add foreign key constraints, and recover recording errors as needed.
 
+
+        // More indexing
+        // TODO integrate with the above indexing code, iterating over a List<String> of index column expressions
+        for (Field field : fields) {
+            if (field.shouldBeIndexed()) {
+                Statement statement = connection.createStatement();
+                String sql = String.format("create index %s_%s_idx on %s (%s)", table.name, field.name, tablePrefix + table.name, field.name);
+                LOG.info(sql);
+                statement.execute(sql);
+            }
+        }
+
         LOG.info("Committing transaction...");
         connection.commit();
-        connection.close();
         LOG.info("Done.");
+        return numberOfRecordsLoaded;
     }
 
     /**

@@ -1,15 +1,27 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.GTFSError;
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.validator.*;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Multimaps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
 
 /**
  * This connects to an SQL RDBMS containing GTFS data and lets you fetch elements out of it.
@@ -20,9 +32,13 @@ public class Feed {
 
     private final DataSource dataSource;
 
-    private final String tablePrefix; // including any separator character, may be the empty string.
+    // The unique database schema name for this particular feed, including the separator charater (dot).
+    // This may be the empty string if the feed is stored in the root ("public") schema.
+    public final String tablePrefix;
 
     public final TableReader<Agency> agencies;
+    public final TableReader<Calendar> calendars;
+    public final TableReader<CalendarDate> calendarDates;
 //    public final TableReader<Fare> fares;
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
@@ -46,6 +62,8 @@ public class Feed {
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
 //        fares = new JDBCTableReader(Table.FARES, dataSource, tablePrefix, EntityPopulator.FARE);
+        calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
+        calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
@@ -54,58 +72,72 @@ public class Feed {
     }
 
     /**
-     * This will return a Feed object for the given GTFS feed file. It will load the data from the file into the Feed
-     * object as needed, but will first look for a cached database file in the same directory and with the same name as
-     * the GTFS feed file. This speeds up uses of the feed after the first time.
+     * TODO check whether validation has already occurred, overwrite results.
+     * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
+     * That would also avoid having to reconnect the error storage to the DB.
      */
-    public Feed loadOrUseCached (String gtfsFilePath) {
-        return null;
-    }
-
-    private void validate (SQLErrorStorage errorStorage, FeedValidator... feedValidators) {
+    public ValidationResult validate () {
         long validationStartTime = System.currentTimeMillis();
+        // Create an empty validation result that will have its fields populated by certain validators.
+        ValidationResult validationResult = new ValidationResult();
+        // Error tables should already be present from the initial load.
+        // Reconnect to the existing error tables.
+        SQLErrorStorage errorStorage = null;
+        try {
+            errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
+        } catch (SQLException e) {
+            throw new StorageException(e);
+        }
+        int errorCountBeforeValidation = errorStorage.getErrorCount();
+
+        List<FeedValidator> feedValidators = Arrays.asList(
+                new MisplacedStopValidator(this, errorStorage, validationResult),
+                new DuplicateStopsValidator(this, errorStorage),
+                new TimeZoneValidator(this, errorStorage),
+                new NewTripTimesValidator(this, errorStorage),
+                new NamesValidator(this, errorStorage));
+
         for (FeedValidator feedValidator : feedValidators) {
+            String validatorName = feedValidator.getClass().getSimpleName();
             try {
-                LOG.info("Running {}.", feedValidator.getClass().getSimpleName());
+                LOG.info("Running {}.", validatorName);
                 int errorCountBefore = errorStorage.getErrorCount();
+                // todo why not just pass the feed and errorstorage in here?
                 feedValidator.validate();
-                LOG.info("{} found {} errors.", feedValidator.getClass().getSimpleName(), errorStorage.getErrorCount() - errorCountBefore);
+                LOG.info("{} found {} errors.", validatorName, errorStorage.getErrorCount() - errorCountBefore);
             } catch (Exception e) {
-                LOG.error("{} failed.", feedValidator.getClass().getSimpleName());
+                // store an error if the validator fails
+                // FIXME: should the exception be stored?
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, validatorName));
+                LOG.error("{} failed.", validatorName);
                 LOG.error(e.toString());
                 e.printStackTrace();
             }
         }
-        LOG.info("Total number of errors found by all validators: {}", errorStorage.getErrorCount());
+        // Signal to all validators that validation is complete and allow them to report on results / status.
+        for (FeedValidator feedValidator : feedValidators) {
+            feedValidator.complete(validationResult);
+        }
+        int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation;
+        LOG.info("Total number of errors found by all validators: {}", totalValidationErrors);
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
-        LOG.info("{} validators completed in {} milliseconds.", feedValidators.length, totalValidationTime);
+        LOG.info("{} validators completed in {} milliseconds.", feedValidators.size(), totalValidationTime);
+
+        // update validation result fields
+        validationResult.errorCount = totalValidationErrors;
+        validationResult.validationTime = totalValidationTime;
+
+        // FIXME: Validation result date and int[] fields need to be set somewhere.
+        return validationResult;
     }
 
     /**
-     * TODO check whether validation has already occurred, overwrite results.
+     * @return a JDBC connection to the database underlying this Feed.
      */
-    public void validate () {
-        // Error tables should already be present from the initial load.
-        // Reconnect to the existing error tables.
-        SQLErrorStorage errorStorage = new SQLErrorStorage(dataSource, tablePrefix, false);
-        validate (errorStorage,
-            new MisplacedStopValidator(this, errorStorage),
-            new DuplicateStopsValidator(this, errorStorage),
-            new TimeZoneValidator(this, errorStorage),
-            new NewTripTimesValidator(this, errorStorage),
-            new NamesValidator(this, errorStorage)
-        );
-    }
-
-    public void close () {
-        LOG.info("Closing feed connections for {}", tablePrefix);
-        routes.close();
-        stops.close();
-        trips.close();
-        shapePoints.close();
-        stopTimes.close();
+    public Connection getConnection() throws SQLException {
+        return dataSource.getConnection();
     }
 
 }

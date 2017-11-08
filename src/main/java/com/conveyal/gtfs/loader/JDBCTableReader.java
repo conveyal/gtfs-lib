@@ -2,8 +2,10 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.storage.StorageException;
+import com.vividsolutions.jts.awt.PointShapeFactory;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,105 +27,102 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(JDBCTableReader.class);
 
-    PreparedStatement selectAll;
-    PreparedStatement select;
-    EntityPopulator<T> entityPopulator;
-    TObjectIntMap<String> columnForName;
+    // See https://www.postgresql.org/docs/9.6/static/errcodes-appendix.html
+    public static final String SQL_STATE_UNDEFINED_TABLE = "42P01";
 
+    private final Table specTable;
+    private final EntityPopulator<T> entityPopulator;
+
+    private final TObjectIntMap<String> columnForName;
     private final DataSource dataSource;
-    private String qualifiedTableName;
-    private Connection connection;
-
+    private final String qualifiedTableName;
+    private final String selectClause;
     /**
-     * @param tablePrefix must not be null, can be empty string, should include any separator character
+     * @param tablePrefix must not be null, can be empty string, should include any separator character (dot)
      */
     public JDBCTableReader(Table specTable, DataSource dataSource, String tablePrefix, EntityPopulator<T> entityPopulator) {
         qualifiedTableName = tablePrefix + specTable.name;
         this.dataSource = dataSource;
         this.entityPopulator = entityPopulator;
-        try {
-            connection = this.dataSource.getConnection();
+        this.specTable = specTable;
+        // Prepare a mapping from column names to indexes. This allows us to avoid throwing exceptions on missing columns.
+        // We do this in the constructor to avoid rebuilding the mapping every time we fetch a single entity from the table.
+        // No entry value defaults to zero, and SQL columns are 1-based.
+        columnForName = new TObjectIntHashMap<>();
+        selectClause = "select * from " + qualifiedTableName;
+        // Try-with-resources will automatically close the connection when the try block exits.
+        try (Connection connection = dataSource.getConnection()) {
             LOG.info("Connected to {}", qualifiedTableName);
-            String selectAllSql = "select * from " + qualifiedTableName;
-            selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
-            // Setting fetchSize to something other than zero enables server-side cursor use.
-            // This will only be effective if autoCommit=false though. Otherwise it fills up the memory with all rows.
-            // By default prepared statements are forward-only and read-only, but it wouldn't hurt to show that explicitly.
-            // Those settings allow cursors to be used efficiently.
-            selectAll.setFetchSize(1000); // Use a cursor, but fetch a lot of rows at once.
-            // Cache the index for each column name to avoid throwing exceptions for missing columns.
+            PreparedStatement selectAll = connection.prepareStatement(
+                    selectClause, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
             ResultSetMetaData metaData = selectAll.getMetaData();
             int nColumns = metaData.getColumnCount();
-            // No entry value defaults to zero, and SQL columns are 1-based.
-            columnForName = new TObjectIntHashMap<>(nColumns);
-            for (int c = 1; c <= nColumns; c++) columnForName.put(metaData.getColumnName(c), c);
-            String idField = specTable.getKeyFieldName();
-            String selectOneSql = String.format("select * from %s where %s = ?", qualifiedTableName, idField);
-            String orderByField = specTable.getOrderFieldName();
-            if (orderByField != null) selectOneSql += " order by " + orderByField;
-            select = connection.prepareStatement(selectOneSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
-            select.setFetchSize(0); // Do not use cursor
-            // Redefine select all to be ordered TODO pull this into a separate statement
-            if (orderByField != null) {
-                selectAllSql = String.format("select * from %s order by %s, %s", qualifiedTableName, idField, orderByField);
-                selectAll = connection.prepareStatement(selectAllSql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
-                selectAll.setFetchSize(1000);
+            for (int c = 1; c <= nColumns; c++) {
+                columnForName.put(metaData.getColumnName(c), c);
             }
-            // FIXME Note that the connection is being left open here, with attached prepared statements!
-        } catch (SQLException ex) {
-            LOG.info("Could not connect to table " + qualifiedTableName);
-            // TODO signal to caller that this table does not exist, check if required
-        }
-
-    }
-
-    public void close () {
-        try {
-            connection.close();
-            LOG.info("Disconnected from table {}", qualifiedTableName);
         } catch (SQLException e) {
-            e.printStackTrace();
+            if (specTable.isRequired()) {
+                LOG.warn("Could not connect to required table " + qualifiedTableName);
+            }
         }
     }
 
+    /**
+     * As a convenience, the TableReader itself is iterable.
+     * Seen as an iterable, the TableReader is equivalent to calling tableReader.getAll().
+     */
     @Override
     public Iterator<T> iterator() {
-        return new EntityIterator(selectAll); //
+        return this.getAll().iterator();
     }
 
     /**
      * Get a single item from this table by ID.
      */
-    public T get (String id) {
-        try {
-            select.setString(1, id);
-            ResultSet result = select.executeQuery();
-            if (result.next()) {
-                return entityPopulator.populate(result, columnForName);
-            } else {
-                return null;
-            }
-        } catch (SQLException ex) {
-            throw new StorageException(ex);
-        }
+    @Override
+    public T get (final String id) {
+        // This is slightly less efficient than writing custom code, but code reuse is good.
+        return getUnordered(id).iterator().next();
     }
 
     /**
      * Get all the items from this table with the given ID, in order.
      */
+    @Override
     public Iterable<T> getOrdered (final String id) {
-        // An iterable is a single function that produces an iterator.
-        return () -> {
-            try {
-                // Set the prepared statement parameter immediately before the iterator is constructed.
-                select.setString(1, id);
-                return new EntityIterator(select);
-            } catch (Exception ex) {
-                throw new StorageException(ex);
-            }
-        };
+        // An iterable has a single method that produces an iterator.
+        return () -> { return new EntityIterator(id, true); };
     }
 
+    /**
+     * Get all the items from this table with the given ID, in unspecified order.
+     */
+    public Iterable<T> getUnordered (final String id) {
+        // An iterable has a single method that produces an iterator.
+        return () -> { return new EntityIterator(id, false); };
+    }
+
+    /**
+     * Get all the items from this table in an unspecified order.
+     */
+    @Override
+    public Iterable<T> getAll () {
+        // An iterable has a single method that produces an iterator.
+        return () -> { return new EntityIterator(null, false); };
+    }
+
+    /**
+     * Get all the items from this table in an unspecified order.
+     */
+    @Override
+    public Iterable<T> getAllOrdered () {
+        // An iterable has a single method that produces an iterator.
+        return () -> { return new EntityIterator(null, true); };
+    }
+
+    /**
+     * @return the total number of rows in this table, or -1 if the table does not exist.
+     */
     public int getRowCount() {
         try {
             Connection connection = dataSource.getConnection();
@@ -135,43 +134,116 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
             connection.close();
             return nRows;
         } catch (SQLException ex) {
-            throw new StorageException(ex);
+            if (SQL_STATE_UNDEFINED_TABLE.equals(ex.getSQLState())) {
+                // Table is missing, signal this to the caller.
+                return -1;
+            } else {
+                throw new StorageException(ex);
+            }
         }
     }
 
     private class EntityIterator implements Iterator<T> {
 
-        boolean hasMoreEntities;
-        ResultSet results;
+        private Connection connection; // Will remain open for the duration of the iteration.
+        private boolean hasMoreEntities;
+        private ResultSet results;
 
-        EntityIterator (PreparedStatement preparedStatement) {
+        EntityIterator (String id, boolean ordered) {
             try {
-                // LOG.info(preparedStatement.toString()); // show SQL
+                connection = dataSource.getConnection();
+                PreparedStatement preparedStatement;
+                String sql = selectClause;
+                String idField = specTable.getKeyFieldName();
+                String orderByField = specTable.getOrderFieldName();
+                if (id != null) {
+                    sql += String.format(" where %s = ?", idField);
+                }
+                if (ordered && orderByField != null) {
+                    sql += String.format(" order by %s, %s", idField, orderByField);
+                }
+                preparedStatement =
+                        connection.prepareStatement(sql, TYPE_FORWARD_ONLY, CONCUR_READ_ONLY, CLOSE_CURSORS_AT_COMMIT);
+                if (id != null && orderByField == null) {
+                    // Select a particular ID on a table without sequence numbers. There should be only one result.
+                    // Do not use cursor.
+                    preparedStatement.setFetchSize(0);
+                } else {
+                    // Use a cursor, but fetch a lot of rows at once.
+                    // Setting fetchSize to something other than zero enables server-side cursor use.
+                    // This will only be effective if autoCommit=false though. Otherwise it fills up the memory with all rows.
+                    // By default prepared statements are forward-only and read-only (though we could set that explicitly).
+                    // Those settings allow cursors to be used efficiently.
+                    preparedStatement.setFetchSize(1000);
+                }
+                if (id != null) {
+                    // Fill the primary key into the prepared statement
+                    preparedStatement.setString(1, id);
+                }
+                // Display the SQL statement for clarity
+                LOG.info(preparedStatement.toString());
                 results = preparedStatement.executeQuery();
                 hasMoreEntities = results.next();
+            } catch (SQLException sqlEx) {
+                DbUtils.closeQuietly(connection);
+                if (SQL_STATE_UNDEFINED_TABLE.equals(sqlEx.getSQLState())) {
+                    // Table is just missing, iterate as if it were an empty table.
+                    LOG.info("Table {} did not exist, returning an iterator as if it were empty.", qualifiedTableName);
+                    results = null;
+                    hasMoreEntities = false;
+                }
             } catch (Exception ex) {
+                DbUtils.closeQuietly(connection);
                 throw new StorageException(ex);
             }
+            // Note that we close the connection in the catch clauses above, not in a finally clause.
+            // This is because we want to leave the connection open for the iterator to continue fetching results.
         }
 
+        /**
+         * Tell the caller whether any object will be returned by a call to next().
+         */
         @Override
         public boolean hasNext () {
             return hasMoreEntities;
         }
 
+        /**
+         * If you iterate all the way through to the end of the iterator the connection will automatically be closed.
+         * This allows concise (for Stop stop : feed.stops) iteration.
+         * However it does not allow for partial iteration - stopping partway through will leave the connection open.
+         */
         @Override
         public T next() {
             try {
                 T entity = entityPopulator.populate(results, columnForName);
                 hasMoreEntities = results.next();
                 if (!hasMoreEntities) {
-                    results.close();
-                    // This blocks nested iteration over different tables.
-                    //selectAll.getConnection().commit();
+                    // No more entities to iterate over. We can close the database connection.
+                    // Closing the connection will also close all result sets and return the connection to the pool.
+                    connection.close();
                 }
                 return entity;
             } catch (Exception ex) {
+                DbUtils.closeQuietly(connection);
                 throw new StorageException(ex);
+            }
+        }
+
+        /**
+         * The finalizer will be called when the object is garbage collected.
+         * This way we can detect unclosed connections.
+         */
+        @Override
+        public void finalize () {
+            try {
+                if (connection != null && !connection.isClosed()) {
+                    LOG.error("An iterator connection to table {} is being closed in a finalizer, " +
+                            "it should have been closed at the end of iteration.", qualifiedTableName);
+                    connection.close();
+                }
+            } catch (SQLException ex) {
+                throw new RuntimeException(ex);
             }
         }
 

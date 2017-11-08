@@ -68,7 +68,7 @@ public class TestUtils {
     /**
      * Generate a new database for isolating a test.
      *
-     * @return The name of the name database, or null if creation unsucessful
+     * @return The name of the name database, or null if creation unsuccessful
      */
     public static String generateNewDB() {
         String newDBName = uniqueString();

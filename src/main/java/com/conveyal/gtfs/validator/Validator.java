@@ -62,4 +62,11 @@ public abstract class Validator {
         errorStorage.storeError(error);
     }
 
+    /**
+     * This method will be called after the validation process is complete.
+     * This allows the implementation to perform any analysis or checking that uses accumulated information, and
+     * provides a path to output that summary information (by saving it in the provided ValidationResult object.
+     */
+    public void complete (ValidationResult validationResult) {}
+
 }

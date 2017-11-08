@@ -122,7 +122,6 @@ public abstract class BaseGTFSCache<T> {
 
         GTFSFeed feed = new GTFSFeed(dbFile.getAbsolutePath());
         feed.loadFromFile(new ZipFile(movedFeedFile));
-        feed.findPatterns();
 
         if (idGenerator != null) id = idGenerator.apply(feed);
 

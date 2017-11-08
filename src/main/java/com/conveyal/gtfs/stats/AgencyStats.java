@@ -64,9 +64,9 @@ public class AgencyStats {
         int startDate = 0;
         for (Service service : feed.services.values()) {
 //            if (agencyId.equals(service.agency_id)) {
-            if (startDate == 0
-                    || service.calendar.start_date < startDate)
-                startDate = service.calendar.start_date;
+//            if (startDate == 0
+//                    || service.calendar.start_date < startDate)
+//                startDate = service.calendar.start_date;
 //            }
         }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
@@ -78,9 +78,9 @@ public class AgencyStats {
 
         for (Service service : feed.services.values()) {
 //            if (agencyId.equals(service.agency_id)) {
-            if (endDate == 0
-                    || service.calendar.end_date > endDate)
-                endDate = service.calendar.end_date;
+//            if (endDate == 0
+//                    || service.calendar.end_date > endDate)
+//                endDate = service.calendar.end_date;
 //            }
         }
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");

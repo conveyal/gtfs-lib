@@ -1,7 +1,5 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.storage.StorageException;
-
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
 
@@ -24,6 +22,7 @@ public abstract class Field {
 
     final String name;
     final Requirement requirement;
+    private boolean shouldBeIndexed;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
@@ -33,6 +32,7 @@ public abstract class Field {
     /**
      * Check the supplied string to see if it can be parsed as the proper data type.
      * Perform any conversion (I think this is only done for times, to integer numbers of seconds).
+     * TODO should we really be converting times and dates to numbers or storing them as strings to simplify things?
      * @param original a non-null String
      * @return a string that is parseable as this field's type, or null if it is not parseable
      */
@@ -77,6 +77,19 @@ public abstract class Field {
 
     public boolean isRequired () {
         return this.requirement == Requirement.REQUIRED;
+    }
+
+    /**
+     * Fluent method that indicates that a newly constructed field should be indexed after the table is loaded.
+     * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
+     */
+    public Field indexThisColumn () {
+        this.shouldBeIndexed = true;
+        return this;
+    }
+
+    public boolean shouldBeIndexed() {
+        return shouldBeIndexed;
     }
 
 }
