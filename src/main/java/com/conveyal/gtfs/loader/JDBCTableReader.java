@@ -217,6 +217,8 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
         public T next() {
             try {
                 T entity = entityPopulator.populate(results, columnForName);
+                // Set line number
+                entity.sourceFileLine = EntityPopulator.getIntIfPresent(results, "csv_line", columnForName);
                 hasMoreEntities = results.next();
                 if (!hasMoreEntities) {
                     // No more entities to iterate over. We can close the database connection.
