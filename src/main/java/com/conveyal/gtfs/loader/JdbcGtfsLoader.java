@@ -406,7 +406,7 @@ public class JdbcGtfsLoader {
         // Finalize loading the table, either by copying the pre-validated text file into the database (for Postgres)
         // or inserting any remaining rows (for all others).
         if (postgresText) {
-            LOG.info("Loading into database table from temporary text file...");
+            LOG.info("Loading into database table {} from temporary text file...", targetTable.name);
             tempTextFileStream.close();
             // Allows sending over network. This is only slightly slower than a local file copy.
             final String copySql = String.format("copy %s from stdin", targetTable.name);
