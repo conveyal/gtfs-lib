@@ -22,6 +22,11 @@ public class Trip extends Entity {
     public int    wheelchair_accessible;
     public String feed_id;
 
+    @Override
+    public String getId() {
+        return trip_id;
+    }
+
     public static class Loader extends Entity.Loader<Trip> {
 
         public Loader(GTFSFeed feed) {

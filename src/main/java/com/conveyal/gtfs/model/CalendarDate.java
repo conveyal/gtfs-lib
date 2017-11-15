@@ -18,6 +18,11 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
     public LocalDate date;
     public int       exception_type;
 
+    @Override
+    public String getId () {
+        return service_id;
+    }
+
     public CalendarDate clone () {
         try {
             return (CalendarDate) super.clone();
