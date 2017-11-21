@@ -19,6 +19,11 @@ public class FareAttribute extends Entity {
     public int transfer_duration;
     public String feed_id;
 
+    @Override
+    public String getId () {
+        return fare_id;
+    }
+
     public static class Loader extends Entity.Loader<FareAttribute> {
         private final Map<String, Fare> fares;
 

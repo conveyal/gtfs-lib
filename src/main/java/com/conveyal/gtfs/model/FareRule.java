@@ -17,6 +17,11 @@ public class FareRule extends Entity {
     public String destination_id;
     public String contains_id;
 
+    @Override
+    public String getId () {
+        return fare_id;
+    }
+
     public static class Loader extends Entity.Loader<FareRule> {
 
         private final Map<String, Fare> fares;

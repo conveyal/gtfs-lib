@@ -196,7 +196,7 @@ public interface EntityPopulator<T> {
     public static int getIntIfPresent (ResultSet resultSet, String columnName,
                                        TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
-        if (columnIndex == 0) return -1;
+        if (columnIndex == 0) return Entity.INT_MISSING;
         else return resultSet.getInt(columnIndex);
     }
 

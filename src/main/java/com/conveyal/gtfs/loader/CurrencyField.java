@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 import com.google.common.collect.Sets;
 
@@ -198,7 +199,9 @@ public class CurrencyField extends Field {
     }
 
     private String validate (String string) {
-        if (!CURRENCY_CODES.contains(string)) throw new StorageException("Currency code not recognized: " + string);
+        if (!CURRENCY_CODES.contains(string)) {
+            throw new StorageException(NewGTFSErrorType.CURRENCY_UNKNOWN, string);
+        }
         return string;
     }
 

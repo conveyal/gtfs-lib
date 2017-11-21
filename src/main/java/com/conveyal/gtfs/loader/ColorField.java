@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -23,12 +24,12 @@ public class ColorField extends Field {
     public String validateAndConvert (String string) {
         try {
             if (string.length() != 6) {
-                throw new StorageException("Expected color string to have six characters.");
+                throw new StorageException(NewGTFSErrorType.COLOR_FORMAT, string);
             }
             int integer = Integer.parseInt(string, 16);
             return string; // Could also store the integer.
         } catch (Exception ex) {
-            throw new StorageException(ex);
+            throw new StorageException(NewGTFSErrorType.COLOR_FORMAT, string);
         }
     }
 

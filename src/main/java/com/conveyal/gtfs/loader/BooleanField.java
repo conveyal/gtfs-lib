@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -17,7 +18,9 @@ public class BooleanField extends Field {
     }
 
     private boolean validate (String string) {
-        if ( ! ("0".equals(string) || "1".equals(string))) throw new StorageException("Field must be 0 or 1.");
+        if ( ! ("0".equals(string) || "1".equals(string))) {
+            throw new StorageException(NewGTFSErrorType.BOOLEAN_FORMAT, string);
+        }
         return "1".equals(string);
     }
 

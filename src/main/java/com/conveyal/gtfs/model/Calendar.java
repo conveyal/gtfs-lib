@@ -32,6 +32,11 @@ public class Calendar extends Entity implements Serializable {
 
     public String feed_id;
 
+    @Override
+    public String getId () {
+        return service_id;
+    }
+
     public static class Loader extends Entity.Loader<Calendar> {
 
         private final Map<String, Service> services;
