@@ -338,5 +338,11 @@
       <artifactId>commons-dbcp2</artifactId>
       <version>2.1.1</version>
     </dependency>
+    <!-- GraphQL for Java, without HTTP layer, just query and response handling. -->
+    <dependency>
+      <groupId>com.graphql-java</groupId>
+      <artifactId>graphql-java</artifactId>
+      <version>4.2</version>
+    </dependency>
   </dependencies>
 </project>
