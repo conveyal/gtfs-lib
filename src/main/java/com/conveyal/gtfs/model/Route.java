@@ -32,6 +32,11 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public URL route_branding_url;
     public String feed_id;
 
+    @Override
+    public String getId () {
+        return route_id;
+    }
+
     public static class Loader extends Entity.Loader<Route> {
 
         public Loader(GTFSFeed feed) {

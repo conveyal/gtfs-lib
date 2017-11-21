@@ -20,6 +20,11 @@ public class Agency extends Entity {
     public URL    agency_branding_url;
     public String feed_id;
 
+    @Override
+    public String getId () {
+        return agency_id;
+    }
+
     public static class Loader extends Entity.Loader<Agency> {
 
         public Loader(GTFSFeed feed) {

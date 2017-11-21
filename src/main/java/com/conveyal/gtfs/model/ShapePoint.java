@@ -16,6 +16,16 @@ public class ShapePoint extends Entity {
     public int    shape_pt_sequence;
     public double shape_dist_traveled;
 
+    @Override
+    public String getId () {
+        return shape_id;
+    }
+
+    @Override
+    public Integer getSequenceNumber() {
+        return shape_pt_sequence;
+    }
+
     public ShapePoint () { }
 
     // Similar to stoptime, we have to have a constructor, because fields are final so as to be immutable for storage in MapDB.

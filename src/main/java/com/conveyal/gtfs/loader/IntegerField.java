@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 
@@ -29,8 +30,8 @@ public class IntegerField extends Field {
 
     private int validate (String string) {
         int i = Integer.parseInt(string);
-        if (i < minValue) throw new StorageException("integer value must be at least " + minValue);
-        if (i > maxValue) throw new StorageException("integer value must be at most " + maxValue);
+        if (i < minValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_SMALL, string);
+        if (i > maxValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, string);
         return i;
     }
 

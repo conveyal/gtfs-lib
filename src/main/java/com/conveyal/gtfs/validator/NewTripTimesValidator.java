@@ -3,6 +3,7 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -76,11 +77,11 @@ public class NewTripTimesValidator extends FeedValidator {
     }
 
     protected static boolean missingEitherTime (StopTime stopTime) {
-        return (stopTime.arrival_time == -1 || stopTime.departure_time == -1);
+        return (stopTime.arrival_time == Entity.INT_MISSING || stopTime.departure_time == Entity.INT_MISSING);
     }
 
     protected static boolean missingBothTimes(StopTime stopTime) {
-        return (stopTime.arrival_time == -1 && stopTime.departure_time == -1);
+        return (stopTime.arrival_time == Entity.INT_MISSING && stopTime.departure_time == Entity.INT_MISSING);
     }
 
     /**
@@ -89,11 +90,11 @@ public class NewTripTimesValidator extends FeedValidator {
      */
     protected static boolean fixMissingTimes (StopTime stopTime) {
         boolean missing = false;
-        if (stopTime.arrival_time == -1) {
+        if (stopTime.arrival_time == Entity.INT_MISSING) {
             stopTime.arrival_time = stopTime.departure_time;
             missing = true;
         }
-        if (stopTime.departure_time == -1) {
+        if (stopTime.departure_time == Entity.INT_MISSING) {
             stopTime.departure_time = stopTime.arrival_time;
             missing = true;
         }

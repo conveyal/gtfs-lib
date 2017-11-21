@@ -13,6 +13,8 @@ import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  * This is the public interface to the RDBMS backed functionality in gtfs-lib.
@@ -72,6 +74,14 @@ public abstract class GTFS {
      * For local Postgres connections, you can supply a null username and password to use host-based authentication.
      */
     public static DataSource createDataSource (String url, String username, String password) {
+        String characterEncoding = Charset.defaultCharset().toString();
+        LOG.debug("Default character encoding: {}", characterEncoding);
+        if (!Charset.defaultCharset().equals(StandardCharsets.UTF_8)) {
+            // Character encoding must be set to UTF-8 in order for the database connection to work without error.
+            // To override default encoding at runtime, run application jar with encoding environment variable set to
+            // UTF-8 (or update IDE settings). TODO we should also check that JDBC and the database know to use UTF-8.
+            throw new RuntimeException("Your system's default encoding (" + characterEncoding + ") is not supported. Please set it to UTF-8. Example: java -Dfile.encoding=UTF-8 application.jar");
+        }
         // ConnectionFactory can handle null username and password (for local host-based authentication)
         ConnectionFactory connectionFactory = new DriverManagerConnectionFactory(url, username, password);
         PoolableConnectionFactory poolableConnectionFactory = new PoolableConnectionFactory(connectionFactory, null);

@@ -55,6 +55,9 @@ public enum NewGTFSErrorType {
     VALIDATOR_FAILED(Priority.HIGH, "???"),
     DEPARTURE_BEFORE_ARRIVAL(Priority.MEDIUM, "The vehicle departs from this stop before it arrives."),
     REFERENTIAL_INTEGRITY(Priority.HIGH, "This line references an ID that does not exist in the target table."),
+    BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
+    COLOR_FORMAT(Priority.MEDIUM, "A color should be specified with six-characters (three two-digit hexadecimal numbers)."),
+    CURRENCY_UNKNOWN(Priority.MEDIUM, "The currency code was not recognized."),
     OTHER(Priority.LOW, "Other errors.");
 
     public final Priority priority;

@@ -17,6 +17,12 @@ public class Transfer extends Entity {
     public String from_trip_id;
     public String to_trip_id;
 
+    // TODO: Add id method for Transfer.
+//    @Override
+//    public String getId() {
+////        return trip_id;
+//    }
+
     public static class Loader extends Entity.Loader<Transfer> {
 
         public Loader(GTFSFeed feed) {

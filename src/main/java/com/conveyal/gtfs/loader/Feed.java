@@ -85,8 +85,8 @@ public class Feed {
         SQLErrorStorage errorStorage = null;
         try {
             errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
-        } catch (SQLException e) {
-            throw new StorageException(e);
+        } catch (SQLException ex) {
+            throw new StorageException(ex);
         }
         int errorCountBeforeValidation = errorStorage.getErrorCount();
 

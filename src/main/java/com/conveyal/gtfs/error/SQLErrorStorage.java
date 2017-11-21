@@ -137,7 +137,7 @@ public class SQLErrorStorage {
             LOG.info("Reconnected to errors table, max error ID is {}.", errorCount);
             errorCount += 1; // Error count is zero based, add one to avoid duplicate error key
         } catch (SQLException ex) {
-            throw new StorageException("Could not connect to errors table.", ex);
+            throw new StorageException(ex);
         }
     }
 
