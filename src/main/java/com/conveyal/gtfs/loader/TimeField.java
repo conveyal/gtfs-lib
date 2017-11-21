@@ -32,13 +32,24 @@ public class TimeField extends Field {
     }
 
     private static int getSeconds (String hhmmss) {
-        if (hhmmss.length() != 8) {
+        // Accept hh:mm:ss or h:mm:ss for single-digit hours.
+        if (hhmmss.length() != 8 && hhmmss.length() != 7) {
             throw new StorageException(NewGTFSErrorType.TIME_FORMAT, hhmmss);
         }
         String[] fields = hhmmss.split(":");
+        if (fields.length != 3) {
+            throw new StorageException(NewGTFSErrorType.TIME_FORMAT, hhmmss);
+        }
         int h = Integer.parseInt(fields[0]);
         int m = Integer.parseInt(fields[1]);
         int s = Integer.parseInt(fields[2]);
+        // Other than the Moscow-Pyongyang route at 8.5 days, most of the longest services are around 6 days.
+        if (h < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, hhmmss);
+        if (h > 150) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
+        if (m < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, hhmmss);
+        if (m > 60) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
+        if (s < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, hhmmss);
+        if (s > 60) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
         return ((h * 60) + m) * 60 + s;
     }
 
