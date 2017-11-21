@@ -217,7 +217,8 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
         public T next() {
             try {
                 T entity = entityPopulator.populate(results, columnForName);
-                // Set line number
+                // Set the line number on every entity the same way 
+                // rather than repeating this statement in each implementation class.
                 entity.sourceFileLine = EntityPopulator.getIntIfPresent(results, "csv_line", columnForName);
                 hasMoreEntities = results.next();
                 if (!hasMoreEntities) {
