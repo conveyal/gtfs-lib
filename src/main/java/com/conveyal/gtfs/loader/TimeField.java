@@ -47,9 +47,9 @@ public class TimeField extends Field {
         if (h < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, hhmmss);
         if (h > 150) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
         if (m < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, hhmmss);
-        if (m > 60) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
+        if (m > 59) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
         if (s < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, hhmmss);
-        if (s > 60) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
+        if (s > 59) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, hhmmss);
         return ((h * 60) + m) * 60 + s;
     }
 
