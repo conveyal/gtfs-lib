@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -21,9 +22,8 @@ public class ShortField extends Field {
     private short validate (String string) {
         if (string == null || string.isEmpty()) return 0; // Default numeric fields to zero.
         short s = Short.parseShort(string);
-        if (s < 0) throw new StorageException("negative field in " + name  );
-        // TODO enforce
-        // if (s > maxValue) throw new StorageException("excessively large short integer value in field " + name);
+        if (s < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, string);
+        if (s > maxValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, string);
         return s;
     }
 

@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -32,7 +33,7 @@ public class TimeField extends Field {
 
     private static int getSeconds (String hhmmss) {
         if (hhmmss.length() != 8) {
-            throw new StorageException("Time field should be 8 characters long.");
+            throw new StorageException(NewGTFSErrorType.TIME_FORMAT, hhmmss);
         }
         String[] fields = hhmmss.split(":");
         int h = Integer.parseInt(fields[0]);

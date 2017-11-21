@@ -261,8 +261,8 @@ public class ServiceValidator extends TripValidator {
                         serviceDateStatement.setString(1, date.format(DateField.GTFS_DATE_FORMATTER));
                         serviceDateStatement.setString(2, serviceInfo.serviceId);
                         serviceDateTracker.addBatch();
-                    } catch (SQLException e) {
-                        throw new StorageException(e);
+                    } catch (SQLException ex) {
+                        throw new StorageException(ex);
                     }
                 }
 
@@ -293,8 +293,8 @@ public class ServiceValidator extends TripValidator {
                         serviceDurationStatement.setInt(2, routeType);
                         serviceDurationStatement.setInt(3, serviceDurationSeconds);
                         serviceDurationTracker.addBatch();
-                    } catch (SQLException e) {
-                        throw new StorageException(e);
+                    } catch (SQLException ex) {
+                        throw new StorageException(ex);
                     }
                     return true; // Iteration continues
                 });
