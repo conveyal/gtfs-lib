@@ -50,6 +50,7 @@ public abstract class Entity implements Serializable {
 
     private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
+    public static final double DOUBLE_MISSING = Double.MIN_VALUE;
     public int sourceFileLine;
 
     /* The feed from which this entity was loaded. TODO is this really necessary in every entity? */

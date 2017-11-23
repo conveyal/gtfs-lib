@@ -1,6 +1,8 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.storage.StorageException;
 import gnu.trove.map.TObjectIntMap;
 
 import java.net.MalformedURLException;
@@ -9,6 +11,7 @@ import java.time.LocalDate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.format.DateTimeParseException;
 
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 
@@ -163,7 +166,15 @@ public interface EntityPopulator<T> {
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return null;
-        else return LocalDate.parse(resultSet.getString(columnIndex), DateField.GTFS_DATE_FORMATTER);
+        String dateString = resultSet.getString(columnIndex);
+        if (dateString == null) return null;
+        try {
+            LocalDate localDate = LocalDate.parse(dateString, DateField.GTFS_DATE_FORMATTER);
+            return localDate;
+        } catch (DateTimeParseException dtpex) {
+            // We're reading out of the database here, not loading from GFTS CSV, so just return null for bad values.
+            return null;
+        }
     }
 
     public static URL getUrlIfPresent (ResultSet resultSet, String columnName,
@@ -178,33 +189,22 @@ public interface EntityPopulator<T> {
         }
     }
 
-    // FIXME: Do we need a method to get LocalDate for calendar tables?
-//    public static LocalDate getDateIfPresent (ResultSet resultSet, String columnName,
-//                                              TObjectIntMap<String> columnForName) throws SQLException {
-//        int columnIndex = columnForName.get(columnName);
-//        if (columnIndex == 0) return -1;
-//        else return resultSet.get(columnIndex);
-//    }
-
-    public static double getDoubleIfPresent (ResultSet resultSet, String columnName,
-                                             TObjectIntMap<String> columnForName) throws SQLException {
+    static double getDoubleIfPresent (ResultSet resultSet, String columnName,
+                                      TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
-        if (columnIndex == 0) return -1;
-        else return resultSet.getDouble(columnIndex);
+        if (columnIndex == 0) return Entity.DOUBLE_MISSING;
+        double value = resultSet.getDouble(columnIndex);
+        if (resultSet.wasNull()) return Entity.DOUBLE_MISSING;
+        else return value;
     }
 
-    public static int getIntIfPresent (ResultSet resultSet, String columnName,
-                                       TObjectIntMap<String> columnForName) throws SQLException {
+    static int getIntIfPresent (ResultSet resultSet, String columnName,
+                                TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return Entity.INT_MISSING;
-        else return resultSet.getInt(columnIndex);
+        int value = resultSet.getInt(columnIndex);
+        if (resultSet.wasNull()) return Entity.INT_MISSING;
+        else return value;
     }
 
-    // This really crushes incorrect values... maybe we should just be using int.
-    public static boolean getBooleanIfPresent (ResultSet resultSet, String columnName,
-                                       TObjectIntMap<String> columnForName) throws SQLException {
-        int columnIndex = columnForName.get(columnName);
-        if (columnIndex == 0) return false;
-        else return resultSet.getBoolean(columnIndex);
-    }
 }
