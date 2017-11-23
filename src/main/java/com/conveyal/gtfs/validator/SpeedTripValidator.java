@@ -1,7 +1,5 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.NewGTFSError;
-import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
@@ -54,14 +52,16 @@ public class SpeedTripValidator extends TripValidator {
             if (currStopTime.departure_time < currStopTime.arrival_time) {
                 registerError(currStopTime, DEPARTURE_BEFORE_ARRIVAL);
             }
+            // TODO detect the case where all travel times are rounded off to minutes (i.e. tt % 60 == 0)
+            // In that case determine the maximum and minimum possible speed by adding/removing one minute of slack.
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
             if (checkDistanceAndTime(distanceMeters, travelTimeSeconds, currStopTime)) {
                 // If distance and time are OK, we've got valid numbers to calculate a travel speed.
                 double kph = (distanceMeters / 1000D) / (travelTimeSeconds / 60D / 60D);
                 if (kph < MIN_SPEED_KPH) {
-                    registerError(currStopTime, TRAVEL_TOO_SLOW, kph + " km/h");
+                    registerError(currStopTime, TRAVEL_TOO_SLOW, String.format("%2.1f km/h", kph));
                 } else if (kph > maxSpeedKph) {
-                    registerError(currStopTime, TRAVEL_TOO_FAST, kph + " km/h");
+                    registerError(currStopTime, TRAVEL_TOO_FAST, String.format("%2.1f km/h", kph));
                 }
             }
             // Reset accumulated distance, we've processed a stop time with arrival or departure time specified.
