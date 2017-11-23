@@ -372,16 +372,17 @@ public class JdbcGtfsLoader {
                     // rather than setObject with a type code. I think some databases don't have setObject though.
                     // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
                     try {
-                        // FIXME we need to set the transformed string element even when an error occurs.
-                        // This means the validation and insertion step need to happen separately.
+                        // Validation and insertion step should probably happen separately.
                         // or the errors should not be signaled with exceptions.
-                        // Also, we should probably not be converting any GTFS field values.
-                        // We should be saving it as-is in the database and converting upon load into our model objects.
+                        // Perhaps we should not be converting any GTFS field values, and we
+                        // should be saving it as-is in the database and converting upon load into our model objects.
                         if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
                         else field.setParameter(insertStatement, f + 2, string);
                     } catch (StorageException ex) {
                         // FIXME many exceptions don't have an error type
                         errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.badValue));
+                        if (postgresText) transformedStrings[f + 1] = "\\N"; // Represents null in Postgres text format
+                        else insertStatement.setNull(f + 2, field.getSqlType().getVendorTypeNumber());
                         // FIXME should set transformedStrings or prepared statement param to null
                     }
                 }
