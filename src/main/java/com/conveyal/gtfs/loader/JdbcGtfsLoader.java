@@ -67,7 +67,10 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
 public class JdbcGtfsLoader {
 
     public static final long INSERT_BATCH_SIZE = 500;
+    private final String schemaSeparator;
+    private final String integerType;
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
+    private final String databaseProductName;
 
     private String gtfsFilePath;
     protected ZipFile zip;
@@ -84,8 +87,31 @@ public class JdbcGtfsLoader {
     private SQLErrorStorage errorStorage;
 
     public JdbcGtfsLoader(String gtfsFilePath, DataSource dataSource) {
+        String dbProductName;
         this.gtfsFilePath = gtfsFilePath;
         this.dataSource = dataSource;
+        try {
+            dbProductName = this.dataSource.getConnection().getMetaData().getDatabaseProductName();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            dbProductName = "";
+        }
+        databaseProductName = dbProductName;
+        switch (databaseProductName) {
+            case "MySQL":
+                integerType = "int";
+                schemaSeparator = "_";
+                break;
+            case "PostgreSQL":
+                integerType = "integer";
+                schemaSeparator = ".";
+                break;
+            // TODO: check that defaults are "standard"
+            default:
+                integerType = "integer";
+                schemaSeparator = ".";
+                break;
+        }
     }
 
 
@@ -124,7 +150,7 @@ public class JdbcGtfsLoader {
             registerFeed(gtfsFile);
             // Include the dot separator in the table prefix.
             // This allows everything to work even when there's no prefix.
-            this.tablePrefix += ".";
+            this.tablePrefix += schemaSeparator;
             this.errorStorage = new SQLErrorStorage(connection, tablePrefix, true);
             long startTime = System.currentTimeMillis();
             // Load each table in turn, saving some summary information about what happened during each table load
@@ -194,9 +220,14 @@ public class JdbcGtfsLoader {
             // TODO try to get the feed_id and feed_version out of the feed_info table
             // statement.execute("select * from feed_info");
 
-            // FIXME do the following only on databases that support schemas.
-            // SQLite does not support them. Is there any advantage of schemas over flat tables?
-            statement.execute("create schema " + tablePrefix);
+            String databaseProductName = connection.getMetaData().getDatabaseProductName();
+            if ("PostgreSQL".equals(databaseProductName)) {
+                // SQLite does not support them. Is there any advantage of schemas over flat tables?
+                statement.execute("create schema " + tablePrefix);
+            } else {
+                LOG.warn("Database product does not support schema creation");
+            }
+
             // TODO load more stuff from feed_info and essentially flatten all feed_infos from all loaded feeds into one table
             // This should include date range etc. Can we reuse any code from Table for this?
             // This makes sense since the file should only have one line.
