@@ -2,7 +2,6 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
-import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
@@ -62,7 +61,7 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
  * - all rows have the same number of fields as there are headers
  * - fields do not contain problematic characters
  * - field contents can be converted to the target data types and are in range
- * - TODO referential integrity
+ * - referential integrity
  */
 public class JdbcGtfsLoader {
 
@@ -82,6 +81,10 @@ public class JdbcGtfsLoader {
     private Connection connection;
     private String tablePrefix;
     private SQLErrorStorage errorStorage;
+
+    // Contains references to unique entity IDs during load stage used for referential integrity check.
+    private final Set<String> transitIds = new HashSet<>();
+    private final Set<String> transitIdsWithSequence = new HashSet<>();
 
     public JdbcGtfsLoader(String gtfsFilePath, DataSource dataSource) {
         this.gtfsFilePath = gtfsFilePath;
@@ -309,6 +312,9 @@ public class JdbcGtfsLoader {
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
         Field[] fields = new Field[csvReader.getHeaderCount()];
         Set<String> fieldsSeen = new HashSet<>();
+        String keyField = table.getKeyFieldName();
+        String orderField = table.getOrderFieldName();
+        int keyFieldIndex = -1;
         for (int h = 0; h < csvReader.getHeaderCount(); h++) {
             String header = sanitize(csvReader.getHeader(h));
             if (fieldsSeen.contains(header)) {
@@ -318,6 +324,9 @@ public class JdbcGtfsLoader {
             } else {
                 fields[h] = table.getFieldForName(header);
                 fieldsSeen.add(header);
+                if (keyField.equals(header)) {
+                    keyFieldIndex = h;
+                }
             }
         }
 
@@ -361,38 +370,69 @@ public class JdbcGtfsLoader {
                 errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, WRONG_NUMBER_OF_FIELDS, badValues));
                 continue;
             }
+            // Store value of key field for use in checking duplicate IDs
+            String keyValue = csvReader.get(keyFieldIndex);
+            // Store transit ID for referential integrity check
+            String transitId = String.join(":", keyField, keyValue);
             // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
             if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
             else insertStatement.setInt(1, lineNumber);
+            // If table has an order field, it should supersede the key field as the "unique" field
+            String uniqueKeyField = orderField != null ? orderField : keyField;
+            // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
+            // whether an order field is part of the "unique ID."
+            Set<String> listOfUniqueIds;
+            String uniqueId;
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 String string = csvReader.get(f);
-                if (string.isEmpty()) {
-                    // TODO verify that CSV reader always returns empty strings, not nulls
-                    if (field.isRequired()) {
-                        errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, MISSING_FIELD, field.name));
-                    }
-                    if (postgresText) transformedStrings[f + 1] = "\\N"; // Represents null in Postgres text format
-                    // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
-                    else insertStatement.setNull(f + 2, field.getSqlType().getVendorTypeNumber());
-                } else {
-                    // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
-                    // rather than setObject with a type code. I think some databases don't have setObject though.
-                    // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
-                    try {
-                        // FIXME we need to set the transformed string element even when an error occurs.
-                        // This means the validation and insertion step need to happen separately.
-                        // or the errors should not be signaled with exceptions.
-                        // Also, we should probably not be converting any GTFS field values.
-                        // We should be saving it as-is in the database and converting upon load into our model objects.
-                        if (postgresText) transformedStrings[f + 1] = field.validateAndConvert(string);
-                        else field.setParameter(insertStatement, f + 2, string);
-                    } catch (StorageException ex) {
-                        // FIXME many exceptions don't have an error type
-                        errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.badValue));
-                        // FIXME should set transformedStrings or prepared statement param to null
+                boolean isOrderField = field.name.equals(orderField);
+
+                if (field.isForeignReference()) {
+                    // Check referential integrity if applicable
+                    String referenceField = field.referenceTable.getKeyFieldName();
+                    String referenceTransitId = String.join(":", referenceField, string);
+
+                    if (!transitIds.contains(referenceTransitId)) {
+//                        LOG.error("Ref error found in {} for field {} with value {}", table.name, referenceField, referenceTransitId);
+                        NewGTFSError referentialIntegrityError = NewGTFSError.forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
+                                .setEntityId(keyValue);
+                        if (isOrderField) {
+                            referentialIntegrityError.setSequence(string);
+                        }
+                        errorStorage.storeError(referentialIntegrityError);
                     }
                 }
+
+                if (field.name.equals(uniqueKeyField)) {
+                    // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
+                    if (isOrderField) {
+                        // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
+                        // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
+                        listOfUniqueIds = transitIdsWithSequence;
+                        uniqueId = String.join(":", field.name, keyValue, string);
+                        if (!field.isForeignReference() && !transitIds.contains(transitId)) {
+                            // Only add ID if the field is not a foreign reference (e.g., adds shape_id for shapes.txt,
+                            // but skips trip_id in stop_times.txt)
+                            transitIds.add(transitId);
+                        }
+                    } else {
+                        listOfUniqueIds = transitIds;
+                        uniqueId = transitId;
+                    }
+                    // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
+                    boolean isDuplicate = !listOfUniqueIds.add(uniqueId);
+                    if (isDuplicate) {
+                        NewGTFSError duplicateIdError = NewGTFSError.forLine(table, lineNumber, DUPLICATE_ID, uniqueId)
+                                .setEntityId(keyValue);
+                        if (isOrderField) {
+                            duplicateIdError.setSequence(string);
+                        }
+                        errorStorage.storeError(duplicateIdError);
+                    }
+                }
+                // Add value for entry into table
+                targetTable.setValueForField(insertStatement, f, lineNumber, field, string, errorStorage, postgresText, transformedStrings);
             }
             if (postgresText) {
                 tempTextFileStream.printf(String.join("\t", transformedStrings));

@@ -238,7 +238,13 @@ public class Table {
         return String.format("insert into %s (id, %s) values (?, %s)", tableName, joinedFieldNames, questionMarks);
     }
 
-    public void addParamForValue(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage, boolean postgresText, String[] transformedStrings) {
+    /**
+     * Set value for a field either as a prepared statement parameter or (if using postgres text-loading) in the
+     * transformed strings array provided. This also handles the case where the string is empty (i.e., field is null)
+     * and when an exception is encountered while setting the field value (usually due to a bad data type), in which case
+     * the field is set to null.
+     */
+    public void setValueForField(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage, boolean postgresText, String[] transformedStrings) {
         if (string.isEmpty()) {
             // CSV reader always returns empty strings, not nulls
             if (field.isRequired() && errorStorage != null) {
