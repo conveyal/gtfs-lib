@@ -19,14 +19,25 @@ import java.sql.SQLType;
  * values (an error and a modified value).
  */
 public abstract class Field {
+    public String getName() {
+        return name;
+    }
 
     final String name;
     final Requirement requirement;
+    final Table referenceTable;
     private boolean shouldBeIndexed;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
         this.requirement = requirement;
+        this.referenceTable = null;
+    }
+
+    public Field(String name, Requirement requirement, Table referenceTable) {
+        this.name = name;
+        this.requirement = requirement;
+        this.referenceTable = referenceTable;
     }
 
     /**
@@ -77,6 +88,14 @@ public abstract class Field {
 
     public boolean isRequired () {
         return this.requirement == Requirement.REQUIRED;
+    }
+
+    public boolean isUnknown () {
+        return this.requirement == Requirement.UNKNOWN;
+    }
+
+    public boolean isForeignReference () {
+        return this.referenceTable != null;
     }
 
     /**

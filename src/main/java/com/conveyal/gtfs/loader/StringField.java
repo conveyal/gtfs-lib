@@ -15,6 +15,10 @@ public class StringField extends Field {
         super(name, requirement);
     }
 
+    public StringField (String name, Requirement requirement, Table referenceTable) {
+        super(name, requirement, referenceTable);
+    }
+
     /** Check that a string can be properly parsed and is in range. */
     public String validateAndConvert (String string) {
         return cleanString(string);
