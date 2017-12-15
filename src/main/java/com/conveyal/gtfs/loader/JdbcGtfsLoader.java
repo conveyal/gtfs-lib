@@ -131,16 +131,16 @@ public class JdbcGtfsLoader {
             result.agency = load(Table.AGENCY);
             result.calendar = load(Table.CALENDAR);
             result.calendarDates = load(Table.CALENDAR_DATES);
+            result.routes = load(Table.ROUTES);
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
             result.fareRules = load(Table.FARE_RULES);
             result.feedInfo = load(Table.FEED_INFO);
-            result.frequencies = load(Table.FREQUENCIES);
-            result.routes = load(Table.ROUTES);
             result.shapes = load(Table.SHAPES);
             result.stops = load(Table.STOPS);
-            result.stopTimes = load(Table.STOP_TIMES);
             result.transfers = load(Table.TRANSFERS);
-            result.trips = load(Table.TRIPS);
+            result.trips = load(Table.TRIPS); // refs routes
+            result.frequencies = load(Table.FREQUENCIES); // refs trips
+            result.stopTimes = load(Table.STOP_TIMES);
             result.errorCount = errorStorage.getErrorCount();
             // This will commit and close the single connection that has been shared between all preceding load steps.
             errorStorage.commitAndClose();
