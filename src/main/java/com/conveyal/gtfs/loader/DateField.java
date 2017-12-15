@@ -28,7 +28,7 @@ public class DateField extends Field {
 
     private String validate (String string) {
         // Parse the date out of the supplied string.
-        LocalDate date = null;
+        LocalDate date;
         try {
             date = LocalDate.parse(string, GTFS_DATE_FORMATTER);
         } catch (DateTimeParseException ex) {
