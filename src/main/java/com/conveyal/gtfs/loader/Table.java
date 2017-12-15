@@ -24,14 +24,23 @@ import static com.conveyal.gtfs.loader.Requirement.*;
 public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
+    // Represents null in Postgres text format
+    private static final String POSTGRES_NULL_TEXT = "\\N";
 
-    final String name;
+    public final String name;
 
     final Class<? extends Entity> entityClass;
 
     final Requirement required;
 
-    final Field[] fields;
+    public final Field[] fields;
+
+    public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
+        this.name = name;
+        this.entityClass = entityClass;
+        this.required = required;
+        this.fields = fields;
+    }
 
     public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
         new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
@@ -74,14 +83,6 @@ public class Table {
     );
 
 
-    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
-        new StringField("fare_id", REQUIRED),
-        new StringField("route_id", OPTIONAL),
-        new StringField("origin_id", OPTIONAL),
-        new StringField("destination_id", OPTIONAL),
-        new StringField("contains_id", OPTIONAL)
-    );
-
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         new StringField("feed_publisher_url", REQUIRED),
@@ -92,17 +93,10 @@ public class Table {
 
     );
 
-    public static final Table FREQUENCIES = new Table("frequencies", Frequency.class, OPTIONAL,
-        new StringField("trip_id", REQUIRED),
-        new TimeField("start_time", REQUIRED),
-        new TimeField("end_time", REQUIRED),
-        new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
-        new IntegerField("exact_times", OPTIONAL, 1)
-    );
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
-        new StringField("agency_id",  OPTIONAL),
+        new StringField("agency_id",  OPTIONAL, AGENCY),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
@@ -110,6 +104,21 @@ public class Table {
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
         new ColorField("route_text_color",  OPTIONAL)
+    );
+
+    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
+            new StringField("fare_id", REQUIRED, FARE_ATTRIBUTES),
+            new StringField("route_id", OPTIONAL, ROUTES),
+            // FIXME: referential integrity check for zone_id for below three fields?
+            new StringField("origin_id", OPTIONAL),
+            new StringField("destination_id", OPTIONAL),
+            new StringField("contains_id", OPTIONAL)
+    );
+
+    public static final Table PATTERNS = new Table("patterns", Pattern.class, OPTIONAL,
+            new StringField("pattern_id", REQUIRED),
+            new StringField("route_id", REQUIRED, ROUTES),
+            new StringField("description", OPTIONAL)
     );
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
@@ -135,10 +144,38 @@ public class Table {
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
     );
 
+    public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
+            new StringField("pattern_id", REQUIRED, PATTERNS),
+            new StringField("stop_id", REQUIRED, STOPS),
+            new IntegerField("stop_sequence", REQUIRED)
+    );
+
+    public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
+            new StringField("from_stop_id", REQUIRED, STOPS),
+            new StringField("to_stop_id", REQUIRED, STOPS),
+            new StringField("transfer_type", REQUIRED),
+            new StringField("min_transfer_time", OPTIONAL)
+    );
+
+    public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
+        new StringField("trip_id",  REQUIRED),
+        new StringField("route_id",  REQUIRED, ROUTES).indexThisColumn(),
+        // FIXME: Should this also optionally reference CALENDAR_DATES?
+        new StringField("service_id",  REQUIRED, CALENDAR),
+        new StringField("trip_headsign",  OPTIONAL),
+        new StringField("trip_short_name",  OPTIONAL),
+        new ShortField("direction_id", OPTIONAL, 1),
+        new StringField("block_id",  OPTIONAL),
+        new StringField("shape_id",  OPTIONAL, SHAPES),
+        new ShortField("wheelchair_accessible", OPTIONAL, 2),
+        new ShortField("bikes_allowed", OPTIONAL, 2)
+    );
+
+    // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
-            new StringField("trip_id", REQUIRED),
+            new StringField("trip_id", REQUIRED, TRIPS),
             new IntegerField("stop_sequence", REQUIRED),
-            new StringField("stop_id", REQUIRED),
+            new StringField("stop_id", REQUIRED, STOPS),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are reqiured
             new TimeField("arrival_time", OPTIONAL),
             new TimeField("departure_time", OPTIONAL),
@@ -150,32 +187,14 @@ public class Table {
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     );
 
-    public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
-            new StringField("from_stop_id", REQUIRED),
-            new StringField("to_stop_id", REQUIRED),
-            new StringField("transfer_type", REQUIRED),
-            new StringField("min_transfer_time", OPTIONAL)
+    // Must come after TRIPS table to which it has a reference
+    public static final Table FREQUENCIES = new Table("frequencies", Frequency.class, OPTIONAL,
+            new StringField("trip_id", REQUIRED, TRIPS),
+            new TimeField("start_time", REQUIRED),
+            new TimeField("end_time", REQUIRED),
+            new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
+            new IntegerField("exact_times", OPTIONAL, 1)
     );
-
-    public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
-        new StringField("trip_id",  REQUIRED),
-        new StringField("route_id",  REQUIRED).indexThisColumn(),
-        new StringField("service_id",  REQUIRED),
-        new StringField("trip_headsign",  OPTIONAL),
-        new StringField("trip_short_name",  OPTIONAL),
-        new ShortField("direction_id", OPTIONAL, 1),
-        new StringField("block_id",  OPTIONAL),
-        new StringField("shape_id",  OPTIONAL),
-        new ShortField("wheelchair_accessible", OPTIONAL, 2),
-        new ShortField("bikes_allowed", OPTIONAL, 2)
-    );
-
-    public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
-        this.name = name;
-        this.entityClass = entityClass;
-        this.required = required;
-        this.fields = fields;
-    }
 
     /**
      * Create an SQL table with all the fields specified by this table object,
