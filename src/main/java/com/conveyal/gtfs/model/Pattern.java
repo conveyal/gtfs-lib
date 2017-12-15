@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 /**
  *
  */
-public class Pattern implements Serializable {
+public class Pattern extends Entity {
     public static final long serialVersionUID = 1L;
 
     // A unique ID for this jouney pattern / stop pattern
