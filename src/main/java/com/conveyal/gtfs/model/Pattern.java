@@ -17,7 +17,7 @@ import org.slf4j.LoggerFactory;
 public class Pattern extends Entity {
     public static final long serialVersionUID = 1L;
 
-    // A unique ID for this jouney pattern / stop pattern
+    // A unique ID for this journey pattern / stop pattern
     public String pattern_id;
 
     // The segment of the pattern's geometry (which is always a LineString) on which each stop in the sequence falls.
