@@ -112,10 +112,20 @@ public class Feed {
         }
         // Signal to all validators that validation is complete and allow them to report on results / status.
         for (FeedValidator feedValidator : feedValidators) {
-            feedValidator.complete(validationResult);
+            try {
+                feedValidator.complete(validationResult);
+            } catch (Exception e) {
+                String badValue = String.join(":", feedValidator.getClass().getSimpleName(), e.toString());
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, badValue));
+                LOG.error("Validator failed completion stage.", e);
+            }
         }
-        int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation;
-        LOG.info("Total number of errors found by all validators: {}", totalValidationErrors);
+        // Total validation errors accounts for errors found during both loading and validation. Otherwise, this value
+        // may be confusing if it reads zero but there were a number of data type or referential integrity errors found
+        // during feed loading stage.
+        int totalValidationErrors = errorStorage.getErrorCount();
+        LOG.info("Errors found during load stage: {}", errorCountBeforeValidation);
+        LOG.info("Errors found by validators: {}", totalValidationErrors - errorCountBeforeValidation);
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;
