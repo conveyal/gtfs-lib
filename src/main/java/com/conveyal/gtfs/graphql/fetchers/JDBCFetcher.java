@@ -121,25 +121,36 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             // FIXME SQL injection: enclosing entity's ID could contain malicious character sequences; quote and sanitize the string.
             conditions.add(String.join(" = ", parentJoinField, quote(enclosingEntity.get(parentJoinField).toString())));
         }
-        for (String key : environment.getArguments().keySet()) {
+        Map<String, Object> arguments = environment.getArguments();
+        for (String key : arguments.keySet()) {
             // Limit and Offset arguments are for pagination. All others become "where X in A, B, C" clauses.
             if ("limit".equals(key) || "offset".equals(key)) continue;
-            List<String> values = (List<String>) environment.getArguments().get(key);
-            if (values != null && !values.isEmpty()) conditions.add(makeInClause(key, values));
+            if ("id".equals(key)) {
+                Integer value = (Integer) arguments.get(key);
+                conditions.add(String.join(" = ", "id", value.toString()));
+            } else {
+                List<String> values = (List<String>) arguments.get(key);
+                if (values != null && !values.isEmpty()) conditions.add(makeInClause(key, values));
+            }
         }
         if ( ! conditions.isEmpty()) {
             sqlBuilder.append(" where ");
             sqlBuilder.append(String.join(" and ", conditions));
         }
-        Integer limit = (Integer) environment.getArguments().get("limit");
+        Integer limit = (Integer) arguments.get("limit");
         if (limit == null) {
             limit = DEFAULT_ROWS_TO_FETCH;
         }
         if (limit > MAX_ROWS_TO_FETCH) {
             limit = MAX_ROWS_TO_FETCH;
         }
-        sqlBuilder.append(" limit " + limit);
-        Integer offset = (Integer) environment.getArguments().get("offset");
+        // FIXME: Skipping limit is not scalable and should be removed.
+        if (limit == -1) {
+            // skip limit.
+        } else {
+            sqlBuilder.append(" limit " + limit);
+        }
+        Integer offset = (Integer) arguments.get("offset");
         if (offset != null && offset >= 0) {
             sqlBuilder.append(" offset " + offset);
         }
