@@ -104,11 +104,15 @@ public class SQLErrorStorage {
             Statement statement = connection.createStatement();
             // If tables are dropped, order matters because of foreign keys.
             // TODO add foreign key constraint on info table?
-            statement.execute(String.format("create table %serrors (error_id integer primary key, error_type varchar, " +
+            String createErrorsSql = String.format("create table %serrors (error_id integer primary key, error_type varchar, " +
                     "entity_type varchar, line_number integer, entity_id varchar, entity_sequence integer, " +
-                    "bad_value varchar)", tablePrefix));
-            statement.execute(String.format("create table %serror_info (error_id integer, key varchar, value varchar)",
-                    tablePrefix));
+                    "bad_value varchar)", tablePrefix);
+            LOG.info(createErrorsSql);
+            statement.execute(createErrorsSql);
+            String createErrorInfoSql = String.format("create table %serror_info (error_id integer, key varchar, value varchar)",
+                    tablePrefix);
+            LOG.info(createErrorInfoSql);
+            statement.execute(createErrorInfoSql);
             connection.commit();
             // Keep connection open, closing would null the wrapped connection and return it to the pool.
         } catch (SQLException ex) {
