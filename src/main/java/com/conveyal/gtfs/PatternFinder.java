@@ -72,7 +72,8 @@ public class PatternFinder {
      * unique sequences of stops encountered.
      */
     public List<Pattern> createPatternObjects () {
-        int nextPatternId = 0;
+        // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
+        int nextPatternId = 1;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
         List<Pattern> patterns = new ArrayList<>();
         // TODO assign patterns sequential small integer IDs (may include route)
@@ -80,6 +81,7 @@ public class PatternFinder {
             Collection<Trip> trips = tripsForPattern.get(key);
             Pattern pattern = new Pattern(key.stops, trips, null);
             // Overwrite long UUID with sequential integer pattern ID
+            // FIXME: Ought the ID be an integer?
             pattern.pattern_id = Integer.toString(nextPatternId++);
             patterns.add(pattern);
         }
