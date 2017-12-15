@@ -268,7 +268,14 @@ public class JdbcGtfsLoader {
         try {
             tableLoadResult.rowCount = loadInternal(table);
         } catch (Exception ex) {
-            tableLoadResult.fatalException = ex.getMessage();
+            LOG.error("Fatal error loading table", ex);
+            tableLoadResult.fatalException = ex.toString();
+            // Rollback connection so that fatal exception does not impact loading of other tables.
+            try {
+                connection.rollback();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         } finally {
             // Explicitly delete the tmp file now that load is finished (either success or failure).
             // Otherwise these multi-GB files clutter the drive.
