@@ -36,7 +36,7 @@ public class PatternFinder {
     // A multi-map that groups trips together by their sequence of stops
     private Multimap<TripPatternKey, Trip> tripsForPattern = HashMultimap.create();
 
-    private int nTripsProessed = 0;
+    private int nTripsProcessed = 0;
 
     /**
      * Bin all trips by the sequence of stops they visit.
@@ -54,8 +54,8 @@ public class PatternFinder {
 //    }
 
     public void processTrip (Trip trip, List<StopTime> orderedStopTimes) {
-        if (++nTripsProessed % 100000 == 0) {
-            LOG.info("trip {}", human(nTripsProessed));
+        if (++nTripsProcessed % 100000 == 0) {
+            LOG.info("trip {}", human(nTripsProcessed));
         }
         // No need to scope the route ID here, patterns are built within the context of a single feed.
         // Create a key that might already be in the map (by semantic equality)
