@@ -105,8 +105,22 @@ public class NewGTFSError {
         return this;
     }
 
+    // Builder to add entity ID info
     public NewGTFSError setEntityId(String entityId) {
         this.entityId = entityId;
+        return this;
+    }
+
+    // Builder to add entity sequence info from string (values during load stage are passed in as strings from csv
+    // reader)
+    public NewGTFSError setSequence(String sequenceAsString) {
+        Integer sequence = null;
+        try {
+            sequence = Integer.parseInt(sequenceAsString);
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
+        }
+        this.entitySequenceNumber = sequence;
         return this;
     }
 }
