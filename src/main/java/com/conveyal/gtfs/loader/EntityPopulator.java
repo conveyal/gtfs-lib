@@ -19,8 +19,7 @@ import java.time.LocalDate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
-
-import static com.conveyal.gtfs.model.Entity.INT_MISSING;
+import java.time.format.DateTimeParseException;
 
 /**
  * For now we will copy all available fields into Java model objects.
@@ -174,7 +173,15 @@ public interface EntityPopulator<T> {
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return null;
-        else return LocalDate.parse(resultSet.getString(columnIndex), DateField.GTFS_DATE_FORMATTER);
+        else {
+            try {
+                String dateString = resultSet.getString(columnIndex);
+                return dateString != null ? LocalDate.parse(dateString, DateField.GTFS_DATE_FORMATTER) : null;
+            } catch (DateTimeParseException ex) {
+//                LOG.info("Could not parse date time");
+                return null;
+            }
+        }
     }
 
     static URL getUrlIfPresent (ResultSet resultSet, String columnName,
