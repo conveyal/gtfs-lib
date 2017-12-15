@@ -49,6 +49,65 @@ public class GraphQLGtfsSchema {
 
     // by using static fields to hold these types, backward references are enforced. a few forward references are inserted explicitly.
 
+    // Represents rows from agency.txt
+    public static final GraphQLObjectType agencyType = newObject().name("agency")
+            .description("A GTFS agency object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("agency_id"))
+            .field(MapFetcher.field("agency_name"))
+            .field(MapFetcher.field("agency_url"))
+            .field(MapFetcher.field("agency_branding_url"))
+            .field(MapFetcher.field("agency_desc"))
+            .field(MapFetcher.field("agency_fare_url"))
+            .field(MapFetcher.field("agency_timezone"))
+            .build();
+
+    // Represents rows from calendar.txt
+    public static final GraphQLObjectType calendarType = newObject()
+            .name("calendar")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("service_id"))
+            .field(MapFetcher.field("monday", GraphQLInt))
+            .field(MapFetcher.field("tuesday", GraphQLInt))
+            .field(MapFetcher.field("wednesday", GraphQLInt))
+            .field(MapFetcher.field("thursday", GraphQLInt))
+            .field(MapFetcher.field("friday", GraphQLInt))
+            .field(MapFetcher.field("saturday", GraphQLInt))
+            .field(MapFetcher.field("sunday", GraphQLInt))
+            .field(MapFetcher.field("start_date"))
+            .field(MapFetcher.field("end_date"))
+            .build();
+
+
+    // Represents rows from fare_rules.txt
+    public static final GraphQLObjectType fareRuleType = newObject().name("fareRule")
+            .description("A GTFS agency object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("fare_id"))
+            .field(MapFetcher.field("route_id"))
+            .field(MapFetcher.field("origin_id"))
+            .field(MapFetcher.field("destination_id"))
+            .field(MapFetcher.field("contains_id"))
+            .build();
+
+    // Represents rows from fare_attributes.txt
+    public static final GraphQLObjectType fareType = newObject().name("fare_attributes")
+            .description("A GTFS agency object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("fare_id"))
+            .field(MapFetcher.field("price", GraphQLFloat))
+            .field(MapFetcher.field("currency_type"))
+            .field(MapFetcher.field("payment_method", GraphQLInt))
+            .field(MapFetcher.field("transfers", GraphQLInt))
+            .field(MapFetcher.field("transfer_duration", GraphQLInt))
+            .field(newFieldDefinition()
+                    .name("fare_rules")
+                    .type(new GraphQLList(fareRuleType))
+                    .dataFetcher(new JDBCFetcher("fare_rules", "fare_id"))
+                    .build()
+            )
+            .build();
+
     // Represents rows from trips.txt
     public static final GraphQLObjectType tripType = newObject()
             .name("trip")
