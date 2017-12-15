@@ -470,32 +470,7 @@ public class JdbcGtfsLoader {
             insertStatement.executeBatch();
         }
 
-        LOG.info("Indexing...");
-        // We determine which columns should be indexed based on field order in the GTFS spec model table.
-        // Not sure that's a good idea, this could use some abstraction. TODO getIndexColumns() on each table.
-        String indexColumns = table.getIndexFields();
-        // TODO verify referential integrity and uniqueness of keys
-        // TODO create primary key and fall back on plain index (consider not null & unique constraints)
-        // TODO use line number as primary key
-        // Note: SQLITE requires specifying a name for indexes.
-        String indexName = String.join("_", targetTable.name.replace(".", "_"), "idx");
-        String indexSql = String.format("create index %s on %s (%s)", indexName, targetTable.name, indexColumns);
-        //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
-        LOG.info(indexSql);
-        connection.createStatement().execute(indexSql);
-        // TODO add foreign key constraints, and recover recording errors as needed.
-
-
-        // More indexing
-        // TODO integrate with the above indexing code, iterating over a List<String> of index column expressions
-        for (Field field : fields) {
-            if (field.shouldBeIndexed()) {
-                Statement statement = connection.createStatement();
-                String sql = String.format("create index %s_%s_idx on %s (%s)", table.name, field.name, tablePrefix + table.name, field.name);
-                LOG.info(sql);
-                statement.execute(sql);
-            }
-        }
+        targetTable.createIndexes(connection);
 
         LOG.info("Committing transaction...");
         connection.commit();
