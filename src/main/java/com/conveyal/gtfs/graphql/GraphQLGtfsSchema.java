@@ -111,6 +111,7 @@ public class GraphQLGtfsSchema {
     // Represents rows from trips.txt
     public static final GraphQLObjectType tripType = newObject()
             .name("trip")
+            .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("trip_id"))
             .field(MapFetcher.field("trip_headsign"))
             .field(MapFetcher.field("trip_short_name"))
@@ -121,7 +122,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pattern_id"))
             .field(newFieldDefinition()
                     .name("stop_times")
-                    // forward reference to the as yet undefined stopTimeType
+                    // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
                     .type(new GraphQLList(new GraphQLTypeReference("stopTime")))
                     .dataFetcher(new JDBCFetcher("stop_times", "trip_id"))
                     .build()
@@ -168,7 +169,7 @@ public class GraphQLGtfsSchema {
     // Represents rows from routes.txt
     public static final GraphQLObjectType routeType = newObject().name("route")
             .description("A line from a GTFS routes.txt table")
-            .field(MapFetcher.field("line_number", Scalars.GraphQLInt))
+            .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("agency_id"))
             .field(MapFetcher.field("route_id"))
             .field(MapFetcher.field("route_short_name"))
@@ -200,6 +201,7 @@ public class GraphQLGtfsSchema {
     // Contains a reference to stopTimeType and routeType
     public static final GraphQLObjectType stopType = newObject().name("stop")
             .description("A GTFS stop object")
+            .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("stop_id"))
             .field(MapFetcher.field("stop_name"))
             .field(MapFetcher.field("stop_code"))
@@ -237,6 +239,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("error_id", GraphQLInt))
             .field(MapFetcher.field("error_type"))
             .field(MapFetcher.field("entity_type"))
+            // FIXME: change to id?
             .field(MapFetcher.field("line_number", GraphQLInt))
             .field(MapFetcher.field("entity_id"))
             .field(MapFetcher.field("entity_sequence", GraphQLInt))
