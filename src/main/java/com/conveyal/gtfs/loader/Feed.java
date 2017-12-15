@@ -108,7 +108,8 @@ public class Feed {
             } catch (Exception e) {
                 // store an error if the validator fails
                 // FIXME: should the exception be stored?
-                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, validatorName));
+                String badValue = String.join(":", validatorName, e.toString());
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, badValue));
                 LOG.error("{} failed.", validatorName);
                 LOG.error(e.toString());
                 e.printStackTrace();
