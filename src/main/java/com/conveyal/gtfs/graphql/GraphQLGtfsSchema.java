@@ -292,6 +292,7 @@ public class GraphQLGtfsSchema {
             .field(newFieldDefinition()
                 .name("trips")
                 .type(new GraphQLList(tripType))
+                .argument(multiStringArg("service_id"))
                 .dataFetcher(new JDBCFetcher("trips", "pattern_id"))
                 .build())
             .build();
