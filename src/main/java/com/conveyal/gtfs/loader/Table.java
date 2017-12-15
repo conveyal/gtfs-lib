@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
@@ -7,10 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.MISSING_FIELD;
 import static com.conveyal.gtfs.loader.Requirement.*;
 
 
@@ -204,13 +210,13 @@ public class Table {
         String fieldDeclarations = Arrays.stream(fields).map(Field::getSqlDeclaration).collect(Collectors.joining(", "));
         String dropSql = String.format("drop table if exists %s", name);
         // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
-        String createSql = String.format("create table %s (csv_line integer, %s)", name, fieldDeclarations);
+        String createSql = String.format("create table %s (id bigint not null, %s)", name, fieldDeclarations);
         try {
             Statement statement = connection.createStatement();
-            statement.execute(dropSql);
             LOG.info(dropSql);
-            statement.execute(createSql);
+            statement.execute(dropSql);
             LOG.info(createSql);
+            statement.execute(createSql);
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
@@ -221,9 +227,75 @@ public class Table {
      * plus an integer CSV line number field in the first position.
      */
     public String generateInsertSql () {
+        return generateInsertSql(null);
+    }
+
+
+    public String generateInsertSql (String namespace) {
+        String tableName = namespace == null ? name : String.join(".", namespace, name);
         String questionMarks = String.join(", ", Collections.nCopies(fields.length, "?"));
         String joinedFieldNames = Arrays.stream(fields).map(f -> f.name).collect(Collectors.joining(", "));
-        return String.format("insert into %s (csv_line, %s) values (?, %s)", name, joinedFieldNames, questionMarks);
+        return String.format("insert into %s (id, %s) values (?, %s)", tableName, joinedFieldNames, questionMarks);
+    }
+
+    public void addParamForValue(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage, boolean postgresText, String[] transformedStrings) {
+        if (string.isEmpty()) {
+            // CSV reader always returns empty strings, not nulls
+            if (field.isRequired() && errorStorage != null) {
+                errorStorage.storeError(NewGTFSError.forLine(this, lineNumber, MISSING_FIELD, field.name));
+            }
+            // Set field to null if string is empty
+            setFieldToNull(postgresText, transformedStrings, statement, fieldIndex, field);
+        } else {
+            // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
+            // rather than setObject with a type code. I think some databases don't have setObject though.
+            // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
+            try {
+                // FIXME we need to set the transformed string element even when an error occurs.
+                // This means the validation and insertion step need to happen separately.
+                // or the errors should not be signaled with exceptions.
+                // Also, we should probably not be converting any GTFS field values.
+                // We should be saving it as-is in the database and converting upon load into our model objects.
+                if (postgresText) transformedStrings[fieldIndex + 1] = field.validateAndConvert(string);
+                else field.setParameter(statement, fieldIndex + 2, string);
+            } catch (StorageException ex) {
+                // FIXME many exceptions don't have an error type
+                if (errorStorage != null) {
+                    errorStorage.storeError(NewGTFSError.forLine(this, lineNumber, ex.errorType, ex.badValue));
+                }
+                // Set transformedStrings or prepared statement param to null
+                setFieldToNull(postgresText, transformedStrings, statement, fieldIndex, field);
+            }
+        }
+    }
+
+    /**
+     * Sets field to null in statement or string array depending on whether postgres is being used.
+     */
+    private static void setFieldToNull(boolean postgresText, String[] transformedStrings, PreparedStatement statement, int fieldIndex, Field field) {
+        if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
+            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
+        else try {
+            statement.setNull(fieldIndex + 2, field.getSqlType().getVendorTypeNumber());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
+            // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
+        }
+    }
+
+    /**
+     * Generate select all SQL string.
+     */
+    public String generateSelectSql (String namespace) {
+        return String.format("select * from %s", String.join(".", namespace, name));
+    }
+
+    /**
+     * Generate delete SQL string.
+     */
+    public String generateDeleteSql (String namespace) {
+        return String.format("delete from %s where id = ?", String.join(".", namespace, name));
     }
 
     /**
@@ -262,4 +334,115 @@ public class Table {
         return required == REQUIRED;
     }
 
+    /**
+     * Create indexes for table using shouldBeIndexed(), key field, and/or sequence field.
+     * FIXME: add foreign reference indexes?
+     */
+    public void createIndexes(Connection connection) throws SQLException {
+        LOG.info("Indexing...");
+        // We determine which columns should be indexed based on field order in the GTFS spec model table.
+        // Not sure that's a good idea, this could use some abstraction. TODO getIndexColumns() on each table.
+        String indexColumns = getIndexFields();
+        // TODO verify referential integrity and uniqueness of keys
+        // TODO create primary key and fall back on plain index (consider not null & unique constraints)
+        // TODO use line number as primary key
+        // Note: SQLITE requires specifying a name for indexes.
+        String indexName = String.join("_", name.replace(".", "_"), "idx");
+        String indexSql = String.format("create index %s on %s (%s)", indexName, name, indexColumns);
+        //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
+        LOG.info(indexSql);
+        connection.createStatement().execute(indexSql);
+        // TODO add foreign key constraints, and recover recording errors as needed.
+
+        // More indexing
+        // TODO integrate with the above indexing code, iterating over a List<String> of index column expressions
+        for (Field field : fields) {
+            if (field.shouldBeIndexed()) {
+                Statement statement = connection.createStatement();
+                String fieldIndex = String.join("_", name.replace(".", "_"), field.name, "idx");
+                String sql = String.format("create index %s on %s (%s)", fieldIndex, name, field.name);
+                LOG.info(sql);
+                statement.execute(sql);
+            }
+        }
+    }
+
+    /**
+     * Creates a SQL table from the table to clone. This uses the SQL syntax "create table x as y" not only copies the
+     * table structure, but also the data from the original table. Creating table indexes is not handled by this method.
+     * @return
+     */
+    public boolean createSqlTableFrom(Connection connection, String tableToClone, boolean addPrimaryKey) {
+        String dropSql = String.format("drop table if exists %s", name);
+        // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
+        // FIXME: Which create table operation is more efficient?
+        String createTableAsSql = String.format("create table %s as table %s", name, tableToClone);
+//        String createTableLikeSql = String.format("create table %s (like %s including indexes)", name, tableToClone);
+//        String insertAllSql = String.format("insert into %s select * from %s", name, tableToClone);
+        try {
+            Statement statement = connection.createStatement();
+            LOG.info(dropSql);
+            statement.execute(dropSql);
+            LOG.info(createTableAsSql);
+            statement.execute(createTableAsSql);
+//            LOG.info(createTableLikeSql);
+//            statement.execute(createTableLikeSql);
+//            LOG.info(insertAllSql);
+//            statement.execute(insertAllSql);
+
+
+            // Make id column serial and set the next value based on the current max value. This code is derived from
+            // https://stackoverflow.com/a/9490532/915811
+            // FIXME: For now we skip the Pattern and PatternStop id creation because neither has an ID field.
+            if (!this.entityClass.equals(Pattern.class) && !this.entityClass.equals(PatternStop.class)) {
+                String selectMaxSql = String.format("SELECT MAX(id) + 1 FROM %s", name);
+
+                int maxID = 0;
+                LOG.info(selectMaxSql);
+                statement.execute(selectMaxSql);
+                ResultSet maxIdResult = statement.getResultSet();
+                if (maxIdResult.next()) {
+                    maxID = maxIdResult.getInt(1);
+                }
+                // Set default max ID to 1 (the start value cannot be less than MINVALUE 1)
+                // FIXME: Skip sequence creation if maxID = 1?
+                if (maxID < 1) {
+                    maxID = 1;
+                }
+
+                String sequenceName = name + "_id_seq";
+                String createSequenceSql = String.format("CREATE SEQUENCE %s START WITH %d", sequenceName, maxID);
+                LOG.info(createSequenceSql);
+                statement.execute(createSequenceSql);
+
+                String alterColumnNextSql = String.format("ALTER TABLE %s ALTER COLUMN id SET DEFAULT nextval('%s')", name, sequenceName);
+                LOG.info(alterColumnNextSql);
+                statement.execute(alterColumnNextSql);
+                String alterColumnNotNullSql = String.format("ALTER TABLE %s ALTER COLUMN id SET NOT NULL", name);
+                LOG.info(alterColumnNotNullSql);
+                statement.execute(alterColumnNotNullSql);
+                // FIXME: Is there a need to add primary key constraint here?
+                if (addPrimaryKey) {
+                    // Add primary key to ID column for any tables that require it.
+                    String addPrimaryKeySql = String.format("ALTER TABLE %s ADD PRIMARY KEY (id)", name);
+                    LOG.info(addPrimaryKeySql);
+                    statement.execute(addPrimaryKeySql);
+                }
+            }
+
+            return true;
+        } catch (SQLException ex) {
+            LOG.error("Error cloning table {}: {}", name, ex.getSQLState());
+            LOG.error("details: ", ex);
+            try {
+                connection.rollback();
+                // FIXME: Try to create table without cloning?
+                createSqlTable(connection);
+                return true;
+            } catch (SQLException e) {
+                e.printStackTrace();
+                return false;
+            }
+        }
+    }
 }

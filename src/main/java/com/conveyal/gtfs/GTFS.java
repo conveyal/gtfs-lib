@@ -3,6 +3,7 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
+import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.validator.ValidationResult;
 import org.apache.commons.cli.*;
 import org.apache.commons.dbcp2.ConnectionFactory;
@@ -45,6 +46,12 @@ public abstract class GTFS {
     public static FeedLoadResult load (String filePath, DataSource dataSource) {
         JdbcGtfsLoader loader = new JdbcGtfsLoader(filePath, dataSource);
         FeedLoadResult result = loader.loadTables();
+        return result;
+    }
+
+    public static FeedLoadResult makeSnapshot (String feedId, DataSource dataSource) {
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource);
+        FeedLoadResult result = snapshotter.copyTables();
         return result;
     }
 
@@ -130,8 +137,8 @@ public abstract class GTFS {
             return;
         }
 
-        if (!(cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
-            LOG.error("Must specify one of 'load', 'validate', or 'graphql'.");
+        if (!(cmd.hasOption("snapshot") || cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
+            LOG.error("Must specify one of 'snapshot', 'load', 'validate', or 'graphql'.");
             printHelp(options);
             return;
         }
@@ -171,6 +178,20 @@ public abstract class GTFS {
             }
         }
 
+        if (cmd.hasOption("snapshot")) {
+            String namespaceToSnapshot = cmd.getOptionValue("snapshot");
+            if (namespaceToSnapshot == null && loadResult != null) {
+                namespaceToSnapshot = loadResult.uniqueIdentifier;
+            }
+            if (namespaceToSnapshot != null) {
+                LOG.info("Snapshotting feed with unique identifier {}", namespaceToSnapshot);
+                FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource);
+                LOG.info("Done snapshotting.");
+            } else {
+                LOG.error("No feed to snapshot. Specify one, or load a feed in the same command.");
+            }
+        }
+
         if (cmd.hasOption("graphql")) {
             Integer port = Integer.parseInt(cmd.getOptionValue("graphql"));
             LOG.info("Starting GraphQL server on port {}", port);
@@ -190,6 +211,8 @@ public abstract class GTFS {
                 .argName("file").desc("load GTFS data from the given file").build());
         options.addOption(Option.builder().longOpt("validate").hasArg().optionalArg(true).argName("feed")
                 .desc("validate the specified feed. defaults to the feed loaded with the --load option").build());
+        options.addOption(Option.builder().longOpt("snapshot").hasArg()
+                .argName("feedId").desc("snapshot GTFS data from the given database feedId").build());
         options.addOption(Option.builder("d").longOpt("database")
                 .hasArg().argName("url").desc("JDBC URL for the database. Defaults to " + DEFAULT_DATABASE_URL).build());
         options.addOption(Option.builder("u").longOpt("user")
