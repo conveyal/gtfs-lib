@@ -56,6 +56,7 @@ public class PatternFinderValidator extends TripValidator {
             Connection connection = feed.getConnection();
             Statement statement = connection.createStatement();
             String tripsTableName = feed.tablePrefix + "trips";
+            // FIXME: use Table class to define and populate patterns and pattern_stops tables?
             String patternsTableName = feed.tablePrefix + "patterns";
             String patternStopsTableName = feed.tablePrefix + "pattern_stops";
             statement.execute(String.format("alter table %s add column pattern_id varchar", tripsTableName));
