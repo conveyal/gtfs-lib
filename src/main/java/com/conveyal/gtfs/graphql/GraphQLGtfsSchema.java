@@ -154,18 +154,6 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .build();
 
-    /**
-     * Represents each stop in a list of stops within a pattern.
-     * We could return just a list of StopIDs within the pattern (a JSON array of strings) but
-     * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
-     */
-    public static final GraphQLObjectType patternStopType = newObject().name("patternStop")
-            .field(MapFetcher.field("pattern_id"))
-            .field(MapFetcher.field("stop_id"))
-            .field(MapFetcher.field("stop_sequence", GraphQLInt))
-            .build();
-
     // Represents rows from routes.txt
     public static final GraphQLObjectType routeType = newObject().name("route")
             .description("A line from a GTFS routes.txt table")
@@ -229,6 +217,18 @@ public class GraphQLGtfsSchema {
 //                    .dataFetcher(RouteFetcher::fromStop)
 //                    .build()
 //            )
+            .build();
+
+    /**
+     * Represents each stop in a list of stops within a pattern.
+     * We could return just a list of StopIDs within the pattern (a JSON array of strings) but
+     * that structure would prevent us from joining tables and returning additional stop details
+     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     */
+    public static final GraphQLObjectType patternStopType = newObject().name("patternStop")
+            .field(MapFetcher.field("pattern_id"))
+            .field(MapFetcher.field("stop_id"))
+            .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .build();
 
     /**
