@@ -100,6 +100,7 @@ public abstract class Field {
 
     /**
      * Fluent method that indicates that a newly constructed field should be indexed after the table is loaded.
+     * FIXME: should shouldBeIndexed be determined based on presence of referenceTable?
      * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
      */
     public Field indexThisColumn () {
