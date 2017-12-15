@@ -1,7 +1,17 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ShapePoint;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import gnu.trove.map.TObjectIntMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -33,10 +43,11 @@ import static com.conveyal.gtfs.model.Entity.INT_MISSING;
  * // FIXME add this interface to Entity itself. And add reader / writer functions to entity as well?
  */
 public interface EntityPopulator<T> {
+    Logger LOG = LoggerFactory.getLogger(EntityPopulator.class);
 
-    public T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
+    T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
 
-    public static final EntityPopulator<Agency> AGENCY = (result, columnForName) -> {
+    EntityPopulator<Agency> AGENCY = (result, columnForName) -> {
         Agency agency = new Agency();
         agency.agency_id       = getStringIfPresent(result, "agency_id", columnForName);
         agency.agency_name     = getStringIfPresent(result, "agency_name", columnForName);
@@ -50,7 +61,7 @@ public interface EntityPopulator<T> {
         return agency;
     };
 
-    public static final EntityPopulator<Calendar> CALENDAR = (result, columnForName) -> {
+    EntityPopulator<Calendar> CALENDAR = (result, columnForName) -> {
         Calendar calendar = new Calendar();
         calendar.service_id = getStringIfPresent(result, "service_id", columnForName);
         calendar.start_date = getDateIfPresent  (result, "start_date", columnForName);
@@ -65,7 +76,7 @@ public interface EntityPopulator<T> {
         return calendar;
     };
 
-    public static final EntityPopulator<CalendarDate> CALENDAR_DATE = (result, columnForName) -> {
+    EntityPopulator<CalendarDate> CALENDAR_DATE = (result, columnForName) -> {
         CalendarDate calendarDate   = new CalendarDate();
         calendarDate.service_id     = getStringIfPresent(result, "service_id",     columnForName);
         calendarDate.date           = getDateIfPresent  (result, "date",           columnForName);
@@ -73,7 +84,7 @@ public interface EntityPopulator<T> {
         return calendarDate;
     };
 
-    public static final EntityPopulator<Route> ROUTE = (result, columnForName) -> {
+    EntityPopulator<Route> ROUTE = (result, columnForName) -> {
         Route route = new Route();
         route.route_id         = getStringIfPresent(result, "route_id",           columnForName);
         route.agency_id        = getStringIfPresent(result, "agency_id",          columnForName);
@@ -83,12 +94,12 @@ public interface EntityPopulator<T> {
         route.route_type       = getIntIfPresent   (result, "route_type",         columnForName);
         route.route_color      = getStringIfPresent(result, "route_color",        columnForName);
         route.route_text_color = getStringIfPresent(result, "route_text_color",   columnForName);
-        route.route_url          = getUrlIfPresent (result, "route_url",          columnForName);;
-        route.route_branding_url = getUrlIfPresent (result, "route_branding_url", columnForName);;
+        route.route_url          = getUrlIfPresent (result, "route_url",          columnForName);
+        route.route_branding_url = getUrlIfPresent (result, "route_branding_url", columnForName);
         return route;
     };
 
-    public static final EntityPopulator<Stop> STOP = (result, columnForName) -> {
+    EntityPopulator<Stop> STOP = (result, columnForName) -> {
         Stop stop = new Stop();
         stop.stop_id        = getStringIfPresent(result, "stop_id",        columnForName);
         stop.stop_code      = getStringIfPresent(result, "stop_code",      columnForName);
@@ -105,7 +116,7 @@ public interface EntityPopulator<T> {
         return stop;
     };
 
-    public static final EntityPopulator<Trip> TRIP = (result, columnForName) -> {
+    EntityPopulator<Trip> TRIP = (result, columnForName) -> {
         Trip trip = new Trip();
         trip.trip_id         = getStringIfPresent(result, "trip_id", columnForName);
         trip.route_id        = getStringIfPresent(result, "route_id", columnForName);
@@ -120,7 +131,7 @@ public interface EntityPopulator<T> {
         return trip;
     };
 
-    public static final EntityPopulator<ShapePoint> SHAPE_POINT = (result, columnForName) -> {
+    EntityPopulator<ShapePoint> SHAPE_POINT = (result, columnForName) -> {
         ShapePoint shapePoint = new ShapePoint();
         shapePoint.shape_id     = getStringIfPresent(result, "shape_id", columnForName);
         shapePoint.shape_pt_lat = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
@@ -130,7 +141,7 @@ public interface EntityPopulator<T> {
         return shapePoint;
     };
 
-    public static final EntityPopulator<StopTime> STOP_TIME = (result, columnForName) -> {
+    EntityPopulator<StopTime> STOP_TIME = (result, columnForName) -> {
         StopTime stopTime = new StopTime();
         stopTime.trip_id        = getStringIfPresent(result, "trip_id", columnForName);
         stopTime.arrival_time   = getIntIfPresent   (result, "arrival_time", columnForName);
@@ -152,21 +163,21 @@ public interface EntityPopulator<T> {
     // for those fields present. Or we could create cursor objects that allow accessing the fields of the ResultSet
     // in a typed way. Those cursor objects would make their own columnForName map when constructed.
 
-    public static String getStringIfPresent (ResultSet resultSet, String columnName,
+    static String getStringIfPresent (ResultSet resultSet, String columnName,
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return null;
         else return resultSet.getString(columnIndex);
     }
 
-    public static LocalDate getDateIfPresent (ResultSet resultSet, String columnName,
+    static LocalDate getDateIfPresent (ResultSet resultSet, String columnName,
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return null;
         else return LocalDate.parse(resultSet.getString(columnIndex), DateField.GTFS_DATE_FORMATTER);
     }
 
-    public static URL getUrlIfPresent (ResultSet resultSet, String columnName,
+    static URL getUrlIfPresent (ResultSet resultSet, String columnName,
                                        TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return null;
@@ -178,33 +189,19 @@ public interface EntityPopulator<T> {
         }
     }
 
-    // FIXME: Do we need a method to get LocalDate for calendar tables?
-//    public static LocalDate getDateIfPresent (ResultSet resultSet, String columnName,
-//                                              TObjectIntMap<String> columnForName) throws SQLException {
-//        int columnIndex = columnForName.get(columnName);
-//        if (columnIndex == 0) return -1;
-//        else return resultSet.get(columnIndex);
-//    }
-
-    public static double getDoubleIfPresent (ResultSet resultSet, String columnName,
+    static double getDoubleIfPresent (ResultSet resultSet, String columnName,
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
+        // FIXME: if SQL value is null, resultSet.getInt will return 0. Should return value equal 0 if column is missing?
         if (columnIndex == 0) return -1;
         else return resultSet.getDouble(columnIndex);
     }
 
-    public static int getIntIfPresent (ResultSet resultSet, String columnName,
+    static int getIntIfPresent (ResultSet resultSet, String columnName,
                                        TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
+        // FIXME: if SQL value is null, resultSet.getInt will return 0. Should INT_MISSING do the same?
         if (columnIndex == 0) return Entity.INT_MISSING;
         else return resultSet.getInt(columnIndex);
-    }
-
-    // This really crushes incorrect values... maybe we should just be using int.
-    public static boolean getBooleanIfPresent (ResultSet resultSet, String columnName,
-                                       TObjectIntMap<String> columnForName) throws SQLException {
-        int columnIndex = columnForName.get(columnName);
-        if (columnIndex == 0) return false;
-        else return resultSet.getBoolean(columnIndex);
     }
 }
