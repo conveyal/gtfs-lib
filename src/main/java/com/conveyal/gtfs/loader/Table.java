@@ -202,6 +202,24 @@ public class Table {
             new IntegerField("exact_times", OPTIONAL, 1)
     );
 
+    public static final Table[] tablesInOrder = {
+            AGENCY,
+            CALENDAR,
+            CALENDAR_DATES,
+            FARE_ATTRIBUTES,
+            FEED_INFO,
+            ROUTES,
+            FARE_RULES,
+            PATTERNS,
+            SHAPES,
+            STOPS,
+            PATTERN_STOP,
+            TRANSFERS,
+            TRIPS,
+            STOP_TIMES,
+            FREQUENCIES
+    };
+
     /**
      * Create an SQL table with all the fields specified by this table object,
      * plus an integer CSV line number field in the first position.
