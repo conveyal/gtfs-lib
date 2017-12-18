@@ -328,8 +328,8 @@ public class Table {
      * a new Field object for this name.
      */
     public Field getFieldForName(String name) {
-        // Linear search, assuming a small number of fields per table.
-        for (Field field : fields) if (field.name.equals(name)) return field;
+        int index = getFieldIndex(name);
+        if (index >= 0) return fields[index];
         LOG.warn("Unrecognized header {}. Treating it as a proprietary string field.", name);
         return new StringField(name, UNKNOWN);
     }
@@ -352,6 +352,24 @@ public class Table {
 
     public Class<? extends Entity> getEntityClass() {
         return entityClass;
+    }
+
+
+    /**
+     * Finds the index of the field given a string name.
+     * @return the index of the field or -1 if no match is found
+     */
+    public int getFieldIndex (String name) {
+        // Linear search, assuming a small number of fields per table.
+        for (int i = 0; i < fields.length; i++) if (fields[i].name.equals(name)) return i;
+        return -1;
+    }
+
+    /**
+     * Whether a field with the provided name exists in the table's list of fields.
+     */
+    public boolean hasField (String name) {
+        return getFieldIndex(name) != -1;
     }
 
     public boolean isRequired () {
