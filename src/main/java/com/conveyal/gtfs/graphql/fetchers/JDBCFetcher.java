@@ -135,7 +135,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             conditions.add(String.join(" = ", parentJoinField, quote(enclosingEntity.get(parentJoinField).toString())));
         }
         if (sortField != null) {
-            sortBy = String.format(" order by %s ", sortField);
+            sortBy = String.format(" order by %s", sortField);
         }
         Map<String, Object> arguments = environment.getArguments();
         for (String key : arguments.keySet()) {
