@@ -124,7 +124,7 @@ public class GraphQLGtfsSchema {
                     .name("stop_times")
                     // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
                     .type(new GraphQLList(new GraphQLTypeReference("stopTime")))
-                    .dataFetcher(new JDBCFetcher("stop_times", "trip_id"))
+                    .dataFetcher(new JDBCFetcher("stop_times", "trip_id", "stop_sequence"))
                     .build()
             )
 //            // some pseudo-fields to reduce the amount of data that has to be fetched over GraphQL to summarize

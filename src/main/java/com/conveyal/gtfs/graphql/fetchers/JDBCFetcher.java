@@ -37,11 +37,12 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
 
     public final String tableName;
     public final String parentJoinField;
+    private final String sortField;
 
     // Supply an SQL result row -> Object transformer
 
     /**
-     * Constructor for tables that don't need any restriction by a where clause based on the enclosing entity.
+     * Constructor for tables that need neither restriction by a where clause nor sorting based on the enclosing entity.
      * These would typically be at the topmost level, directly inside a feed rather than nested in some GTFS entity type.
      */
     public JDBCFetcher (String tableName) {
@@ -55,8 +56,18 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      *        If null, no such clause is added.
      */
     public JDBCFetcher (String tableName, String parentJoinField) {
+        this(tableName, parentJoinField, null);
+    }
+
+    /**
+     *
+     * @param sortField The field on which to sort the list or fetched rows (in ascending order only).
+     *                  If null, no sort is included.
+     */
+    public JDBCFetcher (String tableName, String parentJoinField, String sortField) {
         this.tableName = tableName;
         this.parentJoinField = parentJoinField;
+        this.sortField = sortField;
     }
 
     // We can't automatically generate JDBCFetcher based field definitions for inclusion in a GraphQL schema (as we
@@ -112,6 +123,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
 
         // We will build up additional sql clauses in this List.
         List<String> conditions = new ArrayList<>();
+        // The order by clause will go here.
+        String sortBy = "";
 
         // If we are fetching an item nested within a GTFS entity in the Graphql query, we want to add an SQL "where"
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
@@ -120,6 +133,9 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             Map<String, Object> enclosingEntity = environment.getSource();
             // FIXME SQL injection: enclosing entity's ID could contain malicious character sequences; quote and sanitize the string.
             conditions.add(String.join(" = ", parentJoinField, quote(enclosingEntity.get(parentJoinField).toString())));
+        }
+        if (sortField != null) {
+            sortBy = String.format(" order by %s ", sortField);
         }
         Map<String, Object> arguments = environment.getArguments();
         for (String key : arguments.keySet()) {
@@ -137,6 +153,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             sqlBuilder.append(" where ");
             sqlBuilder.append(String.join(" and ", conditions));
         }
+        // The default value for sortBy is an empty string, so it's safe to always append it here.
+        sqlBuilder.append(sortBy);
         Integer limit = (Integer) arguments.get("limit");
         if (limit == null) {
             limit = DEFAULT_ROWS_TO_FETCH;
