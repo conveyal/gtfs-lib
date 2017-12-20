@@ -1,9 +1,6 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.model.Agency;
-import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.Entity;
-import com.conveyal.gtfs.model.Stop;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -29,12 +26,15 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * This wraps a single database table and provides methods to modify GTFS entities.
+ */
 public class JdbcTableWriter implements TableWriter {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcTableWriter.class);
     private final DataSource dataSource;
     private final Table specTable;
     private final String tablePrefix;
-    private static Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    private static Gson gson = new GsonBuilder().create();
 
     /**
      * Enum containing available methods for updating in SQL.
@@ -351,12 +351,9 @@ public class JdbcTableWriter implements TableWriter {
                 // deleteEntityHook).
 //                    deleteEntityHook();
                 if (sqlMethod.equals(SqlMethod.DELETE)) {
-                    if (entityClass.equals(Calendar.class) ||
-                            entityClass.equals(Stop.class) ||
-                            entityClass.equals(Agency.class)
-                            ) {
-                        // These tables must not have any referencing entities in order to delete.
-                        // FIXME: use switch or some field on Field to indicate constraint on Calendar (and other tables)?
+                    // Check for restrictions on delete.
+                    if (table.isDeleteRestricted()) {
+                        // The entity must not have any referencing entities in order to delete it.
                         connection.rollback();
 //                        List<String> idStrings = new ArrayList<>();
 //                        uniqueIds.forEach(uniqueId -> idStrings.add(String.valueOf(uniqueId)));

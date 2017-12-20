@@ -40,6 +40,8 @@ public class Table {
     final Requirement required;
 
     public final Field[] fields;
+    /** Determines whether cascading delete is restricted. Defaults to false (i.e., cascade delete is allowed) */
+    private boolean deleteRestricted = false;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         this.name = name;
@@ -57,7 +59,7 @@ public class Table {
         new StringField("agency_phone",  OPTIONAL),
         new URLField("agency_fare_url",  OPTIONAL),
         new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
-    );
+    ).restrictDelete();
 
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
     public static final Table CALENDAR = new Table("calendar", Calendar.class, OPTIONAL,
@@ -71,7 +73,7 @@ public class Table {
         new IntegerField("sunday", REQUIRED, 0, 1),
         new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED)
-    );
+    ).restrictDelete();
 
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
         new StringField("service_id", REQUIRED),
@@ -148,15 +150,17 @@ public class Table {
         new StringField("parent_station",  OPTIONAL),
         new StringField("stop_timezone",  OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
-    );
+    ).restrictDelete();
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED, PATTERNS),
+            // FIXME: Do we need an index on stop_id
             new StringField("stop_id", REQUIRED, STOPS),
             new IntegerField("stop_sequence", REQUIRED)
     );
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
+            // FIXME: Do we need an index on from_ and to_stop_id
             new StringField("from_stop_id", REQUIRED, STOPS),
             new StringField("to_stop_id", REQUIRED, STOPS),
             new StringField("transfer_type", REQUIRED),
@@ -167,6 +171,7 @@ public class Table {
         new StringField("trip_id",  REQUIRED),
         new StringField("route_id",  REQUIRED, ROUTES).indexThisColumn(),
         // FIXME: Should this also optionally reference CALENDAR_DATES?
+        // FIXME: Do we need an index on service_id
         new StringField("service_id",  REQUIRED, CALENDAR),
         new StringField("trip_headsign",  OPTIONAL),
         new StringField("trip_short_name",  OPTIONAL),
@@ -181,7 +186,9 @@ public class Table {
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
             new StringField("trip_id", REQUIRED, TRIPS),
             new IntegerField("stop_sequence", REQUIRED),
+            // FIXME: Do we need an index on stop_id
             new StringField("stop_id", REQUIRED, STOPS),
+//                    .indexThisColumn(),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are reqiured
             new TimeField("arrival_time", OPTIONAL),
             new TimeField("departure_time", OPTIONAL),
@@ -219,6 +226,19 @@ public class Table {
             STOP_TIMES,
             FREQUENCIES
     };
+
+    /**
+     * Fluent method that restricts deletion of an entity in this table if there are references to it elsewhere. For
+     * example, a calendar that has trips referencing it must not be deleted.
+     */
+    public Table restrictDelete () {
+        this.deleteRestricted = true;
+        return this;
+    }
+
+    public boolean isDeleteRestricted() {
+        return deleteRestricted;
+    }
 
     /**
      * Create an SQL table with all the fields specified by this table object,
