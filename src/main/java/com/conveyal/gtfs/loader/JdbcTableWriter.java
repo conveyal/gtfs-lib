@@ -176,33 +176,27 @@ public class JdbcTableWriter implements TableWriter {
      * Handle executing a prepared statement and return the ID for the newly-generated or updated entity.
      */
     private static long handleStatementExecution(Connection connection, PreparedStatement statement, boolean isCreating) throws SQLException {
-        try {
-            // Log the SQL for the prepared statement
-            LOG.info(statement.toString());
-            int affectedRows = statement.executeUpdate();
-            // Commit the transaction
-            connection.commit();
-            // Determine operation-specific action for any error messages
-            String messageAction = isCreating ? "Creating" : "Updating";
-            if (affectedRows == 0) {
-                // No update occurred.
-                // TODO: add some clarity on cause (e.g., where clause found no entity with provided ID)?
-                throw new SQLException(messageAction + " entity failed, no rows affected.");
-            }
-            try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    // Get the auto-generated ID from the update execution
-                    long newId = generatedKeys.getLong(1);
-                    return newId;
-                } else {
-                    throw new SQLException(messageAction + " entity failed, no ID obtained.");
-                }
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-            throw e;
+        // Log the SQL for the prepared statement
+        LOG.info(statement.toString());
+        int affectedRows = statement.executeUpdate();
+        // Commit the transaction
+        connection.commit();
+        // Determine operation-specific action for any error messages
+        String messageAction = isCreating ? "Creating" : "Updating";
+        if (affectedRows == 0) {
+            // No update occurred.
+            // TODO: add some clarity on cause (e.g., where clause found no entity with provided ID)?
+            throw new SQLException(messageAction + " entity failed, no rows affected.");
         }
-//        return 0;
+        try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
+            if (generatedKeys.next()) {
+                // Get the auto-generated ID from the update execution
+                long newId = generatedKeys.getLong(1);
+                return newId;
+            } else {
+                throw new SQLException(messageAction + " entity failed, no ID obtained.");
+            }
+        }
     }
 
     /**
