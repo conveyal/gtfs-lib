@@ -104,6 +104,7 @@ public class Table {
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2),
+        new StringField("agency_id", OPTIONAL), // FIXME? only required if there are more than one
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
@@ -111,7 +112,7 @@ public class Table {
     // feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
-        new StringField("feed_publisher_url", REQUIRED),
+        new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
@@ -124,12 +125,13 @@ public class Table {
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
-        new IntegerField("route_type", REQUIRED, 999),
+        new IntegerField("route_type", REQUIRED, 7),
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
         new ColorField("route_text_color",  OPTIONAL),
         new ShortField("publicly_visible", EDITOR, 2),
-        new ShortField("status", EDITOR,  2)
+        new ShortField("status", EDITOR,  2),
+                new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE)
     ).addPrimaryKey();
 
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
