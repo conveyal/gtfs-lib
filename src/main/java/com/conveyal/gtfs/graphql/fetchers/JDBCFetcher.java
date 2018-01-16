@@ -16,6 +16,7 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +36,9 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     public static final int DEFAULT_ROWS_TO_FETCH = 50;
     public static final int MAX_ROWS_TO_FETCH = 500;
 
+    public static final String ID_ARG = "id";
+    public static final String LIMIT_ARG = "limit";
+    public static final String OFFSET_ARG = "offset";
     public final String tableName;
     public final String parentJoinField;
     private final String sortField;
@@ -99,9 +103,9 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
 
     @Override
     public List<Map<String, Object>> get (DataFetchingEnvironment environment) {
-
-        // This will contain one Map<String, Object> for each row fetched from the database table.
-        List<Map<String, Object>> results = new ArrayList<>();
+        // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
+        // the parent feed (FeedFetcher).
+        Map<String, Object> parentEntityMap = environment.getSource();
 
         // Apparently you can't get the arguments from the parent - how do you have arguments on sub-fields?
         // It looks like you have to redefine the argument on each subfield and pass it explicitly in the Graphql request.
@@ -110,9 +114,38 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         // This DataFetcher only makes sense when the enclosing parent object is a feed or something in a feed.
         // So it should always be represented as a map with a namespace key.
 
-        // GetSource is the context in which this this DataFetcher has been created, in this case a map representing the parent feed.
-        Map<String, Object> parentEntityMap = environment.getSource();
         String namespace = (String) parentEntityMap.get("namespace");
+
+        List<String> parentJoinValues = new ArrayList<>();
+        if (parentJoinField != null) {
+            Map<String, Object> enclosingEntity = environment.getSource();
+            // FIXME SQL injection: enclosing entity's ID could contain malicious character sequences; quote and sanitize the string.
+            // FIXME: THIS IS BROKEN if parentJoinValue is null!!!!
+            Object parentJoinValue = enclosingEntity.get(parentJoinField);
+            // Check for null parentJoinValue to protect against NPE.
+            String parentJoinString = parentJoinValue == null ? null : parentJoinValue.toString();
+            parentJoinValues.add(parentJoinString);
+            if (parentJoinValue == null) {
+                return new ArrayList<>();
+            }
+        }
+        Map<String, Object> arguments = environment.getArguments();
+
+        return getResults(namespace, parentJoinValues, arguments);
+    }
+
+    /**
+     * Handle fetching functionality for a given namespace, set of join values, and arguments. This is broken out from
+     * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher)
+     */
+    public List<Map<String, Object>> getResults (String namespace, List<String> parentJoinValues, Map<String, Object> arguments) {
+        // This will contain one Map<String, Object> for each row fetched from the database table.
+        List<Map<String, Object>> results = new ArrayList<>();
+        if (arguments == null) arguments = new HashMap<>();
+        if (namespace == null) {
+            // If namespace is null, do no attempt a query on a namespace that does not exist.
+            return null;
+        }
         StringBuilder sqlBuilder = new StringBuilder();
 
         // We could select only the requested fields by examining environment.getFields(), but we just get them all.
@@ -129,19 +162,19 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         // If we are fetching an item nested within a GTFS entity in the Graphql query, we want to add an SQL "where"
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
         // Note, this is assuming the type of the field in the parent is a string.
-        if (parentJoinField != null) {
-            Map<String, Object> enclosingEntity = environment.getSource();
+        if (parentJoinField != null && parentJoinValues != null && !parentJoinValues.isEmpty()) {
             // FIXME SQL injection: enclosing entity's ID could contain malicious character sequences; quote and sanitize the string.
-            conditions.add(String.join(" = ", parentJoinField, quote(enclosingEntity.get(parentJoinField).toString())));
+            conditions.add(makeInClause(parentJoinField, parentJoinValues));
         }
         if (sortField != null) {
             sortBy = String.format(" order by %s", sortField);
         }
-        Map<String, Object> arguments = environment.getArguments();
         for (String key : arguments.keySet()) {
-            // Limit and Offset arguments are for pagination. All others become "where X in A, B, C" clauses.
-            if ("limit".equals(key) || "offset".equals(key)) continue;
-            if ("id".equals(key)) {
+            // Limit and Offset arguments are for pagination. projectStops is used to mutate shape points before
+            // returning them. All others become "where X in A, B, C" clauses.
+            String[] argsToSkip = new String[]{LIMIT_ARG, OFFSET_ARG};
+            if (Arrays.asList(argsToSkip).indexOf(key) != -1) continue;
+            if (ID_ARG.equals(key)) {
                 Integer value = (Integer) arguments.get(key);
                 conditions.add(String.join(" = ", "id", value.toString()));
             } else {
@@ -155,7 +188,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         }
         // The default value for sortBy is an empty string, so it's safe to always append it here.
         sqlBuilder.append(sortBy);
-        Integer limit = (Integer) arguments.get("limit");
+        Integer limit = (Integer) arguments.get(LIMIT_ARG);
         if (limit == null) {
             limit = DEFAULT_ROWS_TO_FETCH;
         }
@@ -168,7 +201,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         } else {
             sqlBuilder.append(" limit " + limit);
         }
-        Integer offset = (Integer) arguments.get("offset");
+        Integer offset = (Integer) arguments.get(OFFSET_ARG);
         if (offset != null && offset >= 0) {
             sqlBuilder.append(" offset " + offset);
         }
@@ -203,6 +236,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         return results;
     }
 
+    /** Construct filter clause with '=' (single string) or 'in' (multiple strings). */
     private String makeInClause(String key, List<String> strings) {
         StringBuilder sb = new StringBuilder();
         sb.append(key);
