@@ -18,6 +18,7 @@ import static com.conveyal.gtfs.graphql.GraphQLUtil.intt;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.string;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
+import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.*;
 import static graphql.Scalars.GraphQLFloat;
 import static graphql.Scalars.GraphQLInt;
 import static graphql.Scalars.GraphQLString;
@@ -108,6 +109,16 @@ public class GraphQLGtfsSchema {
             )
             .build();
 
+    // Represents rows from shapes.txt
+    public static final GraphQLObjectType shapePointType = newObject().name("shapePoint")
+            .field(MapFetcher.field("shape_id"))
+            .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
+            .field(MapFetcher.field("shape_pt_lat", GraphQLFloat))
+            .field(MapFetcher.field("shape_pt_lon", GraphQLFloat))
+            .field(MapFetcher.field("shape_pt_sequence", GraphQLInt))
+            .field(MapFetcher.field("point_type", GraphQLInt))
+            .build();
+
     // Represents rows from trips.txt
     public static final GraphQLObjectType tripType = newObject()
             .name("trip")
@@ -127,6 +138,12 @@ public class GraphQLGtfsSchema {
                     .dataFetcher(new JDBCFetcher("stop_times", "trip_id", "stop_sequence"))
                     .build()
             )
+            // TODO should this be included in the query?
+            .field(newFieldDefinition()
+                    .name("shape")
+                    .type(new GraphQLList(shapePointType))
+                    .dataFetcher(new JDBCFetcher("shapes", "shape_id"))
+                    .build())
 //            // some pseudo-fields to reduce the amount of data that has to be fetched over GraphQL to summarize
 //            .field(newFieldDefinition()
 //                    .name("start_time")
@@ -238,8 +255,21 @@ public class GraphQLGtfsSchema {
      * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
      */
     public static final GraphQLObjectType patternStopType = newObject().name("patternStop")
+            .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("pattern_id"))
             .field(MapFetcher.field("stop_id"))
+            .field(MapFetcher.field("default_travel_time", GraphQLInt))
+            .field(MapFetcher.field("default_dwell_time", GraphQLInt))
+            .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
+            .field(MapFetcher.field("drop_off_type", GraphQLInt))
+            .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("timepoint", GraphQLInt))
+            .field(newFieldDefinition()
+                    .type(stopType)
+                    .name("stop")
+                    .dataFetcher(new JDBCFetcher("stops", "stop_id"))
+                    .build()
+            )
             .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .build();
 
@@ -287,15 +317,23 @@ public class GraphQLGtfsSchema {
             .field(string("message"))
             .build();
 
-
     /**
      * The GraphQL API type representing a unique sequence of stops on a route. This is used to group trips together.
      */
-    public static GraphQLObjectType patternType = newObject().name("pattern")
+    public static final GraphQLObjectType patternType = newObject().name("pattern")
             .description("A sequence of stops that characterizes a set of trips on a single route.")
+            .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("pattern_id"))
+            .field(MapFetcher.field("shape_id"))
             .field(MapFetcher.field("route_id"))
-            .field(MapFetcher.field("description"))
+            .field(MapFetcher.field("name"))
+            .field(newFieldDefinition()
+                    .name("shape")
+                    .type(new GraphQLList(shapePointType))
+                    .argument(intArg(LIMIT_ARG))
+                    .dataFetcher(new JDBCFetcher("shapes", "shape_id", "shape_pt_sequence"))
+                    .build())
+            .field(RowCountFetcher.field("trip_count", "trips", "pattern_id"))
             .field(newFieldDefinition()
                 .name("stops")
                 .type(new GraphQLList(patternStopType))
