@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
@@ -25,6 +26,6 @@ public abstract class TripValidator extends Validator {
      * @param trip the trip whose stop_times are provided in the other parameter.
      * @param stopTimes a List of all the stop times in the given trip, in order of increasing stop_sequence.
      */
-    public abstract void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops);
+    public abstract void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints);
 
 }

@@ -1,7 +1,9 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.model.StopTime;
+import gnu.trove.list.TDoubleList;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TDoubleArrayList;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.util.ArrayList;
@@ -18,6 +20,10 @@ public class TripPatternKey {
     public List<String> stops = new ArrayList<>();
     public TIntList pickupTypes = new TIntArrayList();
     public TIntList dropoffTypes = new TIntArrayList();
+    public TIntList arrivalTimes = new TIntArrayList();
+    public TIntList departureTimes = new TIntArrayList();
+    public TIntList timepoints = new TIntArrayList();
+    public TDoubleList shapeDistances = new TDoubleArrayList();
 
     public TripPatternKey (String routeId) {
         this.routeId = routeId;
@@ -27,6 +33,10 @@ public class TripPatternKey {
         stops.add(st.stop_id);
         pickupTypes.add(st.pickup_type);
         dropoffTypes.add(st.drop_off_type);
+        arrivalTimes.add(st.arrival_time);
+        departureTimes.add(st.departure_time - st.arrival_time);
+        timepoints.add(st.timepoint);
+        shapeDistances.add(st.shape_dist_traveled);
     }
 
     @Override

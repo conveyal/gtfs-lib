@@ -1,11 +1,20 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.CoordinateList;
+import com.vividsolutions.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.util.Util.human;
 
@@ -53,7 +63,7 @@ public class PatternFinder {
 //
 //    }
 
-    public void processTrip (Trip trip, List<StopTime> orderedStopTimes) {
+    public void processTrip(Trip trip, List<StopTime> orderedStopTimes, List<ShapePoint> shapePoints) {
         if (++nTripsProcessed % 100000 == 0) {
             LOG.info("trip {}", human(nTripsProcessed));
         }
@@ -70,8 +80,10 @@ public class PatternFinder {
     /**
      * Once all trips have been processed, call this method to produce the final Pattern objects representing all the
      * unique sequences of stops encountered.
+     * @param stopById
+     * @param errorStorage
      */
-    public List<Pattern> createPatternObjects () {
+    public List<Pattern> createPatternObjects(Map<String, Stop> stopById, SQLErrorStorage errorStorage) {
         // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
         int nextPatternId = 1;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
@@ -81,12 +93,42 @@ public class PatternFinder {
             Collection<Trip> trips = tripsForPattern.get(key);
             Pattern pattern = new Pattern(key.stops, trips, null);
             // Overwrite long UUID with sequential integer pattern ID
-            // FIXME: Ought the ID be an integer?
             pattern.pattern_id = Integer.toString(nextPatternId++);
+            // FIXME: Should associated shapes be a single entry?
+            pattern.associatedShapes = new HashSet<>();
+            pattern.associatedShapes
+                    .addAll(trips.stream().map(trip -> trip.shape_id).collect(Collectors.toList()));
+            if (pattern.associatedShapes.size() > 1) {
+                // Store an error if there is more than one shape per pattern.
+                // TODO: Should shape ID be added to trip pattern key?
+                errorStorage.storeError(NewGTFSError.forEntity(
+                        pattern,
+                        NewGTFSErrorType.MULTIPLE_SHAPES_FOR_PATTERN)
+                            .setBadValue(pattern.associatedShapes.toString()));
+            }
+            pattern.patternStops = new ArrayList<>();
+            // Construct pattern stops based on values in trip pattern key.
+            for (int i = 0; i < key.stops.size(); i++) {
+                int dwellTime = key.departureTimes.get(i) - key.arrivalTimes.get(i);
+                int travelTime = 0;
+                String stopId = key.stops.get(i);
+                if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
+                double shapeDistTraveled = key.shapeDistances.get(i);
+                pattern.patternStops.add(
+                        new PatternStop(
+                                pattern.pattern_id,
+                                stopId,
+                                i,
+                                travelTime,
+                                dwellTime,
+                                shapeDistTraveled,
+                                key.pickupTypes.get(i),
+                                key.dropoffTypes.get(i)));
+            }
             patterns.add(pattern);
         }
-        // TODO Attempt to assign more human-readable names to all these patterns.
-        // renamePatterns(patterns, stopById);
+        // Name patterns before storing in SQL database.
+        renamePatterns(patterns, stopById);
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
         return patterns;
     }
@@ -96,7 +138,7 @@ public class PatternFinder {
      * This process requires access to all the stops in the feed.
      * Some validators already cache a map of all the stops. There's probably a cleaner way to do this.
      */
-    private void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
+    public static void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
         LOG.info("Generating unique names for patterns");
 
         Map<String, PatternNamingInfo> namingInfoForRoute = new HashMap<>();
@@ -184,6 +226,58 @@ public class PatternFinder {
                         pattern.orderedStops.size(), pattern.name, pattern.associatedTrips.size());
             }
         }
+    }
+
+    public void generatePatternGeometry(Pattern pattern, Map<String, Stop> stopById, Collection<List<ShapePoint>> shapes) {
+        if (shapes.isEmpty() || pattern.orderedStops.isEmpty()) return;
+        // Create line string list to store segments between stops
+        Collection<LineString> lineStrings = new ArrayList<>();
+        CoordinateList coordinateList = new CoordinateList();
+        // First, attempt to use a shape ID for any associated trip to construct the pattern geometry.
+        for (List<ShapePoint> shapePoints : shapes) {
+            // If there are no points for the shape, continue.
+            if (shapePoints.size() == 0) continue;
+            ShapePoint previousPoint = null;
+            // If shape exists, break into segments by divided by stop points
+            for (ShapePoint point : shapePoints) {
+                coordinateList.add(shapePointToCoordinate(point));
+//                if (previousPoint == null) {
+//                    previousPoint = point;
+//                } else {
+//                    Coordinate[] coordinates = {shapePointToCoordinate(previousPoint), shapePointToCoordinate(point)};
+//                    lineStrings.add(geometryFactory.createLineString(coordinates));
+//                    previousPoint = point;
+//                }
+            }
+//            pattern.geometry = GeometryFactory.toLineStringArray(lineStrings);
+            pattern.geometry = GeoUtils.geometryFactory.createLineString(coordinateList.toCoordinateArray());
+            return;
+        }
+
+        // Otherwise, default to a simple straight line between stops.
+        Stop previousStop = null;
+        // Iterate over stops, and store a new coordinate for each stop.
+        for (String stopId : pattern.orderedStops) {
+            Stop stop = stopById.get(stopId);
+            coordinateList.add(stopToCoordinate(stop));
+//            if (previousStop == null) {
+//                previousStop = stop;
+//            } else {
+//                Coordinate[] coordinates = {stopToCoordinate(previousStop), stopToCoordinate(stop)};
+//                lineStrings.add(geometryFactory.createLineString(coordinates));
+//                previousStop = stop;
+//            }
+        }
+//        pattern.geometry = GeometryFactory.toLineStringArray(lineStrings);
+        pattern.geometry = GeoUtils.geometryFactory.createLineString(coordinateList.toCoordinateArray());
+    }
+
+    private static Coordinate stopToCoordinate (Stop stop) {
+        return new Coordinate(stop.stop_lon, stop.stop_lat);
+    }
+
+    private static Coordinate shapePointToCoordinate (ShapePoint shapePoint) {
+        return new Coordinate(shapePoint.shape_pt_lon, shapePoint.shape_pt_lat);
     }
 
     /**

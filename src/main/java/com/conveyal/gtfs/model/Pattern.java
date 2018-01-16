@@ -1,21 +1,35 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.util.GeoUtils;
 import com.google.common.base.Joiner;
+import com.vividsolutions.jts.awt.PointShapeFactory;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
 import com.vividsolutions.jts.geom.LineString;
 
 import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.linearref.LinearLocation;
+import com.vividsolutions.jts.linearref.LocationIndexedLine;
+import org.geotools.referencing.GeodeticCalculator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static com.conveyal.gtfs.util.GeoUtils.getCoordDistances;
+import static com.conveyal.gtfs.util.GeoUtils.pointFromStop;
 
 /**
  *
  */
 public class Pattern extends Entity {
     public static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(Pattern.class);
 
     // A unique ID for this journey pattern / stop pattern
     public String pattern_id;
@@ -27,10 +41,12 @@ public class Pattern extends Entity {
     public double[] segmentFraction;
 
     public List<String> orderedStops;
+    // Contains exemplar information about stops the pattern visits.
+    public List<PatternStop> patternStops;
     // TODO: change list of trips to set
     public List<String> associatedTrips;
     // TODO: add set of shapes
-//    public Set<String> associatedShapes;
+    public Set<String> associatedShapes;
     public LineString geometry;
     public String name;
     public String route_id;

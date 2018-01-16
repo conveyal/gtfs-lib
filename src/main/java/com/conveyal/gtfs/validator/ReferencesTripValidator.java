@@ -3,6 +3,7 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
@@ -27,7 +28,7 @@ public class ReferencesTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints) {
         if (trip != null) referencedTrips.add(trip.trip_id);
         if (route != null) referencedRoutes.add(route.route_id);
         for (Stop stop : stops) referencedStops.add(stop.stop_id);
