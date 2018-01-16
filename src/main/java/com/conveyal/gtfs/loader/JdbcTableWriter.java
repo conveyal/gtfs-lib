@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.storage.StorageException;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonArray;
@@ -9,6 +10,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,13 +20,18 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
+
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.INSERT_BATCH_SIZE;
 
 /**
  * This wraps a single database table and provides methods to modify GTFS entities.
@@ -69,18 +76,63 @@ public class JdbcTableWriter implements TableWriter {
     public String update(Integer id, String json) throws SQLException {
         final boolean isCreating = id == null;
         JsonObject jsonObject = getJsonObject(json);
-        // Parse the fields/values into a Field -> String map (drops ALL unknown fields)
-        Map<Field, String> fieldStringMap = jsonToFieldStringMap(jsonObject, specTable);
         String tableName = String.join(".", tablePrefix, specTable.name);
-        Connection connection = dataSource.getConnection();
-        // Ensure that the key field is unique and that referencing tables are updated if the value is updated.
-        ensureReferentialIntegrity(connection, jsonObject, tablePrefix, specTable, id);
+        // Parse the fields/values into a Field -> String map (drops ALL unknown fields)
+        Connection connection = null;
+        try {
+            connection = dataSource.getConnection();
+            // Ensure that the key field is unique and that referencing tables are updated if the value is updated.
+            ensureReferentialIntegrity(connection, jsonObject, tablePrefix, specTable, id);
+            // This must follow referential integrity check because some tables will modify the jsonObject (e.g., adding trip ID if it is null).
+            Map<Field, String> fieldStringMap = jsonToFieldStringMap(jsonObject, specTable);
+            LOG.info(jsonObject.toString());
+            PreparedStatement preparedStatement = createPreparedUpdate(id, isCreating, fieldStringMap, tableName, connection, false);
+            // ID from create/update result
+            long newId = handleStatementExecution(connection, preparedStatement, isCreating);
+            // At this point, the transaction was successful (and committed). Now we should handle any post-save
+            // logic. For example, after saving a trip, we need to store its stop times.
+            Set<Table> referencingTables = getReferencingTables(specTable);
+            // FIXME: hacky hack hack to add shapes table if we're updating a pattern.
+            if (specTable.name.equals("patterns")) {
+                referencingTables.add(Table.SHAPES);
+            }
+            for (Table referencingTable : referencingTables) {
+                Table parentTable = referencingTable.getParentTable();
+                if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
+                    // If a referencing table has the current table as its parent, update child elements.
+                    JsonElement childEntities = jsonObject.get(referencingTable.name);
+                    if (childEntities == null) {
+                        throw new SQLException(String.format("Child entities %s must not be null", referencingTable.name));
+                    }
+                    int entityId = isCreating ? (int) newId : id;
+                    updateChildTable(childEntities.getAsJsonArray(), entityId, isCreating, referencingTable, connection);
+                }
+            }
+            // Add new ID to JSON object.
+            jsonObject.addProperty("id", newId);
+            // FIXME: Should this return the entity from the database?
+            return jsonObject.toString();
+        } catch (SQLException e) {
+            LOG.error("Error updating entity", e);
+            DbUtils.closeQuietly(connection);
+            throw e;
+        }
+    }
+
+    /**
+     * Creates a prepared statement for an entity update or create operation. Uses a map of Field objects with values to
+     * construct SQL statement for the given table name.
+     */
+    private static PreparedStatement createPreparedUpdate(Integer id, boolean isCreating, Map<Field, String> fieldStringMap, String tableName, Connection connection, boolean batch) throws SQLException {
+        String statementString;
         // Collect field names for string joining from JsonObject.
         List<String> fieldNames = fieldStringMap.keySet().stream()
                 // If updating, add suffix for use in set clause
                 .map(field -> isCreating ? field.getName() : field.getName() + " = ?")
+                // Ensure fields are set according to alphabetical order of field name
+                // This order MUST coincide with whatever function is used to fill values (see fillValues)
+                .sorted()
                 .collect(Collectors.toList());
-        String statementString;
         if (isCreating) {
             // If creating a new entity, use default next value for ID.
             String questionMarks = String.join(", ", Collections.nCopies(fieldNames.size(), "?"));
@@ -93,31 +145,125 @@ public class JdbcTableWriter implements TableWriter {
         PreparedStatement preparedStatement = connection.prepareStatement(
                 statementString,
                 Statement.RETURN_GENERATED_KEYS);
+        if (!batch) {
+            fillValues(fieldStringMap, preparedStatement, connection);
+        }
+        return preparedStatement;
+    }
+
+    private static void fillValues(Map<Field, String> fieldStringMap, PreparedStatement preparedStatement, Connection connection) throws SQLException {
         // one-based index for statement parameters
         int index = 1;
+        // Sort keys on field name to match prepared statement parameters
+        Field[] keys = fieldStringMap.keySet().stream()
+                .sorted(Comparator.comparing(Field::getName))
+                .toArray(Field[]::new);
         // Fill statement parameters with strings from JSON
-        for (Map.Entry<Field, String> entry : fieldStringMap.entrySet()) {
-            entry.getKey().setParameter(preparedStatement, index, entry.getValue());
+        for (Field field : keys) {
+            String value = fieldStringMap.get(field);
+//            LOG.info("{}={}", field.name, value);
+            try {
+                if (value == null) {
+                    // Handle null value
+                    preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
+                } else {
+                    field.setParameter(preparedStatement, index, value);
+                }
+            } catch (StorageException e) {
+                if (field.name.contains("_time")) {
+                    // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
+                    // currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
+                    try {
+                        if (value == null) {
+                            preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
+                        } else {
+                            Integer seconds = Integer.parseInt(value);
+                            preparedStatement.setInt(index, seconds);
+                        }
+                    } catch (NumberFormatException ex) {
+                        connection.rollback();
+                        LOG.error("Bad column: {}={}", field.name, value);
+                        ex.printStackTrace();
+                        throw ex;
+                    }
+                } else {
+                    connection.rollback();
+                    throw e;
+                }
+            }
             index += 1;
         }
-        // ID from create/update result
-        long newId = handleStatementExecution(connection, preparedStatement, isCreating);
-        // At this point, the transaction was successful (and committed). Now we should handle any post-save
-        // logic. For example, after saving a trip, we need to store its stop times.
-        if (specTable.getEntityClass().getSimpleName().equals("Trip")) {
-            JsonArray stopTimes = jsonObject.get("stop_times").getAsJsonArray();
-            for (JsonElement stopTimeElement : stopTimes) {
-                JsonObject stopTime = stopTimeElement.getAsJsonObject();
-                Map<Field, String> stopTimeFieldStringMap = jsonToFieldStringMap(stopTime, Table.STOP_TIMES);
-                LOG.info("stop time fields found: {}", stopTimeFieldStringMap.keySet().stream().map(field -> field.getName()).collect(Collectors.toList()).toString());
-            }
-
-        }
-        // Add new ID to JSON object.
-        jsonObject.addProperty("id", newId);
-        // FIXME: Should this return the entity from the database?
-        return jsonObject.toString();
     }
+
+    /**
+     * This updates
+     */
+    private void updateChildTable(JsonArray entityList, Integer id, boolean isCreating, Table subTable, Connection connection) throws SQLException {
+        // Get parent table's key field
+        String keyField;
+        String keyValue;
+        boolean updatingShapes = subTable.name.equals("shapes");
+        if (updatingShapes) {
+            keyField = "shape_id";
+        } else {
+            keyField = specTable.getKeyFieldName();
+        }
+        // Get parent entity's key value
+        keyValue = getValueForId(id, keyField, tablePrefix, specTable, connection);
+        String childTableName = String.join(".", tablePrefix, subTable.name);
+        // FIXME: add check for pattern stop consistency.
+        // FIXME: re-order stop times if pattern stop order changes.
+        // FIXME: allow shapes to be updated on pattern geometry change.
+        if (!isCreating) {
+            String deleteSql;
+            // Delete existing sub-entities for given entity ID if the parent entity is not being created
+            deleteSql = getUpdateReferencesSql(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
+            LOG.info(deleteSql);
+            Statement statement = connection.createStatement();
+            // FIXME: Copy on update (instead of deleting here)
+            int result = statement.executeUpdate(deleteSql);
+            LOG.info("Deleted {}", result);
+            // FIXME: are there cases when an update should not return zero?
+//            if (result == 0) throw new SQLException("No stop times found for trip ID");
+        }
+        int entityCount = 0;
+        PreparedStatement insertStatement = null;
+        for (JsonElement entityElement : entityList) {
+            JsonObject entity = entityElement.getAsJsonObject();
+            if (entity.get(keyField) == null) {
+                entity.addProperty(keyField, keyValue);
+            }
+            Map<Field, String> fieldStringMap = jsonToFieldStringMap(entity, subTable);
+            // Insert new sub-entity.
+            if (entityCount == 0) {
+                insertStatement = createPreparedUpdate(id, true, fieldStringMap, childTableName, connection, true);
+            }
+            LOG.info("{}", entityCount);
+            fillValues(fieldStringMap, insertStatement, connection);
+            if (entityCount == 0) LOG.info(insertStatement.toString());
+            insertStatement.addBatch();
+            if (entityCount % INSERT_BATCH_SIZE == 0) {
+                LOG.info("Executing batch insert ({}/{}) for {}", entityCount, entityList.size(), childTableName);
+                int[] newIds = insertStatement.executeBatch();
+                LOG.info("Updated {}", newIds.length);
+            }
+            entityCount += 1;
+//            handleStatementExecution(connection, insertStatement, true);
+        }
+        // execute any remaining prepared statement calls
+        LOG.info("Executing batch insert ({}/{}) for {}", entityCount, entityList.size(), childTableName);
+        if (insertStatement != null) {
+            // If insert statement is null, an empty array was passed for the child table, so the child elements have
+            // been wiped.
+            int[] newIds = insertStatement.executeBatch();
+            LOG.info("Updated {}", newIds.length);
+        } else {
+            LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
+        }
+        LOG.info("Committing transaction.");
+        connection.commit();
+    }
+
 
     @Override
     public int delete(Integer id) throws SQLException {
@@ -139,6 +285,11 @@ public class JdbcTableWriter implements TableWriter {
         return result;
     }
 
+    @Override
+    public void commit() throws SQLException {
+        // FIXME: should this take a connection and commit it?
+    }
+
     /**
      * Delete entities from any referencing tables (if required). This method is defined for convenience and clarity, but
      * essentially just runs updateReferencingTables with a null value for newKeyValue param.
@@ -151,7 +302,7 @@ public class JdbcTableWriter implements TableWriter {
      * Handles converting JSON object into a map from Fields (which have methods to set parameter type in SQL
      * statements) to String values found in the JSON.
      */
-    private static Map<Field, String> jsonToFieldStringMap(JsonObject jsonObject, Table table) {
+    private static Map<Field, String> jsonToFieldStringMap(JsonObject jsonObject, Table table) throws SQLException {
         HashMap<Field, String> fieldStringMap = new HashMap<>();
         // Iterate over fields in JSON and remove those not found in table.
         for (Map.Entry<String, JsonElement> entry : jsonObject.entrySet()) {
@@ -167,8 +318,14 @@ public class JdbcTableWriter implements TableWriter {
             if (!value.isJsonNull()) {
                 // Only add non-null fields to map
                 fieldStringMap.put(field, value.getAsString());
+            } else {
+                fieldStringMap.put(field, null);
             }
         }
+        if (fieldStringMap.keySet().size() == 0) {
+            throw new SQLException("Zero valid fields found in JSON object");
+        }
+//        LOG.info("Found {} valid fields", fieldStringMap.keySet().size());
         return fieldStringMap;
     }
 
@@ -209,7 +366,11 @@ public class JdbcTableWriter implements TableWriter {
         if (jsonObject.get(keyField) == null || jsonObject.get(keyField).isJsonNull()) {
             // FIXME: generate key field automatically for certain entities (e.g., trip ID). Maybe this should be
             // generated for all entities if null?
-            throw new SQLException(String.format("Key field %s must not be null", keyField));
+            if ("trip_id".equals(keyField)) {
+                jsonObject.addProperty(keyField, UUID.randomUUID().toString());
+            } else {
+                throw new SQLException(String.format("Key field %s must not be null", keyField));
+            }
         }
         String keyValue = jsonObject.get(keyField).getAsString();
         String tableName = String.join(".", namespace, table.name);
@@ -287,10 +448,9 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * For a given integer ID, return the key field (e.g., stop_id) of that entity.
      */
-    private static String getKeyValueForId(int id, String namespace, Table table, Connection connection) throws SQLException {
+    private static String getValueForId(int id, String fieldName, String namespace, Table table, Connection connection) throws SQLException {
         String tableName = String.join(".", namespace, table.name);
-        String keyField = table.getKeyFieldName();
-        String selectIdSql = String.format("select %s from %s where id = %d", keyField, tableName, id);
+        String selectIdSql = String.format("select %s from %s where id = %d", fieldName, tableName, id);
         LOG.info(selectIdSql);
         Statement selectIdStatement = connection.createStatement();
         ResultSet selectResults = selectIdStatement.executeQuery(selectIdSql);
@@ -325,7 +485,7 @@ public class JdbcTableWriter implements TableWriter {
         Set<Table> referencingTables = getReferencingTables(table);
         // If there are no referencing tables, there is no need to update any values (e.g., .
         if (referencingTables.size() == 0) return;
-        String keyValue = getKeyValueForId(id, namespace, table, connection);
+        String keyValue = getValueForId(id, keyField, namespace, table, connection);
         if (keyValue == null) {
             // FIXME: should we still check referencing tables for null value?
             LOG.warn("Entity {} to {} has null value for {}. Skipping references check.", id, sqlMethod, keyField);
@@ -373,6 +533,8 @@ public class JdbcTableWriter implements TableWriter {
                 return String.format("delete from %s where %s = '%s'", refTableName, keyField, keyValue);
             case UPDATE:
                 return String.format("update %s set %s = '%s' where %s = '%s'", refTableName, keyField, newKeyValue, keyField, keyValue);
+//            case CREATE:
+//                return String.format("insert into %s ");
             default:
                 throw new SQLException("SQL Method must be DELETE or UPDATE.");
         }
