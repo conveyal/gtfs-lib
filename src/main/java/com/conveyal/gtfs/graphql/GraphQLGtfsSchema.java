@@ -164,6 +164,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("route_long_name"))
             .field(MapFetcher.field("route_desc"))
             .field(MapFetcher.field("route_url"))
+            .field(MapFetcher.field("route_branding_url"))
+            .field(MapFetcher.field("wheelchair_boarding"))
             // TODO route_type as enum or int
             .field(MapFetcher.field("route_type"))
             .field(MapFetcher.field("route_color"))
