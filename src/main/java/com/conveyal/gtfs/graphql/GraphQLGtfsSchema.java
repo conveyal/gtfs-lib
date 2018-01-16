@@ -4,10 +4,10 @@ import com.conveyal.gtfs.graphql.fetchers.ErrorCountFetcher;
 import com.conveyal.gtfs.graphql.fetchers.FeedFetcher;
 import com.conveyal.gtfs.graphql.fetchers.JDBCFetcher;
 import com.conveyal.gtfs.graphql.fetchers.MapFetcher;
+import com.conveyal.gtfs.graphql.fetchers.NestedJDBCFetcher;
 import com.conveyal.gtfs.graphql.fetchers.RowCountFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SQLColumnFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SourceObjectFetcher;
-import graphql.Scalars;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLSchema;
@@ -201,6 +201,16 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("zone_id"))
             .field(MapFetcher.field("stop_url"))
             .field(MapFetcher.field("stop_timezone"))
+            .field(newFieldDefinition()
+                    .name("routes")
+                    // Field type should be equivalent to the final JDBCFetcher table type.
+                    .type(new GraphQLList(routeType))
+                    .argument(stringArg("namespace"))
+                    .dataFetcher(new NestedJDBCFetcher(
+                            new JDBCFetcher("pattern_stops", "stop_id"),
+                            new JDBCFetcher("patterns", "pattern_id"),
+                            new JDBCFetcher("routes", "route_id")))
+                    .build())
 //            .field(newFieldDefinition()
 //                    .name("stop_times")
 //                    .description("The list of stop_times for a stop")
@@ -479,6 +489,28 @@ public class GraphQLGtfsSchema {
                 .build()
             )
             .build();
+
+    /**
+     * A top-level query that returns all of the patterns that serve a given stop ID. This demonstrates the use of
+     * NestedJDBCFetcher.
+     */
+//    private static GraphQLObjectType patternsForStopQuery = newObject()
+//            .name("patternsForStopQuery")
+//            .field(newFieldDefinition()
+//                    .name("patternsForStop")
+//                    // Field type should be equivalent to the final JDBCFetcher table type.
+//                    .type(new GraphQLList(patternType))
+//                    // We scope to a single feed namespace, otherwise GTFS entity IDs are ambiguous.
+//                    .argument(stringArg("namespace"))
+//                    // We allow querying only for a single stop, otherwise result processing can take a long time (lots
+//                    // of join queries).
+//                    .argument(stringArg("stop_id"))
+//                    .dataFetcher(new NestedJDBCFetcher(
+//                            new JDBCFetcher("pattern_stops", "stop_id"),
+//                            new JDBCFetcher("patterns", "pattern_id")))
+//                    .build())
+//            .build();
+
 
     /**
      * This is the new schema as of July 2017, where all sub-entities are wrapped in a feed.
