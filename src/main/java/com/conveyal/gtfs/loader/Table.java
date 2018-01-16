@@ -42,6 +42,7 @@ public class Table {
     public final Field[] fields;
     /** Determines whether cascading delete is restricted. Defaults to false (i.e., cascade delete is allowed) */
     private boolean deleteRestricted = false;
+    private Table parentTable;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         this.name = name;
@@ -101,7 +102,6 @@ public class Table {
 
     );
 
-
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL, AGENCY),
@@ -121,20 +121,28 @@ public class Table {
             new StringField("origin_id", OPTIONAL),
             new StringField("destination_id", OPTIONAL),
             new StringField("contains_id", OPTIONAL)
-    );
-
-    public static final Table PATTERNS = new Table("patterns", Pattern.class, OPTIONAL,
-            new StringField("pattern_id", REQUIRED),
-            new StringField("route_id", REQUIRED, ROUTES),
-            new StringField("description", OPTIONAL)
-    );
+    ).withParentTable(FARE_ATTRIBUTES);
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
             new IntegerField("shape_pt_sequence", REQUIRED),
             new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
             new DoubleField("shape_pt_lon", REQUIRED, -180, 180),
-            new DoubleField("shape_dist_traveled", REQUIRED, 0, Double.POSITIVE_INFINITY)
+            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY),
+            // Editor-specific field that represents a shape point's behavior in UI.
+            // 0 - regular shape point
+            // 1 - user-designated anchor point (handle with which the user can manipulate shape)
+            // 2 - stop-projected point (dictates the value of shape_dist_traveled for a pattern stop)
+            new ShortField("point_type", EDITOR, 2)
+    );
+
+    public static final Table PATTERNS = new Table("patterns", Pattern.class, OPTIONAL,
+            new StringField("pattern_id", REQUIRED),
+            new StringField("route_id", REQUIRED, ROUTES),
+            // Editor-specific fields
+            new StringField("name", OPTIONAL),
+            new IntegerField("direction_id", EDITOR, 0, 1),
+            new StringField("shape_id", EDITOR, SHAPES)
     );
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
@@ -154,10 +162,17 @@ public class Table {
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED, PATTERNS),
-            // FIXME: Do we need an index on stop_id
+            new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
+            // FIXME: Do we need an index on stop_id?
             new StringField("stop_id", REQUIRED, STOPS),
-            new IntegerField("stop_sequence", REQUIRED)
-    );
+            // Editor-specific fields
+            new IntegerField("default_travel_time", EDITOR,0, Integer.MAX_VALUE),
+            new IntegerField("default_dwell_time", EDITOR, 0, Integer.MAX_VALUE),
+            new IntegerField("drop_off_type", EDITOR, 2),
+            new IntegerField("pickup_type", EDITOR, 2),
+            new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY),
+            new ShortField("timepoint", EDITOR, 1)
+    ).withParentTable(PATTERNS);
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
             // FIXME: Do we need an index on from_ and to_stop_id
@@ -179,13 +194,14 @@ public class Table {
         new StringField("block_id",  OPTIONAL),
         new StringField("shape_id",  OPTIONAL, SHAPES),
         new ShortField("wheelchair_accessible", OPTIONAL, 2),
-        new ShortField("bikes_allowed", OPTIONAL, 2)
+        new ShortField("bikes_allowed", OPTIONAL, 2),
+        new StringField("pattern_id", EDITOR, PATTERNS)
     );
 
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
             new StringField("trip_id", REQUIRED, TRIPS),
-            new IntegerField("stop_sequence", REQUIRED),
+            new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
             new StringField("stop_id", REQUIRED, STOPS),
 //                    .indexThisColumn(),
@@ -198,7 +214,7 @@ public class Table {
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
-    );
+    ).withParentTable(TRIPS);
 
     // Must come after TRIPS table to which it has a reference
     public static final Table FREQUENCIES = new Table("frequencies", Frequency.class, OPTIONAL,
@@ -236,19 +252,37 @@ public class Table {
         return this;
     }
 
+    /**
+     * Registers the table with a parent table. When updates are made to the parent table, updates to child entities
+     * nested in the JSON string will be made.
+     */
+    private Table withParentTable(Table parentTable) {
+        this.parentTable = parentTable;
+        return this;
+    }
+
     public boolean isDeleteRestricted() {
         return deleteRestricted;
+    }
+
+
+    public void createSqlTable(Connection connection) {
+        createSqlTable(connection, false, null);
     }
 
     /**
      * Create an SQL table with all the fields specified by this table object,
      * plus an integer CSV line number field in the first position.
      */
-    public void createSqlTable (Connection connection) {
+    public void createSqlTable (Connection connection, boolean makeIdSerial, String[] primaryKeyFields) {
         String fieldDeclarations = Arrays.stream(fields).map(Field::getSqlDeclaration).collect(Collectors.joining(", "));
+        if (primaryKeyFields != null) {
+            fieldDeclarations += String.format(", primary key (%s)", String.join(", ", primaryKeyFields));
+        }
         String dropSql = String.format("drop table if exists %s", name);
         // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
-        String createSql = String.format("create table %s (id bigint not null, %s)", name, fieldDeclarations);
+        String idFieldType = makeIdSerial ? "serial" : "bigint";
+        String createSql = String.format("create table %s (id %s not null, %s)", name, idFieldType, fieldDeclarations);
         try {
             Statement statement = connection.createStatement();
             LOG.info(dropSql);
@@ -265,15 +299,24 @@ public class Table {
      * plus an integer CSV line number field in the first position.
      */
     public String generateInsertSql () {
-        return generateInsertSql(null);
+        return generateInsertSql(null, false);
+    }
+
+    public String generateInsertSql (boolean setDefaultId) {
+        return generateInsertSql(null, setDefaultId);
     }
 
 
-    public String generateInsertSql (String namespace) {
+    public String generateInsertSql (String namespace, boolean setDefaultId) {
         String tableName = namespace == null ? name : String.join(".", namespace, name);
         String questionMarks = String.join(", ", Collections.nCopies(fields.length, "?"));
         String joinedFieldNames = Arrays.stream(fields).map(f -> f.name).collect(Collectors.joining(", "));
-        return String.format("insert into %s (id, %s) values (?, %s)", tableName, joinedFieldNames, questionMarks);
+        String idValue = setDefaultId ? "DEFAULT" : "?";
+        return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
+    }
+
+    public void setValueForField(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage) {
+        setValueForField(statement, fieldIndex, lineNumber, field, string, errorStorage, false, null);
     }
 
     /**
@@ -455,43 +498,51 @@ public class Table {
 
             // Make id column serial and set the next value based on the current max value. This code is derived from
             // https://stackoverflow.com/a/9490532/915811
-            // FIXME: For now we skip the Pattern and PatternStop id creation because neither has an ID field.
-            if (!this.entityClass.equals(Pattern.class) && !this.entityClass.equals(PatternStop.class)) {
-                String selectMaxSql = String.format("SELECT MAX(id) + 1 FROM %s", name);
+            String selectMaxSql = String.format("SELECT MAX(id) + 1 FROM %s", name);
 
-                int maxID = 0;
-                LOG.info(selectMaxSql);
-                statement.execute(selectMaxSql);
-                ResultSet maxIdResult = statement.getResultSet();
-                if (maxIdResult.next()) {
-                    maxID = maxIdResult.getInt(1);
-                }
-                // Set default max ID to 1 (the start value cannot be less than MINVALUE 1)
-                // FIXME: Skip sequence creation if maxID = 1?
-                if (maxID < 1) {
-                    maxID = 1;
-                }
-
-                String sequenceName = name + "_id_seq";
-                String createSequenceSql = String.format("CREATE SEQUENCE %s START WITH %d", sequenceName, maxID);
-                LOG.info(createSequenceSql);
-                statement.execute(createSequenceSql);
-
-                String alterColumnNextSql = String.format("ALTER TABLE %s ALTER COLUMN id SET DEFAULT nextval('%s')", name, sequenceName);
-                LOG.info(alterColumnNextSql);
-                statement.execute(alterColumnNextSql);
-                String alterColumnNotNullSql = String.format("ALTER TABLE %s ALTER COLUMN id SET NOT NULL", name);
-                LOG.info(alterColumnNotNullSql);
-                statement.execute(alterColumnNotNullSql);
-                // FIXME: Is there a need to add primary key constraint here?
-                if (addPrimaryKey) {
-                    // Add primary key to ID column for any tables that require it.
-                    String addPrimaryKeySql = String.format("ALTER TABLE %s ADD PRIMARY KEY (id)", name);
-                    LOG.info(addPrimaryKeySql);
-                    statement.execute(addPrimaryKeySql);
-                }
+            int maxID = 0;
+            LOG.info(selectMaxSql);
+            statement.execute(selectMaxSql);
+            ResultSet maxIdResult = statement.getResultSet();
+            if (maxIdResult.next()) {
+                maxID = maxIdResult.getInt(1);
+            }
+            // Set default max ID to 1 (the start value cannot be less than MINVALUE 1)
+            // FIXME: Skip sequence creation if maxID = 1?
+            if (maxID < 1) {
+                maxID = 1;
             }
 
+            String sequenceName = name + "_id_seq";
+            String createSequenceSql = String.format("CREATE SEQUENCE %s START WITH %d", sequenceName, maxID);
+            LOG.info(createSequenceSql);
+            statement.execute(createSequenceSql);
+
+            String alterColumnNextSql = String.format("ALTER TABLE %s ALTER COLUMN id SET DEFAULT nextval('%s')", name, sequenceName);
+            LOG.info(alterColumnNextSql);
+            statement.execute(alterColumnNextSql);
+            String alterColumnNotNullSql = String.format("ALTER TABLE %s ALTER COLUMN id SET NOT NULL", name);
+            LOG.info(alterColumnNotNullSql);
+            statement.execute(alterColumnNotNullSql);
+            // FIXME: Is there a need to add primary key constraint here?
+            if (addPrimaryKey) {
+                // Add primary key to ID column for any tables that require it.
+                String addPrimaryKeySql = String.format("ALTER TABLE %s ADD PRIMARY KEY (id)", name);
+                LOG.info(addPrimaryKeySql);
+                statement.execute(addPrimaryKeySql);
+            }
+
+            for (Field field : fields) {
+                if (EDITOR.equals(field.requirement) || OPTIONAL.equals(field.requirement)) {
+                    // Add columns for any optional or editor fields that don't exist
+                    String addColumnSql = String.format(
+                            "alter table %s add column if not exists %s %s",
+                            name,
+                            field.name,
+                            field.getSqlTypeName());
+                    statement.execute(addColumnSql);
+                }
+            }
             return true;
         } catch (SQLException ex) {
             LOG.error("Error cloning table {}: {}", name, ex.getSQLState());
@@ -506,5 +557,9 @@ public class Table {
                 return false;
             }
         }
+    }
+
+    public Table getParentTable() {
+        return parentTable;
     }
 }
