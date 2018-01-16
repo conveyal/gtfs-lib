@@ -187,6 +187,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("route_type"))
             .field(MapFetcher.field("route_color"))
             .field(MapFetcher.field("route_text_color"))
+            .field(RowCountFetcher.field("trip_count", "trips", "route_id"))
+            .field(RowCountFetcher.field("pattern_count", "patterns", "route_id"))
             .field(newFieldDefinition()
                     .type(new GraphQLList(tripType))
                     .name("trips")
@@ -218,6 +220,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("zone_id"))
             .field(MapFetcher.field("stop_url"))
             .field(MapFetcher.field("stop_timezone"))
+            .field(RowCountFetcher.field("stop_time_count", "stop_times", "stop_id"))
             .field(newFieldDefinition()
                     .name("routes")
                     // Field type should be equivalent to the final JDBCFetcher table type.
