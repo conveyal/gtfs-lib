@@ -8,5 +8,6 @@ public enum Requirement {
     OPTIONAL,    // Optional according to the GTFS spec
     EXTENSION,   // Extension proposed and documented on gtfs-changes
     PROPRIETARY, // Known proprietary extension that is not yet an official proposal
-    UNKNOWN      // Undocumented proprietary extension
+    UNKNOWN,     // Undocumented proprietary extension
+    EDITOR       // Editor-specific fields (e.g., pattern_id)
 }
