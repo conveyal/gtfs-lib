@@ -414,8 +414,8 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(validationErrorType))
                     .argument(stringArg("namespace"))
                     .argument(multiStringArg("error_type"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("errors"))
                     .build()
             )
@@ -433,9 +433,9 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.agencyType))
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
                     .argument(multiStringArg("agency_id"))
-                    .argument(intArg("id"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("agency"))
                     .build()
             )
@@ -444,9 +444,9 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.calendarType))
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
                     .argument(multiStringArg("service_id"))
-                    .argument(intArg("id"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("calendar"))
                     .build()
             )
@@ -455,9 +455,9 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.fareType))
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
                     .argument(multiStringArg("fare_id"))
-                    .argument(intArg("id"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("fare_attributes"))
                     .build()
             )
@@ -466,9 +466,9 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.routeType))
                     .argument(stringArg("namespace"))
                     .argument(multiStringArg("route_id"))
-                    .argument(intArg("id"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("routes"))
                     .build()
             )
@@ -477,9 +477,10 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.stopType))
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
                     .argument(multiStringArg("stop_id"))
-                    .argument(intArg("id"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(multiStringArg("pattern_id"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("stops"))
                     .build()
             )
@@ -489,9 +490,9 @@ public class GraphQLGtfsSchema {
                     .argument(stringArg("namespace"))
                     .argument(multiStringArg("trip_id"))
                     .argument(multiStringArg("route_id"))
-                    .argument(intArg("id"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("trips"))
                     .build()
             )
@@ -499,8 +500,8 @@ public class GraphQLGtfsSchema {
                     .name("stop_times")
                     .type(new GraphQLList(GraphQLGtfsSchema.stopTimeType))
                     .argument(stringArg("namespace"))
-                    .argument(intArg("limit"))
-                    .argument(intArg("offset"))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("stop_times"))
                     .build()
             )
@@ -508,8 +509,8 @@ public class GraphQLGtfsSchema {
                     .name("services")
                     .argument(multiStringArg("service_id"))
                     .type(new GraphQLList(GraphQLGtfsSchema.serviceType))
-                    .argument(intArg("limit")) // Todo somehow autogenerate these JDBCFetcher builders to include standard params.
-                    .argument(intArg("offset"))
+                    .argument(intArg(LIMIT_ARG)) // Todo somehow autogenerate these JDBCFetcher builders to include standard params.
+                    .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("services"))
                     .build()
             )
@@ -557,7 +558,13 @@ public class GraphQLGtfsSchema {
      * This is the new schema as of July 2017, where all sub-entities are wrapped in a feed.
      * Because all of these fields are static (ugh) this must be declared after the feedQuery it references.
      */
-    public static final GraphQLSchema feedBasedSchema = GraphQLSchema.newSchema().query(feedQuery).build();
+    public static final GraphQLSchema feedBasedSchema = GraphQLSchema
+            .newSchema()
+            .query(feedQuery)
+//            .query(patternsForStopQuery)
+            // TODO: Add mutations.
+            // .mutation(someMutation)
+            .build();
 
 
 }
