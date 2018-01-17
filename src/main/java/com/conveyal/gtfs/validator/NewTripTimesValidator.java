@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
@@ -9,9 +8,7 @@ import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,8 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
-import static com.conveyal.gtfs.util.Util.fastDistance;
-import static com.sun.tools.internal.xjc.reader.Ring.add;
 
 /**
  * Check that the travel times between adjacent stops in trips are reasonable.
