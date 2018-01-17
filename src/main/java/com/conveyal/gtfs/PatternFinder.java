@@ -96,8 +96,7 @@ public class PatternFinder {
             pattern.pattern_id = Integer.toString(nextPatternId++);
             // FIXME: Should associated shapes be a single entry?
             pattern.associatedShapes = new HashSet<>();
-            pattern.associatedShapes
-                    .addAll(trips.stream().map(trip -> trip.shape_id).collect(Collectors.toList()));
+            trips.stream().forEach(trip -> pattern.associatedShapes.add(trip.shape_id));
             if (pattern.associatedShapes.size() > 1) {
                 // Store an error if there is more than one shape per pattern.
                 // TODO: Should shape ID be added to trip pattern key?
@@ -109,21 +108,20 @@ public class PatternFinder {
             pattern.patternStops = new ArrayList<>();
             // Construct pattern stops based on values in trip pattern key.
             for (int i = 0; i < key.stops.size(); i++) {
-                int dwellTime = key.departureTimes.get(i) - key.arrivalTimes.get(i);
                 int travelTime = 0;
                 String stopId = key.stops.get(i);
                 if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
                 double shapeDistTraveled = key.shapeDistances.get(i);
-                pattern.patternStops.add(
-                        new PatternStop(
-                                pattern.pattern_id,
-                                stopId,
-                                i,
-                                travelTime,
-                                dwellTime,
-                                shapeDistTraveled,
-                                key.pickupTypes.get(i),
-                                key.dropoffTypes.get(i)));
+                PatternStop patternStop = new PatternStop();
+                patternStop.drop_off_type = key.dropoffTypes.get(i);
+                patternStop.pickup_type = key.pickupTypes.get(i);
+                patternStop.default_travel_time = travelTime;
+                patternStop.default_dwell_time = key.departureTimes.get(i) - key.arrivalTimes.get(i);
+                patternStop.stop_sequence = i;
+                patternStop.stop_id = stopId;
+                patternStop.pattern_id = pattern.pattern_id;
+                patternStop.shape_dist_traveled = shapeDistTraveled;
+                pattern.patternStops.add(patternStop);
             }
             patterns.add(pattern);
         }
@@ -226,58 +224,6 @@ public class PatternFinder {
                         pattern.orderedStops.size(), pattern.name, pattern.associatedTrips.size());
             }
         }
-    }
-
-    public void generatePatternGeometry(Pattern pattern, Map<String, Stop> stopById, Collection<List<ShapePoint>> shapes) {
-        if (shapes.isEmpty() || pattern.orderedStops.isEmpty()) return;
-        // Create line string list to store segments between stops
-        Collection<LineString> lineStrings = new ArrayList<>();
-        CoordinateList coordinateList = new CoordinateList();
-        // First, attempt to use a shape ID for any associated trip to construct the pattern geometry.
-        for (List<ShapePoint> shapePoints : shapes) {
-            // If there are no points for the shape, continue.
-            if (shapePoints.size() == 0) continue;
-            ShapePoint previousPoint = null;
-            // If shape exists, break into segments by divided by stop points
-            for (ShapePoint point : shapePoints) {
-                coordinateList.add(shapePointToCoordinate(point));
-//                if (previousPoint == null) {
-//                    previousPoint = point;
-//                } else {
-//                    Coordinate[] coordinates = {shapePointToCoordinate(previousPoint), shapePointToCoordinate(point)};
-//                    lineStrings.add(geometryFactory.createLineString(coordinates));
-//                    previousPoint = point;
-//                }
-            }
-//            pattern.geometry = GeometryFactory.toLineStringArray(lineStrings);
-            pattern.geometry = GeoUtils.geometryFactory.createLineString(coordinateList.toCoordinateArray());
-            return;
-        }
-
-        // Otherwise, default to a simple straight line between stops.
-        Stop previousStop = null;
-        // Iterate over stops, and store a new coordinate for each stop.
-        for (String stopId : pattern.orderedStops) {
-            Stop stop = stopById.get(stopId);
-            coordinateList.add(stopToCoordinate(stop));
-//            if (previousStop == null) {
-//                previousStop = stop;
-//            } else {
-//                Coordinate[] coordinates = {stopToCoordinate(previousStop), stopToCoordinate(stop)};
-//                lineStrings.add(geometryFactory.createLineString(coordinates));
-//                previousStop = stop;
-//            }
-        }
-//        pattern.geometry = GeometryFactory.toLineStringArray(lineStrings);
-        pattern.geometry = GeoUtils.geometryFactory.createLineString(coordinateList.toCoordinateArray());
-    }
-
-    private static Coordinate stopToCoordinate (Stop stop) {
-        return new Coordinate(stop.stop_lon, stop.stop_lat);
-    }
-
-    private static Coordinate shapePointToCoordinate (ShapePoint shapePoint) {
-        return new Coordinate(shapePoint.shape_pt_lon, shapePoint.shape_pt_lat);
     }
 
     /**

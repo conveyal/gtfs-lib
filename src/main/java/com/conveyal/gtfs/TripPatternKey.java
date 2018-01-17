@@ -20,6 +20,7 @@ public class TripPatternKey {
     public List<String> stops = new ArrayList<>();
     public TIntList pickupTypes = new TIntArrayList();
     public TIntList dropoffTypes = new TIntArrayList();
+    // Note, the lists below are not used in the equality check.
     public TIntList arrivalTimes = new TIntArrayList();
     public TIntList departureTimes = new TIntArrayList();
     public TIntList timepoints = new TIntArrayList();
@@ -33,6 +34,7 @@ public class TripPatternKey {
         stops.add(st.stop_id);
         pickupTypes.add(st.pickup_type);
         dropoffTypes.add(st.drop_off_type);
+        // Note, the items listed below are not used in the equality check.
         arrivalTimes.add(st.arrival_time);
         departureTimes.add(st.departure_time - st.arrival_time);
         timepoints.add(st.timepoint);

@@ -53,13 +53,12 @@ public class PatternFinderValidator extends TripValidator {
         patternFinder.processTrip(trip, stopTimes, shapePoints);
     }
 
+    /**
+     * Store patterns and pattern stops in the database. Also, update the trips table with a pattern_id column.
+     */
     @Override
     public void complete(ValidationResult validationResult) {
         LOG.info("Updating trips with pattern IDs...");
-        // Return patterns in the result
-        // TODO should we really return them in the validation result, or just put them in the DB?
-        // The thing is, in a relational database this would require at least two tables and extra columns in the trips.
-        // patterns, stopsInPatterns, patternForTrip. Though we could in fact get the stop sequence from any example trip in the pattern.
         // FIXME: There may be a better way to handle getting the full list of stops
         Map<String, Stop> stopById = new HashMap<>();
         for (Stop stop : feed.stops) {
@@ -75,7 +74,6 @@ public class PatternFinderValidator extends TripValidator {
             connection = feed.getConnection();
             Statement statement = connection.createStatement();
             String tripsTableName = feed.tablePrefix + "trips";
-            // FIXME: use Table class to define and populate patterns and pattern_stops tables?
             String patternsTableName = feed.tablePrefix + "patterns";
             String patternStopsTableName = feed.tablePrefix + "pattern_stops";
 //            String patternGeometryTableName = feed.tablePrefix + "pattern_geometry";

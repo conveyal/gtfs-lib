@@ -116,6 +116,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
 
         String namespace = (String) parentEntityMap.get("namespace");
 
+        // If we are fetching an item nested within a GTFS entity in the Graphql query, we want to add an SQL "where"
+        // clause using the values found here. Note, these are used in the below getResults call.
         List<String> parentJoinValues = new ArrayList<>();
         if (parentJoinField != null) {
             Map<String, Object> enclosingEntity = environment.getSource();
@@ -167,6 +169,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             conditions.add(makeInClause(parentJoinField, parentJoinValues));
         }
         if (sortField != null) {
+            // FIXME add sort order?
             sortBy = String.format(" order by %s", sortField);
         }
         for (String key : arguments.keySet()) {

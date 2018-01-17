@@ -41,8 +41,11 @@ public class Table {
 
     public final Field[] fields;
     /** Determines whether cascading delete is restricted. Defaults to false (i.e., cascade delete is allowed) */
-    private boolean deleteRestricted = false;
+    private boolean cascadeDeleteRestricted = false;
+    /** An update to the parent table will trigger an update to this table if parent has nested entities. */
     private Table parentTable;
+    /** When snapshotting a table for editor use, this indicates whether a primary key constraint should be added to ID. */
+    private boolean usePrimaryKey = false;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         this.name = name;
@@ -60,7 +63,7 @@ public class Table {
         new StringField("agency_phone",  OPTIONAL),
         new URLField("agency_fare_url",  OPTIONAL),
         new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
-    ).restrictDelete();
+    ).restrictDelete().addPrimaryKey();
 
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
     public static final Table CALENDAR = new Table("calendar", Calendar.class, OPTIONAL,
@@ -74,7 +77,7 @@ public class Table {
         new IntegerField("sunday", REQUIRED, 0, 1),
         new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED)
-    ).restrictDelete();
+    ).restrictDelete().addPrimaryKey();
 
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
         new StringField("service_id", REQUIRED),
@@ -89,7 +92,7 @@ public class Table {
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2),
         new IntegerField("transfer_duration", OPTIONAL)
-    );
+    ).addPrimaryKey();
 
 
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
@@ -104,7 +107,7 @@ public class Table {
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
-        new StringField("agency_id",  OPTIONAL, AGENCY),
+        new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
@@ -112,16 +115,22 @@ public class Table {
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
         new ColorField("route_text_color",  OPTIONAL)
-    );
+    ).addPrimaryKey();
+
+    public static final Table ROUTE_STATUS = new Table("route_status", null, EDITOR,
+        new StringField("route_id", REQUIRED).isReferenceTo(ROUTES),
+        new BooleanField("publicly_visible", EDITOR),
+        new IntegerField("status", EDITOR, 0, 2)
+    ).addPrimaryKey();
 
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
-            new StringField("fare_id", REQUIRED, FARE_ATTRIBUTES),
-            new StringField("route_id", OPTIONAL, ROUTES),
+            new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
+            new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
             // FIXME: referential integrity check for zone_id for below three fields?
             new StringField("origin_id", OPTIONAL),
             new StringField("destination_id", OPTIONAL),
             new StringField("contains_id", OPTIONAL)
-    ).withParentTable(FARE_ATTRIBUTES);
+    ).withParentTable(FARE_ATTRIBUTES).addPrimaryKey();
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
@@ -138,12 +147,12 @@ public class Table {
 
     public static final Table PATTERNS = new Table("patterns", Pattern.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED),
-            new StringField("route_id", REQUIRED, ROUTES),
+            new StringField("route_id", REQUIRED).isReferenceTo(ROUTES),
             // Editor-specific fields
             new StringField("name", OPTIONAL),
             new IntegerField("direction_id", EDITOR, 0, 1),
-            new StringField("shape_id", EDITOR, SHAPES)
-    );
+            new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
+    ).addPrimaryKey();
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id",  REQUIRED),
@@ -158,13 +167,13 @@ public class Table {
         new StringField("parent_station",  OPTIONAL),
         new StringField("stop_timezone",  OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 1)
-    ).restrictDelete();
+    ).restrictDelete().addPrimaryKey();
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
-            new StringField("pattern_id", REQUIRED, PATTERNS),
+            new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id?
-            new StringField("stop_id", REQUIRED, STOPS),
+            new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
             // Editor-specific fields
             new IntegerField("default_travel_time", EDITOR,0, Integer.MAX_VALUE),
             new IntegerField("default_dwell_time", EDITOR, 0, Integer.MAX_VALUE),
@@ -176,34 +185,34 @@ public class Table {
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
             // FIXME: Do we need an index on from_ and to_stop_id
-            new StringField("from_stop_id", REQUIRED, STOPS),
-            new StringField("to_stop_id", REQUIRED, STOPS),
+            new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
+            new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("transfer_type", REQUIRED),
             new StringField("min_transfer_time", OPTIONAL)
-    );
+    ).addPrimaryKey();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
-        new StringField("route_id",  REQUIRED, ROUTES).indexThisColumn(),
+        new StringField("route_id",  REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
         // FIXME: Should this also optionally reference CALENDAR_DATES?
         // FIXME: Do we need an index on service_id
-        new StringField("service_id",  REQUIRED, CALENDAR),
+        new StringField("service_id",  REQUIRED).isReferenceTo(CALENDAR),
         new StringField("trip_headsign",  OPTIONAL),
         new StringField("trip_short_name",  OPTIONAL),
         new ShortField("direction_id", OPTIONAL, 1),
         new StringField("block_id",  OPTIONAL),
-        new StringField("shape_id",  OPTIONAL, SHAPES),
+        new StringField("shape_id",  OPTIONAL).isReferenceTo(SHAPES),
         new ShortField("wheelchair_accessible", OPTIONAL, 2),
         new ShortField("bikes_allowed", OPTIONAL, 2),
-        new StringField("pattern_id", EDITOR, PATTERNS)
-    );
+        new StringField("pattern_id", EDITOR).isReferenceTo(PATTERNS)
+    ).addPrimaryKey();
 
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
-            new StringField("trip_id", REQUIRED, TRIPS),
+            new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
-            new StringField("stop_id", REQUIRED, STOPS),
+            new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
 //                    .indexThisColumn(),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are reqiured
             new TimeField("arrival_time", OPTIONAL),
@@ -218,7 +227,7 @@ public class Table {
 
     // Must come after TRIPS table to which it has a reference
     public static final Table FREQUENCIES = new Table("frequencies", Frequency.class, OPTIONAL,
-            new StringField("trip_id", REQUIRED, TRIPS),
+            new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new TimeField("start_time", REQUIRED),
             new TimeField("end_time", REQUIRED),
             new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
@@ -248,7 +257,19 @@ public class Table {
      * example, a calendar that has trips referencing it must not be deleted.
      */
     public Table restrictDelete () {
-        this.deleteRestricted = true;
+        this.cascadeDeleteRestricted = true;
+        return this;
+    }
+
+    /**
+     * Fluent method that indicates that the integer ID field should be made a primary key. This should generally only
+     * be used for tables that would ever need to be queried on the unique integer ID (which represents row number for
+     * tables directly after csv load). For example, we may need to query for a stop or route by unique ID in order to
+     * update or delete it. (Whereas querying for a specific stop time vs. a set of stop times would rarely if ever be
+     * needed.)
+     */
+    public Table addPrimaryKey () {
+        this.usePrimaryKey = true;
         return this;
     }
 
@@ -261,8 +282,8 @@ public class Table {
         return this;
     }
 
-    public boolean isDeleteRestricted() {
-        return deleteRestricted;
+    public boolean isCascadeDeleteRestricted() {
+        return cascadeDeleteRestricted;
     }
 
 
@@ -331,7 +352,6 @@ public class Table {
             if (field.isRequired() && errorStorage != null) {
                 errorStorage.storeError(NewGTFSError.forLine(this, lineNumber, MISSING_FIELD, field.name));
             }
-            // Set field to null if string is empty
             setFieldToNull(postgresText, transformedStrings, statement, fieldIndex, field);
         } else {
             // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
@@ -475,9 +495,8 @@ public class Table {
     /**
      * Creates a SQL table from the table to clone. This uses the SQL syntax "create table x as y" not only copies the
      * table structure, but also the data from the original table. Creating table indexes is not handled by this method.
-     * @return
      */
-    public boolean createSqlTableFrom(Connection connection, String tableToClone, boolean addPrimaryKey) {
+    public boolean createSqlTableFrom(Connection connection, String tableToClone) {
         String dropSql = String.format("drop table if exists %s", name);
         // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
         // FIXME: Which create table operation is more efficient?
@@ -525,7 +544,7 @@ public class Table {
             LOG.info(alterColumnNotNullSql);
             statement.execute(alterColumnNotNullSql);
             // FIXME: Is there a need to add primary key constraint here?
-            if (addPrimaryKey) {
+            if (usePrimaryKey) {
                 // Add primary key to ID column for any tables that require it.
                 String addPrimaryKeySql = String.format("ALTER TABLE %s ADD PRIMARY KEY (id)", name);
                 LOG.info(addPrimaryKeySql);

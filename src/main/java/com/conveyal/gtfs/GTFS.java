@@ -49,6 +49,18 @@ public abstract class GTFS {
         return result;
     }
 
+    /**
+     * Copy all tables for a given feed ID (schema namespace) into a new namespace in the given JDBC DataSource.
+     *
+     * The resulting snapshot from this operation is intended to be edited, so there are a handful of changes made to
+     * the newly copied tables:
+     *   1. The tables' id column has been modified to be auto-incrementing.
+     *   2. Primary keys may be added to certain columns/tables.
+     *   3. Additional editor-specific columns are added to certain tables.
+     * @param feedId        feed ID (schema namespace) to copy from
+     * @param dataSource    JDBC connection to existing database
+     * @return              FIXME should this be a separate SnapshotResult object?
+     */
     public static FeedLoadResult makeSnapshot (String feedId, DataSource dataSource) {
         JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource);
         FeedLoadResult result = snapshotter.copyTables();

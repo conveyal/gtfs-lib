@@ -25,19 +25,16 @@ public abstract class Field {
 
     final String name;
     final Requirement requirement;
-    final Table referenceTable;
+    /**
+     * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
+     * integrity when loading a feed.
+     * */
+    Table referenceTable = null;
     private boolean shouldBeIndexed;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
         this.requirement = requirement;
-        this.referenceTable = null;
-    }
-
-    public Field(String name, Requirement requirement, Table referenceTable) {
-        this.name = name;
-        this.requirement = requirement;
-        this.referenceTable = referenceTable;
     }
 
     /**
@@ -90,10 +87,6 @@ public abstract class Field {
         return this.requirement == Requirement.REQUIRED;
     }
 
-    public boolean isUnknown () {
-        return this.requirement == Requirement.UNKNOWN;
-    }
-
     public boolean isForeignReference () {
         return this.referenceTable != null;
     }
@@ -112,4 +105,13 @@ public abstract class Field {
         return shouldBeIndexed;
     }
 
+    /**
+     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument.
+     * @param table
+     * @return
+     */
+    public Field isReferenceTo(Table table) {
+        this.referenceTable = table;
+        return this;
+    }
 }

@@ -13,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Represents a collection of trips that all visit the same stops in the same sequence.
  */
 public class Pattern extends Entity {
     public static final long serialVersionUID = 1L;
@@ -29,7 +29,7 @@ public class Pattern extends Entity {
     public double[] segmentFraction;
 
     public List<String> orderedStops;
-    // Contains exemplar information about stops the pattern visits.
+    // The sequence of stops visited along with generic information about when and how pattern trips visit the stop
     public List<PatternStop> patternStops;
     // TODO: change list of trips to set
     public List<String> associatedTrips;

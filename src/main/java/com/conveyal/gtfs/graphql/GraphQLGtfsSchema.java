@@ -334,13 +334,17 @@ public class GraphQLGtfsSchema {
                     .name("shape")
                     .type(new GraphQLList(shapePointType))
                     .argument(intArg(LIMIT_ARG))
-                    .dataFetcher(new JDBCFetcher("shapes", "shape_id", "shape_pt_sequence"))
+                    .dataFetcher(new JDBCFetcher("shapes",
+                            "shape_id",
+                            "shape_pt_sequence"))
                     .build())
             .field(RowCountFetcher.field("trip_count", "trips", "pattern_id"))
             .field(newFieldDefinition()
                 .name("stops")
                 .type(new GraphQLList(patternStopType))
-                .dataFetcher(new JDBCFetcher("pattern_stops", "pattern_id"))
+                .dataFetcher(new JDBCFetcher("pattern_stops",
+                        "pattern_id",
+                        "stop_sequence"))
                 .build())
             .field(newFieldDefinition()
                 .name("trips")

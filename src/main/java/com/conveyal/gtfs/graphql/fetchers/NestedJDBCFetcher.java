@@ -1,61 +1,46 @@
 package com.conveyal.gtfs.graphql.fetchers;
 
-import com.conveyal.gtfs.graphql.GTFSGraphQL;
 import com.conveyal.gtfs.graphql.GraphQLGtfsSchema;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ListMultimap;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.MultimapBuilder;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLList;
-import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 
 /**
- * A generic fetcher to get fields out of an SQL database table.
+ * This fetcher uses nested calls to the general JDBCFetcher for SQL data. It uses the parent entity and a series of
+ * joins to leap frog from one entity to another more distantly-related entity. For example, if we want to know the
+ * routes that serve a specific stop, starting with a top-level stop type, we can nest joins from stop ABC -> pattern
+ * stops -> patterns -> routes (see below example implementation for more details).
  */
 public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
 
-    public static final Logger LOG = LoggerFactory.getLogger(NestedJDBCFetcher.class);
-
-    // Make this an option to the GraphQL query.
-    public static final int DEFAULT_ROWS_TO_FETCH = 50;
-    public static final int MAX_ROWS_TO_FETCH = 500;
-
+    private static final Logger LOG = LoggerFactory.getLogger(NestedJDBCFetcher.class);
     private final JDBCFetcher[] jdbcFetchers;
 
     // Supply an SQL result row -> Object transformer
 
     /**
-     * Constructor for tables that need neither restriction by a where clause nor sorting based on the enclosing entity.
-     * These would typically be at the topmost level, directly inside a feed rather than nested in some GTFS entity type.
+     * Constructor for data that must be derived by chaining multiple joins together.
      */
     public NestedJDBCFetcher (JDBCFetcher ...jdbcFetchers) {
         this.jdbcFetchers = jdbcFetchers;
     }
 
-    // We can't automatically generate JDBCFetcher based field definitions for inclusion in a GraphQL schema (as we
-    // do for MapFetcher for example). This is because we need custom inclusion of sub-tables in each table type.
-    // Still maybe we could make the most basic ones this way (automatically). Keeping this function as an example.
+    // NestedJDBCFetcher should only be used in conjunction with more than one JDBCFetcher in order to chain multiple
+    // joins together. As seen below, the type of the field must match the final JDBCFetcher table type (routeType ->
+    // routes).
     public static GraphQLFieldDefinition field (String tableName) {
         return newFieldDefinition()
                 .name(tableName)
@@ -71,20 +56,6 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                 .build();
     }
 
-    // Horrifically, we're going from SQL response to Gtfs-lib Java model object to GraphQL Java object to JSON.
-    // What if we did direct SQL->JSON?
-    // Could we transform JDBC ResultSets directly to JSON?
-    // With Jackson streaming API we can make a ResultSet serializer: https://stackoverflow.com/a/8120442
-
-    // We could apply a transformation from ResultSet to Gtfs-lib model object, but then more DataFetchers
-    // need to be defined to pull the fields out of those model objects. I'll try to skip those intermediate objects.
-
-    // Unfortunately we can't just apply DataFetchers directly to the ResultSets because they're cursors, and we'd
-    // have to somehow advance them at the right moment. So we need to transform the SQL results into fully materialized
-    // Java objects, then transform those into GraphQL fields. Fortunately the final transformation is trivial fetching
-    // from a Map<String, Object>.
-    // But what are the internal GraphQL objects, i.e. what does an ExecutionResult return? Are they Map<String, Object>?
-
     @Override
     public List<Map<String, Object>> get (DataFetchingEnvironment environment) {
         // Store the join values here.
@@ -94,15 +65,13 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
         // the parent feed (FeedFetcher).
         Map<String, Object> parentEntityMap = environment.getSource();
 
-        // Apparently you can't get the arguments from the parent - how do you have arguments on sub-fields?
-        // It looks like you have to redefine the argument on each subfield and pass it explicitly in the Graphql request.
-
-        // String namespace = environment.getArgument("namespace"); // This is going to be the unique prefix, not the feedId in the usual sense
         // This DataFetcher only makes sense when the enclosing parent object is a feed or something in a feed.
         // So it should always be represented as a map with a namespace key.
-
         String namespace = (String) parentEntityMap.get("namespace");
 
+        // Pass arguments into the first fetcher call only. In the following calls, the argument is no longer relevant.
+        // For example, above the top-level argument is "stop_id," which is only relevant for queries made in the
+        // pattern_stops fetcher.
         Map<String, Object> arguments;
 
         // Store each iteration's fetch results here.

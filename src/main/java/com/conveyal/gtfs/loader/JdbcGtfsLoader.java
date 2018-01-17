@@ -200,9 +200,6 @@ public class JdbcGtfsLoader {
             // FIXME do the following only on databases that support schemas.
             // SQLite does not support them. Is there any advantage of schemas over flat tables?
             statement.execute("create schema " + tablePrefix);
-            // TODO load more stuff from feed_info and essentially flatten all feed_infos from all loaded feeds into one table
-            // This should include date range etc. Can we reuse any code from Table for this?
-            // This makes sense since the file should only have one line.
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
             statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
@@ -220,7 +217,7 @@ public class JdbcGtfsLoader {
             connection.commit();
             LOG.info("Created new feed namespace: {}", insertStatement);
         } catch (Exception ex) {
-            LOG.error("Exception while creating unique prefix for new feed: {}", ex.getMessage());
+            LOG.error("Exception while registering new feed namespace in feeds table: {}", ex.getMessage());
             DbUtils.closeQuietly(connection);
         }
     }

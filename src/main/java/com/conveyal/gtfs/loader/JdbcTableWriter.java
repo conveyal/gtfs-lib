@@ -20,7 +20,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -77,13 +76,15 @@ public class JdbcTableWriter implements TableWriter {
         final boolean isCreating = id == null;
         JsonObject jsonObject = getJsonObject(json);
         String tableName = String.join(".", tablePrefix, specTable.name);
-        // Parse the fields/values into a Field -> String map (drops ALL unknown fields)
         Connection connection = null;
         try {
             connection = dataSource.getConnection();
             // Ensure that the key field is unique and that referencing tables are updated if the value is updated.
             ensureReferentialIntegrity(connection, jsonObject, tablePrefix, specTable, id);
-            // This must follow referential integrity check because some tables will modify the jsonObject (e.g., adding trip ID if it is null).
+            // Parse the fields/values into a Field -> String map (drops ALL fields not explicitly listed in spec table's
+            // fields)
+            // Note, this must follow referential integrity check because some tables will modify the jsonObject (e.g.,
+            // adding trip ID if it is null).
             Map<Field, String> fieldStringMap = jsonToFieldStringMap(jsonObject, specTable);
             LOG.info(jsonObject.toString());
             PreparedStatement preparedStatement = createPreparedUpdate(id, isCreating, fieldStringMap, tableName, connection, false);
@@ -96,6 +97,9 @@ public class JdbcTableWriter implements TableWriter {
             if (specTable.name.equals("patterns")) {
                 referencingTables.add(Table.SHAPES);
             }
+            // Iterate over referencing (child) tables and update those rows that reference the parent entity with the
+            // JSON array for the key that matches the child table's name (e.g., trip.stop_times array will trigger
+            // update of stop_times with matching trip_id).
             for (Table referencingTable : referencingTables) {
                 Table parentTable = referencingTable.getParentTable();
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
@@ -138,10 +142,12 @@ public class JdbcTableWriter implements TableWriter {
             String questionMarks = String.join(", ", Collections.nCopies(fieldNames.size(), "?"));
             statementString = String.format("insert into %s (id, %s) values (DEFAULT, %s)", tableName, String.join(", ", fieldNames), questionMarks);
         } else {
-            // If updating an existing entity, specify record to update fields found with where clause on id.
+            // If updating an existing entity, use a where clause on the ID field to specify which record should be
+            // updated.
             statementString = String.format("update %s set %s where id = %d", tableName, String.join(", ", fieldNames), id);
         }
-        // Prepare statement and set RETURN_GENERATED_KEYS to get the entity id back
+        // Set the RETURN_GENERATED_KEYS flag on the PreparedStatement because it may be creating new rows, in which
+        // case we need to know the auto-generated IDs of those new rows.
         PreparedStatement preparedStatement = connection.prepareStatement(
                 statementString,
                 Statement.RETURN_GENERATED_KEYS);
@@ -152,7 +158,7 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     private static void fillValues(Map<Field, String> fieldStringMap, PreparedStatement preparedStatement, Connection connection) throws SQLException {
-        // one-based index for statement parameters
+        // JDBC SQL statements use a one-based index for setting fields/parameters
         int index = 1;
         // Sort keys on field name to match prepared statement parameters
         Field[] keys = fieldStringMap.keySet().stream()
@@ -196,7 +202,10 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * This updates
+     * This updates those tables that depend on the table currently being updated. For example, if updating/creating a
+     * pattern, this method handles updating its pattern stops and shape points. For trips, this would handle updating
+     * the trips' stop times.
+     * FIXME develop a better way to update tables with foreign keys to the table being updated.
      */
     private void updateChildTable(JsonArray entityList, Integer id, boolean isCreating, Table subTable, Connection connection) throws SQLException {
         // Get parent table's key field
@@ -299,8 +308,9 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Handles converting JSON object into a map from Fields (which have methods to set parameter type in SQL
-     * statements) to String values found in the JSON.
+     * Convert a JSON object to a Map<Field, String> with one entry per attribute of the JSON object. This conversion is
+     * performed within the context of the supplied Table. We do this because we need to use methods on the Table's
+     * Fields to interpret and store the attribute values of the JSON object.
      */
     private static Map<Field, String> jsonToFieldStringMap(JsonObject jsonObject, Table table) throws SQLException {
         HashMap<Field, String> fieldStringMap = new HashMap<>();
@@ -309,7 +319,8 @@ public class JdbcTableWriter implements TableWriter {
             // TODO: clean field names? Currently, unknown fields are just skipped, but in the future, if a bad
             // field name is found, we will want to throw an exception, log an error, and halt.
             if (!table.hasField(entry.getKey())) {
-                // Skip all unknown fields (this includes id field because it is not listed in table fields)
+                // Skip any field not included in spec table field list (this includes id field because it is not listed
+                // in table fields)
                 continue;
             }
             Field field = table.getFieldForName(entry.getKey());
@@ -506,7 +517,7 @@ public class JdbcTableWriter implements TableWriter {
 //                    deleteEntityHook();
                 if (sqlMethod.equals(SqlMethod.DELETE)) {
                     // Check for restrictions on delete.
-                    if (table.isDeleteRestricted()) {
+                    if (table.isCascadeDeleteRestricted()) {
                         // The entity must not have any referencing entities in order to delete it.
                         connection.rollback();
 //                        List<String> idStrings = new ArrayList<>();
