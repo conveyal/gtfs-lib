@@ -2,6 +2,7 @@ package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.validator.ValidationResult;
@@ -27,6 +28,15 @@ public abstract class GTFS {
     private static final Logger LOG = LoggerFactory.getLogger(GTFS.class);
 
     private static final String DEFAULT_DATABASE_URL = "jdbc:postgresql://localhost/gtfs";
+
+    /**
+     * Export a feed ID from the database to a zipped GTFS file in the specified export directory.
+     */
+    public static FeedLoadResult export (String feedId, String outFile, DataSource dataSource) {
+        JdbcGtfsExporter exporter = new JdbcGtfsExporter(feedId, outFile, dataSource);
+        FeedLoadResult result = exporter.exportTables();
+        return result;
+    }
 
     /**
      * Load the GTFS data in the specified file into the given JDBC DataSource.
@@ -149,8 +159,8 @@ public abstract class GTFS {
             return;
         }
 
-        if (!(cmd.hasOption("snapshot") || cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
-            LOG.error("Must specify one of 'snapshot', 'load', 'validate', or 'graphql'.");
+        if (!(cmd.hasOption("export") || cmd.hasOption("snapshot") || cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
+            LOG.error("Must specify one of 'snapshot', 'load', 'validate', 'export', or 'graphql'.");
             printHelp(options);
             return;
         }
@@ -204,6 +214,21 @@ public abstract class GTFS {
             }
         }
 
+        if (cmd.hasOption("export")) {
+            String namespaceToExport = cmd.getOptionValue("export");
+            String outFile = cmd.getOptionValue("outFile");
+            if (namespaceToExport == null && loadResult != null) {
+                namespaceToExport = loadResult.uniqueIdentifier;
+            }
+            if (namespaceToExport != null) {
+                LOG.info("Exporting feed with unique identifier {}", namespaceToExport);
+                FeedLoadResult exportResult = export(namespaceToExport, outFile, dataSource);
+                LOG.info("Done exporting.");
+            } else {
+                LOG.error("No feed to export. Specify one, or load a feed in the same command.");
+            }
+        }
+
         if (cmd.hasOption("graphql")) {
             Integer port = Integer.parseInt(cmd.getOptionValue("graphql"));
             LOG.info("Starting GraphQL server on port {}", port);
@@ -219,6 +244,12 @@ public abstract class GTFS {
     private static Options getOptions () {
         Options options = new Options();
         options.addOption(Option.builder("h").longOpt("help").desc("print this message").build());
+        options.addOption(Option.builder().longOpt("export").hasArg()
+                .argName("feedId")
+                .desc("export GTFS data from the given database feedId to the given directory").build());
+        options.addOption(Option.builder().longOpt("outFile").hasArg()
+                .argName("file")
+                .desc("zip file path for the exported GTFS").build());
         options.addOption(Option.builder().longOpt("load").hasArg()
                 .argName("file").desc("load GTFS data from the given file").build());
         options.addOption(Option.builder().longOpt("validate").hasArg().optionalArg(true).argName("feed")
