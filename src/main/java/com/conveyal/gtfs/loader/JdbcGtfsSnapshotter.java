@@ -81,7 +81,9 @@ public class JdbcGtfsSnapshotter {
             result.stopTimes = copy(Table.STOP_TIMES, true);
             result.transfers = copy(Table.TRANSFERS, true);
             result.trips = copy(Table.TRIPS, true);
-            LOG.info("Copying tables took {} sec", (System.currentTimeMillis() - startTime) / 1000);
+            result.completionTime = System.currentTimeMillis();
+            result.loadTimeMillis = result.completionTime - startTime;
+            LOG.info("Copying tables took {} sec", (result.loadTimeMillis) / 1000);
         } catch (Exception ex) {
             // Note: Exceptions that occur during individual table loads are separately caught and stored in
             // TableLoadResult.

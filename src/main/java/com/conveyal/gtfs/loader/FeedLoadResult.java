@@ -29,4 +29,6 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult transfers;
     public TableLoadResult trips;
 
+    public long loadTimeMillis;
+    public long completionTime;
 }

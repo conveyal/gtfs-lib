@@ -148,7 +148,9 @@ public class JdbcGtfsLoader {
             // This will commit and close the single connection that has been shared between all preceding load steps.
             errorStorage.commitAndClose();
             zip.close();
-            LOG.info("Loading tables took {} sec", (System.currentTimeMillis() - startTime) / 1000);
+            result.completionTime = System.currentTimeMillis();
+            result.loadTimeMillis = result.completionTime - startTime;
+            LOG.info("Loading tables took {} sec", result.loadTimeMillis / 1000);
         } catch (Exception ex) {
             // TODO catch exceptions separately while loading each table so load can continue, store in TableLoadResult
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
