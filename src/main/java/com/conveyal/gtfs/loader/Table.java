@@ -336,6 +336,17 @@ public class Table {
         return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
     }
 
+    public String generateUpdateSql (String namespace, int id) {
+        // Collect field names for string joining from JsonObject.
+        String joinedFieldNames = Arrays.stream(fields)
+                // If updating, add suffix for use in set clause
+                .map(field -> field.getName() + " = ?")
+                .collect(Collectors.joining(", "));
+
+        String tableName = namespace == null ? name : String.join(".", namespace, name);
+        return String.format("update %s set %s where id = %d", tableName, joinedFieldNames, id);
+    }
+
     public void setValueForField(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage) {
         setValueForField(statement, fieldIndex, lineNumber, field, string, errorStorage, false, null);
     }

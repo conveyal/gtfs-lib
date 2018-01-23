@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 
+import java.io.IOException;
 import java.sql.SQLException;
 
 /**
@@ -11,9 +12,9 @@ import java.sql.SQLException;
 public interface TableWriter <T extends Entity> {
 
     // FIXME: add optional auto-commit boolean so that additional changes can be made?
-    String create (String json) throws SQLException;
+    String create (String json) throws SQLException, IOException;
 
-    String update (Integer id, String json) throws SQLException;
+    String update (Integer id, String json) throws SQLException, IOException;
 
     int delete (Integer id) throws SQLException;
 
