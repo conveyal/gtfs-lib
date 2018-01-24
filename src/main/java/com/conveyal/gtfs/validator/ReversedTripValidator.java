@@ -32,7 +32,7 @@ public class ReversedTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         // TODO implement
     }
 

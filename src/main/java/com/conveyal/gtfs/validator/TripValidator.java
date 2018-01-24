@@ -26,6 +26,6 @@ public abstract class TripValidator extends Validator {
      * @param trip the trip whose stop_times are provided in the other parameter.
      * @param stopTimes a List of all the stop times in the given trip, in order of increasing stop_sequence.
      */
-    public abstract void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints);
+    public abstract void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops);
 
 }

@@ -58,7 +58,8 @@ public class NewTripTimesValidator extends FeedValidator {
         // TODO cache automatically in feed or TableReader object
         LOG.info("Cacheing stops, trips, and routes...");
         for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
-        for (ShapePoint shape : feed.shapePoints.getAllOrdered()) shapeById.put(shape.shape_id, shape);
+        // FIXME: determine a good way to validate shapes without caching them all in memory...
+//        for (ShapePoint shape : feed.shapePoints.getAllOrdered()) shapeById.put(shape.shape_id, shape);
         for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
         for (Route route: feed.routes) routeById.put(route.route_id, route);
         LOG.info("Done.");
@@ -168,7 +169,7 @@ public class NewTripTimesValidator extends FeedValidator {
         if (trip != null) route = routeById.get(trip.route_id);
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
 
-        for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops, shapePoints);
+        for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
     }
 
     /**

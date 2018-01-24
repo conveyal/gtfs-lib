@@ -28,7 +28,7 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         // The specific maximum speed for this trip's route's mode of travel.
         double maxSpeedKph = getMaxSpeedKph(route);
         // Skip over any initial stop times that won't allow calculating speeds.

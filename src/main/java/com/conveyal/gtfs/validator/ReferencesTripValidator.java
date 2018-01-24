@@ -28,7 +28,7 @@ public class ReferencesTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         if (trip != null) referencedTrips.add(trip.trip_id);
         if (route != null) referencedRoutes.add(route.route_id);
         for (Stop stop : stops) referencedStops.add(stop.stop_id);

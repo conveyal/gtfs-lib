@@ -63,7 +63,7 @@ public class PatternFinder {
 //
 //    }
 
-    public void processTrip(Trip trip, List<StopTime> orderedStopTimes, List<ShapePoint> shapePoints) {
+    public void processTrip(Trip trip, List<StopTime> orderedStopTimes) {
         if (++nTripsProcessed % 100000 == 0) {
             LOG.info("trip {}", human(nTripsProcessed));
         }

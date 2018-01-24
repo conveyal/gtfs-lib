@@ -67,7 +67,7 @@ public class ServiceValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<ShapePoint> shapePoints) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         int firstStopDeparture = stopTimes.get(0).departure_time;
         int lastStopArrival = stopTimes.get(stopTimes.size() - 1).arrival_time;
         if (firstStopDeparture == Entity.INT_MISSING || lastStopArrival == Entity.INT_MISSING) {
