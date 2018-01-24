@@ -114,13 +114,13 @@ public class NewGTFSError {
     // Builder to add entity sequence info from string (values during load stage are passed in as strings from csv
     // reader)
     public NewGTFSError setSequence(String sequenceAsString) {
-        Integer sequence = null;
         try {
-            sequence = Integer.parseInt(sequenceAsString);
+            // Parse int from string value found during load stage.
+            this.entitySequenceNumber = Integer.parseInt(sequenceAsString);
         } catch (NumberFormatException e) {
             e.printStackTrace();
+            this.entitySequenceNumber = null;
         }
-        this.entitySequenceNumber = sequence;
         return this;
     }
 }
