@@ -109,6 +109,18 @@ public class GraphQLGtfsSchema {
             )
             .build();
 
+    // Represents feed_info.txt
+    public static final GraphQLObjectType feedInfoType = newObject().name("feed_info")
+            .description("A GTFS feed_info object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("feed_publisher_name"))
+            .field(MapFetcher.field("feed_publisher_url"))
+            .field(MapFetcher.field("feed_lang"))
+            .field(MapFetcher.field("feed_start_date"))
+            .field(MapFetcher.field("feed_end_date"))
+            .field(MapFetcher.field("feed_version"))
+            .build();
+
     // Represents rows from shapes.txt
     public static final GraphQLObjectType shapePointType = newObject().name("shapePoint")
             .field(MapFetcher.field("shape_id"))
