@@ -7,6 +7,7 @@ import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_PARSING;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_LARGE;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_SMALL;
 
@@ -26,7 +27,12 @@ public class DoubleField extends Field {
     }
 
     private double validate(String string) {
-        double d = Double.parseDouble(string);
+        double d;
+        try {
+            d = Double.parseDouble(string);
+        } catch (NumberFormatException e) {
+            throw new StorageException(NUMBER_PARSING, string);
+        }
         if (d < minValue) throw new StorageException(NUMBER_TOO_SMALL, Double.toString(d));
         if (d > maxValue) throw new StorageException(NUMBER_TOO_LARGE, Double.toString(d));
         return d;

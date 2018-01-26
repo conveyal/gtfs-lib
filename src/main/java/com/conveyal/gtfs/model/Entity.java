@@ -50,7 +50,8 @@ public abstract class Entity implements Serializable {
 
     private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
-    public int sourceFileLine;
+    /** Represents the csv line for feeds that have been loaded from a zip file. Otherwise it is simply a unique ID. */
+    public int id;
 
     /* The feed from which this entity was loaded. TODO is this really necessary in every entity? */
     transient GTFSFeed feed;

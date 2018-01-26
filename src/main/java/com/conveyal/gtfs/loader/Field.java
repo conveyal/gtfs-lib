@@ -20,8 +20,13 @@ import java.sql.SQLType;
  */
 public abstract class Field {
 
-    final String name;
+    public final String name;
     final Requirement requirement;
+    /**
+     * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
+     * integrity when loading a feed.
+     * */
+    Table referenceTable = null;
     private boolean shouldBeIndexed;
 
     public Field(String name, Requirement requirement) {
@@ -79,8 +84,13 @@ public abstract class Field {
         return this.requirement == Requirement.REQUIRED;
     }
 
+    public boolean isForeignReference () {
+        return this.referenceTable != null;
+    }
+
     /**
      * Fluent method that indicates that a newly constructed field should be indexed after the table is loaded.
+     * FIXME: should shouldBeIndexed be determined based on presence of referenceTable?
      * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
      */
     public Field indexThisColumn () {
@@ -92,4 +102,13 @@ public abstract class Field {
         return shouldBeIndexed;
     }
 
+    /**
+     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument.
+     * @param table
+     * @return
+     */
+    public Field isReferenceTo(Table table) {
+        this.referenceTable = table;
+        return this;
+    }
 }

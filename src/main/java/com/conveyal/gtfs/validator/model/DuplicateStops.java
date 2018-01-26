@@ -16,9 +16,9 @@ public class DuplicateStops implements Serializable {
 		stop2 = s2;
 		distance = dist;
 	}
-	public Stop getOriginalStop () { return stop1.sourceFileLine < stop2.sourceFileLine ? stop1 : stop2; }
+	public Stop getOriginalStop () { return stop1.id < stop2.id ? stop1 : stop2; }
 
-	public Stop getDuplicatedStop () { return stop1.sourceFileLine > stop2.sourceFileLine ? stop1 : stop2; }
+	public Stop getDuplicatedStop () { return stop1.id > stop2.id ? stop1 : stop2; }
 
 	public String getStop1Id() {
 		return stop1.stop_id;

@@ -11,6 +11,7 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
@@ -157,7 +158,10 @@ public class ServiceValidator extends TripValidator {
                 // This service must have been referenced by trips but is never active on any day.
                 registerError(NewGTFSError.forFeed(NewGTFSErrorType.SERVICE_NEVER_ACTIVE, serviceInfo.serviceId));
                 for (String tripId : serviceInfo.tripIds) {
-                    registerError(NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE).setBadValue(tripId));
+                    registerError(
+                            NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE)
+                                    .setEntityId(tripId)
+                                    .setBadValue(tripId));
                 }
             }
             if (serviceInfo.tripIds.isEmpty()) {

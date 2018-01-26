@@ -1,23 +1,25 @@
 package com.conveyal.gtfs.model;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.google.common.base.Joiner;
 import com.vividsolutions.jts.geom.LineString;
 
-import java.io.Serializable;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *
+ * Represents a collection of trips that all visit the same stops in the same sequence.
  */
-public class Pattern implements Serializable {
+public class Pattern extends Entity {
     public static final long serialVersionUID = 1L;
+    private static final Logger LOG = LoggerFactory.getLogger(Pattern.class);
 
-    // A unique ID for this jouney pattern / stop pattern
+    // A unique ID for this journey pattern / stop pattern
     public String pattern_id;
 
     // The segment of the pattern's geometry (which is always a LineString) on which each stop in the sequence falls.
@@ -30,7 +32,7 @@ public class Pattern implements Serializable {
     // TODO: change list of trips to set
     public List<String> associatedTrips;
     // TODO: add set of shapes
-//    public Set<String> associatedShapes;
+    public Set<String> associatedShapes;
     public LineString geometry;
     public String name;
     public String route_id;

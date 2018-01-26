@@ -9,12 +9,12 @@ import com.conveyal.gtfs.model.Entity;
  */
 public interface TableReader <T extends Entity> extends Iterable<T> {
 
-    public T get (String id);
+    T get (String id);
 
-    public Iterable<T> getOrdered (String id);
+    Iterable<T> getOrdered (String id);
 
-    public Iterable<T> getAll ();
+    Iterable<T> getAll ();
 
-    public Iterable<T> getAllOrdered ();
+    Iterable<T> getAllOrdered ();
 
 }

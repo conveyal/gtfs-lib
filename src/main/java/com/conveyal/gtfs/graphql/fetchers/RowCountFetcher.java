@@ -26,9 +26,15 @@ public class RowCountFetcher implements DataFetcher {
     public static final Logger LOG = LoggerFactory.getLogger(RowCountFetcher.class);
 
     private final String tableName;
+    private final String filterField;
 
     public RowCountFetcher(String tableName) {
+        this(tableName, null);
+    }
+
+    public RowCountFetcher(String tableName, String filterField) {
         this.tableName = tableName;
+        this.filterField = filterField;
     }
 
     @Override
@@ -40,6 +46,13 @@ public class RowCountFetcher implements DataFetcher {
             connection = GTFSGraphQL.getConnection();
             Statement statement = connection.createStatement();
             String sql = String.format("select count(*) from %s.%s", namespace, tableName);
+            if (filterField != null) {
+                // FIXME Does this handle null cases?
+                // Add where clause to filter out non-matching results.
+                String filterValue = (String) parentFeedMap.get(filterField);
+                sql += String.format(" where %s = '%s'", filterField, filterValue);
+            }
+            LOG.info(sql);
             if (statement.execute(sql)) {
                 ResultSet resultSet = statement.getResultSet();
                 resultSet.next();
@@ -66,6 +79,20 @@ public class RowCountFetcher implements DataFetcher {
                 .name(fieldName)
                 .type(Scalars.GraphQLInt)
                 .dataFetcher(new RowCountFetcher(tableName))
+                .build();
+    }
+
+    /**
+     * Convenience method to create a field in a GraphQL schema that fetches the number of rows in a table with a filter
+     * or where clause. If a filter field is provided, count only the rows that match the parent entity's value for the
+     * given field. For example, adding a trip_count field to routes (filter field route_id) would add a trip count to
+     * each route entity with the number of trips that operate under each route's route_id.
+     */
+    public static GraphQLFieldDefinition field (String fieldName, String tableName, String filterField) {
+        return newFieldDefinition()
+                .name(fieldName)
+                .type(Scalars.GraphQLInt)
+                .dataFetcher(new RowCountFetcher(tableName, filterField))
                 .build();
     }
 
