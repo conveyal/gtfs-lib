@@ -11,7 +11,7 @@ install: true
 # Decrypt and import the artifact signing certificate before running the build
 before_install: |
   # Don't import certs for PR builds - see https://docs.travis-ci.com/user/pull-requests/#Pull-Requests-and-Security-Restrictions
-  if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || "$TRAVIS_BRANCH" = sql-loader || ! -z "$TRAVIS_TAG" ]]; then
+  if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || "$TRAVIS_BRANCH" = dev || ! -z "$TRAVIS_TAG" ]]; then
     openssl aes-256-cbc -K $encrypted_c5b9f071c998_key -iv $encrypted_c5b9f071c998_iv -in maven-artifact-signing-key.asc.enc -out maven-artifact-signing-key.asc -d
     gpg --import --batch maven-artifact-signing-key.asc
   fi
