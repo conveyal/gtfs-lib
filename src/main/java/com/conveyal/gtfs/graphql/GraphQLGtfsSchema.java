@@ -59,6 +59,9 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("agency_url"))
             .field(MapFetcher.field("agency_branding_url"))
             .field(MapFetcher.field("agency_desc"))
+            .field(MapFetcher.field("agency_phone"))
+            .field(MapFetcher.field("agency_email"))
+            .field(MapFetcher.field("agency_lang"))
             .field(MapFetcher.field("agency_fare_url"))
             .field(MapFetcher.field("agency_timezone"))
             .build();
@@ -77,6 +80,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("sunday", GraphQLInt))
             .field(MapFetcher.field("start_date"))
             .field(MapFetcher.field("end_date"))
+            // FIXME: Description is an editor-specific field
+            .field(MapFetcher.field("description"))
             .build();
 
 
@@ -104,6 +109,10 @@ public class GraphQLGtfsSchema {
             .field(newFieldDefinition()
                     .name("fare_rules")
                     .type(new GraphQLList(fareRuleType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("fare_rules", "fare_id"))
                     .build()
             )
@@ -142,11 +151,18 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("direction_id", GraphQLInt))
             .field(MapFetcher.field("route_id"))
             .field(MapFetcher.field("service_id"))
+            .field(MapFetcher.field("wheelchair_accessible", GraphQLInt))
+            .field(MapFetcher.field("bikes_allowed", GraphQLInt))
+            .field(MapFetcher.field("shape_id"))
             .field(MapFetcher.field("pattern_id"))
             .field(newFieldDefinition()
                     .name("stop_times")
                     // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
                     .type(new GraphQLList(new GraphQLTypeReference("stopTime")))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("stop_times", "trip_id", "stop_sequence"))
                     .build()
             )
@@ -180,6 +196,10 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("arrival_time", GraphQLInt))
             .field(MapFetcher.field("departure_time", GraphQLInt))
             .field(MapFetcher.field("stop_headsign"))
+            .field(MapFetcher.field("timepoint", GraphQLInt))
+            .field(MapFetcher.field("drop_off_type", GraphQLInt))
+            .field(MapFetcher.field("pickup_type", GraphQLInt))
+            // Editor-specific fields
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .build();
 
@@ -199,18 +219,27 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("route_type"))
             .field(MapFetcher.field("route_color"))
             .field(MapFetcher.field("route_text_color"))
+            // FIXME ˇˇ Editor fields that should perhaps be moved elsewhere.
+            .field(MapFetcher.field("publicly_visible", GraphQLInt))
+            .field(MapFetcher.field("status", GraphQLInt))
+            // FIXME ^^
             .field(RowCountFetcher.field("trip_count", "trips", "route_id"))
             .field(RowCountFetcher.field("pattern_count", "patterns", "route_id"))
             .field(newFieldDefinition()
                     .type(new GraphQLList(tripType))
                     .name("trips")
                     .argument(multiStringArg("trip_id"))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("trips", "route_id"))
                     .build()
             )
             .field(newFieldDefinition()
                     .type(new GraphQLList(new GraphQLTypeReference("pattern")))
                     .name("patterns")
+                    .argument(intArg(LIMIT_ARG))
                     .argument(multiStringArg("pattern_id"))
                     .dataFetcher(new JDBCFetcher("patterns", "route_id"))
                     .build()
@@ -282,6 +311,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
+            // FIXME: This is not working. Perhaps it should be removed?
             .field(newFieldDefinition()
                     .type(stopType)
                     .name("stop")
@@ -344,10 +374,16 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pattern_id"))
             .field(MapFetcher.field("shape_id"))
             .field(MapFetcher.field("route_id"))
+            // FIXME: Fields directly below are editor-specific. Move somewhere else?
+            .field(MapFetcher.field("direction_id", GraphQLInt))
+            .field(MapFetcher.field("use_frequency", GraphQLInt))
             .field(MapFetcher.field("name"))
             .field(newFieldDefinition()
                     .name("shape")
                     .type(new GraphQLList(shapePointType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("shapes",
                             "shape_id",
@@ -357,6 +393,10 @@ public class GraphQLGtfsSchema {
             .field(newFieldDefinition()
                 .name("stops")
                 .type(new GraphQLList(patternStopType))
+                // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                // (i.e., nested types that typically would only be nested under another entity and only make sense
+                // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                .argument(intArg(LIMIT_ARG))
                 .dataFetcher(new JDBCFetcher("pattern_stops",
                         "pattern_id",
                         "stop_sequence"))
@@ -364,6 +404,10 @@ public class GraphQLGtfsSchema {
             .field(newFieldDefinition()
                 .name("trips")
                 .type(new GraphQLList(tripType))
+                // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                // (i.e., nested types that typically would only be nested under another entity and only make sense
+                // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                .argument(intArg(LIMIT_ARG))
                 .argument(multiStringArg("service_id"))
                 .dataFetcher(new JDBCFetcher("trips", "pattern_id"))
                 .build())
@@ -387,11 +431,17 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("duration_seconds"))
             .field(newFieldDefinition()
                     .name("dates")
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .type(new GraphQLList(GraphQLString))
                     .dataFetcher(new SQLColumnFetcher<String>("service_dates", "service_id", "service_date"))
                     .build())
             .field(newFieldDefinition()
                     .name("trips")
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .type(new GraphQLList(tripType))
                     .dataFetcher(new JDBCFetcher("trips", "service_id"))
                     .build())
@@ -438,10 +488,25 @@ public class GraphQLGtfsSchema {
                     .dataFetcher(new JDBCFetcher("errors"))
                     .build()
             )
+            // A field containing the feed info table.
+            .field(newFieldDefinition()
+                    .name("feed_info")
+                    .type(new GraphQLList(feedInfoType))
+                    // FIXME: These arguments really don't make sense for feed info, but in order to create generic
+                    // fetches on the client-side they have been included here.
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    // DataFetchers can either be class instances implementing the interface, or a static function reference
+                    .dataFetcher(new JDBCFetcher("feed_info"))
+                    .build())
             // A field containing all the unique stop sequences (patterns) in this feed.
             .field(newFieldDefinition()
                     .name("patterns")
                     .type(new GraphQLList(patternType))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
                     .argument(multiStringArg("pattern_id"))
                     // DataFetchers can either be class instances implementing the interface, or a static function reference
                     .dataFetcher(new JDBCFetcher("patterns"))
