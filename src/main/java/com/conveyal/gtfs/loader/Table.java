@@ -16,7 +16,8 @@ import java.sql.Statement;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.MISSING_FIELD;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.Requirement.*;
 
 
@@ -30,8 +31,7 @@ import static com.conveyal.gtfs.loader.Requirement.*;
 public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
-    // Represents null in Postgres text format
-    private static final String POSTGRES_NULL_TEXT = "\\N";
+    private static final Requirement[] requirementsForEditorFields = new Requirement[]{EDITOR, REQUIRED, OPTIONAL};
 
     public final String name;
 
@@ -61,6 +61,7 @@ public class Table {
         new StringField("agency_timezone",  REQUIRED), // FIXME new field type for time zones?
         new StringField("agency_lang", OPTIONAL), // FIXME new field type for languages?
         new StringField("agency_phone",  OPTIONAL),
+        new URLField("agency_branding_url",  EDITOR),
         new URLField("agency_fare_url",  OPTIONAL),
         new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
     ).restrictDelete().addPrimaryKey();
@@ -76,7 +77,8 @@ public class Table {
         new IntegerField("saturday", REQUIRED, 0, 1),
         new IntegerField("sunday", REQUIRED, 0, 1),
         new DateField("start_date", REQUIRED),
-        new DateField("end_date", REQUIRED)
+        new DateField("end_date", REQUIRED),
+        new StringField("description", EDITOR)
     ).restrictDelete().addPrimaryKey();
 
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
@@ -94,7 +96,8 @@ public class Table {
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
-
+    // FIXME: Should we add some constraint on number of rows that this table has? Perhaps this is a GTFS editor specific
+    // feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         new StringField("feed_publisher_url", REQUIRED),
@@ -102,7 +105,6 @@ public class Table {
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
         new StringField("feed_version", OPTIONAL)
-
     );
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
@@ -114,13 +116,9 @@ public class Table {
         new IntegerField("route_type", REQUIRED, 999),
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
-        new ColorField("route_text_color",  OPTIONAL)
-    ).addPrimaryKey();
-
-    public static final Table ROUTE_STATUS = new Table("route_status", null, EDITOR,
-        new StringField("route_id", REQUIRED).isReferenceTo(ROUTES),
-        new BooleanField("publicly_visible", EDITOR),
-        new IntegerField("status", EDITOR, 0, 2)
+        new ColorField("route_text_color",  OPTIONAL),
+        new ShortField("publicly_visible", EDITOR, 2),
+        new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
 
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
@@ -148,9 +146,10 @@ public class Table {
     public static final Table PATTERNS = new Table("patterns", Pattern.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED),
             new StringField("route_id", REQUIRED).isReferenceTo(ROUTES),
-            // Editor-specific fields
             new StringField("name", OPTIONAL),
-            new IntegerField("direction_id", EDITOR, 0, 1),
+            // Editor-specific fields
+            new ShortField("direction_id", EDITOR, 1),
+            new ShortField("use_frequency", EDITOR, 1),
             new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
     ).addPrimaryKey();
 
@@ -204,6 +203,7 @@ public class Table {
         new StringField("shape_id",  OPTIONAL).isReferenceTo(SHAPES),
         new ShortField("wheelchair_accessible", OPTIONAL, 2),
         new ShortField("bikes_allowed", OPTIONAL, 2),
+        // Editor-specific fields below.
         new StringField("pattern_id", EDITOR).isReferenceTo(PATTERNS)
     ).addPrimaryKey();
 
@@ -234,6 +234,7 @@ public class Table {
             new IntegerField("exact_times", OPTIONAL, 1)
     );
 
+    /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
             AGENCY,
             CALENDAR,
@@ -275,11 +276,25 @@ public class Table {
 
     /**
      * Registers the table with a parent table. When updates are made to the parent table, updates to child entities
-     * nested in the JSON string will be made.
+     * nested in the JSON string will be made. For example, pattern stops and shape points use this method to point to
+     * the pattern table as their parent. Currently, an update to either of these child tables must be made by way of
+     * a pattern update with nested array pattern_stops and/or shapes. This is due in part to the historical editor
+     * data structure in mapdb which allowed for storing a list of objects as a table field. It also (TBD) may be useful
+     * for ensuring data integrity and avoiding potentially risky partial updates. FIXME This needs further investigation.
+     *
+     * FIXME: Perhaps this logic should be removed from the Table class and explicitly stated in the editor/writer
+     * classes.
      */
     private Table withParentTable(Table parentTable) {
         this.parentTable = parentTable;
         return this;
+    }
+
+    public List<Field> fieldsForEditor () {
+        // Filter out fields not used in editor (i.e., extension fields).
+        return Arrays.stream(fields)
+                .filter(field -> Arrays.asList(requirementsForEditorFields).indexOf(field.requirement) != -1)
+                .collect(Collectors.toList());
     }
 
     public boolean isCascadeDeleteRestricted() {
@@ -289,6 +304,10 @@ public class Table {
 
     public void createSqlTable(Connection connection) {
         createSqlTable(connection, false, null);
+    }
+
+    public void createSqlTable(Connection connection, boolean makeIdSerial) {
+        createSqlTable(connection, makeIdSerial, null);
     }
 
     /**
@@ -327,79 +346,29 @@ public class Table {
         return generateInsertSql(null, setDefaultId);
     }
 
-
+    /**
+     * Create SQL string for use in insert statement. Note, this filters table's fields to only those used in editor.
+     */
     public String generateInsertSql (String namespace, boolean setDefaultId) {
         String tableName = namespace == null ? name : String.join(".", namespace, name);
-        String questionMarks = String.join(", ", Collections.nCopies(fields.length, "?"));
-        String joinedFieldNames = Arrays.stream(fields).map(f -> f.name).collect(Collectors.joining(", "));
+        String questionMarks = String.join(", ", Collections.nCopies(fieldsForEditor().size(), "?"));
+        String joinedFieldNames = fieldsForEditor().stream().map(f -> f.name).collect(Collectors.joining(", "));
         String idValue = setDefaultId ? "DEFAULT" : "?";
         return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
     }
 
+    /**
+     * Create SQL string for use in update statement. Note, this filters table's fields to only those used in editor.
+     */
     public String generateUpdateSql (String namespace, int id) {
         // Collect field names for string joining from JsonObject.
-        String joinedFieldNames = Arrays.stream(fields)
+        String joinedFieldNames = fieldsForEditor().stream()
                 // If updating, add suffix for use in set clause
-                .map(field -> field.getName() + " = ?")
+                .map(field -> field.name + " = ?")
                 .collect(Collectors.joining(", "));
 
         String tableName = namespace == null ? name : String.join(".", namespace, name);
         return String.format("update %s set %s where id = %d", tableName, joinedFieldNames, id);
-    }
-
-    public void setValueForField(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage) {
-        setValueForField(statement, fieldIndex, lineNumber, field, string, errorStorage, false, null);
-    }
-
-    /**
-     * Set value for a field either as a prepared statement parameter or (if using postgres text-loading) in the
-     * transformed strings array provided. This also handles the case where the string is empty (i.e., field is null)
-     * and when an exception is encountered while setting the field value (usually due to a bad data type), in which case
-     * the field is set to null.
-     */
-    public void setValueForField(PreparedStatement statement, int fieldIndex, int lineNumber, Field field, String string, SQLErrorStorage errorStorage, boolean postgresText, String[] transformedStrings) {
-        if (string.isEmpty()) {
-            // CSV reader always returns empty strings, not nulls
-            if (field.isRequired() && errorStorage != null) {
-                errorStorage.storeError(NewGTFSError.forLine(this, lineNumber, MISSING_FIELD, field.name));
-            }
-            setFieldToNull(postgresText, transformedStrings, statement, fieldIndex, field);
-        } else {
-            // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
-            // rather than setObject with a type code. I think some databases don't have setObject though.
-            // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
-            try {
-                // FIXME we need to set the transformed string element even when an error occurs.
-                // This means the validation and insertion step need to happen separately.
-                // or the errors should not be signaled with exceptions.
-                // Also, we should probably not be converting any GTFS field values.
-                // We should be saving it as-is in the database and converting upon load into our model objects.
-                if (postgresText) transformedStrings[fieldIndex + 1] = field.validateAndConvert(string);
-                else field.setParameter(statement, fieldIndex + 2, string);
-            } catch (StorageException ex) {
-                // FIXME many exceptions don't have an error type
-                if (errorStorage != null) {
-                    errorStorage.storeError(NewGTFSError.forLine(this, lineNumber, ex.errorType, ex.badValue));
-                }
-                // Set transformedStrings or prepared statement param to null
-                setFieldToNull(postgresText, transformedStrings, statement, fieldIndex, field);
-            }
-        }
-    }
-
-    /**
-     * Sets field to null in statement or string array depending on whether postgres is being used.
-     */
-    private static void setFieldToNull(boolean postgresText, String[] transformedStrings, PreparedStatement statement, int fieldIndex, Field field) {
-        if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
-            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
-        else try {
-            statement.setNull(fieldIndex + 2, field.getSqlType().getVendorTypeNumber());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
-            // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
-        }
     }
 
     /**
@@ -429,6 +398,8 @@ public class Table {
     }
 
     public String getKeyFieldName () {
+        // FIXME: If the table is constructed from fields found in a GTFS file, the first field is not guaranteed to be
+        // the key field.
         return fields[0].name;
     }
 
@@ -579,8 +550,10 @@ public class Table {
             LOG.error("details: ", ex);
             try {
                 connection.rollback();
-                // FIXME: Try to create table without cloning?
-                createSqlTable(connection);
+                // It is likely that if cloning the table fails, the reason was that the table did not already exist.
+                // Try to create the table here from scratch.
+                // FIXME: Maybe we should check that the reason the clone failed was that the table already exists.
+                createSqlTable(connection, true);
                 return true;
             } catch (SQLException e) {
                 e.printStackTrace();
@@ -592,4 +565,74 @@ public class Table {
     public Table getParentTable() {
         return parentTable;
     }
+
+    /**
+     * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
+     * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error.
+     *
+     * FIXME: This is broken for calendar_dates, where the key field (i.e., service_id) can be repeated multiple times in
+     * the calendar_dates table and does not actually need to exist in the calendar table.
+     */
+    public void checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String string, JdbcGtfsLoader.ReferenceTracker referenceTracker) {
+        // Store field-scoped transit ID for referential integrity check. (Note, entity scoping doesn't work here because
+        // we need to cross-check multiple entity types for valid references, e.g., stop times and trips both share trip
+        // id.)
+        String keyField = getKeyFieldName();
+        String orderField = getOrderFieldName();
+        // If table has an order field, it should supersede the key field as the "unique" field
+        String uniqueKeyField = orderField != null ? orderField : keyField;
+
+        boolean isOrderField = field.name.equals(orderField);
+        if (field.isForeignReference()) {
+            // Check referential integrity if applicable
+            String referenceField = field.referenceTable.getKeyFieldName();
+            String referenceTransitId = String.join(":", referenceField, string);
+
+            if (!referenceTracker.transitIds.contains(referenceTransitId)) {
+                // If the reference tracker does not contain
+                // LOG.error("Ref error found in {} for field {} with value {}", table.name, referenceField, referenceTransitId);
+                NewGTFSError referentialIntegrityError = NewGTFSError.forLine(this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
+                        .setEntityId(keyValue);
+                if (isOrderField) {
+                    // If the field is an order field, set the sequence for the new error.
+                    referentialIntegrityError.setSequence(string);
+                }
+                referenceTracker.errorStorage.storeError(referentialIntegrityError);
+            }
+        }
+
+        if (field.name.equals(uniqueKeyField)) {
+            // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
+            // whether an order field is part of the "unique ID."
+            String transitId = String.join(":", getKeyFieldName(), keyValue);
+            Set<String> listOfUniqueIds;
+            String uniqueId;
+            // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
+            if (isOrderField) {
+                // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
+                // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
+                listOfUniqueIds = referenceTracker.transitIdsWithSequence;
+                uniqueId = String.join(":", field.name, keyValue, string);
+                if (!field.isForeignReference() && !referenceTracker.transitIds.contains(transitId)) {
+                    // Only add ID if the field is not a foreign reference (e.g., adds shape_id for shapes.txt,
+                    // but skips trip_id in stop_times.txt)
+                    referenceTracker.transitIds.add(transitId);
+                }
+            } else {
+                listOfUniqueIds = referenceTracker.transitIds;
+                uniqueId = transitId;
+            }
+            // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
+            boolean isDuplicate = !listOfUniqueIds.add(uniqueId);
+            if (isDuplicate) {
+                NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
+                        .setEntityId(keyValue);
+                if (isOrderField) {
+                    duplicateIdError.setSequence(string);
+                }
+                referenceTracker.errorStorage.storeError(duplicateIdError);
+            }
+        }
+    }
+
 }

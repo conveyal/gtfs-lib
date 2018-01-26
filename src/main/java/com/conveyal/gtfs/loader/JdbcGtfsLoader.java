@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
@@ -66,6 +67,8 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
 public class JdbcGtfsLoader {
 
     public static final long INSERT_BATCH_SIZE = 500;
+    // Represents null in Postgres text format
+    private static final String POSTGRES_NULL_TEXT = "\\N";
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
 
     private String gtfsFilePath;
@@ -83,8 +86,7 @@ public class JdbcGtfsLoader {
     private SQLErrorStorage errorStorage;
 
     // Contains references to unique entity IDs during load stage used for referential integrity check.
-    private final Set<String> transitIds = new HashSet<>();
-    private final Set<String> transitIdsWithSequence = new HashSet<>();
+    private ReferenceTracker referenceTracker;
 
     public JdbcGtfsLoader(String gtfsFilePath, DataSource dataSource) {
         this.gtfsFilePath = gtfsFilePath;
@@ -108,6 +110,8 @@ public class JdbcGtfsLoader {
         FeedLoadResult result = new FeedLoadResult();
 
         try {
+            // Begin tracking time. FIXME: should this follow the connect/register and begin with the table loads?
+            long startTime = System.currentTimeMillis();
             // We get a single connection object and share it across several different methods.
             // This ensures that actions taken in one method are visible to all subsequent SQL statements.
             // If we create a schema or table on one connection, then access it in a separate connection, we have no
@@ -129,7 +133,7 @@ public class JdbcGtfsLoader {
             // This allows everything to work even when there's no prefix.
             this.tablePrefix += ".";
             this.errorStorage = new SQLErrorStorage(connection, tablePrefix, true);
-            long startTime = System.currentTimeMillis();
+            this.referenceTracker = new ReferenceTracker(errorStorage);
             // Load each table in turn, saving some summary information about what happened during each table load
             result.agency = load(Table.AGENCY);
             result.calendar = load(Table.CALENDAR);
@@ -334,9 +338,9 @@ public class JdbcGtfsLoader {
         Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.required, fields);
 
         // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
-        // With bulk loads it takes 140 seconds to load the data and addditional 120 seconds just to index the stop times.
+        // With bulk loads it takes 140 seconds to load the data and additional 120 seconds just to index the stop times.
         // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
-        // We'll just literally prepend feed indentifiers to table names when supplied.
+        // We'll just literally prepend feed identifiers to table names when supplied.
         // Some databases require the table to exist before a statement can be prepared.
         targetTable.createSqlTable(connection);
 
@@ -355,6 +359,8 @@ public class JdbcGtfsLoader {
         // One extra position in the array for the CSV line number.
         String[] transformedStrings = new String[fields.length + 1];
 
+        // Iterate over each record and prepare the record for storage in the table either through batch insert
+        // statements or postgres text copy operation.
         while (csvReader.readRecord()) {
             // The CSV reader's current record is zero-based and does not include the header line.
             // Convert to a CSV file line number that will make more sense to people reading error messages.
@@ -371,67 +377,16 @@ public class JdbcGtfsLoader {
             }
             // Store value of key field for use in checking duplicate IDs
             String keyValue = csvReader.get(keyFieldIndex);
-            // Store transit ID for referential integrity check
-            String transitId = String.join(":", keyField, keyValue);
             // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
             if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
             else insertStatement.setInt(1, lineNumber);
-            // If table has an order field, it should supersede the key field as the "unique" field
-            String uniqueKeyField = orderField != null ? orderField : keyField;
-            // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
-            // whether an order field is part of the "unique ID."
-            Set<String> listOfUniqueIds;
-            String uniqueId;
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 String string = csvReader.get(f);
-                boolean isOrderField = field.name.equals(orderField);
-
-                if (field.isForeignReference()) {
-                    // Check referential integrity if applicable
-                    String referenceField = field.referenceTable.getKeyFieldName();
-                    String referenceTransitId = String.join(":", referenceField, string);
-
-                    if (!transitIds.contains(referenceTransitId)) {
-//                        LOG.error("Ref error found in {} for field {} with value {}", table.name, referenceField, referenceTransitId);
-                        NewGTFSError referentialIntegrityError = NewGTFSError.forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
-                                .setEntityId(keyValue);
-                        if (isOrderField) {
-                            referentialIntegrityError.setSequence(string);
-                        }
-                        errorStorage.storeError(referentialIntegrityError);
-                    }
-                }
-
-                if (field.name.equals(uniqueKeyField)) {
-                    // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
-                    if (isOrderField) {
-                        // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
-                        // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
-                        listOfUniqueIds = transitIdsWithSequence;
-                        uniqueId = String.join(":", field.name, keyValue, string);
-                        if (!field.isForeignReference() && !transitIds.contains(transitId)) {
-                            // Only add ID if the field is not a foreign reference (e.g., adds shape_id for shapes.txt,
-                            // but skips trip_id in stop_times.txt)
-                            transitIds.add(transitId);
-                        }
-                    } else {
-                        listOfUniqueIds = transitIds;
-                        uniqueId = transitId;
-                    }
-                    // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
-                    boolean isDuplicate = !listOfUniqueIds.add(uniqueId);
-                    if (isDuplicate) {
-                        NewGTFSError duplicateIdError = NewGTFSError.forLine(table, lineNumber, DUPLICATE_ID, uniqueId)
-                                .setEntityId(keyValue);
-                        if (isOrderField) {
-                            duplicateIdError.setSequence(string);
-                        }
-                        errorStorage.storeError(duplicateIdError);
-                    }
-                }
+                // Use spec table to check that references are valid and IDs are unique.
+                table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
                 // Add value for entry into table
-                targetTable.setValueForField(insertStatement, f, lineNumber, field, string, errorStorage, postgresText, transformedStrings);
+                setValueForField(table, f, lineNumber, field, string, postgresText, transformedStrings);
             }
             if (postgresText) {
                 tempTextFileStream.printf(String.join("\t", transformedStrings));
@@ -478,6 +433,58 @@ public class JdbcGtfsLoader {
     }
 
     /**
+     * Set value for a field either as a prepared statement parameter or (if using postgres text-loading) in the
+     * transformed strings array provided. This also handles the case where the string is empty (i.e., field is null)
+     * and when an exception is encountered while setting the field value (usually due to a bad data type), in which case
+     * the field is set to null.
+     */
+    public void setValueForField(Table table, int fieldIndex, int lineNumber, Field field, String string, boolean postgresText, String[] transformedStrings) {
+        if (string.isEmpty()) {
+            // CSV reader always returns empty strings, not nulls
+            if (field.isRequired() && errorStorage != null) {
+                errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, MISSING_FIELD, field.name));
+            }
+            setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+        } else {
+            // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
+            // rather than setObject with a type code. I think some databases don't have setObject though.
+            // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
+            try {
+                // FIXME we need to set the transformed string element even when an error occurs.
+                // This means the validation and insertion step need to happen separately.
+                // or the errors should not be signaled with exceptions.
+                // Also, we should probably not be converting any GTFS field values.
+                // We should be saving it as-is in the database and converting upon load into our model objects.
+                if (postgresText) transformedStrings[fieldIndex + 1] = field.validateAndConvert(string);
+                else field.setParameter(insertStatement, fieldIndex + 2, string);
+            } catch (StorageException ex) {
+                // FIXME many exceptions don't have an error type
+                if (errorStorage != null) {
+                    errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.badValue));
+                }
+                // Set transformedStrings or prepared statement param to null
+                setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+            }
+        }
+    }
+
+    /**
+     * Sets field to null in statement or string array depending on whether postgres is being used.
+     */
+    private void setFieldToNull(boolean postgresText, String[] transformedStrings, int fieldIndex, Field field) {
+        if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
+            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
+        else try {
+            //            LOG.info("setting {} index to null", fieldIndex + 2);
+            insertStatement.setNull(fieldIndex + 2, field.getSqlType().getVendorTypeNumber());
+        } catch (SQLException e) {
+            e.printStackTrace();
+            // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
+            // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
+        }
+    }
+
+    /**
      * Protect against SQL injection.
      * The only place we include arbitrary input in SQL is the column names of tables.
      * Implicitly (looking at all existing table names) these should consist entirely of
@@ -496,4 +503,13 @@ public class JdbcGtfsLoader {
         return clean;
     }
 
+    public class ReferenceTracker {
+        public final Set<String> transitIds = new HashSet<>();
+        public final Set<String> transitIdsWithSequence = new HashSet<>();
+        public final SQLErrorStorage errorStorage;
+
+        public ReferenceTracker(SQLErrorStorage errorStorage) {
+            this.errorStorage = errorStorage;
+        }
+    }
 }

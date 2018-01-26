@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.PatternFinder;
+import com.conveyal.gtfs.TripPatternKey;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
@@ -25,6 +26,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -65,7 +67,7 @@ public class PatternFinderValidator extends TripValidator {
             stopById.put(stop.stop_id, stop);
         }
         // FIXME In the editor we need patterns to exist separately from and before trips themselves, so me make another table.
-        List<Pattern> patterns = patternFinder.createPatternObjects(stopById, errorStorage);
+        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, errorStorage);
         Connection connection = null;
         try {
             // TODO this assumes gtfs-lib is using an SQL database and not a MapDB.
@@ -76,10 +78,9 @@ public class PatternFinderValidator extends TripValidator {
             String tripsTableName = feed.tablePrefix + "trips";
             String patternsTableName = feed.tablePrefix + "patterns";
             String patternStopsTableName = feed.tablePrefix + "pattern_stops";
-//            String patternGeometryTableName = feed.tablePrefix + "pattern_geometry";
             statement.execute(String.format("alter table %s add column pattern_id varchar", tripsTableName));
             // FIXME: Here we're creating a pattern table that has an integer ID field (similar to the other GTFS tables)
-            // and a varchar pattern_id with essentially the same value cast to a string. Perhaps the pattern ID should
+            // AND a varchar pattern_id with essentially the same value cast to a string. Perhaps the pattern ID should
             // be a UUID or something, just to better distinguish it from the int ID?
             statement.execute(String.format("create table %s (id serial, pattern_id varchar primary key, " +
                     "route_id varchar, name varchar, shape_id varchar)", patternsTableName));
@@ -97,34 +98,33 @@ public class PatternFinderValidator extends TripValidator {
             PreparedStatement insertPatternStopStatement = connection.prepareStatement(insertPatternStopSql);
             int batchSize = 0;
             // TODO update to use batch trackers
-            for (Pattern pattern : patterns) {
+            for (Map.Entry<TripPatternKey, Pattern> entry : patterns.entrySet()) {
+                Pattern pattern = entry.getValue();
+                TripPatternKey key = entry.getKey();
                 // First, create a pattern relation.
                 insertPatternStatement.setString(1, pattern.pattern_id);
                 insertPatternStatement.setString(2, pattern.route_id);
                 insertPatternStatement.setString(3, pattern.name);
                 insertPatternStatement.setString(4, pattern.associatedShapes.iterator().next());
                 insertPatternStatement.addBatch();
-                if (pattern.patternStops != null) {
-                    // Next, add pattern_stops relations for all the stops on this pattern.
-                    for (PatternStop patternStop : pattern.patternStops) {
-                        for (int f = 0; f < patternStopsTable.fields.length; f++) {
-                            Field field = patternStopsTable.fields[f];
-                            String string;
-                            try {
-                                // FIXME Don't use reflection here.
-                                java.lang.reflect.Field psField = patternStop.getClass().getField(field.getName());
-                                Object value = psField.get(patternStop);
-                                string = value != null ? value.toString() : null;
-                                // No line number available because this is a derived object
-                                patternStopsTable.setValueForField(insertPatternStopStatement, f - 1,
-                                        -1, field, string, errorStorage);
-                            } catch (IllegalAccessException | NoSuchFieldException e) {
-                                LOG.error("Error accessing pattern stop field", e);
-                            }
-                        }
-                        insertPatternStopStatement.addBatch();
-                        batchSize += 1;
-                    }
+                // Construct pattern stops based on values in trip pattern key.
+                // FIXME: Use pattern stops table here?
+                for (int i = 0; i < key.stops.size(); i++) {
+                    int travelTime = 0;
+                    String stopId = key.stops.get(i);
+                    if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
+
+                    insertPatternStopStatement.setString(1, pattern.pattern_id);
+                    insertPatternStopStatement.setInt(2, i);
+                    insertPatternStopStatement.setString(3, stopId);
+                    insertPatternStopStatement.setInt(4, travelTime);
+                    insertPatternStopStatement.setInt(5, key.departureTimes.get(i) - key.arrivalTimes.get(i));
+                    insertPatternStopStatement.setInt(6, key.dropoffTypes.get(i));
+                    insertPatternStopStatement.setInt(7, key.pickupTypes.get(i));
+                    insertPatternStopStatement.setDouble(8, key.shapeDistances.get(i));
+                    insertPatternStopStatement.setInt(9, key.timepoints.get(i));
+                    insertPatternStopStatement.addBatch();
+                    batchSize += 1;
                 }
                 // Finally, update all trips on this pattern to reference this pattern's ID.
                 for (String tripId : pattern.associatedTrips) {

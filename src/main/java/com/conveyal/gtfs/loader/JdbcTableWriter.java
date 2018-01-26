@@ -19,7 +19,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -91,9 +93,9 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info(jsonObject.toString());
             PreparedStatement preparedStatement = createPreparedUpdate(id, isCreating, jsonObject, specTable, connection, false);
             // ID from create/update result
-            long newId = handleStatementExecution(connection, preparedStatement, isCreating);
-            // At this point, the transaction was successful (and committed). Now we should handle any post-save
-            // logic. For example, after saving a trip, we need to store its stop times.
+            long newId = handleStatementExecution(preparedStatement, isCreating);
+            // At this point, the transaction was successful (but not yet committed). Now we should handle any update
+            // logic that applies to child tables. For example, after saving a trip, we need to store its stop times.
             Set<Table> referencingTables = getReferencingTables(specTable);
             // FIXME: hacky hack hack to add shapes table if we're updating a pattern.
             if (specTable.name.equals("patterns")) {
@@ -107,7 +109,7 @@ public class JdbcTableWriter implements TableWriter {
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
-                    if (childEntities == null || !childEntities.isArray()) {
+                    if (childEntities == null || childEntities.isNull() || !childEntities.isArray()) {
                         throw new SQLException(String.format("Child entities %s must be an array and not null", referencingTable.name));
                     }
                     int entityId = isCreating ? (int) newId : id;
@@ -116,12 +118,17 @@ public class JdbcTableWriter implements TableWriter {
                     updateChildTable(childEntitiesArray, entityId, isCreating, referencingTable, connection);
                 }
             }
+            // If nothing failed up to this point, it is safe to assume there were no problems updating/creating the
+            // main entity and any of its children, so we commit the transaction.
+            LOG.info("Committing transaction.");
+            connection.commit();
             // Add new ID to JSON object.
             jsonObject.put("id", newId);
             // FIXME: Should this return the entity freshly queried from the database rather than just updating the ID?
             return jsonObject.toString();
-        } catch (SQLException e) {
-            LOG.error("Error updating entity", e);
+        } catch (Exception e) {
+            LOG.error("Error {} {} entity", isCreating ? "creating" : "updating", specTable.name);
+            e.printStackTrace();
             DbUtils.closeQuietly(connection);
             throw e;
         }
@@ -147,64 +154,72 @@ public class JdbcTableWriter implements TableWriter {
                 statementString,
                 Statement.RETURN_GENERATED_KEYS);
         if (!batch) {
-            setStatementParameters(jsonObject, preparedStatement, connection);
+            setStatementParameters(jsonObject, table, preparedStatement, connection);
         }
         return preparedStatement;
     }
 
     /**
-     * Given a prepared statement (for update or create), set the parameters of the statement found in the JSON string
-     * in alphabetical order based on the table field names.
+     * Given a prepared statement (for update or create), set the parameters of the statement based on string values
+     * taken from JSON. Note, string values are used here in order to take advantage of setParameter method on
+     * individual fields, which handles parsing string and non-string values into the appropriate SQL field types.
      */
-    private void setStatementParameters(ObjectNode jsonObject, PreparedStatement preparedStatement, Connection connection) throws SQLException {
+    private void setStatementParameters(ObjectNode jsonObject, Table table, PreparedStatement preparedStatement, Connection connection) throws SQLException {
         // JDBC SQL statements use a one-based index for setting fields/parameters
+        List<String> missingFieldNames = new ArrayList<>();
         int index = 1;
-        // Set statement parameters with string values taken from JSON. (Note, string values are used here in order to
-        // take advantage of setParameter method on individual fields, which handles parsing string and non-string values
-        // into the appropriate SQL field types.
-        for (Field field : specTable.fields) {
+        for (Field field : table.fieldsForEditor()) {
             if (!jsonObject.has(field.name)) {
-                // If there is a field missing from the JSON string, throw an exception. In an effort to keep the
-                // database integrity intact, every update/create operation should have all fields defined by the spec
-                // table.
+                // If there is a field missing from the JSON string and it is required to write to an editor table,
+                // throw an exception (handled after the fields iteration. In an effort to keep the database integrity
+                // intact, every update/create operation should have all fields defined by the spec table.
                 // FIXME: What if someone wants to make updates to non-editor feeds? In this case, the table may not
                 // have all of the required fields, yet this would prohibit such an update. Further, an update on such
                 // a table that DID have all of the spec table fields would fail because they might be missing from
                 // the actual database table.
-                throw new SQLException("Field missing from JSON object");
+                missingFieldNames.add(field.name);
+                continue;
             }
             JsonNode value = jsonObject.get(field.name);
             LOG.info("{}={}", field.name, value);
             try {
-                if (value.isNull()) {
+                if (value == null || value.isNull()) {
                     // Handle setting null value on statement
                     preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
                 } else {
                     field.setParameter(preparedStatement, index, value.asText());
                 }
             } catch (StorageException e) {
+                LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
                 if (field.name.contains("_time")) {
                     // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
                     // currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
                     try {
-                        if (value == null) {
+                        if (value == null ||value.isNull()) {
                             preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
                         } else {
-                            Integer seconds = Integer.parseInt(value.asText());
-                            preparedStatement.setInt(index, seconds);
+                            // Try to parse integer seconds value
+                            preparedStatement.setInt(index, Integer.parseInt(value.asText()));
+                            LOG.info("Parsing value {} for field {} successful!", value, field.name);
                         }
                     } catch (NumberFormatException ex) {
+                        // Attempt to set arrival or departure time via integer seconds failed. Rollback.
                         connection.rollback();
                         LOG.error("Bad column: {}={}", field.name, value);
                         ex.printStackTrace();
                         throw ex;
                     }
                 } else {
+                    // Rollback transaction and throw exception
                     connection.rollback();
                     throw e;
                 }
             }
             index += 1;
+        }
+        if (missingFieldNames.size() > 0) {
+//            String joinedFieldNames = missingFieldNames.stream().collect(Collectors.joining(", "));
+            throw new SQLException(String.format("The following field(s) are missing from JSON %s object: %s", table.name, missingFieldNames.toString()));
         }
     }
 
@@ -248,24 +263,23 @@ public class JdbcTableWriter implements TableWriter {
         for (JsonNode entityNode : entityList) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
             ObjectNode entity = (ObjectNode)entityNode;
-            if (entity.get(keyField) == null) {
+            if (entity.get(keyField) == null || entity.get(keyField).isNull()) {
                 entity.put(keyField, keyValue);
             }
             // Insert new sub-entity.
             if (entityCount == 0) {
                 insertStatement = createPreparedUpdate(id, true, entity, subTable, connection, true);
             }
-            LOG.info("{}", entityCount);
-            setStatementParameters(entity, insertStatement, connection);
+//            LOG.info("{}", entityCount);
+            setStatementParameters(entity, subTable, insertStatement, connection);
             if (entityCount == 0) LOG.info(insertStatement.toString());
             insertStatement.addBatch();
-            if (entityCount % INSERT_BATCH_SIZE == 0) {
+            // Prefix increment count and check whether to execute batched update.
+            if (++entityCount % INSERT_BATCH_SIZE == 0) {
                 LOG.info("Executing batch insert ({}/{}) for {}", entityCount, entityList.size(), childTableName);
                 int[] newIds = insertStatement.executeBatch();
                 LOG.info("Updated {}", newIds.length);
             }
-            entityCount += 1;
-//            handleStatementExecution(connection, insertStatement, true);
         }
         // execute any remaining prepared statement calls
         LOG.info("Executing batch insert ({}/{}) for {}", entityCount, entityList.size(), childTableName);
@@ -273,12 +287,10 @@ public class JdbcTableWriter implements TableWriter {
             // If insert statement is null, an empty array was passed for the child table, so the child elements have
             // been wiped.
             int[] newIds = insertStatement.executeBatch();
-            LOG.info("Updated {}", newIds.length);
+            LOG.info("Updated {} {} child entities", newIds.length, subTable.name);
         } else {
             LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
         }
-        LOG.info("Committing transaction.");
-        connection.commit();
     }
 
     /**
@@ -286,22 +298,29 @@ public class JdbcTableWriter implements TableWriter {
      */
     @Override
     public int delete(Integer id) throws SQLException {
-        Connection connection = dataSource.getConnection();
-        // Handle "cascading" delete or constraints on deleting entities that other entities depend on
-        // (e.g., keep a calendar from being deleted if trips reference it).
-        // FIXME: actually add "cascading"? Currently, it just deletes one level down.
-        deleteFromReferencingTables(tablePrefix, specTable, connection, id);
-        PreparedStatement statement = connection.prepareStatement(specTable.generateDeleteSql(tablePrefix));
-        statement.setInt(1, id);
-        LOG.info(statement.toString());
-        // Execute query
-        int result = statement.executeUpdate();
-        connection.commit();
-        if (result == 0) {
-            throw new SQLException("Could not delete entity");
+        Connection connection = null;
+        try {
+            connection = dataSource.getConnection();
+            // Handle "cascading" delete or constraints on deleting entities that other entities depend on
+            // (e.g., keep a calendar from being deleted if trips reference it).
+            // FIXME: actually add "cascading"? Currently, it just deletes one level down.
+            deleteFromReferencingTables(tablePrefix, specTable, connection, id);
+            PreparedStatement statement = connection.prepareStatement(specTable.generateDeleteSql(tablePrefix));
+            statement.setInt(1, id);
+            LOG.info(statement.toString());
+            // Execute query
+            int result = statement.executeUpdate();
+            if (result == 0) {
+                throw new SQLException("Could not delete entity");
+            }
+            connection.commit();
+            // FIXME: change return message based on result value
+            return result;
+        } catch (SQLException e) {
+            e.printStackTrace();
+            DbUtils.closeQuietly(connection);
+            throw e;
         }
-        // FIXME: change return message based on result value
-        return result;
     }
 
     @Override
@@ -320,12 +339,10 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * Handle executing a prepared statement and return the ID for the newly-generated or updated entity.
      */
-    private static long handleStatementExecution(Connection connection, PreparedStatement statement, boolean isCreating) throws SQLException {
+    private static long handleStatementExecution(PreparedStatement statement, boolean isCreating) throws SQLException {
         // Log the SQL for the prepared statement
         LOG.info(statement.toString());
         int affectedRows = statement.executeUpdate();
-        // Commit the transaction
-        connection.commit();
         // Determine operation-specific action for any error messages
         String messageAction = isCreating ? "Creating" : "Updating";
         if (affectedRows == 0) {
@@ -341,6 +358,9 @@ public class JdbcTableWriter implements TableWriter {
             } else {
                 throw new SQLException(messageAction + " entity failed, no ID obtained.");
             }
+        } catch (SQLException e) {
+            e.printStackTrace();
+            throw e;
         }
     }
 
@@ -353,7 +373,7 @@ public class JdbcTableWriter implements TableWriter {
     private static void ensureReferentialIntegrity(Connection connection, ObjectNode jsonObject, String namespace, Table table, Integer id) throws SQLException {
         final boolean isCreating = id == null;
         String keyField = table.getKeyFieldName();
-        if (jsonObject.get(keyField) == null || jsonObject.get(keyField).isNull()) {
+        if (jsonObject.get(keyField).isNull()) {
             // FIXME: generate key field automatically for certain entities (e.g., trip ID). Maybe this should be
             // generated for all entities if null?
             if ("trip_id".equals(keyField)) {

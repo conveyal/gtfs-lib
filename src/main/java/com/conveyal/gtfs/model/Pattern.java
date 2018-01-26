@@ -29,8 +29,6 @@ public class Pattern extends Entity {
     public double[] segmentFraction;
 
     public List<String> orderedStops;
-    // The sequence of stops visited along with generic information about when and how pattern trips visit the stop
-    public List<PatternStop> patternStops;
     // TODO: change list of trips to set
     public List<String> associatedTrips;
     // TODO: add set of shapes

@@ -178,7 +178,9 @@ public interface EntityPopulator<T> {
                 String dateString = resultSet.getString(columnIndex);
                 return dateString != null ? LocalDate.parse(dateString, DateField.GTFS_DATE_FORMATTER) : null;
             } catch (DateTimeParseException ex) {
-//                LOG.info("Could not parse date time");
+                // FIXME: Should this log an exception if the parse fails? My impression is that it should not because
+                // otherwise this could be very noisy with logs on (e.g., if thousands of calendar dates all have bad
+                // formatting).
                 return null;
             }
         }

@@ -19,11 +19,8 @@ import java.sql.SQLType;
  * values (an error and a modified value).
  */
 public abstract class Field {
-    public String getName() {
-        return name;
-    }
 
-    final String name;
+    public final String name;
     final Requirement requirement;
     /**
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential

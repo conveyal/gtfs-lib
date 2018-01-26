@@ -79,15 +79,14 @@ public class PatternFinder {
 
     /**
      * Once all trips have been processed, call this method to produce the final Pattern objects representing all the
-     * unique sequences of stops encountered.
-     * @param stopById
-     * @param errorStorage
+     * unique sequences of stops encountered. Returns map of patterns to their keys so that downstream functions can
+     * make use of trip pattern keys for constructing pattern stops or other derivative objects.
      */
-    public List<Pattern> createPatternObjects(Map<String, Stop> stopById, SQLErrorStorage errorStorage) {
+    public Map<TripPatternKey, Pattern> createPatternObjects(Map<String, Stop> stopById, SQLErrorStorage errorStorage) {
         // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
         int nextPatternId = 1;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
-        List<Pattern> patterns = new ArrayList<>();
+        Map<TripPatternKey, Pattern> patterns = new HashMap<>();
         // TODO assign patterns sequential small integer IDs (may include route)
         for (TripPatternKey key : tripsForPattern.keySet()) {
             Collection<Trip> trips = tripsForPattern.get(key);
@@ -105,28 +104,10 @@ public class PatternFinder {
                         NewGTFSErrorType.MULTIPLE_SHAPES_FOR_PATTERN)
                             .setBadValue(pattern.associatedShapes.toString()));
             }
-            pattern.patternStops = new ArrayList<>();
-            // Construct pattern stops based on values in trip pattern key.
-            for (int i = 0; i < key.stops.size(); i++) {
-                int travelTime = 0;
-                String stopId = key.stops.get(i);
-                if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
-                double shapeDistTraveled = key.shapeDistances.get(i);
-                PatternStop patternStop = new PatternStop();
-                patternStop.drop_off_type = key.dropoffTypes.get(i);
-                patternStop.pickup_type = key.pickupTypes.get(i);
-                patternStop.default_travel_time = travelTime;
-                patternStop.default_dwell_time = key.departureTimes.get(i) - key.arrivalTimes.get(i);
-                patternStop.stop_sequence = i;
-                patternStop.stop_id = stopId;
-                patternStop.pattern_id = pattern.pattern_id;
-                patternStop.shape_dist_traveled = shapeDistTraveled;
-                pattern.patternStops.add(patternStop);
-            }
-            patterns.add(pattern);
+            patterns.put(key, pattern);
         }
         // Name patterns before storing in SQL database.
-        renamePatterns(patterns, stopById);
+        renamePatterns(patterns.values(), stopById);
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
         return patterns;
     }
