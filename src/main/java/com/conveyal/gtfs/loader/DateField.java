@@ -51,6 +51,18 @@ public class DateField extends Field {
         }
     }
 
+    /**
+     * DateField specific method to set a statement parameter from a {@link LocalDate}.
+     */
+    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, LocalDate localDate) {
+        try {
+            if (localDate == null) preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
+            else preparedStatement.setString(oneBasedIndex, localDate.format(GTFS_DATE_FORMATTER));
+        } catch (Exception e) {
+            throw new StorageException(e);
+        }
+    }
+
     @Override
     public String validateAndConvert (String string) {
         return validate(string);

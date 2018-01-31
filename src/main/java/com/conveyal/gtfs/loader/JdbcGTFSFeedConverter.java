@@ -3,7 +3,6 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
-import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
@@ -12,46 +11,26 @@ import com.conveyal.gtfs.model.FareRule;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.storage.StorageException;
-import com.csvreader.CsvReader;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.hash.HashCode;
-import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
 import org.apache.commons.dbutils.DbUtils;
-import org.apache.commons.io.input.BOMInputStream;
-import org.mapdb.Fun;
-import org.postgresql.copy.CopyManager;
-import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.*;
-import java.nio.charset.Charset;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
-import static com.conveyal.gtfs.model.Entity.human;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
 /**
  * This class loads a MapDB-based GTFSFeed into an RDBMS.
  */
-public class JdbcGtfsConverter {
+public class JdbcGTFSFeedConverter {
 
-    public static final long INSERT_BATCH_SIZE = 500;
-    // Represents null in Postgres text format
-    private static final String POSTGRES_NULL_TEXT = "\\N";
-    private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsConverter.class);
-
-    private File tempTextFile;
-    private PrintStream tempTextFileStream;
-    private PreparedStatement insertStatement = null;
+    private static final Logger LOG = LoggerFactory.getLogger(JdbcGTFSFeedConverter.class);
 
     private final GTFSFeed gtfsFeed;
     private final DataSource dataSource;
@@ -61,12 +40,10 @@ public class JdbcGtfsConverter {
     private String tablePrefix;
     private SQLErrorStorage errorStorage;
 
-    // Contains references to unique entity IDs during load stage used for referential integrity check.
-    private JdbcGtfsLoader.ReferenceTracker referenceTracker;
-    private ObjectMapper mapper;
     private String namespace;
 
-    public JdbcGtfsConverter(GTFSFeed gtfsFeed, DataSource dataSource) {
+    // FIXME Add parameter for Connection so that this can be a part of a larger transaction.
+    public JdbcGTFSFeedConverter(GTFSFeed gtfsFeed, DataSource dataSource) {
         this.gtfsFeed = gtfsFeed;
         this.dataSource = dataSource;
     }
@@ -109,14 +86,8 @@ public class JdbcGtfsConverter {
             // This allows everything to work even when there's no prefix.
             this.tablePrefix += ".";
             this.errorStorage = new SQLErrorStorage(connection, tablePrefix, true);
-//            this.referenceTracker = new JdbcGtfsLoader.ReferenceTracker(errorStorage);
-            // Load each table in turn, saving some summary information about what happened during each table load
-            mapper = new ObjectMapper();
-//            for (Agency agency : gtfsFeed.agency.values()) {
-//                String sqlInsert = agency.toString();
-//                insertStatement
-//            }
-            // Get entities from feeds.
+
+            // Get entity lists that are nested in feed.
             List<Calendar> calendars = gtfsFeed.services.values()
                     .stream()
                     .map(service -> service.calendar)
@@ -139,12 +110,14 @@ public class JdbcGtfsConverter {
                     .map(stringFrequencyTuple2 -> stringFrequencyTuple2.b)
                     .collect(Collectors.toList());
 
+            // Copy all tables (except for PATTERN_STOPS, which does not exist in GTFSFeed).
             copyEntityToSql(gtfsFeed.agency.values(), Table.AGENCY);
             copyEntityToSql(calendars, Table.CALENDAR);
             copyEntityToSql(calendarDates, Table.CALENDAR_DATES);
             copyEntityToSql(gtfsFeed.routes.values(), Table.ROUTES);
-            // FIXME
-//            load(gtfsFeed.patterns.values(), Table.PATTERNS);
+            copyEntityToSql(gtfsFeed.patterns.values(), Table.PATTERNS);
+            // FIXME: How to handle pattern stops?
+//            copyEntityToSql(gtfsFeed.patterns.values(), Table.PATTERN_STOP);
             copyEntityToSql(fareAttributes, Table.FARE_ATTRIBUTES);
             copyEntityToSql(fareRules, Table.FARE_RULES);
             copyEntityToSql(gtfsFeed.feedInfo.values(), Table.FEED_INFO);
@@ -192,8 +165,6 @@ public class JdbcGtfsConverter {
         }
 
         try {
-            String md5Hex = null;
-            String shaHex = null;
             Statement statement = connection.createStatement();
             // FIXME do the following only on databases that support schemas.
             // SQLite does not support them. Is there any advantage of schemas over flat tables?
@@ -206,8 +177,8 @@ public class JdbcGtfsConverter {
             PreparedStatement insertStatement = connection.prepareStatement(
                     "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null)");
             insertStatement.setString(1, tablePrefix);
-            insertStatement.setString(2, md5Hex);
-            insertStatement.setString(3, shaHex);
+            insertStatement.setString(2, null); // md5Hex
+            insertStatement.setString(3, null); // shaHex
             // FIXME: will this throw an NPE if feedId or feedVersion are empty?
             insertStatement.setString(4, feedId.isEmpty() ? null : feedId);
             insertStatement.setString(5, feedVersion.isEmpty() ? null : feedVersion);
@@ -221,15 +192,14 @@ public class JdbcGtfsConverter {
         }
     }
 
-    private PreparedStatement getPreparedStatement(Table table) throws SQLException {
+    /**
+     * Creates table for the specified Table, inserts all entities for the iterable in batches, and, finally, creates
+     * indexes on the table.
+     */
+    private <E extends Entity> void copyEntityToSql(Iterable<E> entities, Table table) throws SQLException {
         table.createSqlTable(connection, namespace, true);
         String entityInsertSql = table.generateInsertSql(namespace, false);
-        return connection.prepareStatement(entityInsertSql);
-    }
-
-
-    private <E extends Entity> void copyEntityToSql(Iterable<E> entities, Table table) throws SQLException {
-        PreparedStatement insertStatement = getPreparedStatement(table);
+        PreparedStatement insertStatement = connection.prepareStatement(entityInsertSql);
         // Iterate over agencies and add to prepared statement
         for (E entity : entities) {
             entity.setStatementParameters(insertStatement);
@@ -237,250 +207,8 @@ public class JdbcGtfsConverter {
             // FIXME: Add batching execute on n
         }
         insertStatement.executeBatch();
-    }
 
-    /**
-     * This wraps the main internal table loader method to catch exceptions and figure out how many errors happened.
-     */
-    private TableLoadResult load (Collection<? extends Entity> entities, Table table) {
-        // This object will be returned to the caller to summarize the contents of the table and any errors.
-        TableLoadResult tableLoadResult = new TableLoadResult();
-
-        int initialErrorCount = errorStorage.getErrorCount();
-        try {
-            tableLoadResult.rowCount = loadInternal(entities, table);
-        } catch (Exception ex) {
-            LOG.error("Fatal error loading table", ex);
-            tableLoadResult.fatalException = ex.toString();
-            // Rollback connection so that fatal exception does not impact loading of other tables.
-            try {
-                connection.rollback();
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        } finally {
-            // Explicitly delete the tmp file now that load is finished (either success or failure).
-            // Otherwise these multi-GB files clutter the drive.
-            if (tempTextFile != null) {
-                tempTextFile.delete();
-            }
-        }
-        int finalErrorCount = errorStorage.getErrorCount();
-        tableLoadResult.errorCount = finalErrorCount - initialErrorCount;
-        return tableLoadResult;
-    }
-
-    /**
-     * This function will throw any exception that occurs. Those exceptions will be handled by the outer load method.
-     * @return number of rows that were loaded.
-     */
-    private int loadInternal(Collection<? extends Entity> entities, Table table) throws Exception {
-        if (entities == null || entities.size() == 0) {
-            // This GTFS table could not be opened in the zip, even in a subdirectory.
-            if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
-            return 0;
-        }
-        LOG.info("Loading GTFS table {}", table.name);
-        // Use the Postgres text load format if we're connected to that DBMS.
-        boolean postgresText = (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL"));
-
-//        // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
-        // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
-        Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.required, table.fields);
-//
-//        // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
-//        // With bulk loads it takes 140 seconds to load the data and additional 120 seconds just to index the stop times.
-//        // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
-//        // We'll just literally prepend feed identifiers to table names when supplied.
-//        // Some databases require the table to exist before a statement can be prepared.
-        targetTable.createSqlTable(connection, true);
-
-
-
-
-        // FIXME: This is using the string table writer.
-        JdbcTableWriter tableWriter = new JdbcTableWriter(table, dataSource, this.namespace, connection);
-        String entitiesString;
-        try {
-            entitiesString = mapper.writeValueAsString(entities);
-            tableWriter.create(entitiesString, false);
-            return 1;
-        } catch (SQLException | IOException e) {
-            e.printStackTrace();
-            return 0;
-        }
-
-
-        //
-//        // TODO are we loading with or without a header row in our Postgres text file?
-//        if (postgresText) {
-//            // No need to output headers to temp text file, our SQL table column order exactly matches our text file.
-//            tempTextFile = File.createTempFile(targetTable.name, "text");
-//            tempTextFileStream = new PrintStream(new BufferedOutputStream(new FileOutputStream(tempTextFile)));
-//            LOG.info("Loading via temporary text file at " + tempTextFile.getAbsolutePath());
-//        } else {
-//            insertStatement = connection.prepareStatement(targetTable.generateInsertSql());
-//            LOG.info(insertStatement.toString()); // Logs the SQL for the prepared statement
-//        }
-//
-//        // When outputting text, accumulate transformed strings to allow skipping rows when errors are encountered.
-//        // One extra position in the array for the CSV line number.
-//        String[] transformedStrings = new String[table.fields.length + 1];
-//
-//        // Iterate over each record and prepare the record for storage in the table either through batch insert
-//        // statements or postgres text copy operation.
-//        int lineNumber = 1;
-//        Iterator<? extends Entity> entityIterator = entities.iterator();
-//        while (entityIterator.hasNext()) {
-//            // FIXME: Use entity subclass
-//            Object currentEntity = entityIterator.next();
-//            // The CSV reader's current record is zero-based and does not include the header line.
-//            // Convert to a CSV file line number that will make more sense to people reading error messages.
-////            if (csvReader.getCurrentRecord() + 2 > Integer.MAX_VALUE) {
-////                errorStorage.storeError(NewGTFSError.forTable(table, TABLE_TOO_LONG));
-////                break;
-////            }
-//            lineNumber++;
-//            if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
-////            if (csvReader.getColumnCount() != table.fields.length) {
-////                String badValues = String.format("expected=%d; found=%d", table.fields.length, csvReader.getColumnCount());
-////                errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, WRONG_NUMBER_OF_FIELDS, badValues));
-////                continue;
-////            }
-//            // Store value of key field for use in checking duplicate IDs
-//            String keyValue = ((Entity) currentEntity).getId();
-//            // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
-//            if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
-//            else insertStatement.setInt(1, lineNumber);
-//            // FIXME: Use reflection here???
-//            for (int f = 0; f < table.fields.length; f++) {
-//                Field field = table.fields[f];
-//                java.lang.reflect.Field currentField = table.entityClass.getField(field.name);
-////                LOG.info(field.name);
-//                Object value = currentField.get(currentEntity);
-//                // Set value for field expects empty strings when null vales are present.
-//                String string = value == null ? "" : value.toString();
-//
-//                // Use spec table to check that references are valid and IDs are unique.
-//                // FIXME: Is there a need to track refs here? Probably.
-//                if (referenceTracker != null) {
-//                    table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
-//                }
-//                // Add value for entry into table
-//                setValueForField(table, f, lineNumber, field, string, postgresText, transformedStrings);
-//            }
-//            if (postgresText) {
-//                tempTextFileStream.printf(String.join("\t", transformedStrings));
-//                tempTextFileStream.print('\n');
-//            } else {
-//                insertStatement.addBatch();
-//                if (lineNumber % INSERT_BATCH_SIZE == 0) insertStatement.executeBatch();
-//            }
-//        }
-//        // Record number is zero based but includes the header record, which we don't want to count.
-//        // But if we are working with Postgres text file (without a header row) we have to add 1
-//        // Iteration over all rows has finished, so We are now one record past the end of the file.
-//        // FIXME: double check this.
-//        int numberOfRecordsLoaded = lineNumber;
-//        if (postgresText) {
-//            numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
-//        }
-//
-//        // Finalize loading the table, either by copying the pre-validated text file into the database (for Postgres)
-//        // or inserting any remaining rows (for all others).
-//        if (postgresText) {
-//            LOG.info("Loading into database table {} from temporary text file...", targetTable.name);
-//            tempTextFileStream.close();
-//            // Allows sending over network. This is only slightly slower than a local file copy.
-//            final String copySql = String.format("copy %s from stdin", targetTable.name);
-//            // FIXME we should be reading the COPY text from a stream in parallel, not from a temporary text file.
-//            InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
-//            // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
-//            CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-//            copyManager.copyIn(copySql, stream, 1024*1024);
-//            stream.close();
-//            // It is also possible to load from local file if this code is running on the database server.
-//            // statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
-//        } else {
-//            insertStatement.executeBatch();
-//        }
-//
-//        targetTable.createIndexes(connection);
-//
-//        LOG.info("Committing transaction...");
-//        connection.commit();
-//        LOG.info("Done.");
-//        return numberOfRecordsLoaded;
-    }
-
-    /**
-     * Set value for a field either as a prepared statement parameter or (if using postgres text-loading) in the
-     * transformed strings array provided. This also handles the case where the string is empty (i.e., field is null)
-     * and when an exception is encountered while setting the field value (usually due to a bad data type), in which case
-     * the field is set to null.
-     */
-    public void setValueForField(Table table, int fieldIndex, int lineNumber, Field field, String string, boolean postgresText, String[] transformedStrings) {
-        if (string.isEmpty()) {
-            // CSV reader always returns empty strings, not nulls
-            if (field.isRequired() && errorStorage != null) {
-                errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, MISSING_FIELD, field.name));
-            }
-            setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
-        } else {
-            // Micro-benchmarks show it's only 4-5% faster to call typed parameter setter methods
-            // rather than setObject with a type code. I think some databases don't have setObject though.
-            // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
-            try {
-                // FIXME we need to set the transformed string element even when an error occurs.
-                // This means the validation and insertion step need to happen separately.
-                // or the errors should not be signaled with exceptions.
-                // Also, we should probably not be converting any GTFS field values.
-                // We should be saving it as-is in the database and converting upon load into our model objects.
-                if (postgresText) transformedStrings[fieldIndex + 1] = field.validateAndConvert(string);
-                else field.setParameter(insertStatement, fieldIndex + 2, string);
-            } catch (StorageException ex) {
-                // FIXME many exceptions don't have an error type
-                if (errorStorage != null) {
-                    errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, ex.errorType, ex.badValue));
-                }
-                // Set transformedStrings or prepared statement param to null
-                setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
-            }
-        }
-    }
-
-    /**
-     * Sets field to null in statement or string array depending on whether postgres is being used.
-     */
-    private void setFieldToNull(boolean postgresText, String[] transformedStrings, int fieldIndex, Field field) {
-        if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
-            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
-        else try {
-            //            LOG.info("setting {} index to null", fieldIndex + 2);
-            insertStatement.setNull(fieldIndex + 2, field.getSqlType().getVendorTypeNumber());
-        } catch (SQLException e) {
-            e.printStackTrace();
-            // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
-            // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
-        }
-    }
-
-    /**
-     * Protect against SQL injection.
-     * The only place we include arbitrary input in SQL is the column names of tables.
-     * Implicitly (looking at all existing table names) these should consist entirely of
-     * lowercase letters and underscores.
-     *
-     * TODO add a test including SQL injection text (quote and semicolon)
-     */
-    public String sanitize (String string) throws SQLException {
-        String clean = string.replaceAll("[^\\p{Alnum}_]", "");
-        if (!clean.equals(string)) {
-            LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);
-            if (errorStorage != null) {
-                errorStorage.storeError(NewGTFSError.forFeed(COLUMN_NAME_UNSAFE, string));
-            }
-        }
-        return clean;
+        // FIXME: Should some tables not have indexes?
+        table.createIndexes(connection, namespace);
     }
 }

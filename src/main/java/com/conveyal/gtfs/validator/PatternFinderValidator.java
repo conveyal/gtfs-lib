@@ -2,36 +2,28 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.PatternFinder;
 import com.conveyal.gtfs.TripPatternKey;
-import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.loader.Field;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.Requirement;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.vividsolutions.jts.geom.Coordinate;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
  * Groups trips together into "patterns" that share the same sequence of stops.
@@ -90,7 +82,7 @@ public class PatternFinderValidator extends TripValidator {
                     Table.PATTERN_STOP.fields);
             String insertPatternStopSql = patternStopsTable.generateInsertSql(true);
             // Create pattern stops table with serial ID and primary key on pattern ID and stop sequence
-            patternStopsTable.createSqlTable(connection, true, new String[]{"pattern_id", "stop_sequence"});
+            patternStopsTable.createSqlTable(connection, null, true, new String[]{"pattern_id", "stop_sequence"});
             PreparedStatement updateTripStatement = connection.prepareStatement(
                     String.format("update %s set pattern_id = ? where trip_id = ?", tripsTableName));
             PreparedStatement insertPatternStatement = connection.prepareStatement(
@@ -124,6 +116,7 @@ public class PatternFinderValidator extends TripValidator {
                     insertPatternStopStatement.setDouble(8, key.shapeDistances.get(i));
                     insertPatternStopStatement.setInt(9, key.timepoints.get(i));
                     insertPatternStopStatement.addBatch();
+                    // FIXME: should each pattern stop be incrementing the batch size?
                     batchSize += 1;
                 }
                 // Finally, update all trips on this pattern to reference this pattern's ID.
