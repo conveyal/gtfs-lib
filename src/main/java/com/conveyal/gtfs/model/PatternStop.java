@@ -1,5 +1,8 @@
 package com.conveyal.gtfs.model;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
 /**
  * A pattern stop represents generalized information about a stop visited by a pattern, i.e. a collection of trips that
  * all visit the same stops in the same sequence. Some of these characteristics, e.g., stop ID, stop sequence, pickup
@@ -22,4 +25,13 @@ public class PatternStop extends Entity {
     public int timepoint;
 
     public PatternStop () {}
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#PATTERN_STOP}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        // FIXME
+    }
 }

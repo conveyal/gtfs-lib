@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 import org.mapdb.Fun;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 import static com.conveyal.gtfs.model.Entity.Writer.convertToGtfsTime;
@@ -35,6 +37,20 @@ public class Frequency extends Entity implements Comparable<Frequency> {
     public int end_time;
     public int headway_secs;
     public int exact_times;
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FREQUENCIES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, trip_id);
+        statement.setInt(3, start_time);
+        statement.setInt(4, end_time);
+        statement.setInt(5, headway_secs);
+        statement.setInt(6, exact_times);
+    }
 
     /** must have a comparator since they go in a navigable set that is serialized */
     @Override

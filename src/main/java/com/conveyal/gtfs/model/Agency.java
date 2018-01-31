@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
 import java.net.URL;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Agency extends Entity {
@@ -23,6 +25,24 @@ public class Agency extends Entity {
     @Override
     public String getId () {
         return agency_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#AGENCY}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, agency_id);
+        statement.setString(3, agency_name);
+        statement.setString(4, agency_url != null ? agency_url.toString() : null);
+        statement.setString(5, agency_timezone);
+        statement.setString(6, agency_lang);
+        statement.setString(7, agency_phone);
+        statement.setString(8, agency_branding_url != null ? agency_branding_url .toString() : null);
+        statement.setString(9, agency_fare_url != null ? agency_fare_url.toString() : null);
+        statement.setString(10, agency_email);
     }
 
     public static class Loader extends Entity.Loader<Agency> {

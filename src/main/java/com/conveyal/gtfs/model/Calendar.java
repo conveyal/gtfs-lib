@@ -2,13 +2,19 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.Table;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -35,6 +41,28 @@ public class Calendar extends Entity implements Serializable {
     @Override
     public String getId () {
         return service_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#CALENDAR}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        DateField startDateField = (DateField) Table.CALENDAR.getFieldForName("start_date");
+        DateField endDateField = ((DateField) Table.CALENDAR.getFieldForName("end_date"));
+        statement.setInt(1, id);
+        statement.setString(2, service_id);
+        statement.setInt(3, monday);
+        statement.setInt(4, tuesday);
+        statement.setInt(5, wednesday);
+        statement.setInt(6, thursday);
+        statement.setInt(7, friday);
+        statement.setInt(8, saturday);
+        statement.setInt(9, sunday);
+        startDateField.setParameter(statement, 10, start_date);
+        endDateField.setParameter(statement, 11, end_date);
+        statement.setString(12, null); // description
     }
 
     public static class Loader extends Entity.Loader<Calendar> {

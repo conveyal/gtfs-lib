@@ -6,6 +6,8 @@ import org.mapdb.Fun;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 /**
@@ -35,6 +37,25 @@ public class StopTime extends Entity implements Cloneable, Serializable {
     @Override
     public Integer getSequenceNumber() {
         return stop_sequence; // Compound key of StopTime is (trip_id, stop_sequence)
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#STOP_TIMES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, trip_id);
+        statement.setInt(3, stop_sequence);
+        statement.setString(4, stop_id);
+        statement.setInt(5, arrival_time);
+        statement.setInt(6, departure_time);
+        statement.setString(7, stop_headsign);
+        statement.setInt(8, pickup_type);
+        statement.setInt(9, drop_off_type);
+        statement.setDouble(10, shape_dist_traveled);
+        statement.setInt(11, timepoint);
     }
 
     public static class Loader extends Entity.Loader<StopTime> {

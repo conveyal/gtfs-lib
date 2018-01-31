@@ -2,7 +2,11 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GeneralError;
+import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.Table;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDate;
 
 import java.io.IOException;
@@ -26,6 +30,24 @@ public class FeedInfo extends Entity implements Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FEED_INFO}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        DateField feedStartDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_start_date");
+        DateField feedEndDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_end_date");
+        String feedPublisherUrl = feed_publisher_url != null ? feed_publisher_url.toString() : null;
+        statement.setInt(1, id);
+        statement.setString(2, feed_publisher_name);
+        statement.setString(3, feedPublisherUrl);
+        statement.setString(4, feed_lang);
+        feedStartDateField.setParameter(statement, 5, feed_start_date);
+        feedEndDateField.setParameter(statement, 6, feed_end_date);
+        statement.setString(7, feed_version);
     }
 
     public static class Loader extends Entity.Loader<FeedInfo> {

@@ -3,6 +3,8 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Trip extends Entity {
@@ -23,6 +25,27 @@ public class Trip extends Entity {
     @Override
     public String getId() {
         return trip_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#TRIPS}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, trip_id);
+        statement.setString(3, route_id);
+        statement.setString(4, service_id);
+        statement.setString(5, trip_headsign);
+        statement.setString(6, trip_short_name);
+        statement.setInt(7, direction_id);
+        statement.setString(8, block_id);
+        statement.setString(9, shape_id);
+        statement.setInt(10, wheelchair_accessible);
+        statement.setInt(11, bikes_allowed);
+        // Editor-specific field? pattern_id
+        statement.setString(12, null);
     }
 
     public static class Loader extends Entity.Loader<Trip> {

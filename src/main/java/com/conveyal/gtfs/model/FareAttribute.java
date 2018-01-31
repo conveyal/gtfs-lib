@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -22,6 +24,21 @@ public class FareAttribute extends Entity {
     @Override
     public String getId () {
         return fare_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FARE_ATTRIBUTES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, fare_id);
+        statement.setDouble(3, price);
+        statement.setString(4, currency_type);
+        statement.setInt(5, payment_method);
+        statement.setInt(6, transfers);
+        statement.setInt(7, transfer_duration);
     }
 
     public static class Loader extends Entity.Loader<FareAttribute> {

@@ -3,6 +3,8 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 import org.mapdb.Fun.Tuple2;
@@ -24,6 +26,22 @@ public class ShapePoint extends Entity {
     @Override
     public Integer getSequenceNumber() {
         return shape_pt_sequence;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#SHAPES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, shape_id);
+        statement.setInt(3, shape_pt_sequence);
+        statement.setDouble(4, shape_pt_lat);
+        statement.setDouble(5, shape_pt_lon);
+        statement.setDouble(6, shape_dist_traveled);
+        // Editor-specific field below (point_type 0 indicates no control point)
+        statement.setInt(7, 0);
     }
 
     public ShapePoint () { }

@@ -3,6 +3,8 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Transfer extends Entity {
@@ -16,6 +18,19 @@ public class Transfer extends Entity {
     public String to_route_id;
     public String from_trip_id;
     public String to_trip_id;
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#TRANSFERS}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+        statement.setInt(1, id);
+        statement.setString(2, from_stop_id);
+        statement.setString(3, to_stop_id);
+        statement.setInt(4, transfer_type);
+        statement.setInt(5, min_transfer_time);
+    }
 
     // TODO: Add id method for Transfer.
 //    @Override
