@@ -134,10 +134,17 @@ public class JdbcGTFSFeedConverter {
             result.loadTimeMillis = result.completionTime - startTime;
             LOG.info("Loading tables took {} sec", result.loadTimeMillis / 1000);
         } catch (Exception ex) {
+            try {
+                connection.rollback();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
             // TODO catch exceptions separately while loading each table so load can continue, store in TableLoadResult
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
             ex.printStackTrace();
             result.fatalException = ex.getMessage();
+        } finally {
+            DbUtils.closeQuietly(connection);
         }
         return result;
     }
@@ -182,11 +189,16 @@ public class JdbcGTFSFeedConverter {
             // FIXME: will this throw an NPE if feedId or feedVersion are empty?
             insertStatement.setString(4, feedId.isEmpty() ? null : feedId);
             insertStatement.setString(5, feedVersion.isEmpty() ? null : feedVersion);
-            insertStatement.setString(6, null);
+            insertStatement.setString(6, "mapdb_gtfs_feed"); // snapshotOf
             insertStatement.execute();
             connection.commit();
             LOG.info("Created new feed namespace: {}", insertStatement);
         } catch (Exception ex) {
+            try {
+                connection.rollback();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
             LOG.error("Exception while registering new feed namespace in feeds table: {}", ex.getMessage());
             DbUtils.closeQuietly(connection);
         }
@@ -198,15 +210,24 @@ public class JdbcGTFSFeedConverter {
      */
     private <E extends Entity> void copyEntityToSql(Iterable<E> entities, Table table) throws SQLException {
         table.createSqlTable(connection, namespace, true);
-        String entityInsertSql = table.generateInsertSql(namespace, false);
+        String entityInsertSql = table.generateInsertSql(namespace, true);
         PreparedStatement insertStatement = connection.prepareStatement(entityInsertSql);
         // Iterate over agencies and add to prepared statement
+        int count = 0, batchSize = 0;
         for (E entity : entities) {
-            entity.setStatementParameters(insertStatement);
+            entity.setStatementParameters(insertStatement, true);
             insertStatement.addBatch();
+            count++;
+            batchSize++;
             // FIXME: Add batching execute on n
+            if (batchSize > JdbcGtfsLoader.INSERT_BATCH_SIZE) {
+                insertStatement.executeBatch();
+                batchSize = 0;
+            }
         }
+        // Handle remaining
         insertStatement.executeBatch();
+        LOG.info("Inserted {} {}", count, table.name);
 
         // FIXME: Should some tables not have indexes?
         table.createIndexes(connection, namespace);
