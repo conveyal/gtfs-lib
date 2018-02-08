@@ -1,6 +1,11 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.Service;
 import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -16,6 +21,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -27,18 +33,19 @@ public class JdbcGtfsExporter {
 
     private final String outFile;
     private final DataSource dataSource;
+    private final boolean fromEditor;
 
     // These fields will be filled in once feed snapshot begins.
     private Connection connection;
-    private String tablePrefix;
     private ZipOutputStream zipOutputStream;
     // The reference feed ID (namespace) to copy.
     private final String feedIdToExport;
 
-    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource) {
+    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
         this.feedIdToExport = feedId;
         this.outFile = outFile;
         this.dataSource = dataSource;
+        this.fromEditor = fromEditor;
     }
 
     /**
@@ -62,20 +69,68 @@ public class JdbcGtfsExporter {
             connection = dataSource.getConnection();
             // Include the dot separator in the table prefix.
             // This allows everything to work even when there's no prefix.
-            this.tablePrefix += ".";
             // Export each table in turn (by placing entry in zip output stream).
             // FIXME: NO non-fatal exception errors are being captured during copy operations.
             result.agency = export(Table.AGENCY);
             result.calendar = export(Table.CALENDAR);
-            result.calendarDates = export(Table.CALENDAR_DATES);
+            if (fromEditor) {
+                GTFSFeed feed = new GTFSFeed();
+                // Export schedule exceptions in place of calendar dates if exporting from the GTFS Editor.
+                // FIXME: The below table readers should probably just share a connection with the exporter.
+                JDBCTableReader<ScheduleException> exceptionsReader =
+                        new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
+                                EntityPopulator.SCHEDULE_EXCEPTION);
+                JDBCTableReader<Calendar> calendarsReader =
+                        new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
+                                EntityPopulator.CALENDAR);
+                Iterable<Calendar> calendars = calendarsReader.getAll();
+                for (Calendar cal : calendars) {
+                    LOG.info("Iterating over calendar {}", cal.service_id);
+                    Service service = new Service(cal.service_id);
+                    service.calendar = cal;
+                    Iterable<ScheduleException> exceptions = exceptionsReader.getAll();
+                    for (ScheduleException ex : exceptions) {
+                        LOG.info("Adding exception {} for calendar {}", ex.name, cal.service_id);
+                        if (ex.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
+                                !ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))
+                            // skip swap exception if cal is not referenced by added or removed service
+                            // this is not technically necessary, but the output is cleaner/more intelligible
+                            continue;
+
+                        for (LocalDate date : ex.dates) {
+                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date))
+                                // no need to write dates that do not apply
+                                continue;
+
+                            CalendarDate calendarDate = new CalendarDate();
+                            calendarDate.date = date;
+                            calendarDate.service_id = cal.service_id;
+                            calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
+
+                            if (service.calendar_dates.containsKey(date))
+                                throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
+
+                            service.calendar_dates.put(date, calendarDate);
+                        }
+                    }
+                    feed.services.put(cal.service_id, service);
+                }
+                LOG.info("Writing calendar dates from schedule exceptions");
+                new CalendarDate.Writer(feed).writeTable(zipOutputStream);
+            } else {
+                // Otherwise, simply export the calendar dates as they were loaded in.
+                result.calendarDates = export(Table.CALENDAR_DATES);
+            }
             result.fareAttributes = export(Table.FARE_ATTRIBUTES);
             result.fareRules = export(Table.FARE_RULES);
             result.feedInfo = export(Table.FEED_INFO);
             result.frequencies = export(Table.FREQUENCIES);
             result.routes = export(Table.ROUTES);
             // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
-            export(Table.PATTERNS);
-            export(Table.PATTERN_STOP);
+            // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
+            // frequency-based pattern travel times match stop time arrivals/departures?
+//            export(Table.PATTERNS);
+//            export(Table.PATTERN_STOP);
             result.shapes = export(Table.SHAPES);
             result.stops = export(Table.STOPS);
             result.stopTimes = export(Table.STOP_TIMES);
@@ -103,7 +158,7 @@ public class JdbcGtfsExporter {
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {
             // Use the Postgres text load format if we're connected to that DBMS.
-            boolean postgresText = (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL"));
+            boolean postgresText = connection.getMetaData().getDatabaseProductName().equals("PostgreSQL");
 
             if (postgresText) {
                 // Create entry for table
@@ -133,8 +188,6 @@ public class JdbcGtfsExporter {
             }
             tableLoadResult.fatalException = e.getMessage();
             LOG.error("Exception while exporting tables", e);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }

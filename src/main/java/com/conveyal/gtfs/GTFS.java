@@ -32,8 +32,8 @@ public abstract class GTFS {
     /**
      * Export a feed ID from the database to a zipped GTFS file in the specified export directory.
      */
-    public static FeedLoadResult export (String feedId, String outFile, DataSource dataSource) {
-        JdbcGtfsExporter exporter = new JdbcGtfsExporter(feedId, outFile, dataSource);
+    public static FeedLoadResult export (String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
+        JdbcGtfsExporter exporter = new JdbcGtfsExporter(feedId, outFile, dataSource, fromEditor);
         FeedLoadResult result = exporter.exportTables();
         return result;
     }
@@ -222,7 +222,7 @@ public abstract class GTFS {
             }
             if (namespaceToExport != null) {
                 LOG.info("Exporting feed with unique identifier {}", namespaceToExport);
-                FeedLoadResult exportResult = export(namespaceToExport, outFile, dataSource);
+                FeedLoadResult exportResult = export(namespaceToExport, outFile, dataSource, true);
                 LOG.info("Done exporting.");
             } else {
                 LOG.error("No feed to export. Specify one, or load a feed in the same command.");
