@@ -31,7 +31,7 @@ public class PatternStop extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#PATTERN_STOP}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
         // FIXME
     }
 }

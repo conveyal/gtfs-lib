@@ -28,13 +28,14 @@ public class FareRule extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#FARE_RULES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, fare_id);
-        statement.setString(3, route_id);
-        statement.setString(4, origin_id);
-        statement.setString(5, destination_id);
-        statement.setString(6, contains_id);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, fare_id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, origin_id);
+        statement.setString(oneBasedIndex++, destination_id);
+        statement.setString(oneBasedIndex++, contains_id);
     }
 
     public static class Loader extends Entity.Loader<FareRule> {

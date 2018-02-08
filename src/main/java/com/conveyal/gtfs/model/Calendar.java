@@ -48,21 +48,22 @@ public class Calendar extends Entity implements Serializable {
      * {@link com.conveyal.gtfs.loader.Table#CALENDAR}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         DateField startDateField = (DateField) Table.CALENDAR.getFieldForName("start_date");
         DateField endDateField = ((DateField) Table.CALENDAR.getFieldForName("end_date"));
-        statement.setInt(1, id);
-        statement.setString(2, service_id);
-        statement.setInt(3, monday);
-        statement.setInt(4, tuesday);
-        statement.setInt(5, wednesday);
-        statement.setInt(6, thursday);
-        statement.setInt(7, friday);
-        statement.setInt(8, saturday);
-        statement.setInt(9, sunday);
-        startDateField.setParameter(statement, 10, start_date);
-        endDateField.setParameter(statement, 11, end_date);
-        statement.setString(12, null); // description
+        statement.setString(oneBasedIndex++, service_id);
+        setIntParameter(statement, oneBasedIndex++, monday);
+        setIntParameter(statement, oneBasedIndex++, tuesday);
+        setIntParameter(statement, oneBasedIndex++, wednesday);
+        setIntParameter(statement, oneBasedIndex++, thursday);
+        setIntParameter(statement, oneBasedIndex++, friday);
+        setIntParameter(statement, oneBasedIndex++, saturday);
+        setIntParameter(statement, oneBasedIndex++, sunday);
+        startDateField.setParameter(statement, oneBasedIndex++, start_date);
+        endDateField.setParameter(statement, oneBasedIndex++, end_date);
+        statement.setString(oneBasedIndex++, null); // description
     }
 
     public static class Loader extends Entity.Loader<Calendar> {

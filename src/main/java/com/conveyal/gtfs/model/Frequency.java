@@ -43,13 +43,14 @@ public class Frequency extends Entity implements Comparable<Frequency> {
      * {@link com.conveyal.gtfs.loader.Table#FREQUENCIES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, trip_id);
-        statement.setInt(3, start_time);
-        statement.setInt(4, end_time);
-        statement.setInt(5, headway_secs);
-        statement.setInt(6, exact_times);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, trip_id);
+        setIntParameter(statement, oneBasedIndex++, start_time);
+        setIntParameter(statement, oneBasedIndex++, end_time);
+        setIntParameter(statement, oneBasedIndex++, headway_secs);
+        setIntParameter(statement, oneBasedIndex++, exact_times);
     }
 
     /** must have a comparator since they go in a navigable set that is serialized */

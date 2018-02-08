@@ -37,17 +37,18 @@ public class FeedInfo extends Entity implements Cloneable {
      * {@link com.conveyal.gtfs.loader.Table#FEED_INFO}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         DateField feedStartDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_start_date");
         DateField feedEndDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_end_date");
         String feedPublisherUrl = feed_publisher_url != null ? feed_publisher_url.toString() : null;
-        statement.setInt(1, id);
-        statement.setString(2, feed_publisher_name);
-        statement.setString(3, feedPublisherUrl);
-        statement.setString(4, feed_lang);
-        feedStartDateField.setParameter(statement, 5, feed_start_date);
-        feedEndDateField.setParameter(statement, 6, feed_end_date);
-        statement.setString(7, feed_version);
+        statement.setString(oneBasedIndex++, feed_publisher_name);
+        statement.setString(oneBasedIndex++, feedPublisherUrl);
+        statement.setString(oneBasedIndex++, feed_lang);
+        feedStartDateField.setParameter(statement, oneBasedIndex++, feed_start_date);
+        feedEndDateField.setParameter(statement, oneBasedIndex++, feed_end_date);
+        statement.setString(oneBasedIndex++, feed_version);
     }
 
     public static class Loader extends Entity.Loader<FeedInfo> {

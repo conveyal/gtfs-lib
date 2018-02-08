@@ -24,12 +24,13 @@ public class Transfer extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#TRANSFERS}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, from_stop_id);
-        statement.setString(3, to_stop_id);
-        statement.setInt(4, transfer_type);
-        statement.setInt(5, min_transfer_time);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, from_stop_id);
+        statement.setString(oneBasedIndex++, to_stop_id);
+        setIntParameter(statement, oneBasedIndex++, transfer_type);
+        setIntParameter(statement, oneBasedIndex++, min_transfer_time);
     }
 
     // TODO: Add id method for Transfer.

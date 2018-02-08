@@ -31,14 +31,16 @@ public class FareAttribute extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#FARE_ATTRIBUTES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, fare_id);
-        statement.setDouble(3, price);
-        statement.setString(4, currency_type);
-        statement.setInt(5, payment_method);
-        statement.setInt(6, transfers);
-        statement.setInt(7, transfer_duration);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, fare_id);
+        statement.setDouble(oneBasedIndex++, price);
+        statement.setString(oneBasedIndex++, currency_type);
+        setIntParameter(statement, oneBasedIndex++, payment_method);
+        // FIXME Entity.INT_MISSING causing out of range error on small int
+        setIntParameter(statement, oneBasedIndex++, transfers);
+        setIntParameter(statement, oneBasedIndex++, transfer_duration);
     }
 
     public static class Loader extends Entity.Loader<FareAttribute> {

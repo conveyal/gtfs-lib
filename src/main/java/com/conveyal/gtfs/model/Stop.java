@@ -36,27 +36,28 @@ public class Stop extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#STOPS}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         int wheelchairBoarding = 0;
         try {
              wheelchairBoarding = Integer.parseInt(wheelchair_boarding);
         } catch (NumberFormatException e) {
             // Do nothing, wheelchairBoarding will remain zero.
         }
-        statement.setInt(1, id);
-        statement.setString(2, stop_id);
-        statement.setString(3, stop_code);
-        statement.setString(4, stop_name);
-        statement.setString(5, stop_desc);
-        statement.setDouble(6, stop_lon);
-        statement.setDouble(7, stop_lat);
-        statement.setString(8, zone_id);
-        statement.setString(9, stop_url != null ? stop_url.toString() : null);
-        statement.setInt(10, location_type);
-        statement.setString(11, parent_station);
-        statement.setString(12, stop_timezone);
+        statement.setString(oneBasedIndex++, stop_id);
+        statement.setString(oneBasedIndex++, stop_code);
+        statement.setString(oneBasedIndex++, stop_name);
+        statement.setString(oneBasedIndex++, stop_desc);
+        statement.setDouble(oneBasedIndex++, stop_lon);
+        statement.setDouble(oneBasedIndex++, stop_lat);
+        statement.setString(oneBasedIndex++, zone_id);
+        statement.setString(oneBasedIndex++, stop_url != null ? stop_url.toString() : null);
+        setIntParameter(statement, oneBasedIndex++, location_type);
+        statement.setString(oneBasedIndex++, parent_station);
+        statement.setString(oneBasedIndex++, stop_timezone);
         // FIXME: For some reason wheelchair boarding type is String
-        statement.setInt(13, wheelchairBoarding);
+        setIntParameter(statement, oneBasedIndex++, wheelchairBoarding);
     }
 
     public static class Loader extends Entity.Loader<Stop> {

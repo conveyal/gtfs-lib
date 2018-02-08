@@ -33,15 +33,16 @@ public class ShapePoint extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#SHAPES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, shape_id);
-        statement.setInt(3, shape_pt_sequence);
-        statement.setDouble(4, shape_pt_lat);
-        statement.setDouble(5, shape_pt_lon);
-        statement.setDouble(6, shape_dist_traveled);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, shape_id);
+        setIntParameter(statement, oneBasedIndex++, shape_pt_sequence);
+        statement.setDouble(oneBasedIndex++, shape_pt_lat);
+        statement.setDouble(oneBasedIndex++, shape_pt_lon);
+        statement.setDouble(oneBasedIndex++, shape_dist_traveled);
         // Editor-specific field below (point_type 0 indicates no control point)
-        statement.setInt(7, 0);
+        statement.setInt(oneBasedIndex++, 0);
     }
 
     public ShapePoint () { }

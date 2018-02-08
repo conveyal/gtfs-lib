@@ -100,14 +100,16 @@ public class Pattern extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#PATTERNS}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, pattern_id);
-        statement.setString(3, route_id);
-        statement.setString(4, name);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, pattern_id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, name);
         // Editor-specific fields
-        statement.setInt(5, 0);
-        statement.setInt(6, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
+        // FIXME: Shape set might be null?
         statement.setString(7, associatedShapes.iterator().next());
     }
 }

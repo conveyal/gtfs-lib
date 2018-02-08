@@ -44,20 +44,21 @@ public class Route extends Entity { // implements Entity.Factory<Route>
      * {@link com.conveyal.gtfs.loader.Table#ROUTES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, route_id);
-        statement.setString(3, agency_id);
-        statement.setString(4, route_short_name);
-        statement.setString(5, route_long_name);
-        statement.setString(6, route_desc);
-        statement.setInt(7, route_type);
-        statement.setString(8, route_url != null ? route_url.toString() : null);
-        statement.setString(9, route_color);
-        statement.setString(10, route_text_color);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, agency_id);
+        statement.setString(oneBasedIndex++, route_short_name);
+        statement.setString(oneBasedIndex++, route_long_name);
+        statement.setString(oneBasedIndex++, route_desc);
+        setIntParameter(statement, oneBasedIndex++, route_type);
+        statement.setString(oneBasedIndex++, route_url != null ? route_url.toString() : null);
+        statement.setString(oneBasedIndex++, route_color);
+        statement.setString(oneBasedIndex++, route_text_color);
         // Editor-specific fields publicly_visible and status.
-        statement.setInt(11, 0);
-        statement.setInt(12, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
     }
 
     public static class Loader extends Entity.Loader<Route> {

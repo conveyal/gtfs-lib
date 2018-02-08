@@ -32,20 +32,21 @@ public class Trip extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#TRIPS}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, trip_id);
-        statement.setString(3, route_id);
-        statement.setString(4, service_id);
-        statement.setString(5, trip_headsign);
-        statement.setString(6, trip_short_name);
-        statement.setInt(7, direction_id);
-        statement.setString(8, block_id);
-        statement.setString(9, shape_id);
-        statement.setInt(10, wheelchair_accessible);
-        statement.setInt(11, bikes_allowed);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, trip_id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, service_id);
+        statement.setString(oneBasedIndex++, trip_headsign);
+        statement.setString(oneBasedIndex++, trip_short_name);
+        setIntParameter(statement, oneBasedIndex++, direction_id);
+        statement.setString(oneBasedIndex++, block_id);
+        statement.setString(oneBasedIndex++, shape_id);
+        setIntParameter(statement, oneBasedIndex++, wheelchair_accessible);
+        setIntParameter(statement, oneBasedIndex++, bikes_allowed);
         // Editor-specific field? pattern_id
-        statement.setString(12, null);
+        statement.setString(oneBasedIndex++, null);
     }
 
     public static class Loader extends Entity.Loader<Trip> {

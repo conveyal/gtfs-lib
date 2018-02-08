@@ -33,12 +33,13 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
      * {@link com.conveyal.gtfs.loader.Table#CALENDAR_DATES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         DateField dateField = (DateField) Table.CALENDAR_DATES.getFieldForName("date");
-        statement.setInt(1, id);
-        statement.setString(2, service_id);
-        dateField.setParameter(statement, 3, date);
-        statement.setInt(4, exception_type);
+        statement.setString(oneBasedIndex++, service_id);
+        dateField.setParameter(statement, oneBasedIndex++, date);
+        setIntParameter(statement, oneBasedIndex++, exception_type);
     }
 
     public CalendarDate clone () {

@@ -44,18 +44,19 @@ public class StopTime extends Entity implements Cloneable, Serializable {
      * {@link com.conveyal.gtfs.loader.Table#STOP_TIMES}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, trip_id);
-        statement.setInt(3, stop_sequence);
-        statement.setString(4, stop_id);
-        statement.setInt(5, arrival_time);
-        statement.setInt(6, departure_time);
-        statement.setString(7, stop_headsign);
-        statement.setInt(8, pickup_type);
-        statement.setInt(9, drop_off_type);
-        statement.setDouble(10, shape_dist_traveled);
-        statement.setInt(11, timepoint);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, trip_id);
+        setIntParameter(statement, oneBasedIndex++, stop_sequence);
+        statement.setString(oneBasedIndex++, stop_id);
+        setIntParameter(statement, oneBasedIndex++, arrival_time);
+        setIntParameter(statement, oneBasedIndex++, departure_time);
+        statement.setString(oneBasedIndex++, stop_headsign);
+        setIntParameter(statement, oneBasedIndex++, pickup_type);
+        setIntParameter(statement, oneBasedIndex++, drop_off_type);
+        statement.setDouble(oneBasedIndex++, shape_dist_traveled);
+        setIntParameter(statement, oneBasedIndex++, timepoint);
     }
 
     public static class Loader extends Entity.Loader<StopTime> {
