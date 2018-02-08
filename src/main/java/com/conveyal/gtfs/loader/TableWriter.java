@@ -12,11 +12,13 @@ import java.sql.SQLException;
 public interface TableWriter <T extends Entity> {
 
     // FIXME: add optional auto-commit boolean so that additional changes can be made?
-    String create (String json) throws SQLException, IOException;
+    String create (String json, boolean autoCommit) throws SQLException, IOException;
 
-    String update (Integer id, String json) throws SQLException, IOException;
+    String update (Integer id, String json, boolean autoCommit) throws SQLException, IOException;
 
-    int delete (Integer id) throws SQLException;
+    int delete (Integer id, boolean autoCommit) throws SQLException;
+
+    int deleteWhere (String fieldName, String value, boolean autoCommit) throws SQLException;
 
     void commit () throws SQLException;
 }

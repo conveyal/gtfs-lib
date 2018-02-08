@@ -6,6 +6,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.dbutils.DbUtils;
@@ -15,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -36,6 +40,11 @@ public class JdbcTableWriter implements TableWriter {
     private final Table specTable;
     private final String tablePrefix;
     private static final ObjectMapper mapper = new ObjectMapper();
+    private final Connection connection;
+
+    public JdbcTableWriter(Table table, DataSource datasource, String namespace) {
+        this(table, datasource, namespace, null);
+    }
 
     /**
      * Enum containing available methods for updating in SQL.
@@ -44,19 +53,29 @@ public class JdbcTableWriter implements TableWriter {
         DELETE, UPDATE, CREATE
     }
 
-    public JdbcTableWriter (Table specTable, DataSource dataSource, String tablePrefix) {
+    public JdbcTableWriter (Table specTable, DataSource dataSource, String tablePrefix, Connection optionalConnection) {
         this.tablePrefix = tablePrefix;
         this.dataSource = dataSource;
         this.specTable = specTable;
+        Connection connection1;
+        try {
+            connection1 = dataSource.getConnection();
+        } catch (SQLException e) {
+            e.printStackTrace();
+            connection1 = null;
+        }
+        if (optionalConnection != null) {
+            DbUtils.closeQuietly(connection1);
+        }
+        this.connection = optionalConnection == null ? connection1 : optionalConnection;
     }
 
     /**
      * Wrapper method to call Jackson to deserialize a JSON string into JsonNode.
      */
-    private static ObjectNode getJsonNode (String json) throws IOException {
+    private static JsonNode getJsonNode (String json) throws IOException {
         try {
-            // Cast to object node to allow mutations (e.g., updating the ID field).
-            return (ObjectNode) mapper.readTree(json);
+            return mapper.readTree(json);
         } catch (IOException e) {
             LOG.error("Bad JSON syntax", e);
             throw e;
@@ -68,8 +87,8 @@ public class JdbcTableWriter implements TableWriter {
      * a JSON string with the full set of fields matching the definition of the GTFS table in the Table class.
      */
     @Override
-    public String create(String json) throws SQLException, IOException {
-        return update(null, json);
+    public String create(String json, boolean autoCommit) throws SQLException, IOException {
+        return update(null, json, autoCommit);
     }
 
     /**
@@ -78,19 +97,32 @@ public class JdbcTableWriter implements TableWriter {
      * a JSON string with the full set of fields matching the definition of the GTFS table in the Table class.
      */
     @Override
-    public String update(Integer id, String json) throws SQLException, IOException {
+    public String update(Integer id, String json, boolean autoCommit) throws SQLException, IOException {
         final boolean isCreating = id == null;
-        ObjectNode jsonObject = getJsonNode(json);
-        Connection connection = null;
+        JsonNode jsonNode = getJsonNode(json);
         try {
-            connection = dataSource.getConnection();
+            if (jsonNode.isArray()) {
+                // If an array of objects is passed in as the JSON input, update them all in a single transaction, only
+                // committing once all entities have been updated.
+                List<String> updatedObjects = new ArrayList<>();
+                for (JsonNode node : jsonNode) {
+                    JsonNode idNode = node.get("id");
+                    Integer nodeId = idNode == null || isCreating ? null : idNode.asInt();
+                    String updatedObject = update(nodeId, node.toString(), false);
+                    updatedObjects.add(updatedObject);
+                }
+                if (autoCommit) connection.commit();
+                return mapper.writeValueAsString(updatedObjects);
+            }
+            // Cast JsonNode to ObjectNode to allow mutations (e.g., updating the ID field).
+            ObjectNode jsonObject = (ObjectNode) jsonNode;
             // Ensure that the key field is unique and that referencing tables are updated if the value is updated.
             ensureReferentialIntegrity(connection, jsonObject, tablePrefix, specTable, id);
             // Parse the fields/values into a Field -> String map (drops ALL fields not explicitly listed in spec table's
             // fields)
             // Note, this must follow referential integrity check because some tables will modify the jsonObject (e.g.,
             // adding trip ID if it is null).
-            LOG.info(jsonObject.toString());
+//            LOG.info("JSON to {} entity: {}", isCreating ? "create" : "update", jsonObject.toString());
             PreparedStatement preparedStatement = createPreparedUpdate(id, isCreating, jsonObject, specTable, connection, false);
             // ID from create/update result
             long newId = handleStatementExecution(preparedStatement, isCreating);
@@ -118,10 +150,12 @@ public class JdbcTableWriter implements TableWriter {
                     updateChildTable(childEntitiesArray, entityId, isCreating, referencingTable, connection);
                 }
             }
-            // If nothing failed up to this point, it is safe to assume there were no problems updating/creating the
-            // main entity and any of its children, so we commit the transaction.
-            LOG.info("Committing transaction.");
-            connection.commit();
+            if (autoCommit) {
+                // If nothing failed up to this point, it is safe to assume there were no problems updating/creating the
+                // main entity and any of its children, so we commit the transaction.
+                LOG.info("Committing transaction.");
+                connection.commit();
+            }
             // Add new ID to JSON object.
             jsonObject.put("id", newId);
             // FIXME: Should this return the entity freshly queried from the database rather than just updating the ID?
@@ -129,8 +163,13 @@ public class JdbcTableWriter implements TableWriter {
         } catch (Exception e) {
             LOG.error("Error {} {} entity", isCreating ? "creating" : "updating", specTable.name);
             e.printStackTrace();
-            DbUtils.closeQuietly(connection);
             throw e;
+        } finally {
+            if (autoCommit) {
+                // Always rollback and close in finally in case of early returns or exceptions.
+                connection.rollback();
+                connection.close();
+            }
         }
     }
 
@@ -147,7 +186,6 @@ public class JdbcTableWriter implements TableWriter {
         } else {
             statementString = table.generateUpdateSql(tablePrefix, id);
         }
-        LOG.info(statementString);
         // Set the RETURN_GENERATED_KEYS flag on the PreparedStatement because it may be creating new rows, in which
         // case we need to know the auto-generated IDs of those new rows.
         PreparedStatement preparedStatement = connection.prepareStatement(
@@ -184,10 +222,22 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info("{}={}", field.name, value);
             try {
                 if (value == null || value.isNull()) {
+                    if (field.isRequired()) {
+                        missingFieldNames.add(field.name);
+                        continue;
+                    }
                     // Handle setting null value on statement
                     preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
                 } else {
-                    field.setParameter(preparedStatement, index, value.asText());
+                    List<String> values = new ArrayList<>();
+                    if (value.isArray()) {
+                        for (JsonNode node : value) {
+                            values.add(node.asText());
+                        }
+                        field.setParameter(preparedStatement, index, String.join(",", values));
+                    } else {
+                        field.setParameter(preparedStatement, index, value.asText());
+                    }
                 }
             } catch (StorageException e) {
                 LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
@@ -196,6 +246,10 @@ public class JdbcTableWriter implements TableWriter {
                     // currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
                     try {
                         if (value == null ||value.isNull()) {
+                            if (field.isRequired()) {
+                                missingFieldNames.add(field.name);
+                                continue;
+                            }
                             preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
                         } else {
                             // Try to parse integer seconds value
@@ -231,16 +285,17 @@ public class JdbcTableWriter implements TableWriter {
      */
     private void updateChildTable(ArrayNode entityList, Integer id, boolean isCreating, Table subTable, Connection connection) throws SQLException {
         // Get parent table's key field
-        String keyField;
+        Field keyField;
         String keyValue;
+        // FIXME: This is shapes specific code that should probably be made generic.
         boolean updatingShapes = subTable.name.equals("shapes");
         if (updatingShapes) {
-            keyField = "shape_id";
+            keyField = subTable.getFieldForName("shape_id");
         } else {
-            keyField = specTable.getKeyFieldName();
+            keyField = specTable.getFieldForName(specTable.getKeyFieldName());
         }
         // Get parent entity's key value
-        keyValue = getValueForId(id, keyField, tablePrefix, specTable, connection);
+        keyValue = getValueForId(id, keyField.name, tablePrefix, specTable, connection);
         String childTableName = String.join(".", tablePrefix, subTable.name);
         // FIXME: add check for pattern stop consistency.
         // FIXME: re-order stop times if pattern stop order changes.
@@ -263,8 +318,8 @@ public class JdbcTableWriter implements TableWriter {
         for (JsonNode entityNode : entityList) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
             ObjectNode entity = (ObjectNode)entityNode;
-            if (entity.get(keyField) == null || entity.get(keyField).isNull()) {
-                entity.put(keyField, keyValue);
+            if (entity.get(keyField.name) == null || entity.get(keyField.name).isNull()) {
+                entity.put(keyField.name, keyValue);
             }
             // Insert new sub-entity.
             if (entityCount == 0) {
@@ -294,13 +349,52 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+     * For a given condition (fieldName = 'value'), delete all entities that match the condition. Because this uses the
+     * primary delete method, it also will delete any "child" entities that reference any entities matching the original
+     * query.
+     */
+    @Override
+    public int deleteWhere(String fieldName, String value, boolean autoCommit) throws SQLException {
+        try {
+            String tableName = String.join(".", tablePrefix, specTable.name);
+            // Get the IDs for entities matching the where condition
+            TIntSet idsToDelete = getIdsForCondition(tableName, fieldName, value, connection);
+            TIntIterator iterator = idsToDelete.iterator();
+            TIntList results = new TIntArrayList();
+            while (iterator.hasNext()) {
+                // For all entity IDs that match query, delete from referencing tables.
+                int id = iterator.next();
+                // FIXME: Should this be a where in clause instead of iterating over IDs?
+                // Delete each entity and its referencing (child) entities
+                int result = delete(id, false);
+                if (result != 1) {
+                    throw new SQLException("Could not delete entity with ID " + id);
+                }
+                results.add(result);
+            }
+            if (autoCommit) connection.commit();
+            LOG.info("Deleted {} {} entities", results.size(), specTable.name);
+            return results.size();
+        } catch (Exception e) {
+            connection.rollback();
+            LOG.error("Could not delete {} entity where {}={}", specTable.name, fieldName, value);
+            e.printStackTrace();
+            throw e;
+        } finally {
+            if (autoCommit) {
+                // Always rollback and close if auto-committing.
+                connection.rollback();
+                connection.close();
+            }
+        }
+    }
+
+    /**
      * Deletes an entity for the specified ID.
      */
     @Override
-    public int delete(Integer id) throws SQLException {
-        Connection connection = null;
+    public int delete(Integer id, boolean autoCommit) throws SQLException {
         try {
-            connection = dataSource.getConnection();
             // Handle "cascading" delete or constraints on deleting entities that other entities depend on
             // (e.g., keep a calendar from being deleted if trips reference it).
             // FIXME: actually add "cascading"? Currently, it just deletes one level down.
@@ -311,21 +405,30 @@ public class JdbcTableWriter implements TableWriter {
             // Execute query
             int result = statement.executeUpdate();
             if (result == 0) {
+                LOG.error("Could not delete {} entity with id: {}", specTable.name, id);
                 throw new SQLException("Could not delete entity");
             }
-            connection.commit();
+            if (autoCommit) connection.commit();
             // FIXME: change return message based on result value
             return result;
-        } catch (SQLException e) {
+        } catch (Exception e) {
+            LOG.error("Could not delete {} entity with id: {}", specTable.name, id);
             e.printStackTrace();
-            DbUtils.closeQuietly(connection);
             throw e;
+        } finally {
+            if (autoCommit) {
+                // Always rollback and close if auto-committing.
+                connection.rollback();
+                connection.close();
+            }
         }
     }
 
     @Override
     public void commit() throws SQLException {
         // FIXME: should this take a connection and commit it?
+        connection.commit();
+        connection.close();
     }
 
     /**
@@ -373,7 +476,7 @@ public class JdbcTableWriter implements TableWriter {
     private static void ensureReferentialIntegrity(Connection connection, ObjectNode jsonObject, String namespace, Table table, Integer id) throws SQLException {
         final boolean isCreating = id == null;
         String keyField = table.getKeyFieldName();
-        if (jsonObject.get(keyField).isNull()) {
+        if (jsonObject.get(keyField) == null || jsonObject.get(keyField).isNull()) {
             // FIXME: generate key field automatically for certain entities (e.g., trip ID). Maybe this should be
             // generated for all entities if null?
             if ("trip_id".equals(keyField)) {
@@ -432,7 +535,7 @@ public class JdbcTableWriter implements TableWriter {
         while (resultSet.next()) {
             int uniqueId = resultSet.getInt(1);
             uniqueIds.add(uniqueId);
-            LOG.info("id: {}, name: {}", uniqueId, resultSet.getString(4));
+            LOG.info("entity id: {}, where {}: {}", uniqueId, keyField, keyValue);
         }
         return uniqueIds;
     }
@@ -445,12 +548,19 @@ public class JdbcTableWriter implements TableWriter {
         Set<Table> referencingTables = new HashSet<>();
         for (Table gtfsTable : Table.tablesInOrder) {
             // IMPORTANT: Skip the table for the entity we're modifying or if loop table does not have field.
-            if (table.name.equals(gtfsTable.name) || !gtfsTable.hasField(keyField)) continue;
-            Field tableField = gtfsTable.getFieldForName(keyField);
-            // If field is not a foreign reference, continue. (This should probably never be the case because a field
-            // that shares the key field's name ought to refer to the key field.
-            if (!tableField.isForeignReference()) continue;
-            referencingTables.add(gtfsTable);
+            if (table.name.equals(gtfsTable.name)) continue;
+//            || !gtfsTable.hasField(keyField)
+            for (Field field : gtfsTable.fields) {
+                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+                    // If any of the table's fields are foreign references to the specified table, add to the return set.
+                    referencingTables.add(gtfsTable);
+                }
+            }
+//            Field tableField = gtfsTable.getFieldForName(keyField);
+//            // If field is not a foreign reference, continue. (This should probably never be the case because a field
+//            // that shares the key field's name ought to refer to the key field.
+//            if (!tableField.isForeignReference()) continue;
+
         }
         return referencingTables;
     }
@@ -488,14 +598,14 @@ public class JdbcTableWriter implements TableWriter {
      * found in the table for the entity being updated/deleted. [Leaving this comment in place for now though.]
      */
     private static void updateReferencingTables(String namespace, Table table, Connection connection, int id, String newKeyValue) throws SQLException {
-        String keyField = table.getKeyFieldName();
+        Field keyField = table.getFieldForName(table.getKeyFieldName());
         Class<? extends Entity> entityClass = table.getEntityClass();
         // Determine method (update vs. delete) depending on presence of newKeyValue field.
         SqlMethod sqlMethod = newKeyValue != null ? SqlMethod.UPDATE : SqlMethod.DELETE;
         Set<Table> referencingTables = getReferencingTables(table);
         // If there are no referencing tables, there is no need to update any values (e.g., .
         if (referencingTables.size() == 0) return;
-        String keyValue = getValueForId(id, keyField, namespace, table, connection);
+        String keyValue = getValueForId(id, keyField.name, namespace, table, connection);
         if (keyValue == null) {
             // FIXME: should we still check referencing tables for null value?
             LOG.warn("Entity {} to {} has null value for {}. Skipping references check.", id, sqlMethod, keyField);
@@ -504,32 +614,36 @@ public class JdbcTableWriter implements TableWriter {
         for (Table referencingTable : referencingTables) {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
-            // Get unique IDs before delete (for logging/message purposes).
-//            TIntSet uniqueIds = getIdsForCondition(refTableName, keyField, keyValue, connection);
-            String updateRefSql = getUpdateReferencesSql(sqlMethod, refTableName, keyField, keyValue, newKeyValue);
-            LOG.info(updateRefSql);
-            Statement updateStatement = connection.createStatement();
-            int result = updateStatement.executeUpdate(updateRefSql);
-            if (result > 0) {
-                // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
-                // deleteEntityHook).
-//                    deleteEntityHook();
-                if (sqlMethod.equals(SqlMethod.DELETE)) {
-                    // Check for restrictions on delete.
-                    if (table.isCascadeDeleteRestricted()) {
-                        // The entity must not have any referencing entities in order to delete it.
-                        connection.rollback();
-//                        List<String> idStrings = new ArrayList<>();
-//                        uniqueIds.forEach(uniqueId -> idStrings.add(String.valueOf(uniqueId)));
-//                        String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s (%s).", entityClass.getSimpleName(), keyField, keyValue, result, referencingTable.name, entityClass.getSimpleName(), String.join(",", idStrings));
-                        String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s.", entityClass.getSimpleName(), keyField, keyValue, result, referencingTable.name, entityClass.getSimpleName());
-                        LOG.warn(message);
-                        throw new SQLException(message);
+            for (Field field : referencingTable.fieldsForEditor()) {
+                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+                    // Get unique IDs before delete (for logging/message purposes).
+                    // TIntSet uniqueIds = getIdsForCondition(refTableName, keyField, keyValue, connection);
+                    String updateRefSql = getUpdateReferencesSql(sqlMethod, refTableName, field, keyValue, newKeyValue);
+                    LOG.info(updateRefSql);
+                    Statement updateStatement = connection.createStatement();
+                    int result = updateStatement.executeUpdate(updateRefSql);
+                    if (result > 0) {
+                        // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
+                        // deleteEntityHook).
+                        // deleteEntityHook();
+                        if (sqlMethod.equals(SqlMethod.DELETE)) {
+                            // Check for restrictions on delete.
+                            if (table.isCascadeDeleteRestricted()) {
+                                // The entity must not have any referencing entities in order to delete it.
+                                connection.rollback();
+                                //                        List<String> idStrings = new ArrayList<>();
+                                //                        uniqueIds.forEach(uniqueId -> idStrings.add(String.valueOf(uniqueId)));
+                                //                        String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s (%s).", entityClass.getSimpleName(), keyField, keyValue, result, referencingTable.name, entityClass.getSimpleName(), String.join(",", idStrings));
+                                String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s.", entityClass.getSimpleName(), keyField.name, keyValue, result, referencingTable.name, entityClass.getSimpleName());
+                                LOG.warn(message);
+                                throw new SQLException(message);
+                            }
+                        }
+                        LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
+                    } else {
+                        LOG.info("No references in {} found!", refTableName);
                     }
                 }
-                LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
-            } else {
-                LOG.info("No references in {} found!", refTableName);
             }
         }
     }
@@ -537,12 +651,24 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * Constructs SQL string based on method provided.
      */
-    private static String getUpdateReferencesSql(SqlMethod sqlMethod, String refTableName, String keyField, String keyValue, String newKeyValue) throws SQLException {
+    private static String getUpdateReferencesSql(SqlMethod sqlMethod, String refTableName, Field keyField, String keyValue, String newKeyValue) throws SQLException {
+        boolean isArrayField = keyField.getSqlType().equals(JDBCType.ARRAY);
         switch (sqlMethod) {
             case DELETE:
-                return String.format("delete from %s where %s = '%s'", refTableName, keyField, keyValue);
+                if (isArrayField) {
+                    return String.format("delete from %s where %s @> ARRAY['%s']::text[]", refTableName, keyField.name, keyValue);
+                } else {
+                    return String.format("delete from %s where %s = '%s'", refTableName, keyField.name, keyValue);
+                }
             case UPDATE:
-                return String.format("update %s set %s = '%s' where %s = '%s'", refTableName, keyField, newKeyValue, keyField, keyValue);
+                if (isArrayField) {
+                    // If the field to be updated is an array field (of which there are only text[] types in the db),
+                    // replace the old value with the new value using array contains clause.
+                    // FIXME This is probably horribly postgres specific.
+                    return String.format("update %s set %s = array_replace(%s, '%s', '%s') where %s @> ARRAY['%s']::text[]", refTableName, keyField.name, keyField.name, keyValue, newKeyValue, keyField.name, keyValue);
+                } else {
+                    return String.format("update %s set %s = '%s' where %s = '%s'", refTableName, keyField.name, newKeyValue, keyField.name, keyValue);
+                }
 //            case CREATE:
 //                return String.format("insert into %s ");
             default:
