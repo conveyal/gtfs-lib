@@ -893,7 +893,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .mmapFileEnable()
                     .asyncWriteEnable()
                     .compressionEnable()
-//                     .cacheSize(1024 * 1024) this bloats memory consumption
+                    .cacheSize(1000)
                     .make();
             return db;
         } catch (ExecutionError | IOError | Exception e) {
