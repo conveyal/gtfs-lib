@@ -73,6 +73,7 @@ public class JdbcGtfsSnapshotter {
             // FIXME: Find some place to store errors encountered on copy for patterns and pattern stops.
             copy(Table.PATTERNS, true);
             copy(Table.PATTERN_STOP, true);
+            copy(Table.SCHEDULE_EXCEPTIONS, true);
             result.shapes = copy(Table.SHAPES, true);
             result.stops = copy(Table.STOPS, true);
             // TODO: Should we defer index creation on stop times?
