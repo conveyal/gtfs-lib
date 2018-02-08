@@ -8,10 +8,15 @@ import com.conveyal.gtfs.graphql.fetchers.NestedJDBCFetcher;
 import com.conveyal.gtfs.graphql.fetchers.RowCountFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SQLColumnFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SourceObjectFetcher;
+import graphql.schema.Coercing;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLObjectType;
+import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLTypeReference;
+
+import java.sql.Array;
+import java.sql.SQLException;
 
 import static com.conveyal.gtfs.graphql.GraphQLUtil.intArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.intt;
@@ -84,6 +89,20 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("description"))
             .build();
 
+    private static final GraphQLScalarType stringList = new GraphQLScalarType("StringList", "List of Strings", new StringCoercing());
+
+    // Represents GTFS Editor service exceptions.
+    public static final GraphQLObjectType scheduleExceptionType = newObject().name("scheduleException")
+            .description("A GTFS Editor schedule exception type")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("name"))
+            .field(MapFetcher.field("exemplar", GraphQLInt))
+            .field(MapFetcher.field("dates", stringList))
+            .field(MapFetcher.field("custom_schedule", stringList))
+            .field(MapFetcher.field("added_service", stringList))
+            .field(MapFetcher.field("removed_service", stringList))
+            .build();
+
 
     // Represents rows from fare_rules.txt
     public static final GraphQLObjectType fareRuleType = newObject().name("fareRule")
@@ -140,6 +159,16 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("point_type", GraphQLInt))
             .build();
 
+
+    // Represents rows from frequencies.txt
+    public static final GraphQLObjectType frequencyType =  newObject().name("frequency")
+            .field(MapFetcher.field("trip_id"))
+            .field(MapFetcher.field("start_time", GraphQLInt))
+            .field(MapFetcher.field("end_time", GraphQLInt))
+            .field(MapFetcher.field("headway_secs", GraphQLInt))
+            .field(MapFetcher.field("exact_times", GraphQLInt))
+            .build();
+
     // Represents rows from trips.txt
     public static final GraphQLObjectType tripType = newObject()
             .name("trip")
@@ -164,6 +193,17 @@ public class GraphQLGtfsSchema {
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("stop_times", "trip_id", "stop_sequence"))
+                    .build()
+            )
+            .field(newFieldDefinition()
+                    .name("frequencies")
+                    // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
+                    .type(new GraphQLList(frequencyType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
+                    .dataFetcher(new JDBCFetcher("frequencies", "trip_id"))
                     .build()
             )
             // TODO should this be included in the query?
@@ -581,6 +621,16 @@ public class GraphQLGtfsSchema {
                     .build()
             )
             .field(newFieldDefinition()
+                    .name("schedule_exceptions")
+                    .type(new GraphQLList(GraphQLGtfsSchema.scheduleExceptionType))
+                    .argument(stringArg("namespace"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    .dataFetcher(new JDBCFetcher("schedule_exceptions"))
+                    .build()
+            )
+            .field(newFieldDefinition()
                     .name("stop_times")
                     .type(new GraphQLList(GraphQLGtfsSchema.stopTimeType))
                     .argument(stringArg("namespace"))
@@ -651,4 +701,27 @@ public class GraphQLGtfsSchema {
             .build();
 
 
+    private static class StringCoercing implements Coercing {
+        @Override
+        public Object serialize(Object input) {
+            String[] strings = new String[]{};
+            try {
+                strings = (String[])((Array) input).getArray();
+//                if (strings == null) strings = new String[]{};
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+            return strings;
+        }
+
+        @Override
+        public Object parseValue(Object input) {
+            return null;
+        }
+
+        @Override
+        public Object parseLiteral(Object input) {
+            return null;
+        }
+    }
 }
