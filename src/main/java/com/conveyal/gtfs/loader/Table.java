@@ -8,10 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -77,12 +77,24 @@ public class Table {
         new IntegerField("sunday", REQUIRED, 0, 1),
         new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED),
+        // Editor-specific field
         new StringField("description", EDITOR)
     ).restrictDelete().addPrimaryKey();
 
+    public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
+//            new StringField("exception_id",  REQUIRED),
+            new StringField("name", REQUIRED), // FIXME: This makes name the key field...
+            // FIXME: Change to DateListField
+            new DateListField("dates", REQUIRED),
+            new ShortField("exemplar", REQUIRED, 9),
+            new StringListField("custom_schedule", OPTIONAL).isReferenceTo(CALENDAR),
+            new StringListField("added_service", OPTIONAL).isReferenceTo(CALENDAR),
+            new StringListField("removed_service", OPTIONAL).isReferenceTo(CALENDAR)
+    );
+
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
         new StringField("service_id", REQUIRED),
-        new IntegerField("date", REQUIRED),
+        new DateField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
     );
 
@@ -231,12 +243,13 @@ public class Table {
             new TimeField("end_time", REQUIRED),
             new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
             new IntegerField("exact_times", OPTIONAL, 1)
-    );
+    ).withParentTable(TRIPS);
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
             AGENCY,
             CALENDAR,
+            SCHEDULE_EXCEPTIONS,
             CALENDAR_DATES,
             FARE_ATTRIBUTES,
             FEED_INFO,
@@ -321,7 +334,9 @@ public class Table {
         // Optionally join namespace and name to create full table name if namespace is not null (i.e., table object is
         // a spec table).
         String tableName = namespace != null ? String.join(".", namespace, name) : name;
-        String fieldDeclarations = Arrays.stream(fields).map(Field::getSqlDeclaration).collect(Collectors.joining(", "));
+        String fieldDeclarations = Arrays.stream(fields)
+                .map(Field::getSqlDeclaration)
+                .collect(Collectors.joining(", "));
         if (primaryKeyFields != null) {
             fieldDeclarations += String.format(", primary key (%s)", String.join(", ", primaryKeyFields));
         }
@@ -391,11 +406,16 @@ public class Table {
         return String.format("select * from %s", String.join(".", namespace, name));
     }
 
+    public String generateDeleteSql (String namespace) {
+        return generateDeleteSql(namespace, null);
+    }
+
     /**
      * Generate delete SQL string.
      */
-    public String generateDeleteSql (String namespace) {
-        return String.format("delete from %s where id = ?", String.join(".", namespace, name));
+    public String generateDeleteSql (String namespace, String fieldName) {
+        String whereField = fieldName == null ? "id" : fieldName;
+        return String.format("delete from %s where %s = ?", String.join(".", namespace, name), whereField);
     }
 
     /**

@@ -26,7 +26,7 @@ public class DateField extends Field {
         super(name, requirement);
     }
 
-    private String validate (String string) {
+    public static String validate (String string) {
         // Parse the date out of the supplied string.
         LocalDate date;
         try {

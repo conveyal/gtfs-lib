@@ -5,6 +5,8 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.ScheduleException.ExemplarServiceDescriptor;
 import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -15,11 +17,18 @@ import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.sql.Array;
 import java.time.LocalDate;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.conveyal.gtfs.model.ScheduleException.exemplarFromInt;
 
 /**
  * For now we will copy all available fields into Java model objects.
@@ -81,6 +90,17 @@ public interface EntityPopulator<T> {
         calendarDate.date           = getDateIfPresent  (result, "date",           columnForName);
         calendarDate.exception_type = getIntIfPresent   (result, "exception_type", columnForName);
         return calendarDate;
+    };
+
+    EntityPopulator<ScheduleException> SCHEDULE_EXCEPTION = (result, columnForName) -> {
+        ScheduleException scheduleException = new ScheduleException();
+        scheduleException.name              = getStringIfPresent(result, "name", columnForName);
+        scheduleException.dates             = getDateListIfPresent(result, "dates", columnForName);
+        scheduleException.exemplar          = exemplarFromInt(getIntIfPresent(result, "exemplar", columnForName));
+        scheduleException.customSchedule    = getStringListIfPresent(result, "customSchedule", columnForName);
+        scheduleException.addedService      = getStringListIfPresent(result, "addedService", columnForName);
+        scheduleException.removedService    = getStringListIfPresent(result, "removedService", columnForName);
+        return scheduleException;
     };
 
     EntityPopulator<Route> ROUTE = (result, columnForName) -> {
@@ -183,6 +203,32 @@ public interface EntityPopulator<T> {
                 // formatting).
                 return null;
             }
+        }
+    }
+
+    static List<String> getStringListIfPresent(ResultSet resultSet, String columnName,
+                                       TObjectIntMap<String> columnForName) throws SQLException {
+        int columnIndex = columnForName.get(columnName);
+        if (columnIndex == 0) return new ArrayList<>();
+        try {
+            return Arrays.asList((String[])resultSet.getArray(columnIndex).getArray());
+
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
+
+    static List<LocalDate> getDateListIfPresent(ResultSet resultSet, String columnName,
+                                        TObjectIntMap<String> columnForName) throws SQLException {
+        int columnIndex = columnForName.get(columnName);
+        if (columnIndex == 0) return new ArrayList<>();
+        try {
+            String[] dateStrings = (String[]) resultSet.getArray(columnIndex).getArray();
+            return Arrays.stream(dateStrings)
+                    .map(date -> date != null ? LocalDate.parse(date, DateField.GTFS_DATE_FORMATTER) : null)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            return new ArrayList<>();
         }
     }
 
