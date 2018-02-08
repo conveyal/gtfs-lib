@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.conveyal.gtfs.model.Entity.setIntParameter;
+
 /**
  * Groups trips together into "patterns" that share the same sequence of stops.
  * This is not a normal validator in the sense that it does not check for bad data.
@@ -97,6 +99,7 @@ public class PatternFinderValidator extends TripValidator {
                 insertPatternStatement.setString(1, pattern.pattern_id);
                 insertPatternStatement.setString(2, pattern.route_id);
                 insertPatternStatement.setString(3, pattern.name);
+                // FIXME: This could be null...
                 insertPatternStatement.setString(4, pattern.associatedShapes.iterator().next());
                 insertPatternStatement.addBatch();
                 // Construct pattern stops based on values in trip pattern key.
@@ -107,14 +110,14 @@ public class PatternFinderValidator extends TripValidator {
                     if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
 
                     insertPatternStopStatement.setString(1, pattern.pattern_id);
-                    insertPatternStopStatement.setInt(2, i);
+                    setIntParameter(insertPatternStopStatement, 2, i);
                     insertPatternStopStatement.setString(3, stopId);
-                    insertPatternStopStatement.setInt(4, travelTime);
-                    insertPatternStopStatement.setInt(5, key.departureTimes.get(i) - key.arrivalTimes.get(i));
-                    insertPatternStopStatement.setInt(6, key.dropoffTypes.get(i));
-                    insertPatternStopStatement.setInt(7, key.pickupTypes.get(i));
+                    setIntParameter(insertPatternStopStatement,4, travelTime);
+                    setIntParameter(insertPatternStopStatement,5, key.departureTimes.get(i) - key.arrivalTimes.get(i));
+                    setIntParameter(insertPatternStopStatement,6, key.dropoffTypes.get(i));
+                    setIntParameter(insertPatternStopStatement,7, key.pickupTypes.get(i));
                     insertPatternStopStatement.setDouble(8, key.shapeDistances.get(i));
-                    insertPatternStopStatement.setInt(9, key.timepoints.get(i));
+                    setIntParameter(insertPatternStopStatement,9, key.timepoints.get(i));
                     insertPatternStopStatement.addBatch();
                     // FIXME: should each pattern stop be incrementing the batch size?
                     batchSize += 1;
