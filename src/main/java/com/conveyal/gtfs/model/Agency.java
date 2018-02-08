@@ -32,17 +32,18 @@ public class Agency extends Entity {
      * {@link com.conveyal.gtfs.loader.Table#AGENCY}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
-    public void setStatementParameters(PreparedStatement statement) throws SQLException {
-        statement.setInt(1, id);
-        statement.setString(2, agency_id);
-        statement.setString(3, agency_name);
-        statement.setString(4, agency_url != null ? agency_url.toString() : null);
-        statement.setString(5, agency_timezone);
-        statement.setString(6, agency_lang);
-        statement.setString(7, agency_phone);
-        statement.setString(8, agency_branding_url != null ? agency_branding_url .toString() : null);
-        statement.setString(9, agency_fare_url != null ? agency_fare_url.toString() : null);
-        statement.setString(10, agency_email);
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, agency_id);
+        statement.setString(oneBasedIndex++, agency_name);
+        statement.setString(oneBasedIndex++, agency_url != null ? agency_url.toString() : null);
+        statement.setString(oneBasedIndex++, agency_timezone);
+        statement.setString(oneBasedIndex++, agency_lang);
+        statement.setString(oneBasedIndex++, agency_phone);
+        statement.setString(oneBasedIndex++, agency_branding_url != null ? agency_branding_url .toString() : null);
+        statement.setString(oneBasedIndex++, agency_fare_url != null ? agency_fare_url.toString() : null);
+        statement.setString(oneBasedIndex++, agency_email);
     }
 
     public static class Loader extends Entity.Loader<Agency> {
