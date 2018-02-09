@@ -3,6 +3,8 @@ package com.conveyal.gtfs.model;
 import com.google.common.base.Joiner;
 import com.vividsolutions.jts.geom.LineString;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -91,5 +93,23 @@ public class Pattern extends Entity {
 
         // TODO: Implement segmentFraction using JTS to segment out LineString by stops.
 
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#PATTERNS}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, pattern_id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, name);
+        // Editor-specific fields
+        setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
+        // FIXME: Shape set might be null?
+        statement.setString(7, associatedShapes.iterator().next());
     }
 }

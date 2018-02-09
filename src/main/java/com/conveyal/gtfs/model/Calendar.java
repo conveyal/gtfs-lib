@@ -2,13 +2,19 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.Table;
 import com.google.common.base.Function;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterators;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -35,6 +41,29 @@ public class Calendar extends Entity implements Serializable {
     @Override
     public String getId () {
         return service_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#CALENDAR}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        DateField startDateField = (DateField) Table.CALENDAR.getFieldForName("start_date");
+        DateField endDateField = ((DateField) Table.CALENDAR.getFieldForName("end_date"));
+        statement.setString(oneBasedIndex++, service_id);
+        setIntParameter(statement, oneBasedIndex++, monday);
+        setIntParameter(statement, oneBasedIndex++, tuesday);
+        setIntParameter(statement, oneBasedIndex++, wednesday);
+        setIntParameter(statement, oneBasedIndex++, thursday);
+        setIntParameter(statement, oneBasedIndex++, friday);
+        setIntParameter(statement, oneBasedIndex++, saturday);
+        setIntParameter(statement, oneBasedIndex++, sunday);
+        startDateField.setParameter(statement, oneBasedIndex++, start_date);
+        endDateField.setParameter(statement, oneBasedIndex++, end_date);
+        statement.setString(oneBasedIndex++, null); // description
     }
 
     public static class Loader extends Entity.Loader<Calendar> {

@@ -77,7 +77,7 @@ public class NewTripTimesValidator extends FeedValidator {
             stopTimesForTrip.add(stopTime);
             previousTripId = stopTime.trip_id;
         }
-        processTrip(stopTimesForTrip);
+        if (!stopTimesForTrip.isEmpty()) processTrip(stopTimesForTrip);
     }
 
     protected static boolean missingEitherTime (StopTime stopTime) {
@@ -128,6 +128,7 @@ public class NewTripTimesValidator extends FeedValidator {
     private void processTrip (List<StopTime> stopTimes) {
         if (++tripCount % 20_000 == 0) LOG.info("Validating trip {}", tripCount);
         // All stop times have the same trip_id, so we look it up right away.
+        // FIXME: gtfs_load error if there are no stop times? / feed=Birnie_Bus_20141105T102949-05_24e99790-211d-4f92-b1d2-147e6f3d5040.zip
         String tripId = stopTimes.get(0).trip_id;
         Trip trip = tripById.get(tripId);
         List<ShapePoint> shapePoints = shapeById.get(trip.shape_id);

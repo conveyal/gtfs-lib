@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
-import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
@@ -9,10 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -78,12 +77,24 @@ public class Table {
         new IntegerField("sunday", REQUIRED, 0, 1),
         new DateField("start_date", REQUIRED),
         new DateField("end_date", REQUIRED),
+        // Editor-specific field
         new StringField("description", EDITOR)
     ).restrictDelete().addPrimaryKey();
 
+    public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
+//            new StringField("exception_id",  REQUIRED),
+            new StringField("name", REQUIRED), // FIXME: This makes name the key field...
+            // FIXME: Change to DateListField
+            new DateListField("dates", REQUIRED),
+            new ShortField("exemplar", REQUIRED, 9),
+            new StringListField("custom_schedule", OPTIONAL).isReferenceTo(CALENDAR),
+            new StringListField("added_service", OPTIONAL).isReferenceTo(CALENDAR),
+            new StringListField("removed_service", OPTIONAL).isReferenceTo(CALENDAR)
+    );
+
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
         new StringField("service_id", REQUIRED),
-        new IntegerField("date", REQUIRED),
+        new DateField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
     );
 
@@ -232,12 +243,13 @@ public class Table {
             new TimeField("end_time", REQUIRED),
             new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
             new IntegerField("exact_times", OPTIONAL, 1)
-    );
+    ).withParentTable(TRIPS);
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
             AGENCY,
             CALENDAR,
+            SCHEDULE_EXCEPTIONS,
             CALENDAR_DATES,
             FARE_ATTRIBUTES,
             FEED_INFO,
@@ -303,26 +315,35 @@ public class Table {
 
 
     public void createSqlTable(Connection connection) {
-        createSqlTable(connection, false, null);
+        createSqlTable(connection, null, false, null);
     }
 
     public void createSqlTable(Connection connection, boolean makeIdSerial) {
-        createSqlTable(connection, makeIdSerial, null);
+        createSqlTable(connection, null, makeIdSerial, null);
+    }
+
+    public void createSqlTable(Connection connection, String namespace, boolean makeIdSerial) {
+        createSqlTable(connection, namespace, makeIdSerial, null);
     }
 
     /**
      * Create an SQL table with all the fields specified by this table object,
      * plus an integer CSV line number field in the first position.
      */
-    public void createSqlTable (Connection connection, boolean makeIdSerial, String[] primaryKeyFields) {
-        String fieldDeclarations = Arrays.stream(fields).map(Field::getSqlDeclaration).collect(Collectors.joining(", "));
+    public void createSqlTable (Connection connection, String namespace, boolean makeIdSerial, String[] primaryKeyFields) {
+        // Optionally join namespace and name to create full table name if namespace is not null (i.e., table object is
+        // a spec table).
+        String tableName = namespace != null ? String.join(".", namespace, name) : name;
+        String fieldDeclarations = Arrays.stream(fields)
+                .map(Field::getSqlDeclaration)
+                .collect(Collectors.joining(", "));
         if (primaryKeyFields != null) {
             fieldDeclarations += String.format(", primary key (%s)", String.join(", ", primaryKeyFields));
         }
-        String dropSql = String.format("drop table if exists %s", name);
+        String dropSql = String.format("drop table if exists %s", tableName);
         // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
         String idFieldType = makeIdSerial ? "serial" : "bigint";
-        String createSql = String.format("create table %s (id %s not null, %s)", name, idFieldType, fieldDeclarations);
+        String createSql = String.format("create table %s (id %s not null, %s)", tableName, idFieldType, fieldDeclarations);
         try {
             Statement statement = connection.createStatement();
             LOG.info(dropSql);
@@ -357,6 +378,13 @@ public class Table {
         return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
     }
 
+    // FIXME: Add table method that sets a field parameter based on field name and string value?
+//    public void setParameterByName (PreparedStatement preparedStatement, String fieldName, String value) {
+//        Field field = getFieldForName(fieldName);
+//        int editorFieldIndex = fieldsForEditor().indexOf(field);
+//        field.setParameter(preparedStatement, editorFieldIndex, value);
+//    }
+
     /**
      * Create SQL string for use in update statement. Note, this filters table's fields to only those used in editor.
      */
@@ -378,11 +406,16 @@ public class Table {
         return String.format("select * from %s", String.join(".", namespace, name));
     }
 
+    public String generateDeleteSql (String namespace) {
+        return generateDeleteSql(namespace, null);
+    }
+
     /**
      * Generate delete SQL string.
      */
-    public String generateDeleteSql (String namespace) {
-        return String.format("delete from %s where id = ?", String.join(".", namespace, name));
+    public String generateDeleteSql (String namespace, String fieldName) {
+        String whereField = fieldName == null ? "id" : fieldName;
+        return String.format("delete from %s where %s = ?", String.join(".", namespace, name), whereField);
     }
 
     /**
@@ -441,12 +474,17 @@ public class Table {
         return required == REQUIRED;
     }
 
+    public void createIndexes (Connection connection) throws SQLException {
+        createIndexes(connection, null);
+    }
+
     /**
      * Create indexes for table using shouldBeIndexed(), key field, and/or sequence field.
      * FIXME: add foreign reference indexes?
      */
-    public void createIndexes(Connection connection) throws SQLException {
+    public void createIndexes(Connection connection, String namespace) throws SQLException {
         LOG.info("Indexing...");
+        String tableName = namespace != null ? String.join(".", namespace, name) : name;
         // We determine which columns should be indexed based on field order in the GTFS spec model table.
         // Not sure that's a good idea, this could use some abstraction. TODO getIndexColumns() on each table.
         String indexColumns = getIndexFields();
@@ -454,9 +492,9 @@ public class Table {
         // TODO create primary key and fall back on plain index (consider not null & unique constraints)
         // TODO use line number as primary key
         // Note: SQLITE requires specifying a name for indexes.
-        String indexName = String.join("_", name.replace(".", "_"), "idx");
-        String indexSql = String.format("create index %s on %s (%s)", indexName, name, indexColumns);
-        //String indexSql = String.format("alter table %s add primary key (%s)", table.name, indexColumns);
+        String indexName = String.join("_", tableName.replace(".", "_"), "idx");
+        String indexSql = String.format("create index %s on %s (%s)", indexName, tableName, indexColumns);
+        //String indexSql = String.format("alter table %s add primary key (%s)", tableName, indexColumns);
         LOG.info(indexSql);
         connection.createStatement().execute(indexSql);
         // TODO add foreign key constraints, and recover recording errors as needed.
@@ -466,8 +504,8 @@ public class Table {
         for (Field field : fields) {
             if (field.shouldBeIndexed()) {
                 Statement statement = connection.createStatement();
-                String fieldIndex = String.join("_", name.replace(".", "_"), field.name, "idx");
-                String sql = String.format("create index %s on %s (%s)", fieldIndex, name, field.name);
+                String fieldIndex = String.join("_", tableName.replace(".", "_"), field.name, "idx");
+                String sql = String.format("create index %s on %s (%s)", fieldIndex, tableName, field.name);
                 LOG.info(sql);
                 statement.execute(sql);
             }

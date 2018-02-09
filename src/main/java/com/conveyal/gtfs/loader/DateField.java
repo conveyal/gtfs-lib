@@ -26,7 +26,7 @@ public class DateField extends Field {
         super(name, requirement);
     }
 
-    private String validate (String string) {
+    public static String validate (String string) {
         // Parse the date out of the supplied string.
         LocalDate date;
         try {
@@ -48,6 +48,18 @@ public class DateField extends Field {
             preparedStatement.setString(oneBasedIndex, validate(string));
         } catch (Exception ex) {
             throw new StorageException(ex);
+        }
+    }
+
+    /**
+     * DateField specific method to set a statement parameter from a {@link LocalDate}.
+     */
+    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, LocalDate localDate) {
+        try {
+            if (localDate == null) preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
+            else preparedStatement.setString(oneBasedIndex, localDate.format(GTFS_DATE_FORMATTER));
+        } catch (Exception e) {
+            throw new StorageException(e);
         }
     }
 

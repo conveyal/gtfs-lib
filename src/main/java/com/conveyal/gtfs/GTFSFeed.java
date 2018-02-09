@@ -1,10 +1,10 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.validator.*;
 import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.validator.service.GeoUtils;
@@ -26,6 +26,7 @@ import org.mapdb.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -225,6 +226,11 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     public void loadFromFile(ZipFile zip) throws Exception {
         loadFromFile(zip, null);
+    }
+
+    public FeedLoadResult toSQL (DataSource dataSource) {
+        JdbcGTFSFeedConverter converter = new JdbcGTFSFeedConverter(this, dataSource);
+        return converter.loadTables();
     }
 
     public void toFile (String file) {

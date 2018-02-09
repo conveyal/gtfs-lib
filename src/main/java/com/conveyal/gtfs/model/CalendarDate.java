@@ -2,8 +2,13 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
+import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.Table;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterators;
+
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDate;
 
 import java.io.IOException;
@@ -21,6 +26,20 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
     @Override
     public String getId () {
         return service_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#CALENDAR_DATES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        DateField dateField = (DateField) Table.CALENDAR_DATES.getFieldForName("date");
+        statement.setString(oneBasedIndex++, service_id);
+        dateField.setParameter(statement, oneBasedIndex++, date);
+        setIntParameter(statement, oneBasedIndex++, exception_type);
     }
 
     public CalendarDate clone () {

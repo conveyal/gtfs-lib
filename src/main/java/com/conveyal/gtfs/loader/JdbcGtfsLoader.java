@@ -389,8 +389,9 @@ public class JdbcGtfsLoader {
                 setValueForField(table, f, lineNumber, field, string, postgresText, transformedStrings);
             }
             if (postgresText) {
-                tempTextFileStream.printf(String.join("\t", transformedStrings));
-                tempTextFileStream.print('\n');
+                // Print a new line in the standard postgres text format:
+                // https://www.postgresql.org/docs/9.1/static/sql-copy.html#AEN64380
+                tempTextFileStream.println(String.join("\t", transformedStrings));
             } else {
                 insertStatement.addBatch();
                 if (lineNumber % INSERT_BATCH_SIZE == 0) insertStatement.executeBatch();

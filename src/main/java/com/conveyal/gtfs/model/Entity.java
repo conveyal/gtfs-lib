@@ -30,6 +30,9 @@ import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.sql.JDBCType;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Enumeration;
@@ -72,6 +75,17 @@ public abstract class Entity implements Serializable {
      */
     public Integer getSequenceNumber () {
         return null;
+    }
+
+    /**
+     * This method should be overridden by each Entity subtybe to handle setting parameters for a prepared statement
+     * created from the entity table constants defined in {@link com.conveyal.gtfs.loader.Table}.
+     */
+    public abstract void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException;
+
+    public static void setIntParameter (PreparedStatement statement, int oneBasedIndex, int value) throws SQLException {
+        if (value == INT_MISSING) statement.setNull(oneBasedIndex, JDBCType.INTEGER.getVendorTypeNumber());
+        else statement.setInt(oneBasedIndex, value);
     }
 
     /* A class that can produce Entities from CSV, and record errors that occur in the process. */

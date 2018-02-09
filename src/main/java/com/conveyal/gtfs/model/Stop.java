@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
 import java.net.URL;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Stop extends Entity {
@@ -27,6 +29,35 @@ public class Stop extends Entity {
     @Override
     public String getId () {
         return stop_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#STOPS}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        int wheelchairBoarding = 0;
+        try {
+             wheelchairBoarding = Integer.parseInt(wheelchair_boarding);
+        } catch (NumberFormatException e) {
+            // Do nothing, wheelchairBoarding will remain zero.
+        }
+        statement.setString(oneBasedIndex++, stop_id);
+        statement.setString(oneBasedIndex++, stop_code);
+        statement.setString(oneBasedIndex++, stop_name);
+        statement.setString(oneBasedIndex++, stop_desc);
+        statement.setDouble(oneBasedIndex++, stop_lon);
+        statement.setDouble(oneBasedIndex++, stop_lat);
+        statement.setString(oneBasedIndex++, zone_id);
+        statement.setString(oneBasedIndex++, stop_url != null ? stop_url.toString() : null);
+        setIntParameter(statement, oneBasedIndex++, location_type);
+        statement.setString(oneBasedIndex++, parent_station);
+        statement.setString(oneBasedIndex++, stop_timezone);
+        // FIXME: For some reason wheelchair boarding type is String
+        setIntParameter(statement, oneBasedIndex++, wheelchairBoarding);
     }
 
     public static class Loader extends Entity.Loader<Stop> {

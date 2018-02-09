@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -19,6 +21,21 @@ public class FareRule extends Entity {
     @Override
     public String getId () {
         return fare_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FARE_RULES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, fare_id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, origin_id);
+        statement.setString(oneBasedIndex++, destination_id);
+        statement.setString(oneBasedIndex++, contains_id);
     }
 
     public static class Loader extends Entity.Loader<FareRule> {

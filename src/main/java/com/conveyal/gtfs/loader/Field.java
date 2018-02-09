@@ -47,7 +47,8 @@ public abstract class Field {
 
     public abstract SQLType getSqlType ();
 
-    // Overridden to create exception for "double precision", since its enum value is just called DOUBLE.
+    // Overridden to create exception for "double precision", since its enum value is just called DOUBLE, and ARRAY types,
+    // which require "string[]" syntax.
     public String getSqlTypeName () {
         return getSqlType().getName().toLowerCase();
     }
