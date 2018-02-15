@@ -73,6 +73,7 @@ public class PatternFinderValidator extends TripValidator {
             String patternsTableName = feed.tablePrefix + "patterns";
             String patternStopsTableName = feed.tablePrefix + "pattern_stops";
             statement.execute(String.format("alter table %s add column pattern_id varchar", tripsTableName));
+            LOG.info("Done storing pattern IDs.");
             // FIXME: Here we're creating a pattern table that has an integer ID field (similar to the other GTFS tables)
             // AND a varchar pattern_id with essentially the same value cast to a string. Perhaps the pattern ID should
             // be a UUID or something, just to better distinguish it from the int ID?
@@ -91,6 +92,7 @@ public class PatternFinderValidator extends TripValidator {
                     String.format("insert into %s values (DEFAULT, ?, ?, ?, ?)", patternsTableName));
             PreparedStatement insertPatternStopStatement = connection.prepareStatement(insertPatternStopSql);
             int batchSize = 0;
+            LOG.info("Storing patterns and pattern stops");
             // TODO update to use batch trackers
             for (Map.Entry<TripPatternKey, Pattern> entry : patterns.entrySet()) {
                 Pattern pattern = entry.getValue();
@@ -115,6 +117,7 @@ public class PatternFinderValidator extends TripValidator {
                     setIntParameter(insertPatternStopStatement,4, travelTime);
                     setIntParameter(insertPatternStopStatement,5, key.departureTimes.get(i) - key.arrivalTimes.get(i));
                     setIntParameter(insertPatternStopStatement,6, key.dropoffTypes.get(i));
+                    // FIXME: NPE encountered on setIntParameter for key pickup_types?
                     setIntParameter(insertPatternStopStatement,7, key.pickupTypes.get(i));
                     insertPatternStopStatement.setDouble(8, key.shapeDistances.get(i));
                     setIntParameter(insertPatternStopStatement,9, key.timepoints.get(i));
@@ -141,16 +144,20 @@ public class PatternFinderValidator extends TripValidator {
             updateTripStatement.executeBatch();
             insertPatternStatement.executeBatch();
             insertPatternStopStatement.executeBatch();
+            LOG.info("Done storing patterns and pattern stops.");
             // Index new pattern_id column on trips. The other tables are already indexed because they have primary keys.
+            LOG.info("Indexing patterns.");
             statement.execute(String.format("create index trips_pattern_id_idx on %s (pattern_id)", tripsTableName));
+            LOG.info("Done indexing patterns.");
             connection.commit();
-            connection.close();
-            LOG.info("Done storing pattern IDs.");
         } catch (SQLException e) {
-            // Close transaction if failure occurs on creating patterns.
-            DbUtils.closeQuietly(connection);
+            // Rollback transaction if failure occurs on creating patterns.
+            DbUtils.rollbackAndCloseQuietly(connection);
             // This exception will be stored as a validator failure.
             throw new RuntimeException(e);
+        } finally {
+            // Close transaction finally.
+            DbUtils.closeQuietly(connection);
         }
 
     }
