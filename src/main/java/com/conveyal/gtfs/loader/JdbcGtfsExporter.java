@@ -74,8 +74,8 @@ public class JdbcGtfsExporter {
             result.agency = export(Table.AGENCY);
             result.calendar = export(Table.CALENDAR);
             if (fromEditor) {
-                GTFSFeed feed = new GTFSFeed();
                 // Export schedule exceptions in place of calendar dates if exporting from the GTFS Editor.
+                GTFSFeed feed = new GTFSFeed();
                 // FIXME: The below table readers should probably just share a connection with the exporter.
                 JDBCTableReader<ScheduleException> exceptionsReader =
                         new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
@@ -124,17 +124,22 @@ public class JdbcGtfsExporter {
             result.fareAttributes = export(Table.FARE_ATTRIBUTES);
             result.fareRules = export(Table.FARE_RULES);
             result.feedInfo = export(Table.FEED_INFO);
+            // FIXME: only write frequencies for "approved" routes using COPY TO with results of select query
             result.frequencies = export(Table.FREQUENCIES);
+            // FIXME: only write "approved" routes using COPY TO with results of select query
             result.routes = export(Table.ROUTES);
             // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
             // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
             // frequency-based pattern travel times match stop time arrivals/departures?
 //            export(Table.PATTERNS);
 //            export(Table.PATTERN_STOP);
+            // FIXME: only write shapes for "approved" routes using COPY TO with results of select query
             result.shapes = export(Table.SHAPES);
             result.stops = export(Table.STOPS);
+            // FIXME: only write stop times for "approved" routes using COPY TO with results of select query
             result.stopTimes = export(Table.STOP_TIMES);
             result.transfers = export(Table.TRANSFERS);
+            // FIXME: only write trips for "approved" routes using COPY TO with results of select query
             result.trips = export(Table.TRIPS);
 
             zipOutputStream.close();
