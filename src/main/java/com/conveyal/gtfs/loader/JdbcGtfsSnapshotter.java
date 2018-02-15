@@ -33,6 +33,10 @@ public class JdbcGtfsSnapshotter {
     // The reference feed ID (namespace) to copy.
     private final String feedIdToSnapshot;
 
+    /**
+     * @param feedId namespace (schema) to snapshot. If null, a blank snapshot will be created.
+     * @param dataSource the JDBC data source with database connection details
+     */
     public JdbcGtfsSnapshotter(String feedId, DataSource dataSource) {
         this.feedIdToSnapshot = feedId;
         this.dataSource = dataSource;
@@ -106,10 +110,17 @@ public class JdbcGtfsSnapshotter {
         try {
             // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
             Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.required, table.fields);
-            String fromTableName = String.format("%s.%s", feedIdToSnapshot, table.name);
-            LOG.info("Copying table {} to {}", fromTableName, targetTable.name);
-            boolean success = targetTable.createSqlTableFrom(connection, fromTableName);
-            // Only create indexes if table clone was successful.
+            boolean success;
+            if (feedIdToSnapshot == null) {
+                // If there is no feedId to snapshot (i.e., we're making an empty snapshot), simply create the table.
+                success = targetTable.createSqlTable(connection, true);
+            } else {
+                // Otherwise, use the create table from method.
+                String fromTableName = String.format("%s.%s", feedIdToSnapshot, table.name);
+                LOG.info("Copying table {} to {}", fromTableName, targetTable.name);
+                success = targetTable.createSqlTableFrom(connection, fromTableName);
+            }
+            // Only create indexes if table creation was successful.
             if (success && createIndexes) targetTable.createIndexes(connection);
             LOG.info("Committing transaction...");
             connection.commit();

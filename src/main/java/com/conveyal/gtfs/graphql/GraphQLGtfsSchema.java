@@ -266,6 +266,21 @@ public class GraphQLGtfsSchema {
             .field(RowCountFetcher.field("trip_count", "trips", "route_id"))
             .field(RowCountFetcher.field("pattern_count", "patterns", "route_id"))
             .field(newFieldDefinition()
+                    .name("stops")
+                    .description("GTFS stop entities that the route serves")
+                    // Field type should be equivalent to the final JDBCFetcher table type.
+                    .type(new GraphQLList(new GraphQLTypeReference("stop")))
+                    // We scope to a single feed namespace, otherwise GTFS entity IDs are ambiguous.
+                    .argument(stringArg("namespace"))
+                    // We allow querying only for a single stop, otherwise result processing can take a long time (lots
+                    // of join queries).
+                    .argument(stringArg("route_id"))
+                    .dataFetcher(new NestedJDBCFetcher(
+                            new JDBCFetcher("patterns", "route_id"),
+                            new JDBCFetcher("pattern_stops", "pattern_id"),
+                            new JDBCFetcher("stops", "stop_id")))
+                    .build())
+            .field(newFieldDefinition()
                     .type(new GraphQLList(tripType))
                     .name("trips")
                     .argument(multiStringArg("trip_id"))
@@ -351,9 +366,10 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
-            // FIXME: This is not working. Perhaps it should be removed?
+            // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
+            // Should this be modified to be an object, rather than a list?
             .field(newFieldDefinition()
-                    .type(stopType)
+                    .type(new GraphQLList(stopType))
                     .name("stop")
                     .dataFetcher(new JDBCFetcher("stops", "stop_id"))
                     .build()
@@ -431,7 +447,7 @@ public class GraphQLGtfsSchema {
                     .build())
             .field(RowCountFetcher.field("trip_count", "trips", "pattern_id"))
             .field(newFieldDefinition()
-                .name("stops")
+                .name("pattern_stops")
                 .type(new GraphQLList(patternStopType))
                 // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
                 // (i.e., nested types that typically would only be nested under another entity and only make sense
@@ -440,6 +456,21 @@ public class GraphQLGtfsSchema {
                 .dataFetcher(new JDBCFetcher("pattern_stops",
                         "pattern_id",
                         "stop_sequence"))
+                .build())
+            .field(newFieldDefinition()
+                .name("stops")
+                .description("GTFS stop entities that the pattern serves")
+                // Field type should be equivalent to the final JDBCFetcher table type.
+                .type(new GraphQLList(stopType))
+                // We scope to a single feed namespace, otherwise GTFS entity IDs are ambiguous.
+                .argument(stringArg("namespace"))
+                .argument(intArg(LIMIT_ARG))
+                // We allow querying only for a single stop, otherwise result processing can take a long time (lots
+                // of join queries).
+                .argument(stringArg("pattern_id"))
+                .dataFetcher(new NestedJDBCFetcher(
+                        new JDBCFetcher("pattern_stops", "pattern_id"),
+                        new JDBCFetcher("stops", "stop_id")))
                 .build())
             .field(newFieldDefinition()
                 .name("trips")

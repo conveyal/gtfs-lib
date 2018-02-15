@@ -314,23 +314,23 @@ public class Table {
     }
 
 
-    public void createSqlTable(Connection connection) {
-        createSqlTable(connection, null, false, null);
+    public boolean createSqlTable(Connection connection) {
+        return createSqlTable(connection, null, false, null);
     }
 
-    public void createSqlTable(Connection connection, boolean makeIdSerial) {
-        createSqlTable(connection, null, makeIdSerial, null);
+    public boolean createSqlTable(Connection connection, boolean makeIdSerial) {
+        return createSqlTable(connection, null, makeIdSerial, null);
     }
 
-    public void createSqlTable(Connection connection, String namespace, boolean makeIdSerial) {
-        createSqlTable(connection, namespace, makeIdSerial, null);
+    public boolean createSqlTable(Connection connection, String namespace, boolean makeIdSerial) {
+        return createSqlTable(connection, namespace, makeIdSerial, null);
     }
 
     /**
      * Create an SQL table with all the fields specified by this table object,
      * plus an integer CSV line number field in the first position.
      */
-    public void createSqlTable (Connection connection, String namespace, boolean makeIdSerial, String[] primaryKeyFields) {
+    public boolean createSqlTable (Connection connection, String namespace, boolean makeIdSerial, String[] primaryKeyFields) {
         // Optionally join namespace and name to create full table name if namespace is not null (i.e., table object is
         // a spec table).
         String tableName = namespace != null ? String.join(".", namespace, name) : name;
@@ -349,7 +349,7 @@ public class Table {
             LOG.info(dropSql);
             statement.execute(dropSql);
             LOG.info(createSql);
-            statement.execute(createSql);
+            return statement.execute(createSql);
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
