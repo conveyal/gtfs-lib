@@ -219,7 +219,7 @@ public class JdbcTableWriter implements TableWriter {
                 continue;
             }
             JsonNode value = jsonObject.get(field.name);
-            LOG.info("{}={}", field.name, value);
+//            LOG.info("{}={}", field.name, value);
             try {
                 if (value == null || value.isNull()) {
                     if (field.isRequired()) {
