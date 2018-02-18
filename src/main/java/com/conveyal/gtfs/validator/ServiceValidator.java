@@ -51,7 +51,7 @@ import java.util.Set;
  */
 public class ServiceValidator extends TripValidator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PatternFinderValidator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ServiceValidator.class);
 
     private Map<String, ServiceInfo> serviceInfoForServiceId = new HashMap<>();
 
