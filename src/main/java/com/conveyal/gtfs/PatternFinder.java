@@ -63,7 +63,7 @@ public class PatternFinder {
 //
 //    }
 
-    public void processTrip(Trip trip, List<StopTime> orderedStopTimes) {
+    public void processTrip(Trip trip, Iterable<StopTime> orderedStopTimes) {
         if (++nTripsProcessed % 100000 == 0) {
             LOG.info("trip {}", human(nTripsProcessed));
         }
@@ -96,8 +96,9 @@ public class PatternFinder {
             // FIXME: Should associated shapes be a single entry?
             pattern.associatedShapes = new HashSet<>();
             trips.stream().forEach(trip -> pattern.associatedShapes.add(trip.shape_id));
-            if (pattern.associatedShapes.size() > 1) {
-                // Store an error if there is more than one shape per pattern.
+            if (pattern.associatedShapes.size() > 1 && errorStorage != null) {
+                // Store an error if there is more than one shape per pattern. Note: error storage is null if called via
+                // MapDB implementation.
                 // TODO: Should shape ID be added to trip pattern key?
                 errorStorage.storeError(NewGTFSError.forEntity(
                         pattern,

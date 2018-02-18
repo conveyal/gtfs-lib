@@ -21,6 +21,11 @@ public class Pattern extends Entity {
     public static final long serialVersionUID = 1L;
     private static final Logger LOG = LoggerFactory.getLogger(Pattern.class);
 
+    @Override
+    public String getId () {
+        return pattern_id;
+    }
+
     // A unique ID for this journey pattern / stop pattern
     public String pattern_id;
 
