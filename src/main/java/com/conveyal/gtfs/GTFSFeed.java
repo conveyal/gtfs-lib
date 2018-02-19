@@ -398,7 +398,11 @@ public class GTFSFeed implements Cloneable, Closeable {
     /**
      * MapDB-based implementation to find patterns.
      *
-     * FIXME: Remove and make pattern finding happen during validation?p
+     * FIXME: Remove and make pattern finding happen during validation? We want to share the pattern finder between the
+     * two implementations (MapDB and RDBMS), apply the same validation process to both kinds of storage, and produce
+     * Patterns in the same way in both cases, during validation. This prevents us from iterating over every stopTime
+     * twice, since we're already iterating over all of them in validation. However, in this case it might not be costly
+     * to simply retrieve the stop times from the stop_times map.
      */
     public void findPatterns () {
         PatternFinder patternFinder = new PatternFinder();
