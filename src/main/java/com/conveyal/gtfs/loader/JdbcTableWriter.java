@@ -206,7 +206,7 @@ public class JdbcTableWriter implements TableWriter {
         // JDBC SQL statements use a one-based index for setting fields/parameters
         List<String> missingFieldNames = new ArrayList<>();
         int index = 1;
-        for (Field field : table.fieldsForEditor()) {
+        for (Field field : table.editorFields()) {
             if (!jsonObject.has(field.name)) {
                 // If there is a field missing from the JSON string and it is required to write to an editor table,
                 // throw an exception (handled after the fields iteration. In an effort to keep the database integrity
@@ -614,7 +614,7 @@ public class JdbcTableWriter implements TableWriter {
         for (Table referencingTable : referencingTables) {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
-            for (Field field : referencingTable.fieldsForEditor()) {
+            for (Field field : referencingTable.editorFields()) {
                 if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
                     // Get unique IDs before delete (for logging/message purposes).
                     // TIntSet uniqueIds = getIdsForCondition(refTableName, keyField, keyValue, connection);

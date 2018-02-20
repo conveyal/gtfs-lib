@@ -11,7 +11,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -31,6 +30,7 @@ public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
     private static final Requirement[] requirementsForEditorFields = new Requirement[]{EDITOR, REQUIRED, OPTIONAL};
+    private static final Requirement[] requirementsForSpecFields = new Requirement[]{REQUIRED, OPTIONAL};
 
     public final String name;
 
@@ -128,7 +128,9 @@ public class Table {
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
         new ColorField("route_text_color",  OPTIONAL),
-        new ShortField("publicly_visible", EDITOR, 2),
+        // Editor fields below.
+        new ShortField("publicly_visible", EDITOR, 1),
+        // Status values are In progress (0), Pending approval (1), and Approved (2).
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
 
@@ -302,10 +304,24 @@ public class Table {
         return this;
     }
 
-    public List<Field> fieldsForEditor () {
+    public List<Field> editorFields() {
         // Filter out fields not used in editor (i.e., extension fields).
         return Arrays.stream(fields)
                 .filter(field -> Arrays.asList(requirementsForEditorFields).indexOf(field.requirement) != -1)
+                .collect(Collectors.toList());
+    }
+
+    public List<Field> requiredFields () {
+        // Filter out fields not used in editor (i.e., extension fields).
+        return Arrays.stream(fields)
+                .filter(field -> REQUIRED == field.requirement)
+                .collect(Collectors.toList());
+    }
+
+    public List<Field> specFields () {
+        // Filter out fields not used in editor (i.e., extension fields).
+        return Arrays.stream(fields)
+                .filter(field -> Arrays.asList(requirementsForSpecFields).indexOf(field.requirement) != -1)
                 .collect(Collectors.toList());
     }
 
@@ -372,16 +388,26 @@ public class Table {
      */
     public String generateInsertSql (String namespace, boolean setDefaultId) {
         String tableName = namespace == null ? name : String.join(".", namespace, name);
-        String questionMarks = String.join(", ", Collections.nCopies(fieldsForEditor().size(), "?"));
-        String joinedFieldNames = fieldsForEditor().stream().map(f -> f.name).collect(Collectors.joining(", "));
+        String questionMarks = String.join(", ", Collections.nCopies(editorFields().size(), "?"));
+        String joinedFieldNames = fieldsToString(editorFields());
         String idValue = setDefaultId ? "DEFAULT" : "?";
         return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
+    }
+
+    public static String fieldsToString (List<Field> fieldsToJoin) {
+        return fieldsToString(fieldsToJoin, null);
+    }
+
+    public static String fieldsToString (List<Field> fieldsToJoin, String prefix) {
+        return fieldsToJoin.stream()
+                .map(f -> prefix != null ? prefix + f.name : f.name)
+                .collect(Collectors.joining(", "));
     }
 
     // FIXME: Add table method that sets a field parameter based on field name and string value?
 //    public void setParameterByName (PreparedStatement preparedStatement, String fieldName, String value) {
 //        Field field = getFieldForName(fieldName);
-//        int editorFieldIndex = fieldsForEditor().indexOf(field);
+//        int editorFieldIndex = editorFields().indexOf(field);
 //        field.setParameter(preparedStatement, editorFieldIndex, value);
 //    }
 
@@ -390,7 +416,7 @@ public class Table {
      */
     public String generateUpdateSql (String namespace, int id) {
         // Collect field names for string joining from JsonObject.
-        String joinedFieldNames = fieldsForEditor().stream()
+        String joinedFieldNames = editorFields().stream()
                 // If updating, add suffix for use in set clause
                 .map(field -> field.name + " = ?")
                 .collect(Collectors.joining(", "));
@@ -400,10 +426,48 @@ public class Table {
     }
 
     /**
-     * Generate select all SQL string.
+     * Generate select all SQL string. The minimum requirement parameter is used to determine which fields ought to be
+     * included in the select statement. For example, if "OPTIONAL" is passed in, both optional and required fields
+     * are included in the select. If "EDITOR" is the minimum requirement, editor, optional, and required fields will
+     * all be included.
      */
-    public String generateSelectSql (String namespace) {
-        return String.format("select * from %s", String.join(".", namespace, name));
+    public String generateSelectSql (String namespace, Requirement minimumRequirement) {
+        String fieldsString;
+        String tableName = String.join(".", namespace, name);
+        if (minimumRequirement.equals(EDITOR)) fieldsString = fieldsToString(editorFields(), tableName + ".");
+        else if (minimumRequirement.equals(OPTIONAL)) fieldsString = fieldsToString(specFields(), tableName + ".");
+        else if (minimumRequirement.equals(REQUIRED)) fieldsString = fieldsToString(requiredFields(), tableName + ".");
+        else fieldsString = "*";
+        return String.format("select %s from %s", fieldsString, tableName);
+    }
+
+    /**
+     * Constructs a join clause to use in conjunction with {@link #generateJoinSql}. By default the join type is "INNER
+     * JOIN" and the join field is whatever the table instance's key field is. Both of those defaults can be overridden
+     * with the other overloaded methods.
+     */
+    public String generateJoinSql (Table joinTable, String namespace) {
+        return generateJoinSql(joinTable, null, namespace, null);
+    }
+
+    public String generateJoinSql (Table joinTable, String namespace, String fieldName) {
+        return generateJoinSql(joinTable, null, namespace, fieldName);
+    }
+
+    public String generateJoinSql (Table joinTable, String joinType, String namespace, String fieldName) {
+        if (fieldName == null) {
+            fieldName = getKeyFieldName();
+        }
+        if (joinType == null) {
+            joinType = "INNER JOIN";
+        }
+        // Construct the join clause. A sample might appear like:
+        // " INNER JOIN schema.join_table ON schema.this_table.field_name = schema.join_table.field_name"
+        return String.format(" %s %s.%s ON %s.%s.%s = %s.%s.%s ",
+                joinType,
+                namespace, joinTable.name,
+                namespace, this.name, fieldName,
+                namespace, joinTable.name, fieldName);
     }
 
     public String generateDeleteSql (String namespace) {

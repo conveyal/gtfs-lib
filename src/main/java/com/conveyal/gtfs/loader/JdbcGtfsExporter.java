@@ -40,6 +40,7 @@ public class JdbcGtfsExporter {
     private ZipOutputStream zipOutputStream;
     // The reference feed ID (namespace) to copy.
     private final String feedIdToExport;
+    private boolean postgresText;
 
     public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
         this.feedIdToExport = feedId;
@@ -67,8 +68,10 @@ public class JdbcGtfsExporter {
             // If we create a schema or table on one connection, then access it in a separate connection, we have no
             // guarantee that it exists when the accessing statement is executed.
             connection = dataSource.getConnection();
-            // Include the dot separator in the table prefix.
-            // This allows everything to work even when there's no prefix.
+            // Use the Postgres text load format if we're connected to that DBMS.
+            postgresText = connection.getMetaData().getDatabaseProductName().equals("PostgreSQL");
+            // Construct where clause for routes for use in filtering GTFS data if exporting from the editor.
+            String routesWhereClause = String.format(" where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             // FIXME: NO non-fatal exception errors are being captured during copy operations.
             result.agency = export(Table.AGENCY);
@@ -124,26 +127,70 @@ public class JdbcGtfsExporter {
             result.fareAttributes = export(Table.FARE_ATTRIBUTES);
             result.fareRules = export(Table.FARE_RULES);
             result.feedInfo = export(Table.FEED_INFO);
-            // FIXME: only write frequencies for "approved" routes using COPY TO with results of select query
-            result.frequencies = export(Table.FREQUENCIES);
-            // FIXME: only write "approved" routes using COPY TO with results of select query
-            result.routes = export(Table.ROUTES);
+            // Only write frequencies for "approved" routes using COPY TO with results of select query
+            String frequencySelectSql = null;
+            if (fromEditor) {
+                // Generate filter SQL for trips if exporting from the editor.
+                // The filter clause for frequencies requires two joins to reach the routes table and a where filter on
+                // route status.
+                frequencySelectSql = Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL) +
+                        Table.FREQUENCIES.generateJoinSql(Table.TRIPS, feedIdToExport) +
+                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id") +
+                        routesWhereClause;
+            }
+            result.frequencies = export(Table.FREQUENCIES, frequencySelectSql);
+            // Only write "approved" routes using COPY TO with results of select query
+            String routeSelectSql = null;
+            if (fromEditor) {
+                // The filter clause for routes is simple. We're just checking that the route is APPROVED.
+                routeSelectSql = Table.ROUTES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL) +
+                        routesWhereClause;
+            }
+            result.routes = export(Table.ROUTES, routeSelectSql);
             // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
             // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
             // frequency-based pattern travel times match stop time arrivals/departures?
 //            export(Table.PATTERNS);
 //            export(Table.PATTERN_STOP);
-            // FIXME: only write shapes for "approved" routes using COPY TO with results of select query
-            result.shapes = export(Table.SHAPES);
+            // Only write shapes for "approved" routes using COPY TO with results of select query
+            String shapeSelectSql = null;
+            if (fromEditor) {
+                // Generate filter SQL for trips if exporting from the editor.
+                // The filter clause for shapes requires two joins to reach the routes table and a where filter on
+                // route status.
+                // FIXME: I'm not sure that shape_id is indexed for the trips table. This could cause slow downs.
+                shapeSelectSql = Table.SHAPES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL) +
+                        Table.SHAPES.generateJoinSql(Table.TRIPS, feedIdToExport) +
+                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id") +
+                        routesWhereClause;
+            }
+            result.shapes = export(Table.SHAPES, shapeSelectSql);
             result.stops = export(Table.STOPS);
-            // FIXME: only write stop times for "approved" routes using COPY TO with results of select query
-            result.stopTimes = export(Table.STOP_TIMES);
+            // Only write stop times for "approved" routes using COPY TO with results of select query
+            String stopTimesSelectSql = null;
+            if (fromEditor) {
+                // Generate filter SQL for trips if exporting from the editor.
+                // The filter clause for stop times requires two joins to reach the routes table and a where filter on
+                // route status.
+                stopTimesSelectSql = Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL) +
+                        Table.STOP_TIMES.generateJoinSql(Table.TRIPS, feedIdToExport) +
+                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id") +
+                        routesWhereClause;
+            }
+            result.stopTimes = export(Table.STOP_TIMES, stopTimesSelectSql);
             result.transfers = export(Table.TRANSFERS);
-            // FIXME: only write trips for "approved" routes using COPY TO with results of select query
-            result.trips = export(Table.TRIPS);
+            String tripSelectSql = null;
+            if (fromEditor) {
+                // Generate filter SQL for trips if exporting from the editor.
+                // The filter clause for trips requires an inner join on the routes table and the same where check on
+                // route status.
+                tripSelectSql = Table.TRIPS.generateSelectSql(feedIdToExport, Requirement.OPTIONAL) +
+                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id") +
+                        routesWhereClause;
+            }
+            result.trips = export(Table.TRIPS, tripSelectSql);
 
             zipOutputStream.close();
-
             result.completionTime = System.currentTimeMillis();
             result.loadTimeMillis = result.completionTime - startTime;
             // Exporting primary GTFS tables for GRTA Xpress = 12 sec
@@ -160,11 +207,13 @@ public class JdbcGtfsExporter {
     }
 
     private TableLoadResult export (Table table) {
+        return export(table, null);
+    }
+
+    private TableLoadResult export (Table table, String filterSql) {
+        long startTime = System.currentTimeMillis();
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {
-            // Use the Postgres text load format if we're connected to that DBMS.
-            boolean postgresText = connection.getMetaData().getDatabaseProductName().equals("PostgreSQL");
-
             if (postgresText) {
                 // Create entry for table
                 ZipEntry zipEntry = new ZipEntry(table.name + ".txt");
@@ -172,13 +221,21 @@ public class JdbcGtfsExporter {
 
                 // don't let CSVWriter close the stream when it is garbage-collected
                 OutputStream protectedOut = new FilterOutputStream(zipOutputStream);
-                String copySql = String.format("copy %s.%s to STDOUT DELIMITER ',' CSV HEADER", feedIdToExport, table.name);
+
+                if (filterSql == null) {
+                    // If there is no filter SQL specified, simply copy out the whole table.
+                    filterSql = String.format("%s.%s", feedIdToExport, table.name);
+                } else {
+                    // Surround filter SQL in parentheses.
+                    filterSql = String.format("(%s)", filterSql);
+                }
+                String copySql = String.format("copy %s to STDOUT DELIMITER ',' CSV HEADER", filterSql);
                 LOG.info(copySql);
                 // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
                 CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
                 copyManager.copyOut(copySql, protectedOut);
                 zipOutputStream.closeEntry();
-                LOG.info("Copy completed.");
+                LOG.info("Copy {} completed in {} ms.", table.name, System.currentTimeMillis() - startTime);
             } else {
                 LOG.error("Export not implemented for non-PostgreSQL databases.");
                 throw new NotImplementedException();
