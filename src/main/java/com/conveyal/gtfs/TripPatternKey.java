@@ -36,7 +36,7 @@ public class TripPatternKey {
         dropoffTypes.add(st.drop_off_type);
         // Note, the items listed below are not used in the equality check.
         arrivalTimes.add(st.arrival_time);
-        departureTimes.add(st.departure_time - st.arrival_time);
+        departureTimes.add(st.departure_time);
         timepoints.add(st.timepoint);
         shapeDistances.add(st.shape_dist_traveled);
     }

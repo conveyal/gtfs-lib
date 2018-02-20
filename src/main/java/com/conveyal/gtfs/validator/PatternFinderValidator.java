@@ -102,7 +102,8 @@ public class PatternFinderValidator extends TripValidator {
                 insertPatternStatement.setString(2, pattern.route_id);
                 insertPatternStatement.setString(3, pattern.name);
                 // FIXME: This could be null...
-                insertPatternStatement.setString(4, pattern.associatedShapes.iterator().next());
+                String shapeId = pattern.associatedShapes.iterator().next();
+                insertPatternStatement.setString(4, shapeId);
                 insertPatternStatement.addBatch();
                 // Construct pattern stops based on values in trip pattern key.
                 // FIXME: Use pattern stops table here?
@@ -110,12 +111,13 @@ public class PatternFinderValidator extends TripValidator {
                     int travelTime = 0;
                     String stopId = key.stops.get(i);
                     if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
+                    int dwellTime = key.departureTimes.get(i) - key.arrivalTimes.get(i);
 
                     insertPatternStopStatement.setString(1, pattern.pattern_id);
                     setIntParameter(insertPatternStopStatement, 2, i);
                     insertPatternStopStatement.setString(3, stopId);
                     setIntParameter(insertPatternStopStatement,4, travelTime);
-                    setIntParameter(insertPatternStopStatement,5, key.departureTimes.get(i) - key.arrivalTimes.get(i));
+                    setIntParameter(insertPatternStopStatement,5, dwellTime);
                     setIntParameter(insertPatternStopStatement,6, key.dropoffTypes.get(i));
                     // FIXME: NPE encountered on setIntParameter for key pickup_types?
                     setIntParameter(insertPatternStopStatement,7, key.pickupTypes.get(i));
