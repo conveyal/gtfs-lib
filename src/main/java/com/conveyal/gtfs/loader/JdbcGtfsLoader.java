@@ -313,25 +313,31 @@ public class JdbcGtfsLoader {
         // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
-        Field[] fields = new Field[csvReader.getHeaderCount()];
+        Field[] rawFields = new Field[csvReader.getHeaderCount()];
         Set<String> fieldsSeen = new HashSet<>();
         String keyField = table.getKeyFieldName();
         String orderField = table.getOrderFieldName();
         int keyFieldIndex = -1;
+        List<Integer> columnsToSkip = new ArrayList<>();
         for (int h = 0; h < csvReader.getHeaderCount(); h++) {
             String header = sanitize(csvReader.getHeader(h));
-            if (fieldsSeen.contains(header)) {
+            if (fieldsSeen.contains(header) || "id".equals(header)) {
+                // FIXME: add separate error for tables containing ID field.
                 errorStorage.storeError(NewGTFSError.forTable(table, DUPLICATE_HEADER).setBadValue(header));
-                // TODO deal with missing (null) Field object below
-                fields[h] = null;
+                rawFields[h] = null;
+                // Store column index to skip when populating values below.
+                columnsToSkip.add(h);
             } else {
-                fields[h] = table.getFieldForName(header);
+                rawFields[h] = table.getFieldForName(header);
                 fieldsSeen.add(header);
                 if (keyField.equals(header)) {
                     keyFieldIndex = h;
                 }
             }
         }
+        Collections.sort(columnsToSkip, Collections.reverseOrder());
+        // Replace fields array with filtered list that does not include null values (for duplicate headers or ID field).
+        Field[] fields = Arrays.stream(rawFields).filter(field -> field != null).toArray(Field[]::new);
 
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
         // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
@@ -370,8 +376,8 @@ public class JdbcGtfsLoader {
             }
             int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
             if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
-            if (csvReader.getColumnCount() != fields.length) {
-                String badValues = String.format("expected=%d; found=%d", fields.length, csvReader.getColumnCount());
+            if (csvReader.getColumnCount() != rawFields.length) {
+                String badValues = String.format("expected=%d; found=%d", rawFields.length, csvReader.getColumnCount());
                 errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, WRONG_NUMBER_OF_FIELDS, badValues));
                 continue;
             }
@@ -380,9 +386,16 @@ public class JdbcGtfsLoader {
             // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
             if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
             else insertStatement.setInt(1, lineNumber);
+
+            // Remove the values from the csv row for any bad fields (i.e., duplicate headers or named "ID").
+            // CSV values needs to be a LinkedList to support removal operation (Arrays.asList is read-only).
+            List<String> values = new LinkedList<>(Arrays.asList(csvReader.getValues()));
+            for (int columnIndex : columnsToSkip) {
+                values.remove(columnIndex);
+            }
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
-                String string = csvReader.get(f);
+                String string = values.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
                 table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
                 // Add value for entry into table
