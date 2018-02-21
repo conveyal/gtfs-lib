@@ -1,7 +1,13 @@
 package com.conveyal.gtfs.loader;
 
 /**
- * Created by abyrd on 2017-03-30
+ * These are field requirement levels, which should be assigned accordingly to any fields within a {@link Table}
+ * to determine if a field is requisite for a specific purpose.
+ *
+ * TODO: These enum values should be placed in an ordered list or assigned order constants, which allow a generic
+ * filtering predicate that returns true for elements "up to and including" a supplied level. Currently, this has a
+ * fragmented implementation in {@link Table#editorFields()} and {@link Table#specFields()}. However, it is currently
+ * unclear what the levels.order for the types EXTENSION, PROPIETARY, and UNKNOWN ought to be.
  */
 public enum Requirement {
     REQUIRED,    // Required by the GTFS spec
