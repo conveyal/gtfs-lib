@@ -150,6 +150,7 @@ public class JdbcGtfsExporter {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for frequencies requires two joins to reach the routes table and a where filter on
                 // route status.
+                // FIXME Replace with string literal query instead of clause generators
                 frequencySelectSql = String.join(" ",
                         Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
                         Table.FREQUENCIES.generateJoinSql(Table.TRIPS, feedIdToExport),
@@ -178,19 +179,25 @@ public class JdbcGtfsExporter {
                 // don't appear in the result. This essentially grabs only one row from the trips table per unique
                 // shape_id, in effect creating a one-to-one mapping from a shape to a route. FIXME this is simplifying
                 // the relationship because multiple trips that share a single shape may operate on different routes.
-                String selectDistinct = String.format(
-                        // FIXME: I'm not sure if this is Postgres-specific syntax for SELECT DISTINCT
-                        "SELECT DISTINCT ON (shape_id) shape_id, trip_id, route_id from %s.%s",
-                        feedIdToExport, Table.TRIPS.name);
+//                String selectDistinct = String.format(
+//                        // FIXME: I'm not sure if this is Postgres-specific syntax for SELECT DISTINCT
+//                        "SELECT DISTINCT ON (shape_id) shape_id, trip_id, route_id from %s.%s",
+//                        feedIdToExport, Table.TRIPS.name);
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for shapes requires two joins to reach the routes table and a where filter on
                 // route status.
                 // FIXME: I'm not sure that shape_id is indexed for the trips table. This could cause slow downs.
-                shapeSelectSql = String.join(" ",
-                        Table.SHAPES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
-                        Table.SHAPES.generateJoinSql(selectDistinct, Table.TRIPS, feedIdToExport),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                // FIXME: this is exporting point_type, which is not a GTFS field, but its presence shouldn't hurt.
+                shapeSelectSql = String.format("select %s.shapes.* " +
+                        "from (select distinct %s.trips.shape_id " +
+                        "from %s.trips, %s.routes " +
+                        "where %s.trips.route_id = %s.routes.route_id and %s.routes.status = 2) as unique_approved_shape_ids, " +
+                        "%s.shapes where unique_approved_shape_ids.shape_id = %s.shapes.shape_id", feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport);
+//                shapeSelectSql = String.join(" ",
+//                        Table.SHAPES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
+//                        Table.SHAPES.generateJoinSql(selectDistinct, Table.TRIPS, feedIdToExport),
+//                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
+//                        whereRouteIsApproved);
             }
             result.shapes = export(Table.SHAPES, shapeSelectSql);
             result.stops = export(Table.STOPS);
@@ -205,6 +212,7 @@ public class JdbcGtfsExporter {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
                 // route status.
+                // FIXME Replace with string literal query instead of clause generators
                 stopTimesSelectSql = String.join(" ",
                         selectWithTransformedTimes,
                         Table.STOP_TIMES.generateJoinSql(Table.TRIPS, feedIdToExport),
@@ -218,6 +226,7 @@ public class JdbcGtfsExporter {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for trips requires an inner join on the routes table and the same where check on
                 // route status.
+                // FIXME Replace with string literal query instead of clause generators
                 tripSelectSql = String.join(" ",
                         Table.TRIPS.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
                         Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
