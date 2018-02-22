@@ -7,6 +7,7 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.*;
 import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.stats.FeedStats;
+import com.conveyal.gtfs.util.Util;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.*;
 import com.google.common.eventbus.EventBus;
@@ -15,7 +16,6 @@ import com.vividsolutions.jts.algorithm.ConvexHull;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.index.strtree.STRtree;
 import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
-import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.BTreeMap;
 import org.mapdb.Bind;
 import org.mapdb.DB;
@@ -439,14 +439,10 @@ public class GTFSFeed implements Cloneable, Closeable {
                 double totalLengthOfInterpolatedSection = 0;
                 double[] lengthOfInterpolatedSections = new double[nInterpolatedStops];
 
-                GeodeticCalculator calc = new GeodeticCalculator();
-
                 for (int stopTimeToInterpolate = startOfInterpolatedBlock, i = 0; stopTimeToInterpolate < stopTime; stopTimeToInterpolate++, i++) {
                     Stop start = stops.get(stopTimes[stopTimeToInterpolate - 1].stop_id);
                     Stop end = stops.get(stopTimes[stopTimeToInterpolate].stop_id);
-                    calc.setStartingGeographicPoint(start.stop_lon, start.stop_lat);
-                    calc.setDestinationGeographicPoint(end.stop_lon, end.stop_lat);
-                    double segLen = calc.getOrthodromicDistance();
+                    double segLen = Util.fastDistance(start.stop_lat, start.stop_lon, end.stop_lat, end.stop_lon);
                     totalLengthOfInterpolatedSection += segLen;
                     lengthOfInterpolatedSections[i] = segLen;
                 }
@@ -454,9 +450,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 // add the segment post-last-interpolated-stop
                 Stop start = stops.get(stopTimes[stopTime - 1].stop_id);
                 Stop end = stops.get(stopTimes[stopTime].stop_id);
-                calc.setStartingGeographicPoint(start.stop_lon, start.stop_lat);
-                calc.setDestinationGeographicPoint(end.stop_lon, end.stop_lat);
-                totalLengthOfInterpolatedSection += calc.getOrthodromicDistance();
+                totalLengthOfInterpolatedSection += Util.fastDistance(start.stop_lat, start.stop_lon, end.stop_lat, end.stop_lon);
 
                 int departureBeforeInterpolation = stopTimes[startOfInterpolatedBlock - 1].departure_time;
                 int arrivalAfterInterpolation = stopTimes[stopTime].arrival_time;
