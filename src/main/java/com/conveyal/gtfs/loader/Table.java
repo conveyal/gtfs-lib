@@ -11,7 +11,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -30,7 +29,6 @@ import static com.conveyal.gtfs.loader.Requirement.*;
 public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
-    private static final Requirement[] requirementsForEditorFields = new Requirement[]{EDITOR, REQUIRED, OPTIONAL};
 
     public final String name;
 
@@ -128,7 +126,9 @@ public class Table {
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
         new ColorField("route_text_color",  OPTIONAL),
-        new ShortField("publicly_visible", EDITOR, 2),
+        // Editor fields below.
+        new ShortField("publicly_visible", EDITOR, 1),
+        // Status values are In progress (0), Pending approval (1), and Approved (2).
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
 
@@ -302,11 +302,35 @@ public class Table {
         return this;
     }
 
-    public List<Field> fieldsForEditor () {
+    /**
+     * Get only those fields included in the official GTFS specification for this table or used by the editor.
+     */
+    public List<Field> editorFields() {
+        List<Field> editorFields = new ArrayList<>();
+        for (Field f : fields) if (f.requirement == REQUIRED || f.requirement == OPTIONAL || f.requirement == EDITOR) {
+            editorFields.add(f);
+        }
+        return editorFields;
+    }
+
+    /**
+     * Get only those fields marked as required in the official GTFS specification for this table.
+     */
+    public List<Field> requiredFields () {
         // Filter out fields not used in editor (i.e., extension fields).
-        return Arrays.stream(fields)
-                .filter(field -> Arrays.asList(requirementsForEditorFields).indexOf(field.requirement) != -1)
-                .collect(Collectors.toList());
+        List<Field> requiredFields = new ArrayList<>();
+        for (Field f : fields) if (f.requirement == REQUIRED) requiredFields.add(f);
+        return requiredFields;
+    }
+
+    /**
+     * Get only those fields included in the official GTFS specification for this table, i.e., filter out fields used
+     * in the editor or extensions.
+     */
+    public List<Field> specFields () {
+        List<Field> specFields = new ArrayList<>();
+        for (Field f : fields) if (f.requirement == REQUIRED || f.requirement == OPTIONAL) specFields.add(f);
+        return specFields;
     }
 
     public boolean isCascadeDeleteRestricted() {
@@ -371,17 +395,32 @@ public class Table {
      * Create SQL string for use in insert statement. Note, this filters table's fields to only those used in editor.
      */
     public String generateInsertSql (String namespace, boolean setDefaultId) {
-        String tableName = namespace == null ? name : String.join(".", namespace, name);
-        String questionMarks = String.join(", ", Collections.nCopies(fieldsForEditor().size(), "?"));
-        String joinedFieldNames = fieldsForEditor().stream().map(f -> f.name).collect(Collectors.joining(", "));
+        String tableName = namespace == null
+                ? name
+                : String.join(".", namespace, name);
+        String questionMarks = String.join(", ", Collections.nCopies(editorFields().size(), "?"));
+        String joinedFieldNames = commaSeparatedNames(editorFields());
         String idValue = setDefaultId ? "DEFAULT" : "?";
         return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
+    }
+
+    public String commaSeparatedNames(List<Field> fieldsToJoin) {
+        return commaSeparatedNames(fieldsToJoin, null);
+    }
+
+    public String commaSeparatedNames(List<Field> fieldsToJoin, String prefix) {
+        return fieldsToJoin.stream()
+                // Only prefix fields that are foreign refs or key fields
+                .map(f -> prefix != null && (f.isForeignReference() || getKeyFieldName().equals(f.name))
+                        ? prefix + f.name
+                        : f.name)
+                .collect(Collectors.joining(", "));
     }
 
     // FIXME: Add table method that sets a field parameter based on field name and string value?
 //    public void setParameterByName (PreparedStatement preparedStatement, String fieldName, String value) {
 //        Field field = getFieldForName(fieldName);
-//        int editorFieldIndex = fieldsForEditor().indexOf(field);
+//        int editorFieldIndex = editorFields().indexOf(field);
 //        field.setParameter(preparedStatement, editorFieldIndex, value);
 //    }
 
@@ -390,7 +429,7 @@ public class Table {
      */
     public String generateUpdateSql (String namespace, int id) {
         // Collect field names for string joining from JsonObject.
-        String joinedFieldNames = fieldsForEditor().stream()
+        String joinedFieldNames = editorFields().stream()
                 // If updating, add suffix for use in set clause
                 .map(field -> field.name + " = ?")
                 .collect(Collectors.joining(", "));
@@ -400,10 +439,78 @@ public class Table {
     }
 
     /**
-     * Generate select all SQL string.
+     * Generate select all SQL string. The minimum requirement parameter is used to determine which fields ought to be
+     * included in the select statement. For example, if "OPTIONAL" is passed in, both optional and required fields
+     * are included in the select. If "EDITOR" is the minimum requirement, editor, optional, and required fields will
+     * all be included.
      */
-    public String generateSelectSql (String namespace) {
-        return String.format("select * from %s", String.join(".", namespace, name));
+    public String generateSelectSql (String namespace, Requirement minimumRequirement) {
+        String fieldsString;
+        String tableName = String.join(".", namespace, name);
+        String fieldPrefix = tableName + ".";
+        if (minimumRequirement.equals(EDITOR)) fieldsString = commaSeparatedNames(editorFields(), fieldPrefix);
+        else if (minimumRequirement.equals(OPTIONAL)) fieldsString = commaSeparatedNames(specFields(), fieldPrefix);
+        else if (minimumRequirement.equals(REQUIRED)) fieldsString = commaSeparatedNames(requiredFields(), fieldPrefix);
+        else fieldsString = "*";
+        return String.format("select %s from %s", fieldsString, tableName);
+    }
+
+    public String generateJoinSql (Table joinTable, String namespace, String fieldName, boolean prefixTableName) {
+        return generateJoinSql(null, joinTable, null, namespace, fieldName, prefixTableName);
+    }
+
+    public String generateJoinSql (String optionalSelect, Table joinTable, String namespace) {
+        return generateJoinSql(optionalSelect, joinTable, null, namespace, null, true);
+    }
+
+    public String generateJoinSql (Table joinTable, String namespace) {
+        return generateJoinSql(null, joinTable, null, namespace, null, true);
+    }
+
+    /**
+     * Constructs a join clause to use in conjunction with {@link #generateJoinSql}. By default the join type is "INNER
+     * JOIN" and the join field is whatever the table instance's key field is. Both of those defaults can be overridden
+     * with the other overloaded methods.
+     * @param optionalSelect optional select query to pre-select the join table
+     * @param joinTable the Table to join with
+     * @param joinType type of join (e.g., INNER JOIN, OUTER LEFT JOIN, etc.)
+     * @param namespace feedId (or schema prefix)
+     * @param fieldName the field to join on (default's to key field)
+     * @param prefixTableName whether to prefix this table's name with the schema (helpful if this join follows a
+     *                        previous join that renamed the table by dropping the schema/namespace
+     * @return a fully formed join clause that can be appended to a select statement
+     */
+    public String generateJoinSql (String optionalSelect, Table joinTable, String joinType, String namespace, String fieldName, boolean prefixTableName) {
+        if (fieldName == null) {
+            // Default to key field if field name is not specified
+            fieldName = getKeyFieldName();
+        }
+        if (joinType == null) {
+            // Default to INNER JOIN if no join type provided
+            joinType = "INNER JOIN";
+        }
+        String joinTableQuery;
+        String joinTableName;
+        if (optionalSelect != null) {
+            // If a pre-select query is provided for the join table, the join table name must not contain the namespace
+            // prefix.
+            joinTableName = joinTable.name;
+            joinTableQuery = String.format("(%s) %s", optionalSelect, joinTableName);
+        } else {
+            // Otherwise, set both the join "query" and the table name to the standard "namespace.table_name"
+            joinTableQuery = joinTableName = String.format("%s.%s", namespace, joinTable.name);
+        }
+        // If prefix table name is set to false, skip prefixing the table name.
+        String tableName = prefixTableName ? String.format("%s.%s", namespace, this.name) :this.name;
+        // Construct the join clause. A sample might appear like:
+        // "INNER JOIN schema.join_table ON schema.this_table.field_name = schema.join_table.field_name"
+        // OR if optionalSelect is specified
+        // "INNER JOIN (select * from schema.join_table where x = 'y') join_table ON schema.this_table.field_name = join_table.field_name"
+        return String.format("%s %s ON %s.%s = %s.%s",
+                joinType,
+                joinTableQuery,
+                tableName, fieldName,
+                joinTableName, fieldName);
     }
 
     public String generateDeleteSql (String namespace) {

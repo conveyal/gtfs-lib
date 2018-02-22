@@ -316,13 +316,12 @@ public class JdbcGtfsLoader {
         Field[] fields = new Field[csvReader.getHeaderCount()];
         Set<String> fieldsSeen = new HashSet<>();
         String keyField = table.getKeyFieldName();
-        String orderField = table.getOrderFieldName();
         int keyFieldIndex = -1;
         for (int h = 0; h < csvReader.getHeaderCount(); h++) {
             String header = sanitize(csvReader.getHeader(h));
-            if (fieldsSeen.contains(header)) {
+            if (fieldsSeen.contains(header) || "id".equals(header)) {
+                // FIXME: add separate error for tables containing ID field.
                 errorStorage.storeError(NewGTFSError.forTable(table, DUPLICATE_HEADER).setBadValue(header));
-                // TODO deal with missing (null) Field object below
                 fields[h] = null;
             } else {
                 fields[h] = table.getFieldForName(header);
@@ -332,10 +331,16 @@ public class JdbcGtfsLoader {
                 }
             }
         }
-
+        // Create separate fields array with filtered list that does not include null values (for duplicate headers or
+        // ID field). This is solely used to construct the table and array of values to load.
+        Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
+        if (cleanFields.length == 0) {
+            // Do not create the table if there are no valid fields.
+            return 0;
+        }
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
         // FIXME this is confusing, we only create a new table object so we can call a couple of methods on it, all of which just need a list of fields.
-        Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.required, fields);
+        Table targetTable = new Table(tablePrefix + table.name, table.entityClass, table.required, cleanFields);
 
         // NOTE H2 doesn't seem to work with schemas (or create schema doesn't work).
         // With bulk loads it takes 140 seconds to load the data and additional 120 seconds just to index the stop times.
@@ -357,7 +362,7 @@ public class JdbcGtfsLoader {
 
         // When outputting text, accumulate transformed strings to allow skipping rows when errors are encountered.
         // One extra position in the array for the CSV line number.
-        String[] transformedStrings = new String[fields.length + 1];
+        String[] transformedStrings = new String[cleanFields.length + 1];
 
         // Iterate over each record and prepare the record for storage in the table either through batch insert
         // statements or postgres text copy operation.
@@ -380,13 +385,21 @@ public class JdbcGtfsLoader {
             // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
             if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
             else insertStatement.setInt(1, lineNumber);
+            // Maintain a separate columnIndex from for loop because some fields may be null and not included in the set
+            // of fields for this table.
+            int columnIndex = 0;
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
+                // If the field is null, it represents a duplicate header or ID field and must be skipped to maintain
+                // table integrity.
+                if (field == null) continue;
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
                 table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
                 // Add value for entry into table
-                setValueForField(table, f, lineNumber, field, string, postgresText, transformedStrings);
+                setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
+                // Increment column index.
+                columnIndex += 1;
             }
             if (postgresText) {
                 // Print a new line in the standard postgres text format:
