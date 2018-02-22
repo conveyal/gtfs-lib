@@ -5,8 +5,7 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
 
 /**
- * GeoUtils ported from old GTFS validator. Does everything with JTS MathTransforms and UTM, which is needlessly complicated,
- * so all functions are deprecated.
+ * GeoUtils ported from old GTFS validator, without the MathTransforms.
  */
 public class GeoUtils {
   public static double RADIANS = 2 * Math.PI;
