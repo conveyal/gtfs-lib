@@ -80,7 +80,6 @@ public class Table {
     ).restrictDelete().addPrimaryKey();
 
     public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
-//            new StringField("exception_id",  REQUIRED),
             new StringField("name", REQUIRED), // FIXME: This makes name the key field...
             // FIXME: Change to DateListField
             new DateListField("dates", REQUIRED),
@@ -714,9 +713,6 @@ public class Table {
     /**
      * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
      * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error.
-     *
-     * FIXME: This is broken for calendar_dates, where the key field (i.e., service_id) can be repeated multiple times in
-     * the calendar_dates table and does not actually need to exist in the calendar table.
      */
     public void checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String string, JdbcGtfsLoader.ReferenceTracker referenceTracker) {
         // Store field-scoped transit ID for referential integrity check. (Note, entity scoping doesn't work here because
@@ -726,7 +722,12 @@ public class Table {
         String orderField = getOrderFieldName();
         // If table has an order field, it should supersede the key field as the "unique" field
         String uniqueKeyField = orderField != null ? orderField : keyField;
+        String transitId = String.join(":", keyField, keyValue);
 
+        // If the field is optional and there is no value present, skip check.
+        if (!field.isRequired() && "".equals(string)) return;
+
+        // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
         if (field.isForeignReference()) {
             // Check referential integrity if applicable
@@ -746,30 +747,27 @@ public class Table {
             }
         }
 
+        // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
+        // whether an order field is part of the "unique ID."
+        Set<String> listOfUniqueIds = referenceTracker.transitIds;
+        String uniqueId = transitId;
+
+        // There is no need to check for duplicate IDs if the field is a foreign reference.
+        if (field.isForeignReference()) return;
+        // Next, check that the ID is table-unique.
         if (field.name.equals(uniqueKeyField)) {
-            // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
-            // whether an order field is part of the "unique ID."
-            String transitId = String.join(":", getKeyFieldName(), keyValue);
-            Set<String> listOfUniqueIds;
-            String uniqueId;
             // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
             if (isOrderField) {
                 // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
                 // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
                 listOfUniqueIds = referenceTracker.transitIdsWithSequence;
                 uniqueId = String.join(":", field.name, keyValue, string);
-                if (!field.isForeignReference() && !referenceTracker.transitIds.contains(transitId)) {
-                    // Only add ID if the field is not a foreign reference (e.g., adds shape_id for shapes.txt,
-                    // but skips trip_id in stop_times.txt)
-                    referenceTracker.transitIds.add(transitId);
-                }
-            } else {
-                listOfUniqueIds = referenceTracker.transitIds;
-                uniqueId = transitId;
             }
             // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
-            boolean isDuplicate = !listOfUniqueIds.add(uniqueId);
-            if (isDuplicate) {
+            boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
+            if (!this.name.equals("calendar_dates") && valueAlreadyExists) {
+                // NOTE: If this is the calendar_dates table, duplicate check should be ignored because the service_id can
+                // appear in multiple rows in the table. Otherwise, if the value is a duplicate, add an error.
                 NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
                         .setEntityId(keyValue);
                 if (isOrderField) {
@@ -777,6 +775,10 @@ public class Table {
                 }
                 referenceTracker.errorStorage.storeError(duplicateIdError);
             }
+        } else {
+            // If the field is not the table unique key field, skip the duplicate ID check and simply add the ID to the
+            // list of unique IDs.
+            listOfUniqueIds.add(uniqueId);
         }
     }
 
