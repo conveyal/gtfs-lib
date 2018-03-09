@@ -393,6 +393,7 @@ public class JdbcGtfsLoader {
                 // If the field is null, it represents a duplicate header or ID field and must be skipped to maintain
                 // table integrity.
                 if (field == null) continue;
+                // CSV reader get on an empty field will be an empty string literal.
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
                 table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
@@ -455,7 +456,7 @@ public class JdbcGtfsLoader {
     public void setValueForField(Table table, int fieldIndex, int lineNumber, Field field, String string, boolean postgresText, String[] transformedStrings) {
         if (string.isEmpty()) {
             // CSV reader always returns empty strings, not nulls
-            if (field.isRequired() && errorStorage != null) {
+            if (field.isRequired() && !field.isEmptyValuePermitted() && errorStorage != null) {
                 errorStorage.storeError(NewGTFSError.forLine(table, lineNumber, MISSING_FIELD, field.name));
             }
             setFieldToNull(postgresText, transformedStrings, fieldIndex, field);

@@ -100,7 +100,7 @@ public class Table {
         new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
-        new ShortField("transfers", REQUIRED, 2),
+        new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 

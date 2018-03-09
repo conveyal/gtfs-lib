@@ -28,6 +28,7 @@ public abstract class Field {
      * */
     Table referenceTable = null;
     private boolean shouldBeIndexed;
+    private boolean emptyValuePermitted;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
@@ -106,10 +107,27 @@ public abstract class Field {
     /**
      * Fluent method indicates that this field is a reference to an entry in the table provided as an argument.
      * @param table
-     * @return
+     * @return this same Field instance
      */
     public Field isReferenceTo(Table table) {
         this.referenceTable = table;
         return this;
+    }
+
+    /**
+     * Fluent method to permit empty values for this field. Used for cases like fare_attributes#transfers, where empty
+     * values are OK on a required field.
+     * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
+     */
+    public Field permitEmptyValue () {
+        this.emptyValuePermitted = true;
+        return this;
+    }
+
+    /**
+     * Check if empty values are permitted for this field.
+     */
+    public boolean isEmptyValuePermitted() {
+        return this.emptyValuePermitted;
     }
 }
