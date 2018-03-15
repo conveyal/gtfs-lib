@@ -43,6 +43,8 @@ public class Table {
     private Table parentTable;
     /** When snapshotting a table for editor use, this indicates whether a primary key constraint should be added to ID. */
     private boolean usePrimaryKey = false;
+    /** Indicates whether the table has unique key field. */
+    private boolean hasUniqueKeyField = true;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         this.name = name;
@@ -113,7 +115,7 @@ public class Table {
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
         new StringField("feed_version", OPTIONAL)
-    );
+    ).keyFieldIsNotUnique();
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
@@ -137,8 +139,9 @@ public class Table {
             // FIXME: referential integrity check for zone_id for below three fields?
             new StringField("origin_id", OPTIONAL),
             new StringField("destination_id", OPTIONAL),
-            new StringField("contains_id", OPTIONAL)
-    ).withParentTable(FARE_ATTRIBUTES).addPrimaryKey();
+            new StringField("contains_id", OPTIONAL))
+            .withParentTable(FARE_ATTRIBUTES)
+            .addPrimaryKey().keyFieldIsNotUnique();
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
@@ -197,8 +200,9 @@ public class Table {
             new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("transfer_type", REQUIRED),
-            new StringField("min_transfer_time", OPTIONAL)
-    ).addPrimaryKey();
+            new StringField("min_transfer_time", OPTIONAL))
+            .addPrimaryKey()
+            .keyFieldIsNotUnique();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
@@ -241,8 +245,9 @@ public class Table {
             new TimeField("start_time", REQUIRED),
             new TimeField("end_time", REQUIRED),
             new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
-            new IntegerField("exact_times", OPTIONAL, 1)
-    ).withParentTable(TRIPS);
+            new IntegerField("exact_times", OPTIONAL, 1))
+            .withParentTable(TRIPS)
+            .keyFieldIsNotUnique();
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
@@ -270,6 +275,14 @@ public class Table {
      */
     public Table restrictDelete () {
         this.cascadeDeleteRestricted = true;
+        return this;
+    }
+
+    /**
+     * Fluent method to de-set the
+     */
+    private Table keyFieldIsNotUnique() {
+        this.hasUniqueKeyField = false;
         return this;
     }
 
@@ -536,6 +549,11 @@ public class Table {
         return new StringField(name, UNKNOWN);
     }
 
+    /**
+     * Gets the key field for the table.
+     *
+     * FIXME: Should this return null if hasUniqueKeyField is false? Not sure what might break if we change this...
+     */
     public String getKeyFieldName () {
         // FIXME: If the table is constructed from fields found in a GTFS file, the first field is not guaranteed to be
         // the key field.
@@ -720,8 +738,9 @@ public class Table {
         // id.)
         String keyField = getKeyFieldName();
         String orderField = getOrderFieldName();
-        // If table has an order field, it should supersede the key field as the "unique" field
-        String uniqueKeyField = orderField != null ? orderField : keyField;
+        // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
+        // duplicates. If it has an order field, that order field should supersede the key field as the "unique" field.
+        String uniqueKeyField = !hasUniqueKeyField ? null : orderField != null ? orderField : keyField;
         String transitId = String.join(":", keyField, keyValue);
 
         // If the field is optional and there is no value present, skip check.
@@ -736,8 +755,8 @@ public class Table {
 
             if (!referenceTracker.transitIds.contains(referenceTransitId)) {
                 // If the reference tracker does not contain
-                // LOG.error("Ref error found in {} for field {} with value {}", table.name, referenceField, referenceTransitId);
-                NewGTFSError referentialIntegrityError = NewGTFSError.forLine(this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
+                NewGTFSError referentialIntegrityError = NewGTFSError.forLine(
+                        this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
                         .setEntityId(keyValue);
                 if (isOrderField) {
                     // If the field is an order field, set the sequence for the new error.
@@ -765,9 +784,8 @@ public class Table {
             }
             // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
             boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
-            if (!this.name.equals("calendar_dates") && valueAlreadyExists) {
-                // NOTE: If this is the calendar_dates table, duplicate check should be ignored because the service_id can
-                // appear in multiple rows in the table. Otherwise, if the value is a duplicate, add an error.
+            if (valueAlreadyExists) {
+                // If the value is a duplicate, add an error.
                 NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
                         .setEntityId(keyValue);
                 if (isOrderField) {
