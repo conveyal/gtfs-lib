@@ -95,7 +95,7 @@ public class Table {
         new StringField("service_id", REQUIRED),
         new DateField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
-    );
+    ).keyFieldIsNotUnique();
 
     public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", FareAttribute.class, OPTIONAL,
         new StringField("fare_id", REQUIRED),
