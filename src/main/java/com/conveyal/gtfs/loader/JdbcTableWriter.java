@@ -476,17 +476,23 @@ public class JdbcTableWriter implements TableWriter {
     private static void ensureReferentialIntegrity(Connection connection, ObjectNode jsonObject, String namespace, Table table, Integer id) throws SQLException {
         final boolean isCreating = id == null;
         String keyField = table.getKeyFieldName();
+        String tableName = String.join(".", namespace, table.name);
         if (jsonObject.get(keyField) == null || jsonObject.get(keyField).isNull()) {
             // FIXME: generate key field automatically for certain entities (e.g., trip ID). Maybe this should be
             // generated for all entities if null?
             if ("trip_id".equals(keyField)) {
                 jsonObject.put(keyField, UUID.randomUUID().toString());
+            } else if ("agency_id".equals(keyField)) {
+                LOG.warn("agency_id field for agency id={} is null.", id);
+                int rowSize = getRowCount(tableName, connection);
+                if (rowSize > 1 || (isCreating && rowSize > 0)) {
+                    throw new SQLException("agency_id must not be null if more than one agency exists.");
+                }
             } else {
                 throw new SQLException(String.format("Key field %s must not be null", keyField));
             }
         }
         String keyValue = jsonObject.get(keyField).asText();
-        String tableName = String.join(".", namespace, table.name);
         // If updating key field, check that there is no ID conflict on value (e.g., stop_id or route_id)
         TIntSet uniqueIds = getIdsForCondition(tableName, keyField, keyValue, connection);
         int size = uniqueIds.size();
@@ -522,10 +528,23 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+     * Get number of rows for a table. This is currently just used to check the number of entities for the agency table.
+     */
+    private static int getRowCount(String tableName, Connection connection) throws SQLException {
+        String rowCountSql = String.format("SELECT COUNT(*) FROM %s", tableName);
+        LOG.info(rowCountSql);
+        // Create statement for counting rows selected
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(rowCountSql);
+        if (resultSet.next()) return resultSet.getInt(1);
+        else return 0;
+    }
+
+    /**
      * For some condition (where field = string value), return the set of unique int IDs for the records that match.
      */
     private static TIntSet getIdsForCondition(String tableName, String keyField, String keyValue, Connection connection) throws SQLException {
-        String idCheckSql = String.format("select * from %s where %s = '%s'", tableName, keyField, keyValue);
+        String idCheckSql = String.format("select id from %s where %s = '%s'", tableName, keyField, keyValue);
         LOG.info(idCheckSql);
         // Create statement for counting rows selected
         Statement statement = connection.createStatement();

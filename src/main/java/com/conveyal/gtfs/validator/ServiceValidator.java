@@ -77,8 +77,10 @@ public class ServiceValidator extends TripValidator {
         // Get the map from modes to service durations in seconds for this trip's service ID.
         // Create a new empty map if it doesn't yet exist.
         ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(trip.service_id, ServiceInfo::new);
-        // Increment the service duration for this trip's transport mode and service ID.
-        serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
+        if (route != null) {
+            // Increment the service duration for this trip's transport mode and service ID.
+            serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
+        }
         // Record which trips occur on each service_id.
         serviceInfo.tripIds.add(trip.trip_id);
         // TODO validate mode codes

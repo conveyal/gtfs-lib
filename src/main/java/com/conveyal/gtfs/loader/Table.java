@@ -43,6 +43,8 @@ public class Table {
     private Table parentTable;
     /** When snapshotting a table for editor use, this indicates whether a primary key constraint should be added to ID. */
     private boolean usePrimaryKey = false;
+    /** Indicates whether the table has unique key field. */
+    private boolean hasUniqueKeyField = true;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         this.name = name;
@@ -80,7 +82,6 @@ public class Table {
     ).restrictDelete().addPrimaryKey();
 
     public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
-//            new StringField("exception_id",  REQUIRED),
             new StringField("name", REQUIRED), // FIXME: This makes name the key field...
             // FIXME: Change to DateListField
             new DateListField("dates", REQUIRED),
@@ -101,7 +102,7 @@ public class Table {
         new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
-        new ShortField("transfers", REQUIRED, 2),
+        new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
@@ -114,7 +115,7 @@ public class Table {
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
         new StringField("feed_version", OPTIONAL)
-    );
+    ).keyFieldIsNotUnique();
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
@@ -138,8 +139,9 @@ public class Table {
             // FIXME: referential integrity check for zone_id for below three fields?
             new StringField("origin_id", OPTIONAL),
             new StringField("destination_id", OPTIONAL),
-            new StringField("contains_id", OPTIONAL)
-    ).withParentTable(FARE_ATTRIBUTES).addPrimaryKey();
+            new StringField("contains_id", OPTIONAL))
+            .withParentTable(FARE_ATTRIBUTES)
+            .addPrimaryKey().keyFieldIsNotUnique();
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
@@ -198,8 +200,9 @@ public class Table {
             new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("transfer_type", REQUIRED),
-            new StringField("min_transfer_time", OPTIONAL)
-    ).addPrimaryKey();
+            new StringField("min_transfer_time", OPTIONAL))
+            .addPrimaryKey()
+            .keyFieldIsNotUnique();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
@@ -242,8 +245,9 @@ public class Table {
             new TimeField("start_time", REQUIRED),
             new TimeField("end_time", REQUIRED),
             new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
-            new IntegerField("exact_times", OPTIONAL, 1)
-    ).withParentTable(TRIPS);
+            new IntegerField("exact_times", OPTIONAL, 1))
+            .withParentTable(TRIPS)
+            .keyFieldIsNotUnique();
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
@@ -271,6 +275,14 @@ public class Table {
      */
     public Table restrictDelete () {
         this.cascadeDeleteRestricted = true;
+        return this;
+    }
+
+    /**
+     * Fluent method to de-set the
+     */
+    private Table keyFieldIsNotUnique() {
+        this.hasUniqueKeyField = false;
         return this;
     }
 
@@ -537,6 +549,11 @@ public class Table {
         return new StringField(name, UNKNOWN);
     }
 
+    /**
+     * Gets the key field for the table.
+     *
+     * FIXME: Should this return null if hasUniqueKeyField is false? Not sure what might break if we change this...
+     */
     public String getKeyFieldName () {
         // FIXME: If the table is constructed from fields found in a GTFS file, the first field is not guaranteed to be
         // the key field.
@@ -714,9 +731,6 @@ public class Table {
     /**
      * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
      * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error.
-     *
-     * FIXME: This is broken for calendar_dates, where the key field (i.e., service_id) can be repeated multiple times in
-     * the calendar_dates table and does not actually need to exist in the calendar table.
      */
     public void checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String string, JdbcGtfsLoader.ReferenceTracker referenceTracker) {
         // Store field-scoped transit ID for referential integrity check. (Note, entity scoping doesn't work here because
@@ -724,9 +738,15 @@ public class Table {
         // id.)
         String keyField = getKeyFieldName();
         String orderField = getOrderFieldName();
-        // If table has an order field, it should supersede the key field as the "unique" field
-        String uniqueKeyField = orderField != null ? orderField : keyField;
+        // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
+        // duplicates. If it has an order field, that order field should supersede the key field as the "unique" field.
+        String uniqueKeyField = !hasUniqueKeyField ? null : orderField != null ? orderField : keyField;
+        String transitId = String.join(":", keyField, keyValue);
 
+        // If the field is optional and there is no value present, skip check.
+        if (!field.isRequired() && "".equals(string)) return;
+
+        // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
         if (field.isForeignReference()) {
             // Check referential integrity if applicable
@@ -735,8 +755,8 @@ public class Table {
 
             if (!referenceTracker.transitIds.contains(referenceTransitId)) {
                 // If the reference tracker does not contain
-                // LOG.error("Ref error found in {} for field {} with value {}", table.name, referenceField, referenceTransitId);
-                NewGTFSError referentialIntegrityError = NewGTFSError.forLine(this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
+                NewGTFSError referentialIntegrityError = NewGTFSError.forLine(
+                        this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
                         .setEntityId(keyValue);
                 if (isOrderField) {
                     // If the field is an order field, set the sequence for the new error.
@@ -746,30 +766,26 @@ public class Table {
             }
         }
 
+        // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
+        // whether an order field is part of the "unique ID."
+        Set<String> listOfUniqueIds = referenceTracker.transitIds;
+        String uniqueId = transitId;
+
+        // There is no need to check for duplicate IDs if the field is a foreign reference.
+        if (field.isForeignReference()) return;
+        // Next, check that the ID is table-unique.
         if (field.name.equals(uniqueKeyField)) {
-            // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
-            // whether an order field is part of the "unique ID."
-            String transitId = String.join(":", getKeyFieldName(), keyValue);
-            Set<String> listOfUniqueIds;
-            String uniqueId;
             // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
             if (isOrderField) {
                 // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
                 // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
                 listOfUniqueIds = referenceTracker.transitIdsWithSequence;
                 uniqueId = String.join(":", field.name, keyValue, string);
-                if (!field.isForeignReference() && !referenceTracker.transitIds.contains(transitId)) {
-                    // Only add ID if the field is not a foreign reference (e.g., adds shape_id for shapes.txt,
-                    // but skips trip_id in stop_times.txt)
-                    referenceTracker.transitIds.add(transitId);
-                }
-            } else {
-                listOfUniqueIds = referenceTracker.transitIds;
-                uniqueId = transitId;
             }
             // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
-            boolean isDuplicate = !listOfUniqueIds.add(uniqueId);
-            if (isDuplicate) {
+            boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
+            if (valueAlreadyExists) {
+                // If the value is a duplicate, add an error.
                 NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
                         .setEntityId(keyValue);
                 if (isOrderField) {
@@ -777,6 +793,10 @@ public class Table {
                 }
                 referenceTracker.errorStorage.storeError(duplicateIdError);
             }
+        } else {
+            // If the field is not the table unique key field, skip the duplicate ID check and simply add the ID to the
+            // list of unique IDs.
+            listOfUniqueIds.add(uniqueId);
         }
     }
 
