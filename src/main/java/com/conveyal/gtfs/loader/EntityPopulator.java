@@ -255,8 +255,11 @@ public interface EntityPopulator<T> {
     static int getIntIfPresent (ResultSet resultSet, String columnName,
                                        TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
-        // FIXME: if SQL value is null, resultSet.getInt will return 0. Should INT_MISSING do the same?
         if (columnIndex == 0) return Entity.INT_MISSING;
-        else return resultSet.getInt(columnIndex);
+        int intValue = resultSet.getInt(columnIndex);
+        // If SQL value for column was null, resultSet.getInt will return 0. If this is the case, override value with
+        // INT_MISSING.
+        if (resultSet.wasNull()) return Entity.INT_MISSING;
+        else return intValue;
     }
 }
