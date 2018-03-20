@@ -49,8 +49,8 @@ public class Stop extends Entity {
         statement.setString(oneBasedIndex++, stop_code);
         statement.setString(oneBasedIndex++, stop_name);
         statement.setString(oneBasedIndex++, stop_desc);
-        statement.setDouble(oneBasedIndex++, stop_lon);
         statement.setDouble(oneBasedIndex++, stop_lat);
+        statement.setDouble(oneBasedIndex++, stop_lon);
         statement.setString(oneBasedIndex++, zone_id);
         statement.setString(oneBasedIndex++, stop_url != null ? stop_url.toString() : null);
         setIntParameter(statement, oneBasedIndex++, location_type);
