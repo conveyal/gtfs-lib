@@ -58,10 +58,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    // This controls how many object instances MapDB will keep in memory to avoid deserializing them from disk.
-    // We perform referential integrity checks against tables which in some feeds have hundreds of thousands of rows.
-    private static final int MAPDB_INSTANCE_CACHE_SIZE = 300_000;
-
     private DB db;
 
     public String feedId = null;
@@ -879,7 +875,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .asyncWriteEnable()
                 .deleteFilesAfterClose()
                 .compressionEnable()
-                .cacheSize(MAPDB_INSTANCE_CACHE_SIZE)
                 .make()); // TODO db.close();
     }
 
@@ -888,6 +883,16 @@ public class GTFSFeed implements Cloneable, Closeable {
         this(constructDB(dbFile)); // TODO db.close();
     }
 
+    // One critical point when constructing the MapDB is the instance cache type and size.
+    // The instance cache is how MapDB keeps some instances in memory to avoid deserializing them repeatedly from disk.
+    // We perform referential integrity checks against tables which in some feeds have hundreds of thousands of rows.
+    // We have observed that the referential integrity checks are very slow with the instance cache disabled.
+    // MapDB's default cache type is a hash table, which is very sensitive to the cache size.
+    // It defaults to 2^15 (32ki) and only seems to run smoothly at other powers of two, so we use 2^16 (64ki).
+    // This might have something to do with compiler optimizations on the hash code calculations.
+    // Initial tests show similar speeds for the default hashtable cache of 64k or 32k size and the hardRef cache.
+    // By not calling any of the cacheEnable or cacheSize methods on the DB builder, we use the default values
+    // that seem to perform well.
     private static DB constructDB(String dbFile) {
         DB db;
         try{
@@ -897,7 +902,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .mmapFileEnable()
                     .asyncWriteEnable()
                     .compressionEnable()
-                    .cacheSize(MAPDB_INSTANCE_CACHE_SIZE)
                     .make();
             return db;
         } catch (ExecutionError | IOError | Exception e) {
