@@ -58,6 +58,10 @@ public class GTFSFeed implements Cloneable, Closeable {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
+    // This controls how many object instances MapDB will keep in memory to avoid deserializing them from disk.
+    // We perform referential integrity checks against tables which in some feeds have hundreds of thousands of rows.
+    private static final int MAPDB_INSTANCE_CACHE_SIZE = 300_000;
+
     private DB db;
 
     public String feedId = null;
@@ -875,7 +879,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .asyncWriteEnable()
                 .deleteFilesAfterClose()
                 .compressionEnable()
-                // .cacheSize(1024 * 1024) this bloats memory consumption
+                .cacheSize(MAPDB_INSTANCE_CACHE_SIZE)
                 .make()); // TODO db.close();
     }
 
@@ -893,7 +897,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .mmapFileEnable()
                     .asyncWriteEnable()
                     .compressionEnable()
-                    .cacheSize(1000)
+                    .cacheSize(MAPDB_INSTANCE_CACHE_SIZE)
                     .make();
             return db;
         } catch (ExecutionError | IOError | Exception e) {
