@@ -18,8 +18,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
@@ -39,6 +41,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     public static final String ID_ARG = "id";
     public static final String LIMIT_ARG = "limit";
     public static final String OFFSET_ARG = "offset";
+    public static final List<String> boundingBoxArgs = Arrays.asList("minLat", "minLon", "maxLat", "maxLon");
+    public static final List<String> paginationArgs = Arrays.asList(LIMIT_ARG, OFFSET_ARG);
     public final String tableName;
     public final String parentJoinField;
     private final String sortField;
@@ -172,17 +176,32 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             // FIXME add sort order?
             sortBy = String.format(" order by %s", sortField);
         }
-        for (String key : arguments.keySet()) {
+        Set<String> argumentKeys = arguments.keySet();
+        for (String key : argumentKeys) {
             // Limit and Offset arguments are for pagination. projectStops is used to mutate shape points before
             // returning them. All others become "where X in A, B, C" clauses.
-            String[] argsToSkip = new String[]{LIMIT_ARG, OFFSET_ARG};
-            if (Arrays.asList(argsToSkip).indexOf(key) != -1) continue;
+            Set<String> argsToSkip = new HashSet<>();
+            argsToSkip.addAll(boundingBoxArgs);
+            argsToSkip.addAll(paginationArgs);
+            if (argsToSkip.contains(key)) continue;
             if (ID_ARG.equals(key)) {
                 Integer value = (Integer) arguments.get(key);
                 conditions.add(String.join(" = ", "id", value.toString()));
             } else {
                 List<String> values = (List<String>) arguments.get(key);
                 if (values != null && !values.isEmpty()) conditions.add(makeInClause(key, values));
+            }
+        }
+        if (argumentKeys.containsAll(boundingBoxArgs)) {
+            // Handle bounding box arguments if all are supplied.
+            for (String bound : boundingBoxArgs) {
+                Double value = (Double) arguments.get(bound);
+                // Determine delimiter/equality operator based on min/max
+                String delimiter = bound.startsWith("max") ? " <= " : " >= ";
+                // Determine field based on lat/lon
+                // FIXME: Currently only works with stops. Add pattern query.
+                String field = bound.endsWith("Lon") ? "stop_lon" : "stop_lat";
+                conditions.add(String.join(delimiter, field, value.toString()));
             }
         }
         if ( ! conditions.isEmpty()) {

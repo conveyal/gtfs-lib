@@ -18,6 +18,7 @@ import graphql.schema.GraphQLTypeReference;
 import java.sql.Array;
 import java.sql.SQLException;
 
+import static com.conveyal.gtfs.graphql.GraphQLUtil.floatArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.intArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.intt;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
@@ -633,6 +634,10 @@ public class GraphQLGtfsSchema {
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
                     .argument(multiStringArg("stop_id"))
                     .argument(multiStringArg("pattern_id"))
+                    .argument(floatArg("minLat"))
+                    .argument(floatArg("minLon"))
+                    .argument(floatArg("maxLat"))
+                    .argument(floatArg("maxLon"))
                     .argument(intArg(ID_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
