@@ -129,6 +129,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL),
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
+        new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
@@ -550,7 +551,7 @@ public class Table {
     }
 
     /**
-     * Gets the key field for the table.
+     * Gets the key field for the table. Calling this on a table that has no key field is meaningless.
      *
      * FIXME: Should this return null if hasUniqueKeyField is false? Not sure what might break if we change this...
      */

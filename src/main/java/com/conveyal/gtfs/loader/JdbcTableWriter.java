@@ -24,10 +24,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.INSERT_BATCH_SIZE;
 
@@ -150,6 +152,12 @@ public class JdbcTableWriter implements TableWriter {
                     updateChildTable(childEntitiesArray, entityId, isCreating, referencingTable, connection);
                 }
             }
+            // Iterate over table's fields and apply linked values to any tables
+            if ("routes".equals(specTable.name)) {
+                updateLinkedFields(specTable, jsonObject, "trips", "route_id", "wheelchair_accessible");
+            } else if ("patterns".equals(specTable.name)) {
+                updateLinkedFields(specTable, jsonObject, "trips", "pattern_id", "direction_id");
+            }
             if (autoCommit) {
                 // If nothing failed up to this point, it is safe to assume there were no problems updating/creating the
                 // main entity and any of its children, so we commit the transaction.
@@ -171,6 +179,51 @@ public class JdbcTableWriter implements TableWriter {
                 connection.close();
             }
         }
+    }
+
+    /**
+     * Updates linked fields with values from entity being updated. This is used to update identical fields in related
+     * tables (for now just fields in trips and stop_times) where the reference table's value should take precedence over
+     * the related table (e.g., pattern_stop#timepoint should update all of its related stop_times).
+     */
+    private void updateLinkedFields(Table referenceTable, ObjectNode jsonObject, String tableName, String keyField, String ...fieldNames) throws SQLException {
+        // Collect fields, the JSON values for these fields, and the strings to add to the prepared statement into Lists.
+        List<Field> fields = new ArrayList<>();
+        List<JsonNode> values = new ArrayList<>();
+        List<String> fieldStrings = new ArrayList<>();
+        for (String field : fieldNames) {
+            fields.add(referenceTable.getFieldForName(field));
+            values.add(jsonObject.get(field));
+            fieldStrings.add(String.format("%s = ?", field));
+        }
+        String setFields = String.join(", ", fieldStrings);
+        // If updating stop_times, use a more complex query that joins trips to stop_times in order to match on pattern_id
+        boolean updatingStopTimes = "stop_times".equals(tableName);
+        Field orderField = updatingStopTimes ? referenceTable.getFieldForName(referenceTable.getOrderFieldName()) : null;
+        String sql = updatingStopTimes
+            ? String.format("update %s.stop_times st set %s from %s.trips t " +
+                        "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
+                tablePrefix, setFields, tablePrefix, keyField, orderField.name)
+            : String.format("update %s.%s set %s where %s = ?", tablePrefix, tableName, setFields, keyField);
+        // Prepare the statement and set statement parameters
+        PreparedStatement statement = connection.prepareStatement(sql);
+        int oneBasedIndex = 1;
+        // Iterate over list of fields that need to be updated and set params.
+        for (int i = 0; i < fields.size(); i++) {
+            String newValue = values.get(i).isNull() ? null : values.get(i).asText();
+            fields.get(i).setParameter(statement, oneBasedIndex++, newValue);
+        }
+        // Set "where clause" with value for key field (e.g., set values where pattern_id = '3')
+        statement.setString(oneBasedIndex++, jsonObject.get(keyField).asText());
+        if (updatingStopTimes) {
+            // If updating stop times set the order field parameter (stop_sequence)
+            String orderValue = jsonObject.get(orderField.name).asText();
+            orderField.setParameter(statement, oneBasedIndex++, orderValue);
+        }
+        // Log query, execute statement, and log result.
+        LOG.info(statement.toString());
+        int entitiesUpdated = statement.executeUpdate();
+        LOG.info("{} {} linked fields updated", entitiesUpdated, tableName);
     }
 
     /**
@@ -279,34 +332,33 @@ public class JdbcTableWriter implements TableWriter {
 
     /**
      * This updates those tables that depend on the table currently being updated. For example, if updating/creating a
-     * pattern, this method handles updating its pattern stops and shape points. For trips, this would handle updating
+     * pattern, this method handles deleting any pattern stops and shape points. For trips, this would handle updating
      * the trips' stop times.
+     *
+     * This method should only be used on tables that have a single foreign key reference to another table, i.e., they
+     * have a hierarchical relationship.
      * FIXME develop a better way to update tables with foreign keys to the table being updated.
      */
-    private void updateChildTable(ArrayNode entityList, Integer id, boolean isCreating, Table subTable, Connection connection) throws SQLException {
+    private void updateChildTable(ArrayNode entityList, Integer id, boolean isCreatingNewEntity, Table subTable, Connection connection) throws SQLException {
         // Get parent table's key field
         Field keyField;
         String keyValue;
-        // FIXME: This is shapes specific code that should probably be made generic.
-        boolean updatingShapes = subTable.name.equals("shapes");
-        if (updatingShapes) {
-            keyField = subTable.getFieldForName("shape_id");
-        } else {
-            keyField = specTable.getFieldForName(specTable.getKeyFieldName());
-        }
+        // Primary key fields are always referenced by foreign key fields with the same name.
+        keyField = specTable.getFieldForName(subTable.getKeyFieldName());
         // Get parent entity's key value
         keyValue = getValueForId(id, keyField.name, tablePrefix, specTable, connection);
         String childTableName = String.join(".", tablePrefix, subTable.name);
         // FIXME: add check for pattern stop consistency.
         // FIXME: re-order stop times if pattern stop order changes.
         // FIXME: allow shapes to be updated on pattern geometry change.
-        if (!isCreating) {
-            String deleteSql;
-            // Delete existing sub-entities for given entity ID if the parent entity is not being created
-            deleteSql = getUpdateReferencesSql(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
+        if (!isCreatingNewEntity) {
+            // Delete existing sub-entities for given entity ID if the parent entity is not being newly created.
+            String deleteSql = getUpdateReferencesSql(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
             LOG.info(deleteSql);
             Statement statement = connection.createStatement();
-            // FIXME: Copy on update (instead of deleting here)
+            // FIXME: Use copy on update for a pattern's shape instead of deleting the previous shape and replacing it.
+            // This would better account for GTFS data loaded from a file where multiple patterns reference a single
+            // shape.
             int result = statement.executeUpdate(deleteSql);
             LOG.info("Deleted {}", result);
             // FIXME: are there cases when an update should not return zero?
@@ -314,7 +366,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         int entityCount = 0;
         PreparedStatement insertStatement = null;
-        // Iterate over the entities found in the array and
+        // Iterate over the entities found in the array and add to batch for inserting into table.
         for (JsonNode entityNode : entityList) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
             ObjectNode entity = (ObjectNode)entityNode;
@@ -325,7 +377,10 @@ public class JdbcTableWriter implements TableWriter {
             if (entityCount == 0) {
                 insertStatement = createPreparedUpdate(id, true, entity, subTable, connection, true);
             }
-//            LOG.info("{}", entityCount);
+            // Update linked stop times fields for updated pattern stop (e.g., timepoint, pickup/drop off type).
+            if ("pattern_stops".equals(subTable.name)) {
+                updateLinkedFields(subTable, entity, "stop_times", "pattern_id", "timepoint", "drop_off_type", "pickup_type", "shape_dist_traveled");
+            }
             setStatementParameters(entity, subTable, insertStatement, connection);
             if (entityCount == 0) LOG.info(insertStatement.toString());
             insertStatement.addBatch();
