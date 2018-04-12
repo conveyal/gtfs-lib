@@ -56,7 +56,7 @@ public class DateField extends Field {
      */
     public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, LocalDate localDate) {
         try {
-            if (localDate == null) preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
+            if (localDate == null) setNull(preparedStatement, oneBasedIndex);
             else preparedStatement.setString(oneBasedIndex, localDate.format(GTFS_DATE_FORMATTER));
         } catch (Exception e) {
             throw new StorageException(e);

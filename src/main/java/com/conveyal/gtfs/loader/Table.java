@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -129,6 +130,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL),
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
+        new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
@@ -550,7 +552,7 @@ public class Table {
     }
 
     /**
-     * Gets the key field for the table.
+     * Gets the key field for the table. Calling this on a table that has no key field is meaningless.
      *
      * FIXME: Should this return null if hasUniqueKeyField is false? Not sure what might break if we change this...
      */
@@ -641,6 +643,7 @@ public class Table {
      * table structure, but also the data from the original table. Creating table indexes is not handled by this method.
      */
     public boolean createSqlTableFrom(Connection connection, String tableToClone) {
+        long startTime = System.currentTimeMillis();
         String dropSql = String.format("drop table if exists %s", name);
         // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
         // FIXME: Which create table operation is more efficient?
@@ -653,11 +656,6 @@ public class Table {
             statement.execute(dropSql);
             LOG.info(createTableAsSql);
             statement.execute(createTableAsSql);
-//            LOG.info(createTableLikeSql);
-//            statement.execute(createTableLikeSql);
-//            LOG.info(insertAllSql);
-//            statement.execute(insertAllSql);
-
 
             // Make id column serial and set the next value based on the current max value. This code is derived from
             // https://stackoverflow.com/a/9490532/915811
@@ -721,6 +719,8 @@ public class Table {
                 e.printStackTrace();
                 return false;
             }
+        } finally {
+            LOG.info("Cloned table {} as {} in {} ms", tableToClone, name, System.currentTimeMillis() - startTime);
         }
     }
 

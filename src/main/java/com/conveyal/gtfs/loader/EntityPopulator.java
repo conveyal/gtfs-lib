@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.ScheduleException.ExemplarServiceDescriptor;
@@ -52,6 +53,19 @@ import static com.conveyal.gtfs.model.ScheduleException.exemplarFromInt;
  */
 public interface EntityPopulator<T> {
     Logger LOG = LoggerFactory.getLogger(EntityPopulator.class);
+    EntityPopulator<PatternStop> PATTERN_STOP = (result, columnForName) -> {
+        PatternStop patternStop = new PatternStop();
+        patternStop.stop_id = getStringIfPresent(result, "stop_id", columnForName);
+        patternStop.default_dwell_time = getIntIfPresent(result, "default_dwell_time", columnForName);
+        patternStop.default_travel_time = getIntIfPresent(result, "default_travel_time", columnForName);
+        patternStop.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        patternStop.drop_off_type = getIntIfPresent(result, "drop_off_type", columnForName);
+        patternStop.pickup_type = getIntIfPresent(result, "pickup_type", columnForName);
+        patternStop.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
+        patternStop.timepoint = getIntIfPresent(result, "timepoint", columnForName);
+        patternStop.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
+        return patternStop;
+    };
 
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
 

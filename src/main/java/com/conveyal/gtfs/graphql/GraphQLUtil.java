@@ -5,6 +5,7 @@ import graphql.schema.GraphQLArgument;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLList;
 
+import static graphql.Scalars.GraphQLFloat;
 import static graphql.Scalars.GraphQLInt;
 import static graphql.Scalars.GraphQLString;
 import static graphql.schema.GraphQLArgument.newArgument;
@@ -46,6 +47,13 @@ public class GraphQLUtil {
         return newArgument()
                 .name(name)
                 .type(GraphQLInt)
+                .build();
+    }
+
+    public static GraphQLArgument floatArg (String name) {
+        return newArgument()
+                .name(name)
+                .type(GraphQLFloat)
                 .build();
     }
 

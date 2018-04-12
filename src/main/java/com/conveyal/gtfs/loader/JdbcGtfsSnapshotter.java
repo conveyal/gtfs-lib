@@ -121,7 +121,28 @@ public class JdbcGtfsSnapshotter {
                 success = targetTable.createSqlTableFrom(connection, fromTableName);
             }
             // Only create indexes if table creation was successful.
-            if (success && createIndexes) targetTable.createIndexes(connection);
+            if (success && createIndexes) {
+                targetTable.createIndexes(connection);
+                if ("stop_times".equals(table.name)) {
+                    // Normalize stop sequences for stop times table so that sequences are all zero-based and increment
+                    // by one. This ensures that sequence values for stop_times and pattern_stops are not initially out
+                    // of sync for feeds imported into the editor.
+                    // NOTE: This happens here instead of in the createTableFrom method (something like
+                    // "create table x as (select blah)") because it's actually (marginally) faster overall to perform
+                    // this update after the indexes are created. This was tested on an AC Transit feed. Also, in order
+                    // for the other approach to work, we need to know all of the column names in the stop_times table,
+                    // which requires a get metadata query and additional messiness.
+                    long startTime = System.currentTimeMillis();
+                    String stopTimesTable = tablePrefix + "stop_times";
+                    String normalizeStopSequence = String.format("with renumber as (select id, -1 + row_number() over " +
+                            "(partition by trip_id order by stop_sequence) as rn from %s)\n" +
+                            "update %s set stop_sequence = r.rn from renumber r\n" +
+                            "where %s.id = r.id and stop_sequence <> r.rn", stopTimesTable, stopTimesTable, stopTimesTable);
+                    PreparedStatement normalizeStatement = connection.prepareStatement(normalizeStopSequence);
+                    int updatedStopTimes = normalizeStatement.executeUpdate();
+                    LOG.info("Normalized {} stop times sequences in {} ms", updatedStopTimes, System.currentTimeMillis() - startTime);
+                }
+            }
             LOG.info("Committing transaction...");
             connection.commit();
             LOG.info("Done.");
