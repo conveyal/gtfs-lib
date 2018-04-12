@@ -273,6 +273,7 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(new GraphQLTypeReference("stop")))
                     // We scope to a single feed namespace, otherwise GTFS entity IDs are ambiguous.
                     .argument(stringArg("namespace"))
+                    .argument(stringArg(SEARCH_ARG))
                     // We allow querying only for a single stop, otherwise result processing can take a long time (lots
                     // of join queries).
                     .argument(stringArg("route_id"))
@@ -322,10 +323,20 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("wheelchair_boarding", GraphQLInt))
             .field(RowCountFetcher.field("stop_time_count", "stop_times", "stop_id"))
             .field(newFieldDefinition()
+                    .name("patterns")
+                    // Field type should be equivalent to the final JDBCFetcher table type.
+                    .type(new GraphQLList(new GraphQLTypeReference("pattern")))
+                    .argument(stringArg("namespace"))
+                    .dataFetcher(new NestedJDBCFetcher(
+                            new JDBCFetcher("pattern_stops", "stop_id"),
+                            new JDBCFetcher("patterns", "pattern_id")))
+                    .build())
+            .field(newFieldDefinition()
                     .name("routes")
                     // Field type should be equivalent to the final JDBCFetcher table type.
                     .type(new GraphQLList(routeType))
                     .argument(stringArg("namespace"))
+                    .argument(stringArg(SEARCH_ARG))
                     .dataFetcher(new NestedJDBCFetcher(
                             new JDBCFetcher("pattern_stops", "stop_id"),
                             new JDBCFetcher("patterns", "pattern_id"),
@@ -339,14 +350,6 @@ public class GraphQLGtfsSchema {
 //                    .argument(longArg("from"))
 //                    .argument(longArg("to"))
 //                    .dataFetcher(StopTimeFetcher::fromStop)
-//                    .build()
-//            )
-//            .field(newFieldDefinition()
-//                    .name("routes")
-//                    .description("The list of routes that serve a stop")
-//                    .type(new GraphQLList(GraphQLGtfsSchema.routeType))
-//                    .argument(multiStringArg("route_id"))
-//                    .dataFetcher(RouteFetcher::fromStop)
 //                    .build()
 //            )
             .build();
@@ -483,6 +486,14 @@ public class GraphQLGtfsSchema {
                 .argument(multiStringArg("service_id"))
                 .dataFetcher(new JDBCFetcher("trips", "pattern_id"))
                 .build())
+            // FIXME This is a singleton array because the JdbcFetcher currently only works with one-to-many joins.
+            .field(newFieldDefinition()
+                .name("route")
+                // Field type should be equivalent to the final JDBCFetcher table type.
+                .type(new GraphQLList(routeType))
+                .argument(stringArg("namespace"))
+                .dataFetcher(new JDBCFetcher("routes", "route_id"))
+                .build())
             .build();
 
     /**
@@ -579,6 +590,10 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(ID_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
+                    .argument(floatArg("minLat"))
+                    .argument(floatArg("minLon"))
+                    .argument(floatArg("maxLat"))
+                    .argument(floatArg("maxLon"))
                     .argument(multiStringArg("pattern_id"))
                     // DataFetchers can either be class instances implementing the interface, or a static function reference
                     .dataFetcher(new JDBCFetcher("patterns"))
@@ -622,6 +637,7 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.routeType))
                     .argument(stringArg("namespace"))
                     .argument(multiStringArg("route_id"))
+                    .argument(stringArg(SEARCH_ARG))
                     .argument(intArg(ID_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
@@ -638,6 +654,7 @@ public class GraphQLGtfsSchema {
                     .argument(floatArg("minLon"))
                     .argument(floatArg("maxLat"))
                     .argument(floatArg("maxLon"))
+                    .argument(stringArg(SEARCH_ARG))
                     .argument(intArg(ID_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))

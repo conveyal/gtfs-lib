@@ -41,8 +41,13 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     public static final String ID_ARG = "id";
     public static final String LIMIT_ARG = "limit";
     public static final String OFFSET_ARG = "offset";
+    public static final String SEARCH_ARG = "search";
+    public static final List<String> stopSearchColumns = Arrays.asList("stop_id", "stop_code", "stop_name");
+    public static final List<String> routeSearchColumns = Arrays.asList("route_id", "route_short_name", "route_long_name");
     public static final List<String> boundingBoxArgs = Arrays.asList("minLat", "minLon", "maxLat", "maxLon");
-    public static final List<String> paginationArgs = Arrays.asList(LIMIT_ARG, OFFSET_ARG);
+    // FIXME: Search arg is not a pagination arg, but it's listed here because it should not be treated like standard
+    // args.
+    public static final List<String> paginationArgs = Arrays.asList(SEARCH_ARG, LIMIT_ARG, OFFSET_ARG);
     public final String tableName;
     public final String parentJoinField;
     private final String sortField;
@@ -158,13 +163,17 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         // The advantage of selecting * is that we don't need to validate the field names.
         // All the columns will be loaded into the Map<String, Object>,
         // but only the requested fields will be fetched from that Map using a MapFetcher.
-        sqlBuilder.append(String.format("select * from %s.%s", namespace, tableName));
+        Set<String> fromTables = new HashSet<>();
+        // By default, select only from the primary table. Other tables may be added to this list to handle joins.
+        fromTables.add(String.join(".", namespace, tableName));
+        sqlBuilder.append("select *");
 
         // We will build up additional sql clauses in this List.
-        List<String> conditions = new ArrayList<>();
+        Set<String> conditions = new HashSet<>();
         // The order by clause will go here.
         String sortBy = "";
-
+        // Track the current parameter index for setting prepared statement parameters
+        int parameterIndex = 1;
         // If we are fetching an item nested within a GTFS entity in the Graphql query, we want to add an SQL "where"
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
         // Note, this is assuming the type of the field in the parent is a string.
@@ -193,18 +202,56 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             }
         }
         if (argumentKeys.containsAll(boundingBoxArgs)) {
-            // Handle bounding box arguments if all are supplied.
+            Set<String> boundsConditions = new HashSet<>();
+            // Handle bounding box arguments if ALL are supplied.
+            // NOTE: This is currently only defined for stops, but can be applied to patterns through a join
             for (String bound : boundingBoxArgs) {
                 Double value = (Double) arguments.get(bound);
                 // Determine delimiter/equality operator based on min/max
                 String delimiter = bound.startsWith("max") ? " <= " : " >= ";
                 // Determine field based on lat/lon
-                // FIXME: Currently only works with stops. Add pattern query.
-                String field = bound.endsWith("Lon") ? "stop_lon" : "stop_lat";
-                conditions.add(String.join(delimiter, field, value.toString()));
+                String field = bound.toLowerCase().endsWith("lon") ? "stop_lon" : "stop_lat";
+                // Scope field with namespace and table name
+                String fieldWithNamespace = String.join(".", namespace, "stops", field);
+                boundsConditions.add(String.join(delimiter, fieldWithNamespace, value.toString()));
+            }
+            if ("stops".equals(tableName)) {
+                conditions.addAll(boundsConditions);
+            } else if ("patterns".equals(tableName)) {
+                // Add from table as unique_pattern_ids_in_bounds to match patterns table -> pattern stops -> stops
+                fromTables.add(
+                        String.format(
+                                "(select distinct ps.pattern_id from %s.stops, %s.pattern_stops as ps where %s AND %s.stops.stop_id = ps.stop_id) as unique_pattern_ids_in_bounds",
+                                namespace,
+                                namespace,
+                                String.join(" and ", boundsConditions),
+                                namespace
+                        ));
+                conditions.add(String.format("%s.patterns.pattern_id = unique_pattern_ids_in_bounds.pattern_id", namespace));
             }
         }
-        if ( ! conditions.isEmpty()) {
+        if (argumentKeys.contains(SEARCH_ARG)) {
+            // Handle string search argument
+            String value = (String) arguments.get(SEARCH_ARG);
+            if (!value.isEmpty()) {
+                // Only apply string search if string is not empty.
+                Set<String> searchFields = getSearchFields(namespace);
+                List<String> searchClauses = new ArrayList<>();
+                for (String field : searchFields) {
+                    // Double percent signs format as single percents, which are used for the string matching.
+                    // FIXME: sanitize for SQL injection!!
+                    // FIXME: is ILIKE compatible with non-Postgres? LIKE doesn't work well enough (even when setting
+                    // the strings to lower case.
+                    searchClauses.add(String.format("%s ILIKE '%%%s%%'", field, value));
+                }
+                if (!searchClauses.isEmpty()) {
+                    // Wrap string search in parentheses to isolate from other conditions.
+                    conditions.add(String.format(("(%s)"), String.join(" OR ", searchClauses)));
+                }
+            }
+        }
+        sqlBuilder.append(String.format(" from %s", String.join(", ", fromTables)));
+        if (!conditions.isEmpty()) {
             sqlBuilder.append(" where ");
             sqlBuilder.append(String.join(" and ", conditions));
         }
@@ -232,7 +279,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             connection = GTFSGraphQL.getConnection();
             Statement statement = connection.createStatement();
             // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
-            // LOG.info("SQL: {}", sqlBuilder.toString());
+//            LOG.info("table name={}", tableName);
+//            LOG.info("SQL: {}", sqlBuilder.toString());
             if (statement.execute(sqlBuilder.toString())) {
                 ResultSet resultSet = statement.getResultSet();
                 ResultSetMetaData meta = resultSet.getMetaData();
@@ -258,6 +306,48 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         return results;
     }
 
+    /**
+     * Get the list of fields to perform a string search on for the provided table. Each table included here must have
+     * the {@link #SEARCH_ARG} argument applied in the query definition.
+     */
+    private Set<String> getSearchFields(String namespace) {
+        // Check table metadata for presence of columns.
+//        long startTime = System.currentTimeMillis();
+        Set<String> columnsForTable = new HashSet<>();
+        List<String> searchColumns = new ArrayList<>();
+        Connection connection = null;
+        try {
+            connection = GTFSGraphQL.getConnection();
+            ResultSet columns = connection.getMetaData().getColumns(null, namespace, tableName, null);
+            while (columns.next()) {
+                String column = columns.getString(4);
+                columnsForTable.add(column);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } finally {
+            DbUtils.closeQuietly(connection);
+        }
+        // Each query seems to take between 10 and 30 milliseconds to get column names. This seems acceptable to avoid
+        // errors for conditions that include columns that don't exist.
+//        LOG.info("Took {} ms to get column name metadata.", System.currentTimeMillis() - startTime);
+        switch (tableName) {
+            case "stops":
+                searchColumns = stopSearchColumns;
+                break;
+            case "routes":
+                searchColumns = routeSearchColumns;
+                break;
+            // TODO: add string search on other tables? For example, trips: id, headway; agency: name; patterns: name.
+            default:
+                // Search columns will be an empty set, which will ultimately return an empty set.
+                break;
+        }
+        // Filter available columns in table by search columns.
+        columnsForTable.retainAll(searchColumns);
+        return columnsForTable;
+    }
+
     /** Construct filter clause with '=' (single string) or 'in' (multiple strings). */
     private String makeInClause(String key, List<String> strings) {
         StringBuilder sb = new StringBuilder();
@@ -279,6 +369,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     // TODO SQL sanitization to avoid injection
     private void quote(StringBuilder sb, String string) {
         sb.append("'");
+//        ESAPI.encoder().encodeForSQL( new PostgreSQLCodec(), string);
         sb.append(string);
         sb.append("'");
     }
