@@ -491,7 +491,7 @@ public class JdbcGtfsLoader {
             // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
         else try {
             //            LOG.info("setting {} index to null", fieldIndex + 2);
-            insertStatement.setNull(fieldIndex + 2, field.getSqlType().getVendorTypeNumber());
+            field.setNull(insertStatement, fieldIndex + 2);
         } catch (SQLException e) {
             e.printStackTrace();
             // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,

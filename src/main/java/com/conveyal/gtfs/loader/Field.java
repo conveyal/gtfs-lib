@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.SQLType;
 
 /**
@@ -46,6 +47,10 @@ public abstract class Field {
 
     public abstract void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string);
 
+    public void setNull(PreparedStatement preparedStatement, int oneBasedIndex) throws SQLException {
+        preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
+    }
+
     public abstract SQLType getSqlType ();
 
     // Overridden to create exception for "double precision", since its enum value is just called DOUBLE, and ARRAY types,
@@ -86,6 +91,11 @@ public abstract class Field {
         return this.requirement == Requirement.REQUIRED;
     }
 
+    /**
+     * More than one foreign reference should not be created on the same table to the same foreign table. This is what
+     * allows us to embed updates to a sub-table in nested JSON because this creates a many-to-one reference instead of
+     * a many-to-many reference.
+     */
     public boolean isForeignReference () {
         return this.referenceTable != null;
     }

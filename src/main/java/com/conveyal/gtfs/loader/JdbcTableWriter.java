@@ -210,8 +210,10 @@ public class JdbcTableWriter implements TableWriter {
         int oneBasedIndex = 1;
         // Iterate over list of fields that need to be updated and set params.
         for (int i = 0; i < fields.size(); i++) {
+            Field field = fields.get(i);
             String newValue = values.get(i).isNull() ? null : values.get(i).asText();
-            fields.get(i).setParameter(statement, oneBasedIndex++, newValue);
+            if (newValue == null) field.setNull(statement, oneBasedIndex++);
+            else field.setParameter(statement, oneBasedIndex++, newValue);
         }
         // Set "where clause" with value for key field (e.g., set values where pattern_id = '3')
         statement.setString(oneBasedIndex++, jsonObject.get(keyField).asText());
@@ -280,7 +282,7 @@ public class JdbcTableWriter implements TableWriter {
                         continue;
                     }
                     // Handle setting null value on statement
-                    preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
+                    field.setNull(preparedStatement, index);
                 } else {
                     List<String> values = new ArrayList<>();
                     if (value.isArray()) {
@@ -303,7 +305,7 @@ public class JdbcTableWriter implements TableWriter {
                                 missingFieldNames.add(field.name);
                                 continue;
                             }
-                            preparedStatement.setNull(index, field.getSqlType().getVendorTypeNumber());
+                            field.setNull(preparedStatement, index);
                         } else {
                             // Try to parse integer seconds value
                             preparedStatement.setInt(index, Integer.parseInt(value.asText()));
