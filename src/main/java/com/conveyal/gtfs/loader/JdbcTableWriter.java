@@ -692,6 +692,29 @@ public class JdbcTableWriter implements TableWriter {
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
                 if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+                    // FIXME: Are there other references that are not being captured???
+                    // Cascade delete stop times and frequencies for trips. This must happen before trips are deleted
+                    // below. Otherwise, there are no trips with which to join.
+                    if ("trips".equals(referencingTable.name)) {
+                        String stopTimesTable = String.join(".", namespace, "stop_times");
+                        String frequenciesTable = String.join(".", namespace, "frequencies");
+                        String tripsTable = String.join(".", namespace, "trips");
+                        // Delete stop times and frequencies for trips for pattern
+                        String deleteStopTimes = String.format(
+                                "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = '%s'",
+                                stopTimesTable, tripsTable, stopTimesTable, tripsTable, tripsTable, keyValue);
+                        LOG.info(deleteStopTimes);
+                        PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deleteStopTimes);
+                        int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
+                        LOG.info("Deleted {} stop times for pattern {}", deletedStopTimes, keyValue);
+                        String deleteFrequencies = String.format(
+                                "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = '%s'",
+                                frequenciesTable, tripsTable, frequenciesTable, tripsTable, tripsTable, keyValue);
+                        LOG.info(deleteFrequencies);
+                        PreparedStatement deleteFrequenciesStatement = connection.prepareStatement(deleteFrequencies);
+                        int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
+                        LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
+                    }
                     // Get unique IDs before delete (for logging/message purposes).
                     // TIntSet uniqueIds = getIdsForCondition(refTableName, keyField, keyValue, connection);
                     String updateRefSql = getUpdateReferencesSql(sqlMethod, refTableName, field, keyValue, newKeyValue);
