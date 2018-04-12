@@ -1,7 +1,10 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -24,7 +27,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -341,7 +343,7 @@ public class JdbcTableWriter implements TableWriter {
      * have a hierarchical relationship.
      * FIXME develop a better way to update tables with foreign keys to the table being updated.
      */
-    private void updateChildTable(ArrayNode entityList, Integer id, boolean isCreatingNewEntity, Table subTable, Connection connection) throws SQLException {
+    private void updateChildTable(ArrayNode subEntities, Integer id, boolean isCreatingNewEntity, Table subTable, Connection connection) throws SQLException, IOException {
         // Get parent table's key field
         Field keyField;
         String keyValue;
@@ -352,6 +354,23 @@ public class JdbcTableWriter implements TableWriter {
         String childTableName = String.join(".", tablePrefix, subTable.name);
         // FIXME: add check for pattern stop consistency.
         // FIXME: re-order stop times if pattern stop order changes.
+        // Reconciling pattern stops MUST happen before original pattern stops are deleted in below block (with
+        // getUpdateReferencesSql)
+        if ("pattern_stops".equals(subTable.name)) {
+            List<PatternStop> newPatternStops = new ArrayList<>();
+            // Clean up pattern stop ID fields (passed in as string ID from datatools-ui to avoid id collision)
+            for (JsonNode node : subEntities) {
+                ObjectNode objectNode = (ObjectNode) node;
+                if (!objectNode.get("id").isNumber()) {
+                    // Set ID to zero. ID is ignored entirely here. When the pattern stops are stored in the database,
+                    // the ID values are determined by auto-incrementation.
+                    objectNode.put("id", 0);
+                }
+                // Accumulate new pattern stop objects from JSON.
+                newPatternStops.add(mapper.readValue(objectNode.toString(), PatternStop.class));
+            }
+            reconcilePatternStops(keyValue, newPatternStops, connection);
+        }
         // FIXME: allow shapes to be updated on pattern geometry change.
         if (!isCreatingNewEntity) {
             // Delete existing sub-entities for given entity ID if the parent entity is not being newly created.
@@ -362,39 +381,42 @@ public class JdbcTableWriter implements TableWriter {
             // This would better account for GTFS data loaded from a file where multiple patterns reference a single
             // shape.
             int result = statement.executeUpdate(deleteSql);
-            LOG.info("Deleted {}", result);
+            LOG.info("Deleted {} {}", result, subTable.name);
             // FIXME: are there cases when an update should not return zero?
 //            if (result == 0) throw new SQLException("No stop times found for trip ID");
         }
         int entityCount = 0;
         PreparedStatement insertStatement = null;
         // Iterate over the entities found in the array and add to batch for inserting into table.
-        for (JsonNode entityNode : entityList) {
+        for (JsonNode entityNode : subEntities) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
-            ObjectNode entity = (ObjectNode)entityNode;
-            if (entity.get(keyField.name) == null || entity.get(keyField.name).isNull()) {
-                entity.put(keyField.name, keyValue);
+            ObjectNode subEntity = (ObjectNode)entityNode;
+            if (subEntity.get(keyField.name) == null || subEntity.get(keyField.name).isNull()) {
+                // If value for key field is missing, apply parent's value.
+                // FIXME: Should this always apply the parent key value (to avoid data mix ups)?
+                subEntity.put(keyField.name, keyValue);
             }
             // Insert new sub-entity.
             if (entityCount == 0) {
-                insertStatement = createPreparedUpdate(id, true, entity, subTable, connection, true);
+                // If handling first iteration, create the prepared statement (later iterations will add to batch).
+                insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
             }
             // Update linked stop times fields for updated pattern stop (e.g., timepoint, pickup/drop off type).
             if ("pattern_stops".equals(subTable.name)) {
-                updateLinkedFields(subTable, entity, "stop_times", "pattern_id", "timepoint", "drop_off_type", "pickup_type", "shape_dist_traveled");
+                updateLinkedFields(subTable, subEntity, "stop_times", "pattern_id", "timepoint", "drop_off_type", "pickup_type", "shape_dist_traveled");
             }
-            setStatementParameters(entity, subTable, insertStatement, connection);
+            setStatementParameters(subEntity, subTable, insertStatement, connection);
             if (entityCount == 0) LOG.info(insertStatement.toString());
             insertStatement.addBatch();
             // Prefix increment count and check whether to execute batched update.
             if (++entityCount % INSERT_BATCH_SIZE == 0) {
-                LOG.info("Executing batch insert ({}/{}) for {}", entityCount, entityList.size(), childTableName);
+                LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
                 int[] newIds = insertStatement.executeBatch();
                 LOG.info("Updated {}", newIds.length);
             }
         }
         // execute any remaining prepared statement calls
-        LOG.info("Executing batch insert ({}/{}) for {}", entityCount, entityList.size(), childTableName);
+        LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
         if (insertStatement != null) {
             // If insert statement is null, an empty array was passed for the child table, so the child elements have
             // been wiped.
@@ -403,6 +425,287 @@ public class JdbcTableWriter implements TableWriter {
         } else {
             LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
         }
+    }
+
+    /**
+     * Update the trip pattern stops and the associated stop times. See extensive discussion in ticket
+     * conveyal/gtfs-editor#102.
+     *
+     * We assume only one stop has changed---either it's been removed, added or moved. The only other case that is
+     * permitted is adding a set of stops to the end of the original list. These conditions are evaluated by simply
+     * checking the lengths of the original and new pattern stops (and ensuring that stop IDs remain the same where
+     * required).
+     *
+     * If the change to pattern stops does not satisfy one of these cases, fail the update operation.
+     *
+     */
+    private void reconcilePatternStops(String patternId, List<PatternStop> newStops, Connection connection) throws SQLException {
+        LOG.info("Reconciling pattern stops for pattern ID={}", patternId);
+        // Collect the original list of pattern stop IDs.
+        String getStopIdsSql = String.format("select stop_id from %s.pattern_stops where pattern_id = ? order by stop_sequence",
+                tablePrefix);
+        PreparedStatement getStopsStatement = connection.prepareStatement(getStopIdsSql);
+        getStopsStatement.setString(1, patternId);
+        LOG.info(getStopsStatement.toString());
+        ResultSet stopsResults = getStopsStatement.executeQuery();
+        List<String> originalStopIds = new ArrayList<>();
+        while (stopsResults.next()) {
+            originalStopIds.add(stopsResults.getString(1));
+        }
+
+        // Collect all trip IDs so that we can insert new stop times (with the appropriate trip ID value) if a pattern
+        // stop is added.
+        String getTripIdsSql = String.format("select trip_id from %s.trips where pattern_id = ?", tablePrefix);
+        PreparedStatement getTripsStatement = connection.prepareStatement(getTripIdsSql);
+        getTripsStatement.setString(1, patternId);
+        ResultSet tripsResults = getTripsStatement.executeQuery();
+        List<String> tripsForPattern = new ArrayList<>();
+        while (tripsResults.next()) {
+            tripsForPattern.add(tripsResults.getString(1));
+        }
+
+        // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
+        String joinToTrips = String.format("%s.trips.trip_id = %s.stop_times.trip_id AND %s.trips.pattern_id = '%s'",
+                tablePrefix, tablePrefix, tablePrefix, patternId);
+
+        // ADDITIONS (IF DIFF == 1)
+        if (originalStopIds.size() == newStops.size() - 1) {
+            // We have an addition; find it.
+            int differenceLocation = -1;
+            for (int i = 0; i < newStops.size(); i++) {
+                if (differenceLocation != -1) {
+                    // we've already found the addition
+                    if (i < originalStopIds.size() && !originalStopIds.get(i).equals(newStops.get(i + 1).stop_id)) {
+                        // there's another difference, which we weren't expecting
+                        throw new IllegalStateException("Multiple differences found when trying to detect stop addition");
+                    }
+                }
+
+                // if we've reached where one trip has an extra stop, or if the stops at this position differ
+                else if (i == newStops.size() - 1 || !originalStopIds.get(i).equals(newStops.get(i).stop_id)) {
+                    // we have found the difference
+                    differenceLocation = i;
+                }
+            }
+            // Increment sequences for stops that follow the inserted location. NOTE: This should happen before the
+            // blank stop time insertion for logical consistency.
+            String updateSql = String.format("update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence > %d AND %s",
+                    tablePrefix, tablePrefix, differenceLocation, joinToTrips);
+            LOG.info(updateSql);
+            PreparedStatement updateStatement = connection.prepareStatement(updateSql);
+            int updated = updateStatement.executeUpdate();
+            LOG.info("Updated {} stop times", updated);
+
+            // Insert a skipped stop at the difference location
+            insertBlankStopTimes(tripsForPattern, newStops, differenceLocation, 1, connection);
+        }
+
+        // DELETIONS
+        else if (originalStopIds.size() == newStops.size() + 1) {
+            // We have a deletion; find it
+            int differenceLocation = -1;
+            for (int i = 0; i < originalStopIds.size(); i++) {
+                if (differenceLocation != -1) {
+                    if (!originalStopIds.get(i).equals(newStops.get(i - 1).stop_id)) {
+                        // There is another difference, which we were not expecting
+                        throw new IllegalStateException("Multiple differences found when trying to detect stop removal");
+                    }
+                } else if (i == originalStopIds.size() - 1 || !originalStopIds.get(i).equals(newStops.get(i).stop_id)) {
+                    // We've reached the end and the only difference is length (so the last stop is the different one)
+                    // or we've found the difference.
+                    differenceLocation = i;
+                }
+            }
+
+
+
+            // Delete stop at difference location
+            String deleteSql = String.format("delete from %s.stop_times using %s.trips where stop_sequence = %d AND %s",
+                    tablePrefix, tablePrefix, differenceLocation, joinToTrips);
+            LOG.info(deleteSql);
+            PreparedStatement deleteStatement = connection.prepareStatement(deleteSql);
+            // Decrement all stops with sequence greater than difference location
+            String updateSql = String.format("update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND %s",
+                    tablePrefix, tablePrefix, differenceLocation, joinToTrips);
+            LOG.info(updateSql);
+            PreparedStatement updateStatement = connection.prepareStatement(updateSql);
+            int deleted = deleteStatement.executeUpdate();
+            int updated = updateStatement.executeUpdate();
+            LOG.info("Deleted {} stop times, updated sequence for {} stop times", deleted, updated);
+
+            // FIXME: Should we be handling bad stop time delete? I.e., we could query for stop times to be deleted and
+            // if any of them have different stop IDs than the pattern stop, we could raise a warning for the user.
+            String removedStopId = originalStopIds.get(differenceLocation);
+//            StopTime removed = trip.stopTimes.remove(differenceLocation);
+//
+//            // the removed stop can be null if it was skipped. trip.stopTimes.remove will throw an exception
+//            // rather than returning null if we try to do a remove out of bounds.
+//            if (removed != null && !removed.stop_id.equals(removedStopId)) {
+//                throw new IllegalStateException("Attempted to remove wrong stop!");
+//            }
+        }
+
+        // TRANSPOSITIONS
+        else if (originalStopIds.size() == newStops.size()) {
+            // Imagine the trip patterns pictured below (where . is a stop, and lines indicate the same stop)
+            // the original trip pattern is on top, the new below
+            // . . . . . . . .
+            // | |  \ \ \  | |
+            // * * * * * * * *
+            // also imagine that the two that are unmarked are the same
+            // (the limitations of ascii art, this is prettier on my whiteboard)
+            // There are three regions: the beginning and end, where stopSequences are the same, and the middle, where they are not
+            // The same is true of trips where stops were moved backwards
+
+            // find the left bound of the changed region
+            int firstDifferentIndex = 0;
+            while (originalStopIds.get(firstDifferentIndex).equals(newStops.get(firstDifferentIndex).stop_id)) {
+                firstDifferentIndex++;
+
+                if (firstDifferentIndex == originalStopIds.size())
+                    // trip patterns do not differ at all, nothing to do
+                    return;
+            }
+
+            // find the right bound of the changed region
+            int lastDifferentIndex = originalStopIds.size() - 1;
+            while (originalStopIds.get(lastDifferentIndex).equals(newStops.get(lastDifferentIndex).stop_id)) {
+                lastDifferentIndex--;
+            }
+
+            // TODO: write a unit test for this
+            if (firstDifferentIndex == lastDifferentIndex) {
+                throw new IllegalStateException(
+                        "stop substitutions are not supported, region of difference must have length > 1");
+            }
+            String updateMoved, updateOthers;
+
+            // figure out whether a stop was moved left or right
+            // note that if the stop was only moved one position, it's impossible to tell, and also doesn't matter,
+            // because the requisite operations are equivalent
+            int from, to;
+            // Ensure that only a single stop has been moved (i.e. verify stop IDs inside changed region remain unchanged)
+            if (originalStopIds.get(firstDifferentIndex).equals(newStops.get(lastDifferentIndex).stop_id)) {
+                // Stop was moved from beginning of changed region to end of changed region (-->)
+                from = firstDifferentIndex;
+                to = lastDifferentIndex;
+                verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, true);
+                // if sequence = fromIndex, update to toIndex.
+                updateMoved = String.format(
+                        "update %s.stop_times set stop_sequence = %d from %s.trips where stop_sequence = %d AND %s",
+                        tablePrefix, to, tablePrefix, from, joinToTrips);
+                // if sequence is greater than fromIndex and less than or equal to toIndex, decrement
+                updateOthers = String.format(
+                        "update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND stop_sequence <= %d AND %s",
+                        tablePrefix, tablePrefix, from, to, joinToTrips);
+            } else if (newStops.get(firstDifferentIndex).stop_id.equals(originalStopIds.get(lastDifferentIndex))) {
+                // Stop was moved from end of changed region to beginning of changed region (<--)
+                from = lastDifferentIndex;
+                to = firstDifferentIndex;
+                verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, false);
+                // if sequence = fromIndex, update to toIndex.
+                updateMoved = String.format("update %s.stop_times set stop_sequence = %d from %s.trips where stop_sequence = %d AND %s",
+                        tablePrefix, to, tablePrefix, from, joinToTrips);
+                // if sequence is less than fromIndex and greater than or equal to toIndex, increment
+                updateOthers = String.format(
+                        "update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence < %d AND stop_sequence >= %d AND %s",
+                        tablePrefix, tablePrefix, from, to, joinToTrips);
+            } else {
+                throw new IllegalStateException("not a simple, single move!");
+            }
+
+            // Update the stop sequences for the stop that was moved and the other stops within the changed region.
+            PreparedStatement movedStatement = connection.prepareStatement(updateMoved);
+            PreparedStatement othersStatement = connection.prepareStatement(updateOthers);
+            LOG.info(movedStatement.toString());
+            LOG.info(othersStatement.toString());
+            int moved = movedStatement.executeUpdate();
+            int others = othersStatement.executeUpdate();
+            LOG.info("Moved {}. Adjusted {} others.", moved, others);
+        }
+        // CHECK IF SET OF STOPS ADDED TO END OF ORIGINAL LIST
+        else if (originalStopIds.size() < newStops.size()) {
+            // find the left bound of the changed region to check that no stops have changed in between
+            int firstDifferentIndex = 0;
+            while (
+                    firstDifferentIndex < originalStopIds.size() &&
+                    originalStopIds.get(firstDifferentIndex).equals(newStops.get(firstDifferentIndex).stop_id)
+                ) {
+                firstDifferentIndex++;
+            }
+            if (firstDifferentIndex != originalStopIds.size())
+                throw new IllegalStateException("When adding multiple stops to patterns, new stops must all be at the end");
+
+            // insert a skipped stop for each new element in newStops
+            int stopsToInsert = newStops.size() - firstDifferentIndex + 1;
+            // FIXME: Should we be inserting blank stop times at all?  Shouldn't these just inherit the arrival times
+            // from the pattern stops?
+            insertBlankStopTimes(tripsForPattern, newStops, firstDifferentIndex, stopsToInsert, connection);
+        }
+        // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
+        else {
+            throw new IllegalStateException("Changes to trip pattern stops must be made one at a time.");
+        }
+    }
+
+    /**
+     * Check the stops in the changed region to ensure they remain in the same order. If not, throw an exception to
+     * cancel the transaction.
+     */
+    private static void verifyInteriorStopsAreUnchanged(List<String> originalStopIds, List<PatternStop> newStops, int firstDifferentIndex, int lastDifferentIndex, boolean movedRight) {
+        //Stops mapped to list of stop IDs simply for easier viewing/comparison with original IDs while debugging with
+        // breakpoints.
+        List<String> newStopIds = newStops.stream().map(s -> s.stop_id).collect(Collectors.toList());
+        // Determine the bounds of the region that should be identical between the two lists.
+        int beginRegion = movedRight ? firstDifferentIndex : firstDifferentIndex + 1;
+        int endRegion = movedRight ? lastDifferentIndex - 1 : lastDifferentIndex;
+        for (int i = beginRegion; i <= endRegion; i++) {
+            // Shift index when selecting stop from original list to account for displaced stop.
+            int shiftedIndex = movedRight ? i + 1 : i - 1;
+            String newStopId = newStopIds.get(i);
+            String originalStopId = originalStopIds.get(shiftedIndex);
+            if (!newStopId.equals(originalStopId)) {
+                // If stop ID for new stop at the given index does not match the original stop ID, the order of at least
+                // one stop within the changed region has been changed, which is illegal according to the rule enforcing
+                // only a single addition, deletion, or transposition per update.
+                throw new IllegalStateException("Changes to trip pattern stops must be made one at a time.");
+            }
+        }
+    }
+
+    /**
+     * You must call this method after updating sequences for any stop times following the starting stop sequence to
+     * avoid overwriting these other stop times.
+     */
+    private void insertBlankStopTimes(List<String> tripIds, List<PatternStop> newStops, int startingStopSequence, int stopTimesToAdd, Connection connection) throws SQLException {
+        String insertSql = Table.STOP_TIMES.generateInsertSql(tablePrefix, true);
+        PreparedStatement insertStatement = connection.prepareStatement(insertSql);
+        int count = 0;
+        int totalRowsUpdated = 0;
+        // Create a new stop time for each sequence value (times each trip ID) that needs to be inserted.
+        for (int i = startingStopSequence; i < stopTimesToAdd + startingStopSequence; i++) {
+            PatternStop patternStop = newStops.get(i);
+            StopTime stopTime = new StopTime();
+            stopTime.stop_id = patternStop.stop_id;
+            stopTime.drop_off_type = patternStop.drop_off_type;
+            stopTime.pickup_type = patternStop.pickup_type;
+            stopTime.timepoint = patternStop.timepoint;
+            stopTime.shape_dist_traveled = patternStop.shape_dist_traveled;
+            stopTime.stop_sequence = i;
+            // Update stop time with each trip ID and add to batch.
+            for (String tripId : tripIds) {
+                stopTime.trip_id = tripId;
+                stopTime.setStatementParameters(insertStatement, true);
+                insertStatement.addBatch();
+                if (count % INSERT_BATCH_SIZE == 0) {
+                    int[] rowsUpdated = insertStatement.executeBatch();
+                    totalRowsUpdated += rowsUpdated.length;
+                }
+            }
+        }
+        int[] rowsUpdated = insertStatement.executeBatch();
+        totalRowsUpdated += rowsUpdated.length;
+        LOG.info("{} blank stop times inserted", totalRowsUpdated);
     }
 
     /**
