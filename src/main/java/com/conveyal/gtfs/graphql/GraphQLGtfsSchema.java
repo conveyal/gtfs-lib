@@ -342,16 +342,18 @@ public class GraphQLGtfsSchema {
                             new JDBCFetcher("patterns", "pattern_id"),
                             new JDBCFetcher("routes", "route_id")))
                     .build())
-//            .field(newFieldDefinition()
-//                    .name("stop_times")
-//                    .description("The list of stop_times for a stop")
-//                    .type(new GraphQLList(GraphQLGtfsSchema.stopTimeType))
-//                    .argument(stringArg("date"))
-//                    .argument(longArg("from"))
-//                    .argument(longArg("to"))
-//                    .dataFetcher(StopTimeFetcher::fromStop)
-//                    .build()
-//            )
+            .field(newFieldDefinition()
+                    .name("stop_times")
+                    // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
+                    .type(new GraphQLList(new GraphQLTypeReference("stopTime")))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(stringArg(DATE_ARG))
+                    .argument(intArg(FROM_ARG))
+                    .argument(intArg(TO_ARG))
+                    .dataFetcher(new JDBCFetcher("stop_times", "stop_id", "stop_sequence")))
             .build();
 
     /**
@@ -688,6 +690,9 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(GraphQLGtfsSchema.stopTimeType))
                     .argument(stringArg("namespace"))
                     .argument(intArg(LIMIT_ARG))
+                    .argument(stringArg(DATE_ARG))
+                    .argument(intArg(FROM_ARG))
+                    .argument(intArg(TO_ARG))
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("stop_times"))
                     .build()
