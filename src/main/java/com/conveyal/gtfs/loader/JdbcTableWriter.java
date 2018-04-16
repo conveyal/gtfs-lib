@@ -464,6 +464,12 @@ public class JdbcTableWriter implements TableWriter {
             tripsForPattern.add(tripsResults.getString(1));
         }
 
+        if (originalStopIds.size() == 0 && newStops.size() == 0) {
+            // If there were never stops for the pattern and there are none now, there is no need to reconcile anything.
+            // This short circuit prevents the transposition check from throwing an IndexOutOfBoundsException when it
+            // attempts to access index 0 of a list with no items.
+            return;
+        }
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
         String joinToTrips = String.format("%s.trips.trip_id = %s.stop_times.trip_id AND %s.trips.pattern_id = '%s'",
                 tablePrefix, tablePrefix, tablePrefix, patternId);
