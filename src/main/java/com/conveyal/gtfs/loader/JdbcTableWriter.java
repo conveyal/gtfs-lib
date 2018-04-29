@@ -464,10 +464,12 @@ public class JdbcTableWriter implements TableWriter {
             tripsForPattern.add(tripsResults.getString(1));
         }
 
-        if (originalStopIds.size() == 0 && newStops.size() == 0) {
-            // If there were never stops for the pattern and there are none now, there is no need to reconcile anything.
-            // This short circuit prevents the transposition check from throwing an IndexOutOfBoundsException when it
-            // attempts to access index 0 of a list with no items.
+        if (tripsForPattern.size() == 0) {
+            // If there are no trips for the pattern, there is no need to reconcile stop times to modified pattern stops.
+            // This permits the creation of patterns without stops, reversing the stops on existing patterns, and
+            // duplicating patterns.
+            // For new patterns, this short circuit is required to prevent the transposition conditional check from
+            // throwing an IndexOutOfBoundsException when it attempts to access index 0 of a list with no items.
             return;
         }
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
@@ -650,7 +652,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
         else {
-            throw new IllegalStateException("Changes to trip pattern stops must be made one at a time.");
+            throw new IllegalStateException("Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.");
         }
     }
 
@@ -684,6 +686,10 @@ public class JdbcTableWriter implements TableWriter {
      * avoid overwriting these other stop times.
      */
     private void insertBlankStopTimes(List<String> tripIds, List<PatternStop> newStops, int startingStopSequence, int stopTimesToAdd, Connection connection) throws SQLException {
+        if (tripIds.isEmpty()) {
+            // There is no need to insert blank stop times if there are no trips for the pattern.
+            return;
+        }
         String insertSql = Table.STOP_TIMES.generateInsertSql(tablePrefix, true);
         PreparedStatement insertStatement = connection.prepareStatement(insertSql);
         int count = 0;
