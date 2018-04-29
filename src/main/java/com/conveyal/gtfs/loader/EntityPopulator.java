@@ -262,7 +262,7 @@ public interface EntityPopulator<T> {
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         // FIXME: if SQL value is null, resultSet.getInt will return 0. Should return value equal 0 if column is missing?
-        if (columnIndex == 0) return -1;
+        if (columnIndex == 0) return Entity.DOUBLE_MISSING;
         else return resultSet.getDouble(columnIndex);
     }
 

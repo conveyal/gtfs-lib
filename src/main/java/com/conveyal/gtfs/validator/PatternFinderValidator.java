@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.copyFromFile;
+import static com.conveyal.gtfs.model.Entity.setDoubleParameter;
 import static com.conveyal.gtfs.model.Entity.setIntParameter;
 
 /**
@@ -149,7 +150,7 @@ public class PatternFinderValidator extends TripValidator {
                     setIntParameter(insertPatternStopStatement,5, dwellTime);
                     setIntParameter(insertPatternStopStatement,6, key.dropoffTypes.get(i));
                     setIntParameter(insertPatternStopStatement,7, key.pickupTypes.get(i));
-                    insertPatternStopStatement.setDouble(8, key.shapeDistances.get(i));
+                    setDoubleParameter(insertPatternStopStatement, 8, key.shapeDistances.get(i));
                     setIntParameter(insertPatternStopStatement,9, key.timepoints.get(i));
                     insertPatternStopStatement.addBatch();
                     batchSize += 1;
