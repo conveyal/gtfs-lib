@@ -122,7 +122,8 @@ public class JdbcGtfsSnapshotter {
             }
             // Only create indexes if table creation was successful.
             if (success && createIndexes) {
-                targetTable.createIndexes(connection);
+                // Use spec table to create indexes.
+                table.createIndexes(connection, tablePrefix);
                 if ("stop_times".equals(table.name)) {
                     // Normalize stop sequences for stop times table so that sequences are all zero-based and increment
                     // by one. This ensures that sequence values for stop_times and pattern_stops are not initially out

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
+import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -552,7 +553,9 @@ public class Table {
     }
 
     /**
-     * Gets the key field for the table. Calling this on a table that has no key field is meaningless.
+     * Gets the key field for the table. Calling this on a table that has no key field is meaningless. WARNING: this
+     * MUST be called on a spec table (i.e., one of the constant tables defined in this class). Otherwise, it
+     * could return a non-key field.
      *
      * FIXME: Should this return null if hasUniqueKeyField is false? Not sure what might break if we change this...
      */
@@ -562,12 +565,22 @@ public class Table {
         return fields[0].name;
     }
 
+    /**
+     * Returns field name that defines order for grouped entities. WARNING: this MUST be called on a spec table (i.e.,
+     * one of the constant tables defined in this class). Otherwise, it could return null even if the table has an order
+     * field defined.
+     */
     public String getOrderFieldName () {
         String name = fields[1].name;
         if (name.contains("_sequence")) return name;
         else return null;
     }
 
+    /**
+     * Gets index fields for the spec table. WARNING: this MUST be called on a spec table (i.e., one of the constant
+     * tables defined in this class). Otherwise, it could return fields that should not be indexed.
+     * @return
+     */
     public String getIndexFields() {
         String orderFieldName = getOrderFieldName();
         if (orderFieldName == null) return getKeyFieldName();
@@ -600,17 +613,21 @@ public class Table {
         return required == REQUIRED;
     }
 
-    public void createIndexes (Connection connection) throws SQLException {
-        createIndexes(connection, null);
-    }
-
     /**
-     * Create indexes for table using shouldBeIndexed(), key field, and/or sequence field.
+     * Create indexes for table using shouldBeIndexed(), key field, and/or sequence field. WARNING: this MUST be called
+     * on a spec table (i.e., one of the constant tables defined in this class). Otherwise, the getIndexFields method
+     * could return fields that should not be indexed.
      * FIXME: add foreign reference indexes?
      */
     public void createIndexes(Connection connection, String namespace) throws SQLException {
         LOG.info("Indexing...");
-        String tableName = namespace != null ? String.join(".", namespace, name) : name;
+        String tableName;
+        if (namespace == null) {
+            throw new IllegalStateException("Schema namespace must be provided!");
+        } else {
+            // Construct table name with prefixed namespace (and account for whether it already ends in a period).
+            tableName = namespace.endsWith(".") ? namespace + name : String.join(".", namespace, name);
+        }
         // We determine which columns should be indexed based on field order in the GTFS spec model table.
         // Not sure that's a good idea, this could use some abstraction. TODO getIndexColumns() on each table.
         String indexColumns = getIndexFields();
