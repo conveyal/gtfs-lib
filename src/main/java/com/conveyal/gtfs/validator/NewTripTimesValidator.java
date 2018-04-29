@@ -33,7 +33,7 @@ public class NewTripTimesValidator extends FeedValidator {
 
     // Caching stops and trips gives a massive speed improvement by avoiding database calls.
     // TODO build this same kind of caching into the table reader class.
-    ListMultimap<String, ShapePoint> shapeById = MultimapBuilder.treeKeys().arrayListValues().build();
+//    ListMultimap<String, ShapePoint> shapeById = MultimapBuilder.treeKeys().arrayListValues().build();
     Map<String, Stop> stopById = new HashMap<>();
     Map<String, Trip> tripById = new HashMap<>();
     Map<String, Route> routeById = new HashMap<>();
@@ -131,7 +131,6 @@ public class NewTripTimesValidator extends FeedValidator {
         // FIXME: gtfs_load error if there are no stop times? / feed=Birnie_Bus_20141105T102949-05_24e99790-211d-4f92-b1d2-147e6f3d5040.zip
         String tripId = stopTimes.get(0).trip_id;
         Trip trip = tripById.get(tripId);
-        List<ShapePoint> shapePoints = shapeById.get(trip.shape_id);
         if (trip == null) {
             // This feed does not contain a trip with the ID specified in these stop_times.
             // This error should already have been caught TODO verify.
