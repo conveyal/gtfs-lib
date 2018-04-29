@@ -133,7 +133,11 @@ public class JdbcGtfsSnapshotter {
                     // this update after the indexes are created. This was tested on an AC Transit feed. Also, in order
                     // for the other approach to work, we need to know all of the column names in the stop_times table,
                     // which requires a get metadata query and additional messiness.
+                    // For the Bronx bus feed, this update takes 53 seconds on an un-normalized table (i.e., snapshotting
+                    // a table from a direct GTFS load) and 5.5 seconds on an already normalized table (i.e., snapshotting
+                    // a table from an editor buffer).
                     long startTime = System.currentTimeMillis();
+                    LOG.info("Normalizing stop sequences");
                     String stopTimesTable = tablePrefix + "stop_times";
                     String normalizeStopSequence = String.format("with renumber as (select id, -1 + row_number() over " +
                             "(partition by trip_id order by stop_sequence) as rn from %s)\n" +
@@ -142,6 +146,15 @@ public class JdbcGtfsSnapshotter {
                     PreparedStatement normalizeStatement = connection.prepareStatement(normalizeStopSequence);
                     int updatedStopTimes = normalizeStatement.executeUpdate();
                     LOG.info("Normalized {} stop times sequences in {} ms", updatedStopTimes, System.currentTimeMillis() - startTime);
+                }
+                if ("routes".equals(table.name)) {
+                    // Set default values for route status and publicly visible to "Approved" and "Public", respectively.
+                    // This prevents unexpected results when users attempt to export a GTFS feed from the editor and no
+                    // routes are exported due to undefined values for status and publicly visible.
+                    String updateStatusSql = String.format("update %sroutes set status = 2, publicly_visible = 1 where status is NULL AND publicly_visible is NULL", tablePrefix);
+                    Statement statement = connection.createStatement();
+                    int updatedRoutes = statement.executeUpdate(updateStatusSql);
+                    LOG.info("Updated status for {} routes", updatedRoutes);
                 }
             }
             LOG.info("Committing transaction...");
