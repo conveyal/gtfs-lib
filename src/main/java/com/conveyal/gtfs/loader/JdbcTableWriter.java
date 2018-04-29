@@ -225,9 +225,9 @@ public class JdbcTableWriter implements TableWriter {
             orderField.setParameter(statement, oneBasedIndex++, orderValue);
         }
         // Log query, execute statement, and log result.
-        LOG.info(statement.toString());
+        LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
-        LOG.info("{} {} linked fields updated", entitiesUpdated, tableName);
+        LOG.debug("{} {} linked fields updated", entitiesUpdated, tableName);
     }
 
     /**
