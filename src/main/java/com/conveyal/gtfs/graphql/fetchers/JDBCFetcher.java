@@ -40,7 +40,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     // Make this an option to the GraphQL query.
     public static final int DEFAULT_ROWS_TO_FETCH = 50;
     public static final int MAX_ROWS_TO_FETCH = 500;
-
+    // Symbolic constants for argument names used to prevent misspellings.
     public static final String ID_ARG = "id";
     public static final String LIMIT_ARG = "limit";
     public static final String OFFSET_ARG = "offset";
@@ -48,14 +48,16 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     public static final String DATE_ARG = "date";
     public static final String FROM_ARG = "from";
     public static final String TO_ARG = "to";
+    // Lists of column names to be used when searching for string matches in the respective tables.
     public static final List<String> stopSearchColumns = Arrays.asList("stop_id", "stop_code", "stop_name");
     public static final List<String> routeSearchColumns = Arrays.asList("route_id", "route_short_name", "route_long_name");
+    // The following lists of arguments are considered non-standard, i.e., they are not handled by filtering entities
+    // with a simple WHERE clause. They are all bundled together in argsToSkip as a convenient way to pass over them
+    // when constructing said WHERE clause.
     public static final List<String> boundingBoxArgs = Arrays.asList("minLat", "minLon", "maxLat", "maxLon");
     public static final List<String> dateTimeArgs = Arrays.asList("date", "from", "to");
-    // FIXME: Search arg is not a pagination arg, but it's listed here because it should not be treated like standard
-    // args.
-    public static final List<String> paginationArgs = Arrays.asList(SEARCH_ARG, LIMIT_ARG, OFFSET_ARG);
-    public static final List<String> argsToSkip = Stream.of(paginationArgs, boundingBoxArgs, dateTimeArgs)
+    public static final List<String> otherNonStandardArgs = Arrays.asList(SEARCH_ARG, LIMIT_ARG, OFFSET_ARG);
+    public static final List<String> argsToSkip = Stream.of(boundingBoxArgs, dateTimeArgs, otherNonStandardArgs)
             .flatMap(Collection::stream)
             .collect(Collectors.toList());
     public final String tableName;
@@ -182,7 +184,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         Set<String> conditions = new HashSet<>();
         // The order by clause will go here.
         String sortBy = "";
-        // Track the current parameter index for setting prepared statement parameters
+        // TODO: Track the current parameter index for setting prepared statement parameters?
         int parameterIndex = 1;
         // If we are fetching an item nested within a GTFS entity in the Graphql query, we want to add an SQL "where"
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
@@ -197,8 +199,9 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         }
         Set<String> argumentKeys = arguments.keySet();
         for (String key : argumentKeys) {
-            // Limit and Offset arguments are for pagination. projectStops is used to mutate shape points before
-            // returning them. All others become "where X in A, B, C" clauses.
+            // The pagination, bounding box, and date/time args should all be skipped here because they are handled
+            // separately below from standard args (pagination becomes limit/offset clauses, bounding box applies to
+            // stops table, and date/time args filter stop times. All other args become "where X in A, B, C" clauses.
             if (argsToSkip.contains(key)) continue;
             if (ID_ARG.equals(key)) {
                 Integer value = (Integer) arguments.get(key);
@@ -210,8 +213,10 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         }
         if (argumentKeys.containsAll(boundingBoxArgs)) {
             Set<String> boundsConditions = new HashSet<>();
-            // Handle bounding box arguments if ALL are supplied.
-            // NOTE: This is currently only defined for stops, but can be applied to patterns through a join
+            // Handle bounding box arguments if ALL are supplied. The stops falling within the bounds will be returned.
+            // If operating on the stops table, this will just add the bounds filters to the conditions list. If
+            // operating on the patterns table, a SELECT DISTINCT patterns query will be constructed with a join to
+            // stops and pattern stops.
             for (String bound : boundingBoxArgs) {
                 Double value = (Double) arguments.get(bound);
                 // Determine delimiter/equality operator based on min/max
