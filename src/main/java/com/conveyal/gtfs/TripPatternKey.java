@@ -8,8 +8,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Used as a map key when grouping trips by stop pattern. Note that this includes the routeId, so the same sequence of
- * stops on two different routes makes two different patterns.
+ * Used as a map key when grouping trips by stop pattern and pick/drop sequences. Note that this includes the routeId,
+ * so the same sequence of stops on two different routes makes two different patterns.
  * These objects are not intended for use outside the grouping process.
  */
 public class TripPatternKey {

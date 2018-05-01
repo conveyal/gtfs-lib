@@ -493,7 +493,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     *  Bin all trips by the sequence of stops they visit.
+     *  Bin all trips by stop sequence and pick/drop sequences.
      * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
      */
     public void findPatterns() {
