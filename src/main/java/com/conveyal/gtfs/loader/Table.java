@@ -181,7 +181,7 @@ public class Table {
         new ShortField("location_type", OPTIONAL, 2),
         new StringField("parent_station",  OPTIONAL),
         new StringField("stop_timezone",  OPTIONAL),
-        new ShortField("wheelchair_boarding", OPTIONAL, 1)
+        new ShortField("wheelchair_boarding", OPTIONAL, 2)
     ).restrictDelete().addPrimaryKey();
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
