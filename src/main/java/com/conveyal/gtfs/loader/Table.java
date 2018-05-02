@@ -4,13 +4,12 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
-import com.sun.javaws.exceptions.InvalidArgumentException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.*;
@@ -179,7 +178,8 @@ public class Table {
         new StringField("zone_id",  OPTIONAL),
         new URLField("stop_url",  OPTIONAL),
         new ShortField("location_type", OPTIONAL, 2),
-        new StringField("parent_station",  OPTIONAL),
+        // FIXME: Need self-reference check during referential integrity check
+        new StringField("parent_station",  OPTIONAL), //.isReferenceToSelf()
         new StringField("stop_timezone",  OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 2)
     ).restrictDelete().addPrimaryKey();
@@ -661,65 +661,29 @@ public class Table {
      */
     public boolean createSqlTableFrom(Connection connection, String tableToClone) {
         long startTime = System.currentTimeMillis();
-        String dropSql = String.format("drop table if exists %s", name);
-        // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
-        // FIXME: Which create table operation is more efficient?
-        String createTableAsSql = String.format("create table %s as table %s", name, tableToClone);
-//        String createTableLikeSql = String.format("create table %s (like %s including indexes)", name, tableToClone);
-//        String insertAllSql = String.format("insert into %s select * from %s", name, tableToClone);
         try {
             Statement statement = connection.createStatement();
+            // Drop target table to avoid a conflict.
+            String dropSql = String.format("drop table if exists %s", name);
             LOG.info(dropSql);
             statement.execute(dropSql);
-            LOG.info(createTableAsSql);
-            statement.execute(createTableAsSql);
-
-            // Make id column serial and set the next value based on the current max value. This code is derived from
-            // https://stackoverflow.com/a/9490532/915811
-            String selectMaxSql = String.format("SELECT MAX(id) + 1 FROM %s", name);
-
-            int maxID = 0;
-            LOG.info(selectMaxSql);
-            statement.execute(selectMaxSql);
-            ResultSet maxIdResult = statement.getResultSet();
-            if (maxIdResult.next()) {
-                maxID = maxIdResult.getInt(1);
+            if (tableToClone.endsWith("stop_times")) {
+                normalizeAndCloneStopTimes(statement, name, tableToClone);
+            } else {
+                // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
+                // FIXME: Which create table operation is more efficient?
+                String createTableAsSql = String.format("create table %s as table %s", name, tableToClone);
+                // Create table in the image of the table we're copying (indexes are not included).
+                LOG.info(createTableAsSql);
+                statement.execute(createTableAsSql);
             }
-            // Set default max ID to 1 (the start value cannot be less than MINVALUE 1)
-            // FIXME: Skip sequence creation if maxID = 1?
-            if (maxID < 1) {
-                maxID = 1;
-            }
-
-            String sequenceName = name + "_id_seq";
-            String createSequenceSql = String.format("CREATE SEQUENCE %s START WITH %d", sequenceName, maxID);
-            LOG.info(createSequenceSql);
-            statement.execute(createSequenceSql);
-
-            String alterColumnNextSql = String.format("ALTER TABLE %s ALTER COLUMN id SET DEFAULT nextval('%s')", name, sequenceName);
-            LOG.info(alterColumnNextSql);
-            statement.execute(alterColumnNextSql);
-            String alterColumnNotNullSql = String.format("ALTER TABLE %s ALTER COLUMN id SET NOT NULL", name);
-            LOG.info(alterColumnNotNullSql);
-            statement.execute(alterColumnNotNullSql);
+            applyAutoIncrementingSequence(statement);
             // FIXME: Is there a need to add primary key constraint here?
             if (usePrimaryKey) {
                 // Add primary key to ID column for any tables that require it.
                 String addPrimaryKeySql = String.format("ALTER TABLE %s ADD PRIMARY KEY (id)", name);
                 LOG.info(addPrimaryKeySql);
                 statement.execute(addPrimaryKeySql);
-            }
-
-            for (Field field : fields) {
-                if (EDITOR.equals(field.requirement) || OPTIONAL.equals(field.requirement)) {
-                    // Add columns for any optional or editor fields that don't exist
-                    String addColumnSql = String.format(
-                            "alter table %s add column if not exists %s %s",
-                            name,
-                            field.name,
-                            field.getSqlTypeName());
-                    statement.execute(addColumnSql);
-                }
             }
             return true;
         } catch (SQLException ex) {
@@ -739,6 +703,80 @@ public class Table {
         } finally {
             LOG.info("Cloned table {} as {} in {} ms", tableToClone, name, System.currentTimeMillis() - startTime);
         }
+    }
+
+    /**
+     *  Normalize stop sequences for stop times table so that sequences are all zero-based and increment
+     by one. This ensures that sequence values for stop_times and pattern_stops are not initially out
+     of sync for feeds imported into the editor.
+
+     NOTE: This happens here instead of as part of post-processing because it's much faster overall to perform
+     this as an INSERT vs. an UPDATE. It also needs to be done before creating table indexes. There may be some
+     messiness here as far as using the column metadata to perform the SELECT query with the correct column names, but
+     it is about an order of magnitude faster than the UPDATE approach.
+
+     For example, with the Bronx bus feed, the UPDATE approach took 53 seconds on an un-normalized table (i.e., snapshotting
+     a table from a direct GTFS load), but it only takes about 8 seconds with the INSERT approach. Additionally, this
+     INSERT approach seems to dramatically cut down on the time needed for indexing large tables.
+     */
+    private void normalizeAndCloneStopTimes(Statement statement, String name, String tableToClone) throws SQLException {
+        // Create table with matching columns first and then insert all rows with a special select query that
+        // normalizes the stop sequences before inserting.
+        // "Create table like" can optionally include indexes, but we want to avoid creating the indexes beforehand
+        // because this will slow down our massive insert for stop times.
+        String createTableLikeSql = String.format("create table %s (like %s)", name, tableToClone);
+        LOG.info(createTableLikeSql);
+        statement.execute(createTableLikeSql);
+        long normalizeStartTime = System.currentTimeMillis();
+        LOG.info("Normalizing stop sequences");
+        // First get the column names (to account for any non-standard fields that may be present)
+        List<String> columns = new ArrayList<>();
+        ResultSet resultSet = statement.executeQuery(String.format("select * from %s limit 1", tableToClone));
+        ResultSetMetaData metadata = resultSet.getMetaData();
+        int nColumns = metadata.getColumnCount();
+        for (int i = 1; i <= nColumns; i++) {
+            columns.add(metadata.getColumnName(i));
+        }
+        // Replace stop sequence column with the normalized sequence values.
+        columns.set(columns.indexOf("stop_sequence"), "-1 + row_number() over (partition by trip_id order by stop_sequence) as stop_sequence");
+        String insertAllSql = String.format("insert into %s (select %s from %s)", name, String.join(", ", columns), tableToClone);
+        LOG.info(insertAllSql);
+        statement.execute(insertAllSql);
+        LOG.info("Normalized stop times sequences in {} ms", System.currentTimeMillis() - normalizeStartTime);
+    }
+
+    /**
+     * Make id column serial and set the next value based on the current max value. This is intended to operate on
+     * existing statement/connection and should not be applied to a table has been created with a serial (i.e., auto-
+     * incrementing ID. This code is derived from https://stackoverflow.com/a/9490532/915811
+     */
+    private void applyAutoIncrementingSequence(Statement statement) throws SQLException {
+        String selectMaxSql = String.format("SELECT MAX(id) + 1 FROM %s", name);
+
+        int maxID = 0;
+        LOG.info(selectMaxSql);
+        statement.execute(selectMaxSql);
+        ResultSet maxIdResult = statement.getResultSet();
+        if (maxIdResult.next()) {
+            maxID = maxIdResult.getInt(1);
+        }
+        // Set default max ID to 1 (the start value cannot be less than MINVALUE 1)
+        // FIXME: Skip sequence creation if maxID = 1?
+        if (maxID < 1) {
+            maxID = 1;
+        }
+
+        String sequenceName = name + "_id_seq";
+        String createSequenceSql = String.format("CREATE SEQUENCE %s START WITH %d", sequenceName, maxID);
+        LOG.info(createSequenceSql);
+        statement.execute(createSequenceSql);
+
+        String alterColumnNextSql = String.format("ALTER TABLE %s ALTER COLUMN id SET DEFAULT nextval('%s')", name, sequenceName);
+        LOG.info(alterColumnNextSql);
+        statement.execute(alterColumnNextSql);
+        String alterColumnNotNullSql = String.format("ALTER TABLE %s ALTER COLUMN id SET NOT NULL", name);
+        LOG.info(alterColumnNotNullSql);
+        statement.execute(alterColumnNotNullSql);
     }
 
     public Table getParentTable() {
