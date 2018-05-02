@@ -211,11 +211,13 @@ public class JdbcGtfsExporter {
             // Only write stop times for "approved" routes using COPY TO with results of select query
             String stopTimesSelectSql = null;
             if (fromEditor) {
+                String scopedArrivalTime = String.join(".", feedIdToExport, "arrival_time");
+                String scopedDepartureTime = String.join(".", feedIdToExport, "departure_time");
                 // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string format.
                 String selectWithTransformedTimes = Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
                         // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-                        .replace("arrival_time", "TO_CHAR((arrival_time || ' second')::interval, 'HH24:MI:SS') as arrival_time")
-                        .replace("departure_time", "TO_CHAR((departure_time || ' second')::interval, 'HH24:MI:SS') as departure_time");
+                        .replace(scopedArrivalTime, String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as arrival_time", scopedArrivalTime))
+                        .replace(scopedDepartureTime, String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as departure_time", scopedDepartureTime));
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
                 // route status.

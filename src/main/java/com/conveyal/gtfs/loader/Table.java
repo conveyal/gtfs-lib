@@ -419,14 +419,22 @@ public class Table {
         return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
     }
 
+    /**
+     * Join a list of fields with a comma + space separator.
+     */
     public String commaSeparatedNames(List<Field> fieldsToJoin) {
         return commaSeparatedNames(fieldsToJoin, null);
     }
 
+    /**
+     * Prepend a prefix string to each field and join them with a comma + space separator.
+     */
     public String commaSeparatedNames(List<Field> fieldsToJoin, String prefix) {
         return fieldsToJoin.stream()
-                // Only prefix fields that are foreign refs or key fields
-                .map(f -> prefix != null && (f.isForeignReference() || getKeyFieldName().equals(f.name))
+                // NOTE: This previously only prefixed fields that were foreign refs or key fields. However, this
+                // caused an issue where shared fields were ambiguously referenced in a select query (specifically,
+                // wheelchair_accessible in routes and trips). So this filter has been removed.
+                .map(f -> prefix != null // && (f.isForeignReference() || getKeyFieldName().equals(f.name))
                         ? prefix + f.name
                         : f.name)
                 .collect(Collectors.joining(", "));
