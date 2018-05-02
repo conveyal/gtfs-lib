@@ -412,6 +412,13 @@ public class GraphQLGtfsSchema {
             .field(RowCountFetcher.field("errors"))
             .build();
 
+    public static GraphQLObjectType tripGroupCountType = newObject().name("tripGroupCount")
+            .description("")
+            .field(RowCountFetcher.groupedField("trips", "service_id"))
+            .field(RowCountFetcher.groupedField("trips", "route_id"))
+            .field(RowCountFetcher.groupedField("trips", "pattern_id"))
+            .build();
+
     /**
      * GraphQL does not have a type for arbitrary maps (String -> X). Such maps must be expressed as a list of
      * key-value pairs. This is probably intended to protect us from ourselves (sending untyped data) but it just
@@ -551,6 +558,11 @@ public class GraphQLGtfsSchema {
             .field(newFieldDefinition()
                     .name("row_counts")
                     .type(rowCountsType)
+                    .dataFetcher(new SourceObjectFetcher())
+                    .build())
+            .field(newFieldDefinition()
+                    .name("trip_counts")
+                    .type(tripGroupCountType)
                     .dataFetcher(new SourceObjectFetcher())
                     .build())
             // A field containing counts for each type of error independently.
