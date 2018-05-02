@@ -550,9 +550,10 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("namespace"))
             .field(MapFetcher.field("feed_id"))
             .field(MapFetcher.field("feed_version"))
-            .field(MapFetcher.field("filename"))
             .field(MapFetcher.field("md5"))
             .field(MapFetcher.field("sha1"))
+            .field(MapFetcher.field("filename"))
+            .field(MapFetcher.field("loaded_date"))
             .field(MapFetcher.field("snapshot_of"))
             // A field containing row counts for every table.
             .field(newFieldDefinition()
