@@ -524,9 +524,6 @@ public class JdbcTableWriter implements TableWriter {
                     differenceLocation = i;
                 }
             }
-
-
-
             // Delete stop at difference location
             String deleteSql = String.format("delete from %s.stop_times using %s.trips where stop_sequence = %d AND %s",
                     tablePrefix, tablePrefix, differenceLocation, joinToTrips);
@@ -586,7 +583,7 @@ public class JdbcTableWriter implements TableWriter {
                 throw new IllegalStateException(
                         "stop substitutions are not supported, region of difference must have length > 1");
             }
-            String updateMoved, updateOthers;
+            String conditionalUpdate;
 
             // figure out whether a stop was moved left or right
             // note that if the stop was only moved one position, it's impossible to tell, and also doesn't matter,
@@ -598,38 +595,40 @@ public class JdbcTableWriter implements TableWriter {
                 from = firstDifferentIndex;
                 to = lastDifferentIndex;
                 verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, true);
-                // if sequence = fromIndex, update to toIndex.
-                updateMoved = String.format(
-                        "update %s.stop_times set stop_sequence = %d from %s.trips where stop_sequence = %d AND %s",
-                        tablePrefix, to, tablePrefix, from, joinToTrips);
-                // if sequence is greater than fromIndex and less than or equal to toIndex, decrement
-                updateOthers = String.format(
-                        "update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND stop_sequence <= %d AND %s",
-                        tablePrefix, tablePrefix, from, to, joinToTrips);
+                conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
+                        // if sequence = fromIndex, update to toIndex.
+                        "when stop_sequence = %d then %d " +
+                        // if sequence is greater than fromIndex and less than or equal to toIndex, decrement
+                        "when stop_sequence > %d AND stop_sequence <= %d then stop_sequence - 1 " +
+                        // Otherwise, sequence remains untouched
+                        "else stop_sequence " +
+                        "end " +
+                        "from %s.trips where %s",
+                        tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
             } else if (newStops.get(firstDifferentIndex).stop_id.equals(originalStopIds.get(lastDifferentIndex))) {
                 // Stop was moved from end of changed region to beginning of changed region (<--)
                 from = lastDifferentIndex;
                 to = firstDifferentIndex;
                 verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, false);
-                // if sequence = fromIndex, update to toIndex.
-                updateMoved = String.format("update %s.stop_times set stop_sequence = %d from %s.trips where stop_sequence = %d AND %s",
-                        tablePrefix, to, tablePrefix, from, joinToTrips);
-                // if sequence is less than fromIndex and greater than or equal to toIndex, increment
-                updateOthers = String.format(
-                        "update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence < %d AND stop_sequence >= %d AND %s",
-                        tablePrefix, tablePrefix, from, to, joinToTrips);
+                conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
+                        // if sequence = fromIndex, update to toIndex.
+                        "when stop_sequence = %d then %d " +
+                        // if sequence is less than fromIndex and greater than or equal to toIndex, increment
+                        "when stop_sequence < %d AND stop_sequence >= %d then stop_sequence + 1 " +
+                        // Otherwise, sequence remains untouched
+                        "else stop_sequence " +
+                        "end " +
+                        "from %s.trips where %s",
+                        tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
             } else {
                 throw new IllegalStateException("not a simple, single move!");
             }
 
             // Update the stop sequences for the stop that was moved and the other stops within the changed region.
-            PreparedStatement movedStatement = connection.prepareStatement(updateMoved);
-            PreparedStatement othersStatement = connection.prepareStatement(updateOthers);
-            LOG.info(movedStatement.toString());
-            LOG.info(othersStatement.toString());
-            int moved = movedStatement.executeUpdate();
-            int others = othersStatement.executeUpdate();
-            LOG.info("Moved {}. Adjusted {} others.", moved, others);
+            PreparedStatement updateStatement = connection.prepareStatement(conditionalUpdate);
+            LOG.info(updateStatement.toString());
+            int updated = updateStatement.executeUpdate();
+            LOG.info("Updated {} stop_times.", updated);
         }
         // CHECK IF SET OF STOPS ADDED TO END OF ORIGINAL LIST
         else if (originalStopIds.size() < newStops.size()) {
