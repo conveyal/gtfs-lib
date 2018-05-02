@@ -64,7 +64,6 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("agency_name"))
             .field(MapFetcher.field("agency_url"))
             .field(MapFetcher.field("agency_branding_url"))
-            .field(MapFetcher.field("agency_desc"))
             .field(MapFetcher.field("agency_phone"))
             .field(MapFetcher.field("agency_email"))
             .field(MapFetcher.field("agency_lang"))
