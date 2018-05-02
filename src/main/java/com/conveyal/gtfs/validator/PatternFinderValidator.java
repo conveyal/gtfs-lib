@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.copyFromFile;
+import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 import static com.conveyal.gtfs.model.Entity.setDoubleParameter;
 import static com.conveyal.gtfs.model.Entity.setIntParameter;
 
@@ -137,11 +138,27 @@ public class PatternFinderValidator extends TripValidator {
                 insertPatternStatement.addBatch();
                 // Construct pattern stops based on values in trip pattern key.
                 // FIXME: Use pattern stops table here?
+                int lastValidDeparture = key.departureTimes.get(0);
                 for (int i = 0; i < key.stops.size(); i++) {
                     int travelTime = 0;
                     String stopId = key.stops.get(i);
-                    if (i > 0) travelTime = key.arrivalTimes.get(i) - key.departureTimes.get(i - 1);
-                    int dwellTime = key.departureTimes.get(i) - key.arrivalTimes.get(i);
+                    int arrival = key.arrivalTimes.get(i);
+                    if (i > 0) {
+                        int prevDeparture = key.departureTimes.get(i - 1);
+                        // Set travel time for all stops except the first.
+                        if (prevDeparture != INT_MISSING) {
+                            // Update the previous departure if it's not missing. Otherwise, base travel time based on the
+                            // most recent valid departure.
+                            lastValidDeparture = prevDeparture;
+                        }
+                        travelTime = arrival == INT_MISSING || lastValidDeparture == INT_MISSING
+                            ? INT_MISSING
+                            : arrival - lastValidDeparture;
+                    }
+                    int departure = key.departureTimes.get(i);
+                    int dwellTime = arrival == INT_MISSING || departure == INT_MISSING
+                        ? INT_MISSING
+                        : departure - arrival;
 
                     insertPatternStopStatement.setString(1, pattern.pattern_id);
                     setIntParameter(insertPatternStopStatement, 2, i);
