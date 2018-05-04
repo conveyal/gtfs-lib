@@ -50,8 +50,10 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                 // Optional argument should match only the first join field.
                 .argument(multiStringArg("stop_id"))
                 .dataFetcher(new NestedJDBCFetcher(
-                        new JDBCFetcher("pattern_stops", "stop_id"),
-                        new JDBCFetcher("patterns", "pattern_id"),
+                        // Auto limit is set to false in first fetchers because otherwise the limit could cut short the
+                        // queries which first get the fields to join to routes.
+                        new JDBCFetcher("pattern_stops", "stop_id", null, false),
+                        new JDBCFetcher("patterns", "pattern_id", null, false),
                         new JDBCFetcher("routes", "route_id")))
                 .build();
     }
@@ -69,10 +71,11 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
         // So it should always be represented as a map with a namespace key.
         String namespace = (String) parentEntityMap.get("namespace");
 
-        // Pass arguments into the first fetcher call only. In the following calls, the argument is no longer relevant.
-        // For example, above the top-level argument is "stop_id," which is only relevant for queries made in the
-        // pattern_stops fetcher.
-        Map<String, Object> arguments;
+        // Arguments are only applied for the final fetcher iteration.
+        // FIXME: NestedJDBCFetcher may need to be refactored so that it avoids conventions of JDBCFetcher (like the
+        // implied limit of 50 records). For now, the autoLimit field has been added to JDBCFetcher, so that certain
+        // fetchers (like the nested ones used solely for joins here) will not apply the limit by default.
+        Map<String, Object> arguments = null;
 
         // Store each iteration's fetch results here.
         List<Map<String, Object>> fetchResults = null;
@@ -92,23 +95,21 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                 if (parentJoinValue == null) {
                     return new ArrayList<>();
                 }
-                // Arguments match parent entity
-                arguments = environment.getArguments();
-                // FIXME: should we limit
-                LOG.info(arguments.keySet().toString());
-                LOG.info(arguments.values().toString());
-//                if (arguments.keySet().isEmpty()) return new ArrayList<>();
             } else {
                 // Otherwise, get join values stored by previous fetcher.
                 joinValues = joinValuesForJoinField.get(fetcher.parentJoinField);
-                // Arguments are null if not the first iteration.
-                arguments = null;
+                if (i == jdbcFetchers.length - 1) {
+                    // Apply arguments only to the final fetched table
+                    arguments = environment.getArguments();
+                    LOG.info("{} args: {}", fetcher.tableName, arguments.keySet().toString());
+                }
             }
-            LOG.info(joinValues.toString());
+            LOG.info("Join values: {}", joinValues.toString());
             fetchResults = fetcher.getResults(namespace, joinValues, arguments);
             if (i < jdbcFetchers.length - 1) {
+                // Iterate over results from current fetcher to store for next iteration for all but the last iteration
+                // (last iteration will contain the final results).
                 JDBCFetcher nextFetcher = jdbcFetchers[i + 1];
-                // Iterate over results from fetcher to store for next iteration.
                 for (Map<String, Object> entity : fetchResults) {
                     Object joinValue = entity.get(nextFetcher.parentJoinField);
                     // Store join values in multimap for

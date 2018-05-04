@@ -192,7 +192,11 @@ public class GraphQLGtfsSchema {
                     // (i.e., nested types that typically would only be nested under another entity and only make sense
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
-                    .dataFetcher(new JDBCFetcher("stop_times", "trip_id", "stop_sequence"))
+                    .dataFetcher(new JDBCFetcher(
+                            "stop_times",
+                            "trip_id",
+                            "stop_sequence",
+                            false))
                     .build()
             )
             .field(newFieldDefinition()
@@ -273,12 +277,13 @@ public class GraphQLGtfsSchema {
                     // We scope to a single feed namespace, otherwise GTFS entity IDs are ambiguous.
                     .argument(stringArg("namespace"))
                     .argument(stringArg(SEARCH_ARG))
+                    .argument(intArg(LIMIT_ARG))
                     // We allow querying only for a single stop, otherwise result processing can take a long time (lots
                     // of join queries).
                     .argument(stringArg("route_id"))
                     .dataFetcher(new NestedJDBCFetcher(
-                            new JDBCFetcher("patterns", "route_id"),
-                            new JDBCFetcher("pattern_stops", "pattern_id"),
+                            new JDBCFetcher("patterns", "route_id", null, false),
+                            new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                             new JDBCFetcher("stops", "stop_id")))
                     .build())
             .field(newFieldDefinition()
@@ -327,7 +332,7 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(new GraphQLTypeReference("pattern")))
                     .argument(stringArg("namespace"))
                     .dataFetcher(new NestedJDBCFetcher(
-                            new JDBCFetcher("pattern_stops", "stop_id"),
+                            new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id")))
                     .build())
             .field(newFieldDefinition()
@@ -337,8 +342,8 @@ public class GraphQLGtfsSchema {
                     .argument(stringArg("namespace"))
                     .argument(stringArg(SEARCH_ARG))
                     .dataFetcher(new NestedJDBCFetcher(
-                            new JDBCFetcher("pattern_stops", "stop_id"),
-                            new JDBCFetcher("patterns", "pattern_id"),
+                            new JDBCFetcher("pattern_stops", "stop_id", null, false),
+                            new JDBCFetcher("patterns", "pattern_id", null, false),
                             new JDBCFetcher("routes", "route_id")))
                     .build())
 //            .field(newFieldDefinition()
@@ -453,7 +458,8 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("shapes",
                             "shape_id",
-                            "shape_pt_sequence"))
+                            "shape_pt_sequence",
+                            false))
                     .build())
             .field(RowCountFetcher.field("trip_count", "trips", "pattern_id"))
             .field(newFieldDefinition()
@@ -465,7 +471,8 @@ public class GraphQLGtfsSchema {
                 .argument(intArg(LIMIT_ARG))
                 .dataFetcher(new JDBCFetcher("pattern_stops",
                         "pattern_id",
-                        "stop_sequence"))
+                        "stop_sequence",
+                        false))
                 .build())
             .field(newFieldDefinition()
                 .name("stops")
@@ -479,7 +486,7 @@ public class GraphQLGtfsSchema {
                 // of join queries).
                 .argument(stringArg("pattern_id"))
                 .dataFetcher(new NestedJDBCFetcher(
-                        new JDBCFetcher("pattern_stops", "pattern_id"),
+                        new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                         new JDBCFetcher("stops", "stop_id")))
                 .build())
             .field(newFieldDefinition()
