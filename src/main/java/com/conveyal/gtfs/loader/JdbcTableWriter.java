@@ -45,6 +45,7 @@ public class JdbcTableWriter implements TableWriter {
     private final String tablePrefix;
     private static final ObjectMapper mapper = new ObjectMapper();
     private final Connection connection;
+    private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.";
 
     public JdbcTableWriter(Table table, DataSource datasource, String namespace) {
         this(table, datasource, namespace, null);
@@ -651,7 +652,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
         else {
-            throw new IllegalStateException("Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.");
+            throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
         }
     }
 
@@ -675,7 +676,7 @@ public class JdbcTableWriter implements TableWriter {
                 // If stop ID for new stop at the given index does not match the original stop ID, the order of at least
                 // one stop within the changed region has been changed, which is illegal according to the rule enforcing
                 // only a single addition, deletion, or transposition per update.
-                throw new IllegalStateException("Changes to trip pattern stops must be made one at a time.");
+                throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
             }
         }
     }
