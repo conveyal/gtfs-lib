@@ -147,6 +147,9 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("feed_start_date"))
             .field(MapFetcher.field("feed_end_date"))
             .field(MapFetcher.field("feed_version"))
+            // Editor-specific fields
+            .field(MapFetcher.field("default_route_color"))
+            .field(MapFetcher.field("default_route_type"))
             .build();
 
     // Represents rows from shapes.txt

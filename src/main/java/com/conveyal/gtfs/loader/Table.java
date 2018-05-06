@@ -115,7 +115,11 @@ public class Table {
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
-        new StringField("feed_version", OPTIONAL)
+        new StringField("feed_version", OPTIONAL),
+        // Editor-specific field that represents default route values for use in editing.
+        new ColorField("default_route_color", EDITOR),
+        // FIXME: Should the route type max value be equivalent to GTFS spec's max?
+        new IntegerField("default_route_type", EDITOR, 999)
     ).keyFieldIsNotUnique();
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
@@ -124,6 +128,7 @@ public class Table {
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
+        // FIXME: Should the route type max value be equivalent to GTFS spec's max?
         new IntegerField("route_type", REQUIRED, 999),
         new URLField("route_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
