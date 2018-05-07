@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.loader;
 
-import com.sun.xml.internal.ws.util.StringUtils;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,7 +183,8 @@ public class JdbcGtfsSnapshotter {
                         .map(d -> String.format(
                                     "case %s when 1 then '%s' else '' end",
                                     d,
-                                    StringUtils.capitalize(d.substring(0, 2)))).toArray(String[]::new));
+                                // Capitalize first letter. Converts days of week from "monday" -> "Mo".
+                                d.substring(0, 1).toUpperCase() + d.substring(1, 2))).toArray(String[]::new));
             String updateOtherSql = String.format(
                     "update %scalendar set description = concat(%s) where description is NULL",
                     tablePrefix,
