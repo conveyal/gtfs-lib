@@ -427,14 +427,14 @@ public class Table {
     /**
      * Join a list of fields with a comma + space separator.
      */
-    public String commaSeparatedNames(List<Field> fieldsToJoin) {
+    public static String commaSeparatedNames(List<Field> fieldsToJoin) {
         return commaSeparatedNames(fieldsToJoin, null);
     }
 
     /**
      * Prepend a prefix string to each field and join them with a comma + space separator.
      */
-    public String commaSeparatedNames(List<Field> fieldsToJoin, String prefix) {
+    public static String commaSeparatedNames(List<Field> fieldsToJoin, String prefix) {
         return fieldsToJoin.stream()
                 // NOTE: This previously only prefixed fields that were foreign refs or key fields. However, this
                 // caused an issue where shared fields were ambiguously referenced in a select query (specifically,
