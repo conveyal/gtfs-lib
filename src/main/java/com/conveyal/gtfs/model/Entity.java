@@ -53,6 +53,7 @@ public abstract class Entity implements Serializable {
 
     private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
+    public static final double DOUBLE_MISSING = Double.MIN_VALUE;
     /** Represents the csv line for feeds that have been loaded from a zip file. Otherwise it is simply a unique ID. */
     public int id;
 
@@ -86,6 +87,11 @@ public abstract class Entity implements Serializable {
     public static void setIntParameter (PreparedStatement statement, int oneBasedIndex, int value) throws SQLException {
         if (value == INT_MISSING) statement.setNull(oneBasedIndex, JDBCType.INTEGER.getVendorTypeNumber());
         else statement.setInt(oneBasedIndex, value);
+    }
+
+    public static void setDoubleParameter (PreparedStatement statement, int oneBasedIndex, double value) throws SQLException {
+        if (value == DOUBLE_MISSING) statement.setNull(oneBasedIndex, JDBCType.DOUBLE.getVendorTypeNumber());
+        else statement.setDouble(oneBasedIndex, value);
     }
 
     /* A class that can produce Entities from CSV, and record errors that occur in the process. */

@@ -45,6 +45,7 @@ public class JdbcTableWriter implements TableWriter {
     private final String tablePrefix;
     private static final ObjectMapper mapper = new ObjectMapper();
     private final Connection connection;
+    private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.";
 
     public JdbcTableWriter(Table table, DataSource datasource, String namespace) {
         this(table, datasource, namespace, null);
@@ -225,9 +226,9 @@ public class JdbcTableWriter implements TableWriter {
             orderField.setParameter(statement, oneBasedIndex++, orderValue);
         }
         // Log query, execute statement, and log result.
-        LOG.info(statement.toString());
+        LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
-        LOG.info("{} {} linked fields updated", entitiesUpdated, tableName);
+        LOG.debug("{} {} linked fields updated", entitiesUpdated, tableName);
     }
 
     /**
@@ -464,10 +465,12 @@ public class JdbcTableWriter implements TableWriter {
             tripsForPattern.add(tripsResults.getString(1));
         }
 
-        if (originalStopIds.size() == 0 && newStops.size() == 0) {
-            // If there were never stops for the pattern and there are none now, there is no need to reconcile anything.
-            // This short circuit prevents the transposition check from throwing an IndexOutOfBoundsException when it
-            // attempts to access index 0 of a list with no items.
+        if (tripsForPattern.size() == 0) {
+            // If there are no trips for the pattern, there is no need to reconcile stop times to modified pattern stops.
+            // This permits the creation of patterns without stops, reversing the stops on existing patterns, and
+            // duplicating patterns.
+            // For new patterns, this short circuit is required to prevent the transposition conditional check from
+            // throwing an IndexOutOfBoundsException when it attempts to access index 0 of a list with no items.
             return;
         }
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
@@ -522,9 +525,6 @@ public class JdbcTableWriter implements TableWriter {
                     differenceLocation = i;
                 }
             }
-
-
-
             // Delete stop at difference location
             String deleteSql = String.format("delete from %s.stop_times using %s.trips where stop_sequence = %d AND %s",
                     tablePrefix, tablePrefix, differenceLocation, joinToTrips);
@@ -584,7 +584,7 @@ public class JdbcTableWriter implements TableWriter {
                 throw new IllegalStateException(
                         "stop substitutions are not supported, region of difference must have length > 1");
             }
-            String updateMoved, updateOthers;
+            String conditionalUpdate;
 
             // figure out whether a stop was moved left or right
             // note that if the stop was only moved one position, it's impossible to tell, and also doesn't matter,
@@ -596,38 +596,40 @@ public class JdbcTableWriter implements TableWriter {
                 from = firstDifferentIndex;
                 to = lastDifferentIndex;
                 verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, true);
-                // if sequence = fromIndex, update to toIndex.
-                updateMoved = String.format(
-                        "update %s.stop_times set stop_sequence = %d from %s.trips where stop_sequence = %d AND %s",
-                        tablePrefix, to, tablePrefix, from, joinToTrips);
-                // if sequence is greater than fromIndex and less than or equal to toIndex, decrement
-                updateOthers = String.format(
-                        "update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND stop_sequence <= %d AND %s",
-                        tablePrefix, tablePrefix, from, to, joinToTrips);
+                conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
+                        // if sequence = fromIndex, update to toIndex.
+                        "when stop_sequence = %d then %d " +
+                        // if sequence is greater than fromIndex and less than or equal to toIndex, decrement
+                        "when stop_sequence > %d AND stop_sequence <= %d then stop_sequence - 1 " +
+                        // Otherwise, sequence remains untouched
+                        "else stop_sequence " +
+                        "end " +
+                        "from %s.trips where %s",
+                        tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
             } else if (newStops.get(firstDifferentIndex).stop_id.equals(originalStopIds.get(lastDifferentIndex))) {
                 // Stop was moved from end of changed region to beginning of changed region (<--)
                 from = lastDifferentIndex;
                 to = firstDifferentIndex;
                 verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, false);
-                // if sequence = fromIndex, update to toIndex.
-                updateMoved = String.format("update %s.stop_times set stop_sequence = %d from %s.trips where stop_sequence = %d AND %s",
-                        tablePrefix, to, tablePrefix, from, joinToTrips);
-                // if sequence is less than fromIndex and greater than or equal to toIndex, increment
-                updateOthers = String.format(
-                        "update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence < %d AND stop_sequence >= %d AND %s",
-                        tablePrefix, tablePrefix, from, to, joinToTrips);
+                conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
+                        // if sequence = fromIndex, update to toIndex.
+                        "when stop_sequence = %d then %d " +
+                        // if sequence is less than fromIndex and greater than or equal to toIndex, increment
+                        "when stop_sequence < %d AND stop_sequence >= %d then stop_sequence + 1 " +
+                        // Otherwise, sequence remains untouched
+                        "else stop_sequence " +
+                        "end " +
+                        "from %s.trips where %s",
+                        tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
             } else {
                 throw new IllegalStateException("not a simple, single move!");
             }
 
             // Update the stop sequences for the stop that was moved and the other stops within the changed region.
-            PreparedStatement movedStatement = connection.prepareStatement(updateMoved);
-            PreparedStatement othersStatement = connection.prepareStatement(updateOthers);
-            LOG.info(movedStatement.toString());
-            LOG.info(othersStatement.toString());
-            int moved = movedStatement.executeUpdate();
-            int others = othersStatement.executeUpdate();
-            LOG.info("Moved {}. Adjusted {} others.", moved, others);
+            PreparedStatement updateStatement = connection.prepareStatement(conditionalUpdate);
+            LOG.info(updateStatement.toString());
+            int updated = updateStatement.executeUpdate();
+            LOG.info("Updated {} stop_times.", updated);
         }
         // CHECK IF SET OF STOPS ADDED TO END OF ORIGINAL LIST
         else if (originalStopIds.size() < newStops.size()) {
@@ -650,7 +652,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
         else {
-            throw new IllegalStateException("Changes to trip pattern stops must be made one at a time.");
+            throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
         }
     }
 
@@ -674,7 +676,7 @@ public class JdbcTableWriter implements TableWriter {
                 // If stop ID for new stop at the given index does not match the original stop ID, the order of at least
                 // one stop within the changed region has been changed, which is illegal according to the rule enforcing
                 // only a single addition, deletion, or transposition per update.
-                throw new IllegalStateException("Changes to trip pattern stops must be made one at a time.");
+                throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
             }
         }
     }
@@ -684,6 +686,10 @@ public class JdbcTableWriter implements TableWriter {
      * avoid overwriting these other stop times.
      */
     private void insertBlankStopTimes(List<String> tripIds, List<PatternStop> newStops, int startingStopSequence, int stopTimesToAdd, Connection connection) throws SQLException {
+        if (tripIds.isEmpty()) {
+            // There is no need to insert blank stop times if there are no trips for the pattern.
+            return;
+        }
         String insertSql = Table.STOP_TIMES.generateInsertSql(tablePrefix, true);
         PreparedStatement insertStatement = connection.prepareStatement(insertSql);
         int count = 0;

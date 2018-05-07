@@ -111,9 +111,9 @@ public interface EntityPopulator<T> {
         scheduleException.name              = getStringIfPresent(result, "name", columnForName);
         scheduleException.dates             = getDateListIfPresent(result, "dates", columnForName);
         scheduleException.exemplar          = exemplarFromInt(getIntIfPresent(result, "exemplar", columnForName));
-        scheduleException.customSchedule    = getStringListIfPresent(result, "customSchedule", columnForName);
-        scheduleException.addedService      = getStringListIfPresent(result, "addedService", columnForName);
-        scheduleException.removedService    = getStringListIfPresent(result, "removedService", columnForName);
+        scheduleException.customSchedule    = getStringListIfPresent(result, "custom_schedule", columnForName);
+        scheduleException.addedService      = getStringListIfPresent(result, "added_service", columnForName);
+        scheduleException.removedService    = getStringListIfPresent(result, "removed_service", columnForName);
         return scheduleException;
     };
 
@@ -225,7 +225,8 @@ public interface EntityPopulator<T> {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return new ArrayList<>();
         try {
-            return Arrays.asList((String[])resultSet.getArray(columnIndex).getArray());
+            List<String> strings = Arrays.asList((String[]) resultSet.getArray(columnIndex).getArray());
+            return strings;
 
         } catch (Exception e) {
             return new ArrayList<>();
@@ -262,7 +263,7 @@ public interface EntityPopulator<T> {
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         // FIXME: if SQL value is null, resultSet.getInt will return 0. Should return value equal 0 if column is missing?
-        if (columnIndex == 0) return -1;
+        if (columnIndex == 0) return Entity.DOUBLE_MISSING;
         else return resultSet.getDouble(columnIndex);
     }
 

@@ -98,29 +98,36 @@ public class JdbcGtfsExporter {
                         new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
                                 EntityPopulator.CALENDAR);
                 Iterable<Calendar> calendars = calendarsReader.getAll();
+                Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
+                List<ScheduleException> exceptions = new ArrayList<>();
+                // FIXME: Doing this causes the connection to stay open, but it is closed in the finalizer so it should
+                // not be a big problem.
+                for (ScheduleException exception : exceptionsIterator) {
+                    exceptions.add(exception);
+                }
                 int calendarDateCount = 0;
                 for (Calendar cal : calendars) {
-                    LOG.info("Iterating over calendar {}", cal.service_id);
                     Service service = new Service(cal.service_id);
                     service.calendar = cal;
-                    Iterable<ScheduleException> exceptions = exceptionsReader.getAll();
                     for (ScheduleException ex : exceptions) {
-                        LOG.info("Adding exception {} for calendar {}", ex.name, cal.service_id);
-                        if (ex.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
-                                !ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))
-                            // skip swap exception if cal is not referenced by added or removed service
-                            // this is not technically necessary, but the output is cleaner/more intelligible
+                        if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
+                            (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
+                            // Skip swap exception if cal is not referenced by added or removed service.
+                            // This is not technically necessary, but the output is cleaner/more intelligible.
                             continue;
+                        }
 
                         for (LocalDate date : ex.dates) {
-                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date))
-                                // no need to write dates that do not apply
+                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
+                                // No need to write dates that do not apply
                                 continue;
+                            }
 
                             CalendarDate calendarDate = new CalendarDate();
                             calendarDate.date = date;
                             calendarDate.service_id = cal.service_id;
                             calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
+                            LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
 
                             if (service.calendar_dates.containsKey(date))
                                 throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
@@ -204,11 +211,13 @@ public class JdbcGtfsExporter {
             // Only write stop times for "approved" routes using COPY TO with results of select query
             String stopTimesSelectSql = null;
             if (fromEditor) {
+                String scopedArrivalTime = String.join(".", feedIdToExport, "arrival_time");
+                String scopedDepartureTime = String.join(".", feedIdToExport, "departure_time");
                 // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string format.
                 String selectWithTransformedTimes = Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
                         // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-                        .replace("arrival_time", "TO_CHAR((arrival_time || ' second')::interval, 'HH24:MI:SS') as arrival_time")
-                        .replace("departure_time", "TO_CHAR((departure_time || ' second')::interval, 'HH24:MI:SS') as departure_time");
+                        .replace(scopedArrivalTime, String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as arrival_time", scopedArrivalTime))
+                        .replace(scopedDepartureTime, String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as departure_time", scopedDepartureTime));
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
                 // route status.
@@ -320,7 +329,7 @@ public class JdbcGtfsExporter {
             zipOutputStream.closeEntry();
             LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, table.name, System.currentTimeMillis() - startTime);
             connection.commit();
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             // Rollback connection so that fatal exception does not impact loading of other tables.
             try {
                 connection.rollback();
@@ -329,8 +338,6 @@ public class JdbcGtfsExporter {
             }
             tableLoadResult.fatalException = e.getMessage();
             LOG.error("Exception while exporting tables", e);
-        } catch (IOException e) {
-            e.printStackTrace();
         }
         return tableLoadResult;
     }

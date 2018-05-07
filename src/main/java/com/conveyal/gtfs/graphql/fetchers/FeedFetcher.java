@@ -41,7 +41,7 @@ public class FeedFetcher implements DataFetcher {
                     // Create a Map to hold the contents of this row, injecting the feed_id into every map
                     Map<String, Object> resultMap = new HashMap<>();
                     resultMap.put("namespace", namespace);
-                    for (int i = 1; i < nColumns; i++) {
+                    for (int i = 1; i <= nColumns; i++) {
                         resultMap.put(meta.getColumnName(i), resultSet.getObject(i));
                     }
                     connection.close();
