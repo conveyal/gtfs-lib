@@ -131,9 +131,16 @@ public abstract class BaseGTFSCache<T> {
         feed.close(); // make sure everything is written to disk
 
         if (idGenerator != null) {
-            Files.move(new File(cacheDir, cleanTempId + ".zip"),(new File(cacheDir, cleanId + ".zip")));
-            Files.move(new File(cacheDir, cleanTempId + ".db"),(new File(cacheDir, cleanId + ".db")));
-            Files.move(new File(cacheDir, cleanTempId + ".db.p"),(new File(cacheDir, cleanId + ".db.p")));
+            // This mess seems to be necessary to get around Windows file locks.
+            File originalZip = new File(cacheDir, cleanTempId + ".zip");
+            File originalDb = new File(cacheDir, cleanTempId + ".db");
+            File originalDbp = new File(cacheDir, cleanTempId + ".db.p");
+            Files.copy(originalZip,(new File(cacheDir, cleanId + ".zip")));
+            Files.copy(originalDb,(new File(cacheDir, cleanId + ".db")));
+            Files.copy(originalDbp,(new File(cacheDir, cleanId + ".db.p")));
+            originalZip.delete();
+            originalDb.delete();
+            originalDbp.delete();
         }
 
         // upload feed
