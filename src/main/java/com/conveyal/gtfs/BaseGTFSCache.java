@@ -231,9 +231,6 @@ public abstract class BaseGTFSCache<T> {
                 LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
         }
-
-        // see if the
-
         // if we fell through to here, getting the mapdb was unsuccessful
         // grab GTFS from S3 if it is not found locally
         File feedFile = new File(cacheDir, id + ".zip");
