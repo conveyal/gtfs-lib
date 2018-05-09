@@ -397,6 +397,9 @@ public class JdbcTableWriter implements TableWriter {
                 // FIXME: Should this always apply the parent key value (to avoid data mix ups)?
                 subEntity.put(keyField.name, keyValue);
             }
+            // FIXME: Check any references the sub entity might have (e.g., the stop ID refs on pattern stops).
+            // See https://github.com/catalogueglobal/datatools-ui/issues/132
+            // ensureReferentialIntegrity(connection, subEntity, tablePrefix, subTable, id);
             // Insert new sub-entity.
             if (entityCount == 0) {
                 // If handling first iteration, create the prepared statement (later iterations will add to batch).
@@ -645,9 +648,10 @@ public class JdbcTableWriter implements TableWriter {
                 throw new IllegalStateException("When adding multiple stops to patterns, new stops must all be at the end");
 
             // insert a skipped stop for each new element in newStops
-            int stopsToInsert = newStops.size() - firstDifferentIndex + 1;
+            int stopsToInsert = newStops.size() - firstDifferentIndex;
             // FIXME: Should we be inserting blank stop times at all?  Shouldn't these just inherit the arrival times
             // from the pattern stops?
+            LOG.info("Adding {} stop times to existing {} stop times. Starting at {}", stopsToInsert, originalStopIds.size(), firstDifferentIndex);
             insertBlankStopTimes(tripsForPattern, newStops, firstDifferentIndex, stopsToInsert, connection);
         }
         // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
