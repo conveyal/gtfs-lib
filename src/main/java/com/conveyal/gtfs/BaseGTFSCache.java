@@ -131,9 +131,9 @@ public abstract class BaseGTFSCache<T> {
         feed.close(); // make sure everything is written to disk
 
         if (idGenerator != null) {
-            new File(cacheDir, cleanTempId + ".zip").renameTo(new File(cacheDir, cleanId + ".zip"));
-            new File(cacheDir, cleanTempId + ".db").renameTo(new File(cacheDir, cleanId + ".db"));
-            new File(cacheDir, cleanTempId + ".db.p").renameTo(new File(cacheDir, cleanId + ".db.p"));
+            Files.move(new File(cacheDir, cleanTempId + ".zip"),(new File(cacheDir, cleanId + ".zip")));
+            Files.move(new File(cacheDir, cleanTempId + ".db"),(new File(cacheDir, cleanId + ".db")));
+            Files.move(new File(cacheDir, cleanTempId + ".db.p"),(new File(cacheDir, cleanId + ".db.p")));
         }
 
         // upload feed
