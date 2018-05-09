@@ -34,58 +34,64 @@ public class SQLErrorStorage {
     // Should include any dot or other separator. May also be the empty string if you want no prefix added.
     private String tablePrefix;
 
+    // This serves as a unique ID, so it must persist across multiple validator runs. It is, however, distinct from the
+    // count, which should only be determined with a SQL query.
+    private int errorId;
+
     // How many errors to insert at a time in a batch, for efficiency.
     private static final long INSERT_BATCH_SIZE = 500;
 
     public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
         // TablePrefix should always be internally generated so doesn't need to be sanitized.
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
+        errorId = 0;
         this.connection = connection;
         if (createTables) createErrorTables();
+        else reconnectErrorTables();
         createPreparedStatements();
     }
 
     public void storeError (NewGTFSError error) {
         try {
             // Insert one row for the error itself
-            // NOTE: The error ID is a serial auto-incrementing value, so it does not need to be set in the statement.
-            insertError.setString(1, error.errorType.name());
+            insertError.setInt(1, errorId);
+            insertError.setString(2, error.errorType.name());
             // Using SetObject to allow null values, do all target DBs support this?
-            insertError.setObject(2, error.entityType == null ? null : error.entityType.getSimpleName());
-            insertError.setObject(3, error.lineNumber);
-            insertError.setObject(4, error.entityId);
-            insertError.setObject(5, error.entitySequenceNumber);
-            insertError.setObject(6, error.badValue);
-            insertError.execute();
-            // Get the error ID from the insert to use for reference in the following error info inserts.
-            ResultSet generatedKeys = insertError.getGeneratedKeys();
-            generatedKeys.next();
-            int errorId = (int) generatedKeys.getLong(1);
+            insertError.setObject(3, error.entityType == null ? null : error.entityType.getSimpleName());
+            insertError.setObject(4, error.lineNumber);
+            insertError.setObject(5, error.entityId);
+            insertError.setObject(6, error.entitySequenceNumber);
+            insertError.setObject(7, error.badValue);
+            insertError.addBatch();
             // Insert all key-value info pairs for the error
-            int errorInfoCount = 0;
             for (Map.Entry<String, String> entry : error.errorInfo.entrySet()) {
                 insertInfo.setInt(1, errorId);
                 insertInfo.setString(2, entry.getKey());
                 insertInfo.setString(3, entry.getValue());
                 insertInfo.addBatch();
-                errorInfoCount++;
             }
-            if (errorInfoCount % INSERT_BATCH_SIZE == 0) {
+            if (errorId % INSERT_BATCH_SIZE == 0) {
+                insertError.executeBatch();
                 insertInfo.executeBatch();
             }
+            errorId += 1;
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
     }
 
+    /**
+     * Commits any outstanding error inserts and returns the error count via a SQL query.
+     */
     public int getErrorCount () {
         try {
+            // Ensure any outstanding inserts are committed so that count is accurate.
+            this.commit();
             Statement statement = connection.createStatement();
             statement.execute(String.format("select count(*) from %serrors", tablePrefix));
             ResultSet resultSet = statement.getResultSet();
             resultSet.next();
             int count = resultSet.getInt(1);
-            LOG.info("Error count is {} for {}", count, tablePrefix);
             return count;
         } catch (SQLException ex) {
             throw new StorageException(ex);
@@ -93,15 +99,26 @@ public class SQLErrorStorage {
     }
 
     /**
-     * This commits any remaining inserts, commits the transaction, and closes the connection permanently.
-     * commitAndClose() should only be called when access to SQLErrorStorage is no longer needed.
+     * This executes any remaining inserts and commits the transaction.
      */
-    public void commitAndClose() {
+    private void commit() {
         try {
             // Execute any remaining batch inserts and commit the transaction.
             insertError.executeBatch();
             insertInfo.executeBatch();
             connection.commit();
+        } catch (SQLException ex) {
+            throw new StorageException(ex);
+        }
+    }
+
+    /**
+     * This executes any remaining inserts, commits the transaction, and closes the connection permanently.
+     * commitAndClose() should only be called when access to SQLErrorStorage is no longer needed.
+     */
+    public void commitAndClose() {
+        try {
+            this.commit();
             // Close the connection permanently (should be called only after errorStorage instance no longer needed).
             connection.close();
         } catch (SQLException ex) {
@@ -114,7 +131,7 @@ public class SQLErrorStorage {
             Statement statement = connection.createStatement();
             // If tables are dropped, order matters because of foreign keys.
             // TODO add foreign key constraint on info table?
-            String createErrorsSql = String.format("create table %serrors (error_id serial primary key, error_type varchar, " +
+            String createErrorsSql = String.format("create table %serrors (error_id integer primary key, error_type varchar, " +
                     "entity_type varchar, line_number integer, entity_id varchar, entity_sequence integer, " +
                     "bad_value varchar)", tablePrefix);
             LOG.info(createErrorsSql);
@@ -133,11 +150,23 @@ public class SQLErrorStorage {
     private void createPreparedStatements () {
         try {
             insertError = connection.prepareStatement(
-                    // Insert error does not set the error ID because it is auto-incrementing per the table defintion.
-                    String.format("insert into %serrors values (DEFAULT, ?, ?, ?, ?, ?, ?)", tablePrefix),
-                    Statement.RETURN_GENERATED_KEYS);
+                    String.format("insert into %serrors values (?, ?, ?, ?, ?, ?, ?)", tablePrefix));
             insertInfo = connection.prepareStatement(
                     String.format("insert into %serror_info values (?, ?, ?)", tablePrefix));
+        } catch (SQLException ex) {
+            throw new StorageException(ex);
+        }
+    }
+
+    private void reconnectErrorTables () {
+        try {
+            Statement statement = connection.createStatement();
+            statement.execute(String.format("select max(error_id) from %serrors", tablePrefix));
+            ResultSet resultSet = statement.getResultSet();
+            resultSet.next();
+            errorId = resultSet.getInt(1);
+            LOG.info("Reconnected to errors table, max error ID is {}.", errorId);
+            errorId += 1; // Error count is zero based, add one to avoid duplicate error key
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
