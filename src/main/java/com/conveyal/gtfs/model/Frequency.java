@@ -4,7 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 import org.mapdb.Fun;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 import static com.conveyal.gtfs.model.Entity.Writer.convertToGtfsTime;
@@ -37,6 +38,21 @@ public class Frequency extends Entity implements Comparable<Frequency> {
     public int headway_secs;
     public int exact_times;
 
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FREQUENCIES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, trip_id);
+        setIntParameter(statement, oneBasedIndex++, start_time);
+        setIntParameter(statement, oneBasedIndex++, end_time);
+        setIntParameter(statement, oneBasedIndex++, headway_secs);
+        setIntParameter(statement, oneBasedIndex++, exact_times);
+    }
+
     /** must have a comparator since they go in a navigable set that is serialized */
     @Override
     public int compareTo(Frequency o) {
@@ -58,7 +74,7 @@ public class Frequency extends Entity implements Comparable<Frequency> {
         public void loadOneRow() throws IOException {
             Frequency f = new Frequency();
             Trip trip = getRefField("trip_id", true, feed.trips);
-            f.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            f.id = row + 1; // offset line number by 1 to account for 0-based row index
             f.trip_id = trip.trip_id;
             f.start_time = getTimeField("start_time", true);
             f.end_time = getTimeField("end_time", true);

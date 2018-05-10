@@ -6,17 +6,12 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.validator.*;
-import com.google.common.collect.Multimap;
-import com.google.common.collect.Multimaps;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -108,7 +103,8 @@ public class Feed {
             } catch (Exception e) {
                 // store an error if the validator fails
                 // FIXME: should the exception be stored?
-                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, validatorName));
+                String badValue = String.join(":", validatorName, e.toString());
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, badValue));
                 LOG.error("{} failed.", validatorName);
                 LOG.error(e.toString());
                 e.printStackTrace();
@@ -116,10 +112,20 @@ public class Feed {
         }
         // Signal to all validators that validation is complete and allow them to report on results / status.
         for (FeedValidator feedValidator : feedValidators) {
-            feedValidator.complete(validationResult);
+            try {
+                feedValidator.complete(validationResult);
+            } catch (Exception e) {
+                String badValue = String.join(":", feedValidator.getClass().getSimpleName(), e.toString());
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, badValue));
+                LOG.error("Validator failed completion stage.", e);
+            }
         }
-        int totalValidationErrors = errorStorage.getErrorCount() - errorCountBeforeValidation;
-        LOG.info("Total number of errors found by all validators: {}", totalValidationErrors);
+        // Total validation errors accounts for errors found during both loading and validation. Otherwise, this value
+        // may be confusing if it reads zero but there were a number of data type or referential integrity errors found
+        // during feed loading stage.
+        int totalValidationErrors = errorStorage.getErrorCount();
+        LOG.info("Errors found during load stage: {}", errorCountBeforeValidation);
+        LOG.info("Errors found by validators: {}", totalValidationErrors - errorCountBeforeValidation);
         errorStorage.commitAndClose();
         long validationEndTime = System.currentTimeMillis();
         long totalValidationTime = validationEndTime - validationStartTime;

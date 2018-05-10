@@ -1,20 +1,21 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.google.common.collect.ListMultimap;
+import com.google.common.collect.MultimapBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
-import static com.conveyal.gtfs.util.Util.fastDistance;
 
 /**
  * Check that the travel times between adjacent stops in trips are reasonable.
@@ -32,6 +33,7 @@ public class NewTripTimesValidator extends FeedValidator {
 
     // Caching stops and trips gives a massive speed improvement by avoiding database calls.
     // TODO build this same kind of caching into the table reader class.
+//    ListMultimap<String, ShapePoint> shapeById = MultimapBuilder.treeKeys().arrayListValues().build();
     Map<String, Stop> stopById = new HashMap<>();
     Map<String, Trip> tripById = new HashMap<>();
     Map<String, Route> routeById = new HashMap<>();
@@ -56,6 +58,8 @@ public class NewTripTimesValidator extends FeedValidator {
         // TODO cache automatically in feed or TableReader object
         LOG.info("Cacheing stops, trips, and routes...");
         for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
+        // FIXME: determine a good way to validate shapes without caching them all in memory...
+//        for (ShapePoint shape : feed.shapePoints.getAllOrdered()) shapeById.put(shape.shape_id, shape);
         for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
         for (Route route: feed.routes) routeById.put(route.route_id, route);
         LOG.info("Done.");
@@ -73,7 +77,7 @@ public class NewTripTimesValidator extends FeedValidator {
             stopTimesForTrip.add(stopTime);
             previousTripId = stopTime.trip_id;
         }
-        processTrip(stopTimesForTrip);
+        if (!stopTimesForTrip.isEmpty()) processTrip(stopTimesForTrip);
     }
 
     protected static boolean missingEitherTime (StopTime stopTime) {
@@ -124,6 +128,7 @@ public class NewTripTimesValidator extends FeedValidator {
     private void processTrip (List<StopTime> stopTimes) {
         if (++tripCount % 20_000 == 0) LOG.info("Validating trip {}", tripCount);
         // All stop times have the same trip_id, so we look it up right away.
+        // FIXME: gtfs_load error if there are no stop times? / feed=Birnie_Bus_20141105T102949-05_24e99790-211d-4f92-b1d2-147e6f3d5040.zip
         String tripId = stopTimes.get(0).trip_id;
         Trip trip = tripById.get(tripId);
         if (trip == null) {
@@ -163,6 +168,7 @@ public class NewTripTimesValidator extends FeedValidator {
         Route route = null;
         if (trip != null) route = routeById.get(trip.route_id);
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
+
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
     }
 

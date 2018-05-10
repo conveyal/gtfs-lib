@@ -15,7 +15,7 @@ public class ShapeMissingCoordinatesError extends GTFSError implements Serializa
     public final String[] tripIds;
 
     public ShapeMissingCoordinatesError(ShapePoint shapePoint, String[] tripIds) {
-        super("shapes", shapePoint.sourceFileLine, "shape_id", shapePoint.shape_id);
+        super("shapes", shapePoint.id, "shape_id", shapePoint.shape_id);
         this.tripIds = tripIds;
     }
 

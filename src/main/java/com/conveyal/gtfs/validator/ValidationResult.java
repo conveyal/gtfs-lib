@@ -3,6 +3,9 @@ package com.conveyal.gtfs.validator;
 import java.awt.geom.Rectangle2D;
 import java.io.Serializable;
 import com.conveyal.gtfs.model.Pattern;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -11,7 +14,10 @@ import java.util.List;
  * It groups together several kinds of information about what happened during the validation process.
  * Detailed lists of errors can be found in database tables created by the validator, but this class provides
  * immediate summary information.
+ *
+ * Ignore unknown properties on deserialization to avoid conflicts with past versions. FIXME
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ValidationResult implements Serializable {
 
     private static final long serialVersionUID = 1L;

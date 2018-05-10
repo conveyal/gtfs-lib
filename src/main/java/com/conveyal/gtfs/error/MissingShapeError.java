@@ -14,7 +14,7 @@ public class MissingShapeError extends GTFSError implements Serializable {
     public final Priority priority = Priority.MEDIUM;
 
     public MissingShapeError(Trip trip) {
-        super("trips", trip.sourceFileLine, "shape_id", trip.trip_id);
+        super("trips", trip.id, "shape_id", trip.trip_id);
     }
 
     @Override public String getMessage() {
