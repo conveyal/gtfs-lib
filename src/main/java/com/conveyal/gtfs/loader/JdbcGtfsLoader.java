@@ -313,11 +313,12 @@ public class JdbcGtfsLoader {
         // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
-        Field[] fields = new Field[csvReader.getHeaderCount()];
+        int headerCount = csvReader.getHeaderCount();
+        Field[] fields = new Field[headerCount];
         Set<String> fieldsSeen = new HashSet<>();
         String keyField = table.getKeyFieldName();
         int keyFieldIndex = -1;
-        for (int h = 0; h < csvReader.getHeaderCount(); h++) {
+        for (int h = 0; h < headerCount; h++) {
             String header = sanitize(csvReader.getHeader(h));
             if (fieldsSeen.contains(header) || "id".equals(header)) {
                 // FIXME: add separate error for tables containing ID field.
@@ -336,6 +337,7 @@ public class JdbcGtfsLoader {
         Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
         if (cleanFields.length == 0) {
             // Do not create the table if there are no valid fields.
+            errorStorage.storeError(NewGTFSError.forTable(table, TABLE_MISSING_COLUMN_HEADERS));
             return 0;
         }
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
@@ -417,7 +419,10 @@ public class JdbcGtfsLoader {
         // Iteration over all rows has finished, so We are now one record past the end of the file.
         int numberOfRecordsLoaded = (int) csvReader.getCurrentRecord();
         if (postgresText) {
-          numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
+            numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
+        }
+        if (table.isRequired() && numberOfRecordsLoaded == 0) {
+            errorStorage.storeError(NewGTFSError.forTable(table, REQUIRED_TABLE_EMPTY));
         }
         csvReader.close();
 
