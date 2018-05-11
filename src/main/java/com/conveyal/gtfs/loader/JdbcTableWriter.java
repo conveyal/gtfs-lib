@@ -4,11 +4,12 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -27,6 +28,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -389,17 +392,26 @@ public class JdbcTableWriter implements TableWriter {
         int entityCount = 0;
         PreparedStatement insertStatement = null;
         // Iterate over the entities found in the array and add to batch for inserting into table.
+        String orderFieldName = subTable.getOrderFieldName();
+        boolean hasOrderField = orderFieldName != null;
+        int previousOrder = -1;
+        TIntSet orderValues = new TIntHashSet();
+        Multimap<Table, String> referencesPerTable = HashMultimap.create();
         for (JsonNode entityNode : subEntities) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
             ObjectNode subEntity = (ObjectNode)entityNode;
-            if (subEntity.get(keyField.name) == null || subEntity.get(keyField.name).isNull()) {
-                // If value for key field is missing, apply parent's value.
-                // FIXME: Should this always apply the parent key value (to avoid data mix ups)?
-                subEntity.put(keyField.name, keyValue);
+            // Always override the key field (shape_id for shapes, pattern_id for patterns) regardless of the entity's
+            // actual value.
+            subEntity.put(keyField.name, keyValue);
+            // Check any references the sub entity might have. For example, this checks that stop_id values on
+            // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
+            // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
+            // field statement above.
+            for (Field field : subTable.specFields()) {
+                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
+                    referencesPerTable.put(field.referenceTable, subEntity.get(field.name).asText());
+                }
             }
-            // FIXME: Check any references the sub entity might have (e.g., the stop ID refs on pattern stops).
-            // See https://github.com/catalogueglobal/datatools-ui/issues/132
-            // ensureReferentialIntegrity(connection, subEntity, tablePrefix, subTable, id);
             // Insert new sub-entity.
             if (entityCount == 0) {
                 // If handling first iteration, create the prepared statement (later iterations will add to batch).
@@ -407,9 +419,37 @@ public class JdbcTableWriter implements TableWriter {
             }
             // Update linked stop times fields for updated pattern stop (e.g., timepoint, pickup/drop off type).
             if ("pattern_stops".equals(subTable.name)) {
-                updateLinkedFields(subTable, subEntity, "stop_times", "pattern_id", "timepoint", "drop_off_type", "pickup_type", "shape_dist_traveled");
+                updateLinkedFields(
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "shape_dist_traveled"
+                );
             }
             setStatementParameters(subEntity, subTable, insertStatement, connection);
+            if (hasOrderField) {
+                // If the table has an order field, check that it is zero-based and incrementing for all sub entities.
+                // NOTE: Rather than coercing the order values to conform to the sequence in which they are found, we
+                // check the values here as a sanity check.
+                int orderValue = subEntity.get(orderFieldName).asInt();
+                boolean orderIsUnique = orderValues.add(orderValue);
+                boolean valuesAreIncrementing = ++previousOrder == orderValue;
+                if (!orderIsUnique || !valuesAreIncrementing) {
+                    throw new SQLException(String.format(
+                            "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
+                            subTable.name,
+                            orderFieldName,
+                            entityCount,
+                            previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
+                            orderValue)
+                    );
+                }
+            }
+            // Log statement on first iteration so that it is not logged for each item in the batch.
             if (entityCount == 0) LOG.info(insertStatement.toString());
             insertStatement.addBatch();
             // Prefix increment count and check whether to execute batched update.
@@ -419,6 +459,8 @@ public class JdbcTableWriter implements TableWriter {
                 LOG.info("Updated {}", newIds.length);
             }
         }
+        // Check that accumulated references all exist in reference tables.
+        verifyReferencesExist(subTable.name, referencesPerTable);
         // execute any remaining prepared statement calls
         LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
         if (insertStatement != null) {
@@ -428,6 +470,54 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info("Updated {} {} child entities", newIds.length, subTable.name);
         } else {
             LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
+        }
+    }
+
+    /**
+     * Checks that a set of string references to a set of reference tables are all valid. For each set of references
+     * mapped to a reference table, the method queries for all of the references. If there are any references that were
+     * not returned in the query, one of the original references was invalid and an exception is thrown.
+     * @param referringTableName    name of the table which contains references for logging/exception message only
+     * @param referencesPerTable    string references mapped to the tables to which they refer
+     * @throws SQLException
+     */
+    private void verifyReferencesExist(String referringTableName, Multimap<Table, String> referencesPerTable) throws SQLException {
+        for (Table referencedTable: referencesPerTable.keySet()) {
+            LOG.info("Checking {} references to {}", referringTableName, referencedTable.name);
+            Collection<String> referenceStrings = referencesPerTable.get(referencedTable);
+            String referenceFieldName = referencedTable.getKeyFieldName();
+            String questionMarks = String.join(", ", Collections.nCopies(referenceStrings.size(), "?"));
+            String checkCountSql = String.format(
+                    "select %s from %s.%s where %s in (%s)",
+                    referenceFieldName,
+                    tablePrefix,
+                    referencedTable.name,
+                    referenceFieldName,
+                    questionMarks);
+            PreparedStatement preparedStatement = connection.prepareStatement(checkCountSql);
+            int oneBasedIndex = 1;
+            for (String ref : referenceStrings) {
+                preparedStatement.setString(oneBasedIndex++, ref);
+            }
+            LOG.info(preparedStatement.toString());
+            ResultSet resultSet = preparedStatement.executeQuery();
+            Set<String> foundReferences = new HashSet<>();
+            while (resultSet.next()) {
+                String referenceValue = resultSet.getString(1);
+                foundReferences.add(referenceValue);
+            }
+            // Determine if any references were not found.
+            referenceStrings.removeAll(foundReferences);
+            if (referenceStrings.size() > 0) {
+                throw new SQLException(
+                        String.format(
+                                "%s entities must contain valid %s references. (Invalid references: %s)",
+                                referringTableName,
+                                referenceFieldName,
+                                String.join(", ", referenceStrings)));
+            } else {
+                LOG.info("All {} {} {} references are valid.", foundReferences.size(), referencedTable.name, referenceFieldName);
+            }
         }
     }
 
@@ -585,7 +675,7 @@ public class JdbcTableWriter implements TableWriter {
             // TODO: write a unit test for this
             if (firstDifferentIndex == lastDifferentIndex) {
                 throw new IllegalStateException(
-                        "stop substitutions are not supported, region of difference must have length > 1");
+                        "Pattern stop substitutions are not supported, region of difference must have length > 1.");
             }
             String conditionalUpdate;
 
@@ -897,8 +987,14 @@ public class JdbcTableWriter implements TableWriter {
             } else if (size > 1) {
                 // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
                 // attempt to rectify bad data.
-                LOG.warn("{} entity shares the same key field ({}={})! This is Bad!!", size, keyField, keyValue);
-                throw new SQLException("More than one entity must not share the same id field");
+                String message = String.format(
+                        "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
+                        size,
+                        table.name,
+                        keyField,
+                        keyValue);
+                LOG.error(message);
+                throw new SQLException(message);
             }
         }
     }
