@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.StopTime;
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
+import org.junit.BeforeClass;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,8 +17,9 @@ import java.time.LocalDate;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.gtfs.TestUtils.getResourceFileName;
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.equalTo;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 
@@ -27,6 +29,7 @@ import static org.hamcrest.number.IsCloseTo.closeTo;
 public class GTFSFeedTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeedTest.class);
+    private static String simpleGtfsZipFileName;
 
     private static class FileTestCase {
         public String filename;
@@ -48,6 +51,17 @@ public class GTFSFeedTest {
         }
     }
 
+    @BeforeClass
+    public static void setUpClass() {
+        //executed only once, before the first test
+        simpleGtfsZipFileName = null;
+        try {
+            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     /**
      * Make sure a roundtrip of loading a GTFS zip file and then writing another zip file can be performed.
      */
@@ -59,7 +73,7 @@ public class GTFSFeedTest {
         // delete file to make sure we can assert that this program created the file
         outZip.delete();
 
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         feed.toFile(outZip.getAbsolutePath());
         feed.close();
         assertThat(outZip.exists(), is(true));
@@ -161,7 +175,7 @@ public class GTFSFeedTest {
      */
     @Test
     public void canGetAgencyTimeZoneForStop() {
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         assertThat(
             feed.getAgencyTimeZoneForStop("4u6g").getId(),
             equalTo("America/Los_Angeles")
@@ -173,10 +187,12 @@ public class GTFSFeedTest {
      * @throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes
      */
     @Test
-    public void canGetInterpolatedTimes() throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes {
+    public void canGetInterpolatedTimes() throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes, IOException {
         String tripId = "a30277f8-e50a-4a85-9141-b1e0da9d429d";
 
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency-interpolated-stop-times.zip"));
+        String gtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-interpolated-stop-times");
+
+        GTFSFeed feed = GTFSFeed.fromFile(gtfsZipFileName);
         Iterable<StopTime> stopTimes = feed.getInterpolatedStopTimesForTrip(tripId);
 
 
@@ -221,7 +237,7 @@ public class GTFSFeedTest {
      */
     @Test
     public void canGetServicesForDate() {
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         assertThat(
             feed.getServicesForDate(LocalDate.of(2017,9,17)).get(0).service_id,
             equalTo("04100312-8fe1-46a5-a9f2-556f39478f57")
@@ -233,7 +249,7 @@ public class GTFSFeedTest {
      */
     @Test
     public void canGetSpatialIndex() {
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         assertThat(
             feed.getSpatialIndex().size(),
             equalTo(2)
@@ -245,7 +261,7 @@ public class GTFSFeedTest {
      */
     @Test
     public void canGetTripSpeedUsingShape() {
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         assertThat(
             feed.getTripSpeed("a30277f8-e50a-4a85-9141-b1e0da9d429d"),
             is(closeTo(5.96, 0.01))
@@ -257,7 +273,7 @@ public class GTFSFeedTest {
      */
     @Test
     public void canGetTripSpeedUsingStraightLine() {
-        GTFSFeed feed = GTFSFeed.fromFile(getResourceFileName("fake-agency.zip"));
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         assertThat(
             feed.getTripSpeed("a30277f8-e50a-4a85-9141-b1e0da9d429d", true),
             is(closeTo(5.18, 0.01))
