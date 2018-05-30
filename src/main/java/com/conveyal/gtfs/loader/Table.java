@@ -61,7 +61,7 @@ public class Table {
         new StringField("agency_timezone",  REQUIRED), // FIXME new field type for time zones?
         new StringField("agency_lang", OPTIONAL), // FIXME new field type for languages?
         new StringField("agency_phone",  OPTIONAL),
-        new URLField("agency_branding_url",  EDITOR),
+        new URLField("agency_branding_url",  OPTIONAL),
         new URLField("agency_fare_url",  OPTIONAL),
         new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
     ).restrictDelete().addPrimaryKey();
@@ -131,6 +131,7 @@ public class Table {
         // FIXME: Should the route type max value be equivalent to GTFS spec's max?
         new IntegerField("route_type", REQUIRED, 999),
         new URLField("route_url",  OPTIONAL),
+        new URLField("route_branding_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
         new ColorField("route_text_color",  OPTIONAL),
         // Editor fields below.

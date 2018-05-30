@@ -79,7 +79,7 @@ public interface EntityPopulator<T> {
         agency.agency_phone    = getStringIfPresent(result, "agency_phone", columnForName);
         agency.agency_fare_url = getUrlIfPresent   (result, "agency_fare_url", columnForName);
         agency.agency_email    = getStringIfPresent(result, "agency_email", columnForName);
-        agency.agency_branding_url = null; // FIXME
+        agency.agency_branding_url = getUrlIfPresent (result, "agency_branding_url", columnForName);
         return agency;
     };
 

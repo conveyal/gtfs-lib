@@ -187,6 +187,10 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
                 LOG.info(preparedStatement.toString());
                 results = preparedStatement.executeQuery();
                 hasMoreEntities = results.next();
+                if (!hasMoreEntities) {
+                    // If immediately after the SQL query there are no results, close the connection immediately.
+                    connection.close();
+                }
             } catch (SQLException sqlEx) {
                 DbUtils.closeQuietly(connection);
                 if (SQL_STATE_UNDEFINED_TABLE.equals(sqlEx.getSQLState())) {
