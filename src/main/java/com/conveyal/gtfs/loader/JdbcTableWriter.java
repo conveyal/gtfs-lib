@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.INSERT_BATCH_SIZE;
+import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
 /**
  * This wraps a single database table and provides methods to modify GTFS entities.
@@ -62,8 +63,13 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     public JdbcTableWriter (Table specTable, DataSource dataSource, String tablePrefix, Connection optionalConnection) {
+        // verify tablePrefix (namespace) is ok to use for constructing dynamic sql statements
+        ensureValidNamespace(tablePrefix);
+
         this.tablePrefix = tablePrefix;
         this.dataSource = dataSource;
+
+        // TODO: verify specTable.name is ok to use for constructing dynamic sql statements
         this.specTable = specTable;
         Connection connection1;
         try {
@@ -1016,11 +1022,12 @@ public class JdbcTableWriter implements TableWriter {
      * For some condition (where field = string value), return the set of unique int IDs for the records that match.
      */
     private static TIntSet getIdsForCondition(String tableName, String keyField, String keyValue, Connection connection) throws SQLException {
-        String idCheckSql = String.format("select id from %s where %s = '%s'", tableName, keyField, keyValue);
+        String idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
         LOG.info(idCheckSql);
         // Create statement for counting rows selected
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(idCheckSql);
+        PreparedStatement statement = connection.prepareStatement(idCheckSql);
+        statement.setString(1, keyValue);
+        ResultSet resultSet = statement.executeQuery();
         // Keep track of number of records found with key field
         TIntSet uniqueIds = new TIntHashSet();
         while (resultSet.next()) {
