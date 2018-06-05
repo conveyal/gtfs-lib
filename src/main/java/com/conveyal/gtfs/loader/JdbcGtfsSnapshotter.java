@@ -198,12 +198,12 @@ public class JdbcGtfsSnapshotter {
             // frequencies. NOTE: This is performed after copying the TRIPS table rather than after PATTERNS because
             // both tables (plus, frequencies) need to exist for the successful operation.
             // TODO: How should this handle patterns that have both timetable- and frequency-based trips?
-            // NOTE: The below substitution uses relative indexing. All values "%<s" reference the same arg as the
-            // previous format specifier (i.e., tablePrefix).
+            // NOTE: The below substitution uses argument indexing. All values "%1$s" reference the first argument
+            // supplied (i.e., tablePrefix).
             String updatePatternsSql = String.format(
-                    "update %spatterns set use_frequency = 1 " +
-                    "from (select distinct %<strips.pattern_id from %<strips, %<sfrequencies where %<sfrequencies.trip_id = %<strips.trip_id) freq " +
-                    "where freq.pattern_id = %<spatterns.pattern_id",
+                    "update %1$spatterns set use_frequency = 1 " +
+                    "from (select distinct %1$strips.pattern_id from %1$strips, %1$sfrequencies where %1$sfrequencies.trip_id = %1$strips.trip_id) freq " +
+                    "where freq.pattern_id = %1$spatterns.pattern_id",
                     tablePrefix);
             LOG.info(updatePatternsSql);
             int patternsUpdated = statement.executeUpdate(updatePatternsSql);
