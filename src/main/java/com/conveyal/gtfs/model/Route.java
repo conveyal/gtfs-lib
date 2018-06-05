@@ -54,9 +54,11 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         statement.setString(oneBasedIndex++, route_desc);
         setIntParameter(statement, oneBasedIndex++, route_type);
         statement.setString(oneBasedIndex++, route_url != null ? route_url.toString() : null);
+        statement.setString(oneBasedIndex++, route_branding_url != null ? route_branding_url.toString() : null);
         statement.setString(oneBasedIndex++, route_color);
         statement.setString(oneBasedIndex++, route_text_color);
-        // Editor-specific fields publicly_visible and status.
+        // Editor-specific fields publicly_visible, wheelchair_accessible, and status.
+        setIntParameter(statement, oneBasedIndex++, 0);
         setIntParameter(statement, oneBasedIndex++, 0);
         setIntParameter(statement, oneBasedIndex++, 0);
     }
