@@ -193,6 +193,22 @@ public class JdbcGtfsSnapshotter {
             int calendarsUpdated = statement.executeUpdate(updateOtherSql);
             LOG.info("Updated description for {} calendars", calendarsUpdated);
         }
+        if (Table.TRIPS.name.equals(table.name)) {
+            // Update use_frequency field for patterns. This sets all patterns that have a frequency trip to use
+            // frequencies. NOTE: This is performed after copying the TRIPS table rather than after PATTERNS because
+            // both tables (plus, frequencies) need to exist for the successful operation.
+            // TODO: How should this handle patterns that have both timetable- and frequency-based trips?
+            // NOTE: The below substitution uses argument indexing. All values "%1$s" reference the first argument
+            // supplied (i.e., tablePrefix).
+            String updatePatternsSql = String.format(
+                    "update %1$spatterns set use_frequency = 1 " +
+                    "from (select distinct %1$strips.pattern_id from %1$strips, %1$sfrequencies where %1$sfrequencies.trip_id = %1$strips.trip_id) freq " +
+                    "where freq.pattern_id = %1$spatterns.pattern_id",
+                    tablePrefix);
+            LOG.info(updatePatternsSql);
+            int patternsUpdated = statement.executeUpdate(updatePatternsSql);
+            LOG.info("Updated use_frequency for {} patterns", patternsUpdated);
+        }
         // TODO: Add simple conversion from calendar_dates to schedule_exceptions if no exceptions exist? See
         // https://github.com/catalogueglobal/datatools-server/issues/80
     }
