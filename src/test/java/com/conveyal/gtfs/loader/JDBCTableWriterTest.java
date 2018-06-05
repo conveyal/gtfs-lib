@@ -109,6 +109,32 @@ public class JDBCTableWriterTest {
         assertThat(rs.getFetchSize(), equalTo(0));
     }
 
+    @Test
+    public void canPreventSQLInjection() throws IOException, SQLException {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // create new object to be saved
+        FeedInfoDTO feedInfoInput = new FeedInfoDTO();
+        String publisherName = "' OR 1 = 1; SELECT '1";
+        feedInfoInput.feed_publisher_name = publisherName;
+        feedInfoInput.feed_publisher_url = "example.com";
+        feedInfoInput.feed_lang = "en";
+        feedInfoInput.default_route_color = "1c8edb";
+        feedInfoInput.default_route_type = "3";
+
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = new JdbcTableWriter(Table.FEED_INFO, testDataSource, testNamespace);
+        String createOutput = createTableWriter.create(mapper.writeValueAsString(feedInfoInput), true);
+        LOG.info("create output:");
+        LOG.info(createOutput);
+
+        // parse output
+        FeedInfoDTO createdFeedInfo = mapper.readValue(createOutput, FeedInfoDTO.class);
+
+        // make sure saved data matches expected data
+        assertThat(createdFeedInfo.feed_publisher_name, equalTo(publisherName));
+    }
+
     @AfterClass
     public static void tearDownClass() {
         TestUtils.dropDB(testDBName);
