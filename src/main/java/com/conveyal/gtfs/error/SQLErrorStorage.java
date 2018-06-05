@@ -4,9 +4,14 @@ import com.conveyal.gtfs.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.sql.DataSource;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Map;
+
+import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
 /**
  * This is an abstraction for something that stores GTFS loading and validation errors one by one.
@@ -42,7 +47,7 @@ public class SQLErrorStorage {
     private static final long INSERT_BATCH_SIZE = 500;
 
     public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
-        // TablePrefix should always be internally generated so doesn't need to be sanitized.
+        ensureValidNamespace(tablePrefix);
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         errorId = 0;
         this.connection = connection;
