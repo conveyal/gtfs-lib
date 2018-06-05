@@ -35,6 +35,7 @@ public class UtilTest {
     public void canEnsureValidNamespace() {
         testNamespace("abc123", false);
         testNamespace("abc_123", false);
+        testNamespace("abc_123.", false);
         testNamespace("abc 123", true);
         testNamespace("' OR 1=1;SELECT '1", true);
     }

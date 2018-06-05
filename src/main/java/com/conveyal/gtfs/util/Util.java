@@ -91,7 +91,7 @@ public abstract class Util {
      * @param namespace
      */
     public static void ensureValidNamespace(String namespace) throws IllegalStateException {
-        Pattern pattern = Pattern.compile("[^a-zA-Z0-9_]");
+        Pattern pattern = Pattern.compile("[^a-zA-Z0-9_\\.]");
         Matcher matcher = pattern.matcher(namespace);
         if (matcher.find()) {
             throw new IllegalStateException("Namespace must only have alphanumeric characters or the underscore symbol");
