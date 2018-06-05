@@ -1023,10 +1023,10 @@ public class JdbcTableWriter implements TableWriter {
      */
     private static TIntSet getIdsForCondition(String tableName, String keyField, String keyValue, Connection connection) throws SQLException {
         String idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
-        LOG.info(idCheckSql);
         // Create statement for counting rows selected
         PreparedStatement statement = connection.prepareStatement(idCheckSql);
         statement.setString(1, keyValue);
+        LOG.info(statement.toString());
         ResultSet resultSet = statement.executeQuery();
         // Keep track of number of records found with key field
         TIntSet uniqueIds = new TIntHashSet();
