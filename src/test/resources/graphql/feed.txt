@@ -1,0 +1,6 @@
+query($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    snapshot_of
+  }
+}

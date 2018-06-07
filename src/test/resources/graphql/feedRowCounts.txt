@@ -1,0 +1,16 @@
+query($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    snapshot_of
+    row_counts {
+      agency
+      calendar
+      calendar_dates
+      errors
+      routes
+      stops
+      stop_times
+      trips
+    }
+  }
+}
