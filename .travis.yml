@@ -23,7 +23,8 @@ script: |
   if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || "$TRAVIS_BRANCH" = dev || ! -z "$TRAVIS_TAG" ]]; then
     mvn clean deploy --settings maven-settings.xml
   else
-    # otherwise, just run test suite, without signing it
+    # Otherwise, just run all the way up to verify, the last phase before installing and deploying.
+    # Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
     mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
   fi
   # Wipe out all the Conveyal artifacts in the local Maven repo before they get cached.

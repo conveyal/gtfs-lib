@@ -7,7 +7,6 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
-import com.conveyal.gtfs.model.ScheduleException.ExemplarServiceDescriptor;
 import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -18,7 +17,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.sql.Array;
 import java.time.LocalDate;
 
 import java.sql.ResultSet;
@@ -212,9 +210,7 @@ public interface EntityPopulator<T> {
                 String dateString = resultSet.getString(columnIndex);
                 return dateString != null ? LocalDate.parse(dateString, DateField.GTFS_DATE_FORMATTER) : null;
             } catch (DateTimeParseException ex) {
-                // FIXME: Should this log an exception if the parse fails? My impression is that it should not because
-                // otherwise this could be very noisy with logs on (e.g., if thousands of calendar dates all have bad
-                // formatting).
+                // We're reading out of the database here, not loading from GFTS CSV, so just return null for bad values.
                 return null;
             }
         }
