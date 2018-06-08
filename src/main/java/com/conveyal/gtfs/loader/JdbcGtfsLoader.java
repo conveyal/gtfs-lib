@@ -337,7 +337,7 @@ public class JdbcGtfsLoader {
         }
         // Create separate fields array with filtered list that does not include null values (for duplicate headers or
         // ID field). This is solely used to construct the table and array of values to load.
-        Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
+        Field[] cleanFields = Arrays.stream(fields).filter(Objects::nonNull).toArray(Field[]::new);
         if (cleanFields.length == 0) {
             // Do not create the table if there are no valid fields.
             errorStorage.storeError(NewGTFSError.forTable(table, TABLE_MISSING_COLUMN_HEADERS));
