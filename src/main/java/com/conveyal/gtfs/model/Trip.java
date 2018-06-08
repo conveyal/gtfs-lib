@@ -3,9 +3,9 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
-import java.util.Collection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
-import java.util.Map;
 
 public class Trip extends Entity {
 
@@ -27,6 +27,28 @@ public class Trip extends Entity {
         return trip_id;
     }
 
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#TRIPS}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, trip_id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, service_id);
+        statement.setString(oneBasedIndex++, trip_headsign);
+        statement.setString(oneBasedIndex++, trip_short_name);
+        setIntParameter(statement, oneBasedIndex++, direction_id);
+        statement.setString(oneBasedIndex++, block_id);
+        statement.setString(oneBasedIndex++, shape_id);
+        setIntParameter(statement, oneBasedIndex++, wheelchair_accessible);
+        setIntParameter(statement, oneBasedIndex++, bikes_allowed);
+        // Editor-specific field? pattern_id
+        statement.setString(oneBasedIndex++, null);
+    }
+
     public static class Loader extends Entity.Loader<Trip> {
 
         public Loader(GTFSFeed feed) {
@@ -42,7 +64,7 @@ public class Trip extends Entity {
         public void loadOneRow() throws IOException {
             Trip t = new Trip();
 
-            t.sourceFileLine  = row + 1; // offset line number by 1 to account for 0-based row index
+            t.id = row + 1; // offset line number by 1 to account for 0-based row index
             t.route_id        = getStringField("route_id", true);
             t.service_id      = getStringField("service_id", true);
             t.trip_id         = getStringField("trip_id", true);

@@ -5,6 +5,8 @@ import com.conveyal.gtfs.error.NoAgencyInFeedError;
 
 import java.io.IOException;
 import java.net.URL;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Route extends Entity { // implements Entity.Factory<Route>
@@ -37,6 +39,30 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         return route_id;
     }
 
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#ROUTES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, route_id);
+        statement.setString(oneBasedIndex++, agency_id);
+        statement.setString(oneBasedIndex++, route_short_name);
+        statement.setString(oneBasedIndex++, route_long_name);
+        statement.setString(oneBasedIndex++, route_desc);
+        setIntParameter(statement, oneBasedIndex++, route_type);
+        statement.setString(oneBasedIndex++, route_url != null ? route_url.toString() : null);
+        statement.setString(oneBasedIndex++, route_branding_url != null ? route_branding_url.toString() : null);
+        statement.setString(oneBasedIndex++, route_color);
+        statement.setString(oneBasedIndex++, route_text_color);
+        // Editor-specific fields publicly_visible, wheelchair_accessible, and status.
+        setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, 0);
+    }
+
     public static class Loader extends Entity.Loader<Route> {
 
         public Loader(GTFSFeed feed) {
@@ -51,7 +77,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         @Override
         public void loadOneRow() throws IOException {
             Route r = new Route();
-            r.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            r.id = row + 1; // offset line number by 1 to account for 0-based row index
             r.route_id = getStringField("route_id", true);
             Agency agency = getRefField("agency_id", false, feed.agency);
 
