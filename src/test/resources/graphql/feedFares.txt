@@ -1,0 +1,22 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    fares {
+      currency_type
+      fare_id
+      fare_rules {
+        contains_id
+        destination_id
+        fare_id
+        id
+        origin_id
+        route_id
+      }
+      id
+      payment_method
+      price
+      transfer_duration
+      transfers
+    }
+  }
+}

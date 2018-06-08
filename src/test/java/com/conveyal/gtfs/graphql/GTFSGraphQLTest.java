@@ -87,6 +87,24 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("feedPatterns.txt"), matchesSnapshot());
     }
 
+    // tests that the feed_info of a feed can be fetched
+    @Test
+    public void canFetchAgencies() throws IOException {
+        assertThat(queryGraphQL("feedAgencies.txt"), matchesSnapshot());
+    }
+
+    // tests that the feed_info of a feed can be fetched
+    @Test
+    public void canFetchCalendars() throws IOException {
+        assertThat(queryGraphQL("feedCalendars.txt"), matchesSnapshot());
+    }
+
+    // tests that the feed_info of a feed can be fetched
+    @Test
+    public void canFetchFares() throws IOException {
+        assertThat(queryGraphQL("feedFares.txt"), matchesSnapshot());
+    }
+
     /**
      * Helper method to make a query with default variables
      */

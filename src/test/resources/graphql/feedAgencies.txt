@@ -1,0 +1,17 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    agency {
+      agency_branding_url
+      agency_email
+      agency_fare_url
+      agency_id
+      agency_lang
+      agency_name
+      agency_phone
+      agency_timezone
+      agency_url
+      id
+    }
+  }
+}
