@@ -320,11 +320,14 @@ public class JdbcGtfsLoader {
         int keyFieldIndex = -1;
         for (int h = 0; h < headerCount; h++) {
             String header = sanitize(csvReader.getHeader(h));
-            if (fieldsSeen.contains(header) || "id".equals(header)) {
-                // FIXME: add separate error for tables containing ID field.
+            if (fieldsSeen.contains(header)) {
                 errorStorage.storeError(NewGTFSError.forTable(table, DUPLICATE_HEADER).setBadValue(header));
                 fields[h] = null;
-            } else {
+            } else if ("id".equals(header) || header.isEmpty()) {
+                // Header field cannot be "id" or missing.
+                errorStorage.storeError(NewGTFSError.forTable(table, COLUMN_NAME_INVALID).setBadValue(header));
+                fields[h] = null;
+            }  else {
                 fields[h] = table.getFieldForName(header);
                 fieldsSeen.add(header);
                 if (keyField.equals(header)) {

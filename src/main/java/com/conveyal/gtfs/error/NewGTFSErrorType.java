@@ -12,6 +12,7 @@ public enum NewGTFSErrorType {
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     FLOATING_FORMAT(Priority.MEDIUM, "Incorrect floating point number format."),
+    COLUMN_NAME_INVALID(Priority.HIGH, "Column header is not permitted."),
     COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),
     NUMBER_PARSING(Priority.MEDIUM, "Unable to parse number from value."),
     NUMBER_NEGATIVE(Priority.MEDIUM, "Number was expected to be non-negative."),
