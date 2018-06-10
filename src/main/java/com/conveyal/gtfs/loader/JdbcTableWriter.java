@@ -589,9 +589,9 @@ public class JdbcTableWriter implements TableWriter {
                     differenceLocation = i;
                 }
             }
-            // Increment sequences for stops that follow the inserted location. NOTE: This should happen before the
-            // blank stop time insertion for logical consistency.
-            String updateSql = String.format("update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence > %d AND %s",
+            // Increment sequences for stops that follow the inserted location (including the stop at the changed index).
+            // NOTE: This should happen before the blank stop time insertion for logical consistency.
+            String updateSql = String.format("update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence >= %d AND %s",
                     tablePrefix, tablePrefix, differenceLocation, joinToTrips);
             LOG.info(updateSql);
             PreparedStatement updateStatement = connection.prepareStatement(updateSql);
