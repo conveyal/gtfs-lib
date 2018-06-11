@@ -38,7 +38,7 @@ public class Feed {
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
     public final TableReader<Trip>  trips;
-    public final TableReader<ShapePoint> shapePoints;
+//    public final TableReader<ShapePoint> shapePoints;
     public final TableReader<StopTime>   stopTimes;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
@@ -62,7 +62,7 @@ public class Feed {
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
-        shapePoints = new JDBCTableReader(Table.SHAPES, dataSource, tablePrefix, EntityPopulator.SHAPE_POINT);
+//        shapePoints = new JDBCTableReader(Table.SHAPES, dataSource, tablePrefix, EntityPopulator.SHAPE_POINT);
         stopTimes = new JDBCTableReader(Table.STOP_TIMES, dataSource, tablePrefix, EntityPopulator.STOP_TIME);
     }
 

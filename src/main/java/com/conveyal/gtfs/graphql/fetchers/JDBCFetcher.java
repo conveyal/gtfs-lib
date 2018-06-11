@@ -63,6 +63,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     public final String tableName;
     public final String parentJoinField;
     private final String sortField;
+    private final boolean autoLimit;
 
     // Supply an SQL result row -> Object transformer
 
@@ -81,18 +82,21 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      *        If null, no such clause is added.
      */
     public JDBCFetcher (String tableName, String parentJoinField) {
-        this(tableName, parentJoinField, null);
+        this(tableName, parentJoinField, null, true);
     }
 
     /**
      *
      * @param sortField The field on which to sort the list or fetched rows (in ascending order only).
      *                  If null, no sort is included.
+     * @param autoLimit Whether to by default apply a limit to the fetched rows. This is used for certain
+     *                  tables that it is unnatural to expect a limit (e.g., shape points or pattern stops).
      */
-    public JDBCFetcher (String tableName, String parentJoinField, String sortField) {
+    public JDBCFetcher (String tableName, String parentJoinField, String sortField, boolean autoLimit) {
         this.tableName = tableName;
         this.parentJoinField = parentJoinField;
         this.sortField = sortField;
+        this.autoLimit = autoLimit;
     }
 
     // We can't automatically generate JDBCFetcher based field definitions for inclusion in a GraphQL schema (as we
@@ -295,9 +299,10 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         if (limit > MAX_ROWS_TO_FETCH) {
             limit = MAX_ROWS_TO_FETCH;
         }
-        // FIXME: Skipping limit is not scalable and should be removed.
-        if (limit == -1) {
-            // skip limit.
+        if (limit == -1 || !autoLimit) {
+            // Do not append limit if explicitly set to -1 or autoLimit is disabled. NOTE: this conditional block is
+            // empty simply because it is clearer to define the condition in this way (vs. if limit > 0).
+            // FIXME: Skipping limit is not scalable in many cases and should possibly be removed/limited.
         } else {
             sqlBuilder.append(" limit " + limit);
         }

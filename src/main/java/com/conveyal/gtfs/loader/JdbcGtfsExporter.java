@@ -3,18 +3,14 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
-import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import javax.sql.DataSource;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
@@ -98,29 +94,36 @@ public class JdbcGtfsExporter {
                         new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
                                 EntityPopulator.CALENDAR);
                 Iterable<Calendar> calendars = calendarsReader.getAll();
+                Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
+                List<ScheduleException> exceptions = new ArrayList<>();
+                // FIXME: Doing this causes the connection to stay open, but it is closed in the finalizer so it should
+                // not be a big problem.
+                for (ScheduleException exception : exceptionsIterator) {
+                    exceptions.add(exception);
+                }
                 int calendarDateCount = 0;
                 for (Calendar cal : calendars) {
-                    LOG.info("Iterating over calendar {}", cal.service_id);
                     Service service = new Service(cal.service_id);
                     service.calendar = cal;
-                    Iterable<ScheduleException> exceptions = exceptionsReader.getAll();
                     for (ScheduleException ex : exceptions) {
-                        LOG.info("Adding exception {} for calendar {}", ex.name, cal.service_id);
-                        if (ex.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
-                                !ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))
-                            // skip swap exception if cal is not referenced by added or removed service
-                            // this is not technically necessary, but the output is cleaner/more intelligible
+                        if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
+                            (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
+                            // Skip swap exception if cal is not referenced by added or removed service.
+                            // This is not technically necessary, but the output is cleaner/more intelligible.
                             continue;
+                        }
 
                         for (LocalDate date : ex.dates) {
-                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date))
-                                // no need to write dates that do not apply
+                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
+                                // No need to write dates that do not apply
                                 continue;
+                            }
 
                             CalendarDate calendarDate = new CalendarDate();
                             calendarDate.date = date;
                             calendarDate.service_id = cal.service_id;
                             calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
+                            LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
 
                             if (service.calendar_dates.containsKey(date))
                                 throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
@@ -175,40 +178,39 @@ public class JdbcGtfsExporter {
             // Only write shapes for "approved" routes using COPY TO with results of select query
             String shapeSelectSql = null;
             if (fromEditor) {
-                // Joined trips table needs to use a select distinct to ensure that multiple joins to the trips table
-                // don't appear in the result. This essentially grabs only one row from the trips table per unique
-                // shape_id, in effect creating a one-to-one mapping from a shape to a route. FIXME this is simplifying
-                // the relationship because multiple trips that share a single shape may operate on different routes.
-//                String selectDistinct = String.format(
-//                        // FIXME: I'm not sure if this is Postgres-specific syntax for SELECT DISTINCT
-//                        "SELECT DISTINCT ON (shape_id) shape_id, trip_id, route_id from %s.%s",
-//                        feedIdToExport, Table.TRIPS.name);
-                // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
-                // The filter clause for shapes requires two joins to reach the routes table and a where filter on
+                // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
+                // The filter clause for shapes requires joining to trips and then to routes table and a where filter on
                 // route status.
                 // FIXME: I'm not sure that shape_id is indexed for the trips table. This could cause slow downs.
                 // FIXME: this is exporting point_type, which is not a GTFS field, but its presence shouldn't hurt.
-                shapeSelectSql = String.format("select %s.shapes.* " +
+                String shapeFieldsToExport = Table.commaSeparatedNames(
+                        Table.SHAPES.specFields(), String.join(".", feedIdToExport, Table.SHAPES.name + "."));
+                // NOTE: The below substitution uses relative indexing. All values "%<s" reference the same arg as the
+                // previous format specifier (i.e., feedIdToExport).
+                shapeSelectSql = String.format("select %s " +
                         "from (select distinct %s.trips.shape_id " +
-                        "from %s.trips, %s.routes " +
-                        "where %s.trips.route_id = %s.routes.route_id and %s.routes.status = 2) as unique_approved_shape_ids, " +
-                        "%s.shapes where unique_approved_shape_ids.shape_id = %s.shapes.shape_id", feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport, feedIdToExport);
-//                shapeSelectSql = String.join(" ",
-//                        Table.SHAPES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
-//                        Table.SHAPES.generateJoinSql(selectDistinct, Table.TRIPS, feedIdToExport),
-//                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-//                        whereRouteIsApproved);
+                        "from %<s.trips, %<s.routes " +
+                        "where %<s.trips.route_id = %<s.routes.route_id and %<s.routes.status = 2) as unique_approved_shape_ids, " +
+                        "%<s.shapes where unique_approved_shape_ids.shape_id = %<s.shapes.shape_id",
+                        shapeFieldsToExport,
+                        feedIdToExport);
             }
             result.shapes = export(Table.SHAPES, shapeSelectSql);
             result.stops = export(Table.STOPS);
             // Only write stop times for "approved" routes using COPY TO with results of select query
             String stopTimesSelectSql = null;
             if (fromEditor) {
+                String scopedArrivalTime = String.join(".", feedIdToExport, Table.STOP_TIMES.name, "arrival_time");
+                String scopedDepartureTime = String.join(".", feedIdToExport, Table.STOP_TIMES.name, "departure_time");
                 // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string format.
+                String secondsToFormattedTime = "TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS')";
+                String convertArrivalTime = String.format(secondsToFormattedTime, scopedArrivalTime);
+                String convertDepartureTime = String.format(secondsToFormattedTime, scopedDepartureTime);
                 String selectWithTransformedTimes = Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
                         // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-                        .replace("arrival_time", "TO_CHAR((arrival_time || ' second')::interval, 'HH24:MI:SS') as arrival_time")
-                        .replace("departure_time", "TO_CHAR((departure_time || ' second')::interval, 'HH24:MI:SS') as departure_time");
+                        .replace(scopedArrivalTime, String.format("%s as arrival_time", convertArrivalTime))
+                        .replace(scopedDepartureTime, String.format("%s as departure_time", convertDepartureTime));
+                LOG.info(selectWithTransformedTimes);
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
                 // route status.
@@ -320,7 +322,7 @@ public class JdbcGtfsExporter {
             zipOutputStream.closeEntry();
             LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, table.name, System.currentTimeMillis() - startTime);
             connection.commit();
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             // Rollback connection so that fatal exception does not impact loading of other tables.
             try {
                 connection.rollback();
@@ -329,8 +331,6 @@ public class JdbcGtfsExporter {
             }
             tableLoadResult.fatalException = e.getMessage();
             LOG.error("Exception while exporting tables", e);
-        } catch (IOException e) {
-            e.printStackTrace();
         }
         return tableLoadResult;
     }

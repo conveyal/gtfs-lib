@@ -313,11 +313,12 @@ public class JdbcGtfsLoader {
         // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
-        Field[] fields = new Field[csvReader.getHeaderCount()];
+        int headerCount = csvReader.getHeaderCount();
+        Field[] fields = new Field[headerCount];
         Set<String> fieldsSeen = new HashSet<>();
         String keyField = table.getKeyFieldName();
         int keyFieldIndex = -1;
-        for (int h = 0; h < csvReader.getHeaderCount(); h++) {
+        for (int h = 0; h < headerCount; h++) {
             String header = sanitize(csvReader.getHeader(h));
             if (fieldsSeen.contains(header) || "id".equals(header)) {
                 // FIXME: add separate error for tables containing ID field.
@@ -336,6 +337,7 @@ public class JdbcGtfsLoader {
         Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
         if (cleanFields.length == 0) {
             // Do not create the table if there are no valid fields.
+            errorStorage.storeError(NewGTFSError.forTable(table, TABLE_MISSING_COLUMN_HEADERS));
             return 0;
         }
         // Replace the GTFS spec Table with one representing the SQL table we will populate, with reordered columns.
@@ -381,6 +383,7 @@ public class JdbcGtfsLoader {
                 continue;
             }
             // Store value of key field for use in checking duplicate IDs
+            // FIXME: If the key field is missing (keyFieldIndex is still -1) from a loaded table, this will crash.
             String keyValue = csvReader.get(keyFieldIndex);
             // The first field holds the line number of the CSV file. Prepared statement parameters are one-based.
             if (postgresText) transformedStrings[0] = Integer.toString(lineNumber);
@@ -416,7 +419,10 @@ public class JdbcGtfsLoader {
         // Iteration over all rows has finished, so We are now one record past the end of the file.
         int numberOfRecordsLoaded = (int) csvReader.getCurrentRecord();
         if (postgresText) {
-          numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
+            numberOfRecordsLoaded = numberOfRecordsLoaded + 1;
+        }
+        if (table.isRequired() && numberOfRecordsLoaded == 0) {
+            errorStorage.storeError(NewGTFSError.forTable(table, REQUIRED_TABLE_EMPTY));
         }
         csvReader.close();
 
@@ -425,26 +431,35 @@ public class JdbcGtfsLoader {
         if (postgresText) {
             LOG.info("Loading into database table {} from temporary text file...", targetTable.name);
             tempTextFileStream.close();
-            // Allows sending over network. This is only slightly slower than a local file copy.
-            final String copySql = String.format("copy %s from stdin", targetTable.name);
-            // FIXME we should be reading the COPY text from a stream in parallel, not from a temporary text file.
-            InputStream stream = new BufferedInputStream(new FileInputStream(tempTextFile.getAbsolutePath()));
-            // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
-            CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-            copyManager.copyIn(copySql, stream, 1024*1024);
-            stream.close();
-            // It is also possible to load from local file if this code is running on the database server.
-            // statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
+            copyFromFile(connection, tempTextFile, targetTable.name);
         } else {
             insertStatement.executeBatch();
         }
-
-        targetTable.createIndexes(connection);
+        // Create indexes using spec table. Target table must not be used because fields could be in the wrong order
+        // (and the order is currently important to determining the index fields).
+        table.createIndexes(connection, tablePrefix);
 
         LOG.info("Committing transaction...");
         connection.commit();
         LOG.info("Done.");
         return numberOfRecordsLoaded;
+    }
+
+    /**
+     * Method that uses the PostgreSQL-specific copy from file command to load csv data into a table on the provided
+     * connection. NOTE: This method does not commit the transaction or close the connection.
+     */
+    public static void copyFromFile(Connection connection, File file, String targetTableName) throws IOException, SQLException {
+        // Allows sending over network. This is only slightly slower than a local file copy.
+        final String copySql = String.format("copy %s from stdin", targetTableName);
+        // FIXME we should be reading the COPY text from a stream in parallel, not from a temporary text file.
+        InputStream stream = new BufferedInputStream(new FileInputStream(file.getAbsolutePath()));
+        // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
+        CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
+        copyManager.copyIn(copySql, stream, 1024*1024);
+        stream.close();
+        // It is also possible to load from local file if this code is running on the database server.
+        // statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
     }
 
     /**
@@ -488,9 +503,9 @@ public class JdbcGtfsLoader {
      */
     private void setFieldToNull(boolean postgresText, String[] transformedStrings, int fieldIndex, Field field) {
         if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
-            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
+        // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
         else try {
-            //            LOG.info("setting {} index to null", fieldIndex + 2);
+            // LOG.info("setting {} index to null", fieldIndex + 2);
             field.setNull(insertStatement, fieldIndex + 2);
         } catch (SQLException e) {
             e.printStackTrace();

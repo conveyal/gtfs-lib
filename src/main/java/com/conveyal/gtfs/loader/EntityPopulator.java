@@ -7,7 +7,6 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
-import com.conveyal.gtfs.model.ScheduleException.ExemplarServiceDescriptor;
 import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -18,7 +17,6 @@ import org.slf4j.LoggerFactory;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.sql.Array;
 import java.time.LocalDate;
 
 import java.sql.ResultSet;
@@ -79,7 +77,7 @@ public interface EntityPopulator<T> {
         agency.agency_phone    = getStringIfPresent(result, "agency_phone", columnForName);
         agency.agency_fare_url = getUrlIfPresent   (result, "agency_fare_url", columnForName);
         agency.agency_email    = getStringIfPresent(result, "agency_email", columnForName);
-        agency.agency_branding_url = null; // FIXME
+        agency.agency_branding_url = getUrlIfPresent (result, "agency_branding_url", columnForName);
         return agency;
     };
 
@@ -111,9 +109,9 @@ public interface EntityPopulator<T> {
         scheduleException.name              = getStringIfPresent(result, "name", columnForName);
         scheduleException.dates             = getDateListIfPresent(result, "dates", columnForName);
         scheduleException.exemplar          = exemplarFromInt(getIntIfPresent(result, "exemplar", columnForName));
-        scheduleException.customSchedule    = getStringListIfPresent(result, "customSchedule", columnForName);
-        scheduleException.addedService      = getStringListIfPresent(result, "addedService", columnForName);
-        scheduleException.removedService    = getStringListIfPresent(result, "removedService", columnForName);
+        scheduleException.customSchedule    = getStringListIfPresent(result, "custom_schedule", columnForName);
+        scheduleException.addedService      = getStringListIfPresent(result, "added_service", columnForName);
+        scheduleException.removedService    = getStringListIfPresent(result, "removed_service", columnForName);
         return scheduleException;
     };
 
@@ -212,9 +210,7 @@ public interface EntityPopulator<T> {
                 String dateString = resultSet.getString(columnIndex);
                 return dateString != null ? LocalDate.parse(dateString, DateField.GTFS_DATE_FORMATTER) : null;
             } catch (DateTimeParseException ex) {
-                // FIXME: Should this log an exception if the parse fails? My impression is that it should not because
-                // otherwise this could be very noisy with logs on (e.g., if thousands of calendar dates all have bad
-                // formatting).
+                // We're reading out of the database here, not loading from GFTS CSV, so just return null for bad values.
                 return null;
             }
         }
@@ -225,7 +221,8 @@ public interface EntityPopulator<T> {
         int columnIndex = columnForName.get(columnName);
         if (columnIndex == 0) return new ArrayList<>();
         try {
-            return Arrays.asList((String[])resultSet.getArray(columnIndex).getArray());
+            List<String> strings = Arrays.asList((String[]) resultSet.getArray(columnIndex).getArray());
+            return strings;
 
         } catch (Exception e) {
             return new ArrayList<>();
@@ -262,7 +259,7 @@ public interface EntityPopulator<T> {
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
         // FIXME: if SQL value is null, resultSet.getInt will return 0. Should return value equal 0 if column is missing?
-        if (columnIndex == 0) return -1;
+        if (columnIndex == 0) return Entity.DOUBLE_MISSING;
         else return resultSet.getDouble(columnIndex);
     }
 
