@@ -265,20 +265,14 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             if (argumentKeys.contains(FROM_ARG) && argumentKeys.contains(TO_ARG)) {
                 // Determine which trips start in the specified time window by joining to filtered stop times.
                 String timeFilteredTrips = "trips_beginning_in_time_period";
-                // If applying the time period filter to trips, filter out only the first stop time for each trip. If
-                // applying to stop_times, use entire stop times table (stop times are nested under stops, so we want
-                // all stop times not just the first departure).
-                String stopTimesTable = "trips".equals(tableName)
-                    ? String.format("(select distinct on (trip_id) * from %s.stop_times order by trip_id, stop_sequence) as first_stop_times", namespace)
-                    : String.format("%s.stop_times", namespace);
                 conditions.add(String.format("%s.trip_id = %s.trip_id", timeFilteredTrips, tripsTable));
                 // Select all trip IDs that start during the specified time window. Note: the departure and arrival times
                 // are divided by 86399 to account for trips that begin after midnight. FIXME: Should this be 86400?
                 fromTables.add(String.format(
                         "(select trip_id " +
-                        "from %s " +
+                        "from (select distinct on (trip_id) * from %s.stop_times order by trip_id, stop_sequence) as first_stop_times " +
                         "where departure_time %% 86399 >= %d and departure_time %% 86399 <= %d) as %s",
-                        stopTimesTable,
+                        namespace,
                         (int) arguments.get(FROM_ARG),
                         (int) arguments.get(TO_ARG),
                         timeFilteredTrips));
