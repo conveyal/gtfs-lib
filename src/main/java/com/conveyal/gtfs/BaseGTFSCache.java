@@ -2,6 +2,7 @@ package com.conveyal.gtfs;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.cache.CacheBuilder;
@@ -44,7 +45,7 @@ public abstract class BaseGTFSCache<T> {
 
     public final File cacheDir;
 
-    private static final AmazonS3 s3 = new AmazonS3Client();
+    private static final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
     private LoadingCache<String, T> cache;
 
     public BaseGTFSCache(String bucket, File cacheDir) {
