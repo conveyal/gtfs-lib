@@ -153,9 +153,14 @@ public class JdbcGtfsExporter {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for frequencies requires two joins to reach the routes table and a where filter on
                 // route status.
+                String scopedStartTime = qualifyField(Table.FREQUENCIES, "start_time");
+                String scopedEndTime = qualifyField(Table.FREQUENCIES, "end_time");
                 // FIXME Replace with string literal query instead of clause generators
                 frequencySelectSql = String.join(" ",
-                        Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
+                        // Convert start_time and end_time values from seconds to time format (HH:MM:SS).
+                        Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
+                            .replace(scopedStartTime, convertSecondsToTime(scopedStartTime, "start_time"))
+                            .replace(scopedEndTime, convertSecondsToTime(scopedEndTime, "end_time")),
                         Table.FREQUENCIES.generateJoinSql(Table.TRIPS, feedIdToExport),
                         Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
                         whereRouteIsApproved);
@@ -200,23 +205,18 @@ public class JdbcGtfsExporter {
             // Only write stop times for "approved" routes using COPY TO with results of select query
             String stopTimesSelectSql = null;
             if (fromEditor) {
-                String scopedArrivalTime = String.join(".", feedIdToExport, Table.STOP_TIMES.name, "arrival_time");
-                String scopedDepartureTime = String.join(".", feedIdToExport, Table.STOP_TIMES.name, "departure_time");
-                // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string format.
-                String secondsToFormattedTime = "TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS')";
-                String convertArrivalTime = String.format(secondsToFormattedTime, scopedArrivalTime);
-                String convertDepartureTime = String.format(secondsToFormattedTime, scopedDepartureTime);
-                String selectWithTransformedTimes = Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
-                        // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-                        .replace(scopedArrivalTime, String.format("%s as arrival_time", convertArrivalTime))
-                        .replace(scopedDepartureTime, String.format("%s as departure_time", convertDepartureTime));
-                LOG.info(selectWithTransformedTimes);
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
                 // route status.
+                String scopedArrivalTime = qualifyField(Table.STOP_TIMES, "arrival_time");
+                String scopedDepartureTime = qualifyField(Table.STOP_TIMES, "departure_time");
                 // FIXME Replace with string literal query instead of clause generators
                 stopTimesSelectSql = String.join(" ",
-                        selectWithTransformedTimes,
+                        // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string
+                        // format.
+                        Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
+                            .replace(scopedArrivalTime, convertSecondsToTime(scopedArrivalTime, "arrival_time"))
+                            .replace(scopedDepartureTime, convertSecondsToTime(scopedDepartureTime, "departure_time")),
                         Table.STOP_TIMES.generateJoinSql(Table.TRIPS, feedIdToExport),
                         Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
                         whereRouteIsApproved);
@@ -253,6 +253,22 @@ public class JdbcGtfsExporter {
         }
         return result;
     }
+
+    /**
+     * Returns the PostgreSQL syntax to convert seconds since midnight into time format HH:MM:SS for the specified field.
+     *
+     * Note: the returned string should be used to replace the field name provided as an argument.
+     *
+     * FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
+     */
+    private String convertSecondsToTime (String scopedFieldName, String exportedFieldName) {
+        return String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as %s", scopedFieldName, exportedFieldName);
+    }
+
+    private String qualifyField (Table table, String field) {
+        return String.join(".", feedIdToExport, table.name, field);
+    }
+
 
     /**
      * Removes any empty zip files from the final zip file.
