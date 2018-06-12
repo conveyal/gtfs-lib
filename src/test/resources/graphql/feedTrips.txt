@@ -1,0 +1,35 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    trips {
+      bikes_allowed
+      block_id
+      direction_id
+      frequencies {
+        trip_id
+      }
+      id
+      pattern_id
+      route_id
+      service_id
+      shape {
+        point_type
+        shape_dist_traveled
+        shape_id
+        shape_pt_lat
+        shape_pt_lon
+        shape_pt_sequence
+      }
+      shape_id
+      stop_times {
+        stop_id
+        stop_sequence
+        trip_id
+      }
+      trip_headsign
+      trip_id
+      trip_short_name
+      wheelchair_accessible
+    }
+  }
+}

@@ -81,28 +81,60 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("feedFeedInfo.txt"), matchesSnapshot());
     }
 
-    // tests that the feed_info of a feed can be fetched
+    // tests that the patterns of a feed can be fetched
     @Test
     public void canFetchPatterns() throws IOException {
         assertThat(queryGraphQL("feedPatterns.txt"), matchesSnapshot());
     }
 
-    // tests that the feed_info of a feed can be fetched
+    // tests that the agencies of a feed can be fetched
     @Test
     public void canFetchAgencies() throws IOException {
         assertThat(queryGraphQL("feedAgencies.txt"), matchesSnapshot());
     }
 
-    // tests that the feed_info of a feed can be fetched
+    // tests that the calendars of a feed can be fetched
     @Test
     public void canFetchCalendars() throws IOException {
         assertThat(queryGraphQL("feedCalendars.txt"), matchesSnapshot());
     }
 
-    // tests that the feed_info of a feed can be fetched
+    // tests that the fares of a feed can be fetched
     @Test
     public void canFetchFares() throws IOException {
         assertThat(queryGraphQL("feedFares.txt"), matchesSnapshot());
+    }
+
+    // tests that the routes of a feed can be fetched
+    @Test
+    public void canFetchRoutes() throws IOException {
+        assertThat(queryGraphQL("feedRoutes.txt"), matchesSnapshot());
+    }
+
+    // tests that the stops of a feed can be fetched
+    @Test
+    public void canFetchStops() throws IOException {
+        assertThat(queryGraphQL("feedStops.txt"), matchesSnapshot());
+    }
+
+    // tests that the trips of a feed can be fetched
+    @Test
+    public void canFetchTrips() throws IOException {
+        assertThat(queryGraphQL("feedTrips.txt"), matchesSnapshot());
+    }
+
+    // TODO: make tests for schedule_exceptions / calendar_dates
+
+    // tests that the stop times of a feed can be fetched
+    @Test
+    public void canFetchStopTimes() throws IOException {
+        assertThat(queryGraphQL("feedStopTimes.txt"), matchesSnapshot());
+    }
+
+    // tests that the stop times of a feed can be fetched
+    @Test
+    public void canFetchServices() throws IOException {
+        assertThat(queryGraphQL("feedServices.txt"), matchesSnapshot());
     }
 
     /**
