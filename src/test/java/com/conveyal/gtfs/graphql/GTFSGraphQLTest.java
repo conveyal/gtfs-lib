@@ -12,8 +12,11 @@ import org.junit.Test;
 import javax.sql.DataSource;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
@@ -27,6 +30,10 @@ public class GTFSGraphQLTest {
     private static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
+
+    private static String testInjectionDBName;
+    private static DataSource testInjectionDataSource;
+    private static String testInjectionNamespace;
 
     private ObjectMapper mapper = new ObjectMapper();
 
@@ -43,11 +50,23 @@ public class GTFSGraphQLTest {
         testNamespace = feedLoadResult.uniqueIdentifier;
         // validate feed to create additional tables
         validate(testNamespace, testDataSource);
+
+        // create a separate injection database to use in injection tests
+        // create a new database
+        testInjectionDBName = TestUtils.generateNewDB();
+        String injectionDbConnectionUrl = "jdbc:postgresql://localhost/" + testInjectionDBName;
+        testInjectionDataSource = createDataSource(injectionDbConnectionUrl, null, null);
+        // load feed into db
+        FeedLoadResult injectionFeedLoadResult = load(zipFileName, testInjectionDataSource);
+        testInjectionNamespace = injectionFeedLoadResult.uniqueIdentifier;
+        // validate feed to create additional tables
+        validate(testInjectionNamespace, testInjectionDataSource);
     }
 
     @AfterClass
     public static void tearDownClass() {
         TestUtils.dropDB(testDBName);
+        TestUtils.dropDB(testInjectionDBName);
     }
 
     // tests that the graphQL schema can initialize
@@ -138,19 +157,65 @@ public class GTFSGraphQLTest {
     }
 
     /**
+     * attempt to fetch more than one record with SQL injection as inputs
+     * the graphql library should properly escape the string and return 0 results for stops
+     */
+    @Test
+    public void canSanitizeSQLInjectionSentAsInput() throws IOException {
+        Map<String, Object> variables = new HashMap<String, Object>();
+        variables.put("namespace", testInjectionNamespace);
+        variables.put("stop_id", Arrays.asList("' OR 1=1;"));
+        assertThat(
+            queryGraphQL(
+                "feedStopsByStopId.txt",
+                variables,
+                testInjectionDataSource
+            ),
+            matchesSnapshot()
+        );
+    }
+
+    /**
+     * attempt run a graphql query when one of the pieces of data contains a SQL injection
+     * the graphql library should properly escape the string and complete the queries
+     */
+    @Test
+    public void canSanitizeSQLInjectionSentAsKeyValue() throws IOException, SQLException {
+        // manually update the route_id key in routes and patterns
+        String injection = "'' OR 1=1; Select ''99";
+        Connection connection = testInjectionDataSource.getConnection();
+        List<String> tablesToUpdate = Arrays.asList("routes", "fare_rules", "patterns", "trips");
+        for (String table : tablesToUpdate) {
+            connection.createStatement()
+                .execute(String.format("update %s.%s set route_id = '%s'", testInjectionNamespace, table, injection));
+        }
+        connection.commit();
+
+        // make graphql query
+        Map<String, Object> variables = new HashMap<String, Object>();
+        variables.put("namespace", testInjectionNamespace);
+        assertThat(queryGraphQL("feedRoutes.txt", variables, testInjectionDataSource), matchesSnapshot());
+    }
+
+
+    /**
      * Helper method to make a query with default variables
      */
     private Map<String, Object> queryGraphQL(String queryFilename) throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("namespace", testNamespace);
-        return queryGraphQL(queryFilename, variables);
+        return queryGraphQL(queryFilename, variables, testDataSource);
     }
 
     /**
      * Helper method to execute a GraphQL query and return the result
      */
-    private Map<String, Object> queryGraphQL(String queryFilename, Map<String,Object> variables) throws IOException {
-        GTFSGraphQL.initialize(testDataSource);
+    private Map<String, Object> queryGraphQL(
+        String queryFilename,
+        Map<String,Object> variables,
+        DataSource dataSource
+    ) throws IOException {
+        GTFSGraphQL.initialize(dataSource);
         FileInputStream inputStream = new FileInputStream(getResourceFileName("graphql/" + queryFilename));
         return GTFSGraphQL.getGraphQl().execute(
             IOUtils.toString(inputStream),

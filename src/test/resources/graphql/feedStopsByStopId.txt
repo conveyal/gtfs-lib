@@ -1,0 +1,9 @@
+query ($namespace: String, $stop_id: [String]) {
+  feed(namespace: $namespace) {
+    feed_version
+    stops(stop_id: $stop_id) {
+      stop_id
+      stop_name
+    }
+  }
+}
