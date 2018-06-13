@@ -29,12 +29,13 @@ public class TestUtils {
      */
     public static void dropDB(String dbName) {
         // first, terminate all other user sessions
-        executeAndClose("SELECT pg_terminate_backend(pg_stat_activity.pid) " +
+        executeAndClose(String.format("SELECT pg_terminate_backend(pg_stat_activity.pid) " +
             "FROM pg_stat_activity " +
-            "WHERE pg_stat_activity.datname = '" + dbName + "' " +
-            "AND pid <> pg_backend_pid()");
+            "WHERE pg_stat_activity.datname = '%s' " +
+            "AND pid <> pg_backend_pid()", dbName
+        ));
         // drop the db
-        executeAndClose("DROP DATABASE " + dbName);
+        executeAndClose(String.format("DROP DATABASE %s", dbName));
     }
 
     /**
@@ -78,7 +79,7 @@ public class TestUtils {
      */
     public static String generateNewDB() {
         String newDBName = uniqueString();
-        if (executeAndClose("CREATE DATABASE " + newDBName)) {
+        if (executeAndClose(String.format("CREATE DATABASE %s", newDBName))) {
             return newDBName;
         } else {
             return null;
@@ -92,14 +93,14 @@ public class TestUtils {
      * @return
      */
     public static String getResourceFileName(String fileName) {
-        return "./src/test/resources/" + fileName;
+        return String.format("./src/test/resources/%s", fileName);
     }
 
     /**
      * Generate a unique string.  Mostly copied from the uniqueId method of https://github.com/javadev/underscore-java
      */
     public static String uniqueString() {
-        return "test_db_" + UNIQUE_ID.incrementAndGet();
+        return String.format("test_db_%d", UNIQUE_ID.incrementAndGet());
     }
 
     /**

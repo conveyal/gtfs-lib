@@ -454,7 +454,7 @@ public class GTFSTest {
             return false;
         }
         String newDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = "jdbc:postgresql://localhost/" + newDBName;
+        String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
         try {
             // load and validate feed
             DataSource dataSource = createDataSource(
@@ -471,31 +471,47 @@ public class GTFSTest {
             Connection conn = DriverManager.getConnection(dbConnectionUrl);
             for (PersistanceExpectation persistanceExpectation : persistanceExpectations) {
                 // select all entries from a table
-                String sql = "select * from " + loadResult.uniqueIdentifier + "." + persistanceExpectation.tableName;
+                String sql = String.format(
+                    "select * from %s.%s",
+                    loadResult.uniqueIdentifier,
+                    persistanceExpectation.tableName
+                );
                 LOG.info(sql);
                 ResultSet rs = conn.prepareStatement(sql).executeQuery();
                 boolean foundRecord = false;
                 int numRecordsSearched = 0;
                 while (rs.next()) {
                     numRecordsSearched++;
-                    LOG.info("record " + numRecordsSearched + " in ResultSet");
+                    LOG.info(String.format("record %d in ResultSet", numRecordsSearched));
                     boolean allFieldsMatch = true;
                     for (RecordExpectation recordExpectation: persistanceExpectation.recordExpectations) {
                         switch (recordExpectation.expectedFieldType) {
                             case DOUBLE:
-                                LOG.info(recordExpectation.fieldName + ": " + rs.getDouble(recordExpectation.fieldName));
+                                LOG.info(String.format(
+                                    "%s: %f",
+                                    recordExpectation.fieldName,
+                                    rs.getDouble(recordExpectation.fieldName)
+                                ));
                                 if (rs.getDouble(recordExpectation.fieldName) != recordExpectation.doubleExpectation) {
                                     allFieldsMatch = false;
                                 }
                                 break;
                             case INT:
-                                LOG.info(recordExpectation.fieldName + ": " + rs.getInt(recordExpectation.fieldName));
+                                LOG.info(String.format(
+                                    "%s: %d",
+                                    recordExpectation.fieldName,
+                                    rs.getInt(recordExpectation.fieldName)
+                                ));
                                 if (rs.getInt(recordExpectation.fieldName) != recordExpectation.intExpectation) {
                                     allFieldsMatch = false;
                                 }
                                 break;
                             case STRING:
-                                LOG.info(recordExpectation.fieldName + ": " + rs.getString(recordExpectation.fieldName));
+                                LOG.info(String.format(
+                                    "%s: %s",
+                                    recordExpectation.fieldName,
+                                    rs.getString(recordExpectation.fieldName)
+                                ));
                                 if (!rs.getString(recordExpectation.fieldName).equals(recordExpectation.stringExpectation)) {
                                     allFieldsMatch = false;
                                 }

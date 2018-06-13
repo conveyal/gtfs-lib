@@ -163,7 +163,7 @@ public class GTFSFeedTest {
                 }
             }
             assertThat(
-                "Data Expectation record not found in " + fileTestCase.filename,
+                String.format("Data Expectation record not found in %s", fileTestCase.filename),
                 recordFound,
                 is(true)
             );
