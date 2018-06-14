@@ -102,8 +102,12 @@ public class JDBCTableWriterTest {
         LOG.info(updateOutput);
 
         // make sure record does not exist in DB
-        String sql = "select * from " + testNamespace + "." + Table.FEED_INFO.name +
-            " where id=" + createdFeedInfo.id;
+        String sql = String.format(
+            "select * from %s.%s where id=%d",
+            testNamespace,
+            Table.FEED_INFO.name,
+            createdFeedInfo.id
+        );
         LOG.info(sql);
         ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
         assertThat(rs.getFetchSize(), equalTo(0));

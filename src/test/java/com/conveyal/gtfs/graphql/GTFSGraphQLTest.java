@@ -41,7 +41,7 @@ public class GTFSGraphQLTest {
     public static void setUpClass() throws SQLException, IOException {
         // create a new database
         testDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = "jdbc:postgresql://localhost/" + testDBName;
+        String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = createDataSource(dbConnectionUrl, null, null);
         // zip up test folder into temp zip file
         String zipFileName = TestUtils.zipFolderFiles("fake-agency");
@@ -54,7 +54,7 @@ public class GTFSGraphQLTest {
         // create a separate injection database to use in injection tests
         // create a new database
         testInjectionDBName = TestUtils.generateNewDB();
-        String injectionDbConnectionUrl = "jdbc:postgresql://localhost/" + testInjectionDBName;
+        String injectionDbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testInjectionDBName);
         testInjectionDataSource = createDataSource(injectionDbConnectionUrl, null, null);
         // load feed into db
         FeedLoadResult injectionFeedLoadResult = load(zipFileName, testInjectionDataSource);
@@ -216,7 +216,9 @@ public class GTFSGraphQLTest {
         DataSource dataSource
     ) throws IOException {
         GTFSGraphQL.initialize(dataSource);
-        FileInputStream inputStream = new FileInputStream(getResourceFileName("graphql/" + queryFilename));
+        FileInputStream inputStream = new FileInputStream(
+            getResourceFileName(String.format("graphql/%s", queryFilename))
+        );
         return GTFSGraphQL.getGraphQl().execute(
             IOUtils.toString(inputStream),
             null,

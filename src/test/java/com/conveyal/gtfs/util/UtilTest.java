@@ -51,11 +51,11 @@ public class UtilTest {
                     "Namespace must only have alphanumeric characters or the underscore symbol"
                 ));
             } else {
-                fail("ensureValidNamespace provided false positive for value: " + namespace);
+                fail(String.format("ensureValidNamespace provided false positive for value: %s", namespace));
             }
         }
         if (shouldFail && !errorThrown) {
-            fail("ensureValidNamespace failed to throw exception for value: " + namespace);
+            fail(String.format("ensureValidNamespace failed to throw exception for value: %s", namespace));
         }
     }
 
