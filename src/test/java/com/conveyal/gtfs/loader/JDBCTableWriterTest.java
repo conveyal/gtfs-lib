@@ -32,7 +32,7 @@ public class JDBCTableWriterTest {
     public static void setUpClass() throws SQLException {
         // create a new database
         testDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = "jdbc:postgresql://localhost/" + testDBName;
+        String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = createDataSource (dbConnectionUrl, null, null);
         LOG.info("creating feeds table because it isn't automtically generated unless you import a feed");
         Connection connection = testDataSource.getConnection();
