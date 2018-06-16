@@ -310,12 +310,12 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         sqlBuilder.append(sortBy);
         Integer limit = (Integer) arguments.get(LIMIT_ARG);
         if (limit == null) {
-            limit = DEFAULT_ROWS_TO_FETCH;
+            limit = autoLimit ? DEFAULT_ROWS_TO_FETCH : -1;
         }
         if (limit > MAX_ROWS_TO_FETCH) {
             limit = MAX_ROWS_TO_FETCH;
         }
-        if (limit == -1 || !autoLimit) {
+        if (limit == -1) {
             // Do not append limit if explicitly set to -1 or autoLimit is disabled. NOTE: this conditional block is
             // empty simply because it is clearer to define the condition in this way (vs. if limit > 0).
             // FIXME: Skipping limit is not scalable in many cases and should possibly be removed/limited.

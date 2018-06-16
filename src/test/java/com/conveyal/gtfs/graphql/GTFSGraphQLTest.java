@@ -170,6 +170,12 @@ public class GTFSGraphQLTest {
         );
     }
 
+    // tests that the limit argument applies properly to a fetcher defined with autolimit set to false
+    @Test
+    public void canFetchNestedEntityWithLimit() throws IOException {
+        assertThat(queryGraphQL("feedStopsStopTimeLimit.txt"), matchesSnapshot());
+    }
+
     /**
      * attempt to fetch more than one record with SQL injection as inputs
      * the graphql library should properly escape the string and return 0 results for stops
