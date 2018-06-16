@@ -1,0 +1,13 @@
+query ($namespace: String, $date: String, $from: Int, $to: Int) {
+  feed(namespace: $namespace) {
+    routes {
+      route_id
+      route_short_name
+      route_long_name
+      route_desc
+      trips (date: $date, from: $from, to: $to) {
+        trip_id
+      }
+    }
+  }
+}

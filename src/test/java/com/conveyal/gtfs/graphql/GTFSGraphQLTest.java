@@ -156,6 +156,20 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("feedServices.txt"), matchesSnapshot());
     }
 
+    // tests that the stop times of a feed can be fetched
+    @Test
+    public void canFetchRoutesAndFilterTripsByDateAndTime() throws IOException {
+        Map<String, Object> variables = new HashMap<String, Object>();
+        variables.put("namespace", testNamespace);
+        variables.put("date", "20170916");
+        variables.put("from", 24000);
+        variables.put("to", 28000);
+        assertThat(
+            queryGraphQL("feedRoutesAndTripsByTime.txt", variables, testDataSource),
+            matchesSnapshot()
+        );
+    }
+
     /**
      * attempt to fetch more than one record with SQL injection as inputs
      * the graphql library should properly escape the string and return 0 results for stops

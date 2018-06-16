@@ -297,6 +297,9 @@ public class GraphQLGtfsSchema {
                     // (i.e., nested types that typically would only be nested under another entity and only make sense
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
+                    .argument(stringArg(DATE_ARG))
+                    .argument(intArg(FROM_ARG))
+                    .argument(intArg(TO_ARG))
                     .dataFetcher(new JDBCFetcher("trips", "route_id"))
                     .build()
             )
