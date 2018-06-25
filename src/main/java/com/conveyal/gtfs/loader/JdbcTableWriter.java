@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -51,7 +52,7 @@ public class JdbcTableWriter implements TableWriter {
     private final Connection connection;
     private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.";
 
-    public JdbcTableWriter(Table table, DataSource datasource, String namespace) {
+    public JdbcTableWriter(Table table, DataSource datasource, String namespace) throws InvalidNamespaceException {
         this(table, datasource, namespace, null);
     }
 
@@ -62,7 +63,12 @@ public class JdbcTableWriter implements TableWriter {
         DELETE, UPDATE, CREATE
     }
 
-    public JdbcTableWriter (Table specTable, DataSource dataSource, String tablePrefix, Connection optionalConnection) {
+    public JdbcTableWriter (
+        Table specTable,
+        DataSource dataSource,
+        String tablePrefix,
+        Connection optionalConnection
+    ) throws InvalidNamespaceException {
         // verify tablePrefix (namespace) is ok to use for constructing dynamic sql statements
         ensureValidNamespace(tablePrefix);
 

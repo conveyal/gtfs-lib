@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.util.FeedInfoDTO;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -49,7 +50,7 @@ public class JDBCTableWriterTest {
     }
 
     @Test
-    public void canCreateUpdateAndDeleteFeedinfoEntities () throws IOException, SQLException {
+    public void canCreateUpdateAndDeleteFeedinfoEntities () throws IOException, SQLException, InvalidNamespaceException {
         ObjectMapper mapper = new ObjectMapper();
 
         // create new object to be saved
@@ -114,7 +115,7 @@ public class JDBCTableWriterTest {
     }
 
     @Test
-    public void canPreventSQLInjection() throws IOException, SQLException {
+    public void canPreventSQLInjection() throws IOException, SQLException, InvalidNamespaceException {
         ObjectMapper mapper = new ObjectMapper();
 
         // create new object to be saved
