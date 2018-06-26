@@ -1,0 +1,21 @@
+{
+  "data" : {
+    "feed" : {
+      "calendar" : [ {
+        "description" : null,
+        "end_date" : "20170917",
+        "friday" : 1,
+        "id" : 2,
+        "monday" : 1,
+        "saturday" : 1,
+        "service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57",
+        "start_date" : "20170915",
+        "sunday" : 1,
+        "thursday" : 1,
+        "tuesday" : 1,
+        "wednesday" : 1
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}

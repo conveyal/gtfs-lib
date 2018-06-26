@@ -48,6 +48,7 @@ public class Table {
     private boolean hasUniqueKeyField = true;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
+        // TODO: verify table name is OK for use in constructing dynamic SQL queries
         this.name = name;
         this.entityClass = entityClass;
         this.required = required;

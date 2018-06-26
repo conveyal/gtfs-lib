@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -37,6 +38,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.INSERT_BATCH_SIZE;
+import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
 /**
  * This wraps a single database table and provides methods to modify GTFS entities.
@@ -50,7 +52,7 @@ public class JdbcTableWriter implements TableWriter {
     private final Connection connection;
     private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.";
 
-    public JdbcTableWriter(Table table, DataSource datasource, String namespace) {
+    public JdbcTableWriter(Table table, DataSource datasource, String namespace) throws InvalidNamespaceException {
         this(table, datasource, namespace, null);
     }
 
@@ -61,9 +63,19 @@ public class JdbcTableWriter implements TableWriter {
         DELETE, UPDATE, CREATE
     }
 
-    public JdbcTableWriter (Table specTable, DataSource dataSource, String tablePrefix, Connection optionalConnection) {
+    public JdbcTableWriter (
+        Table specTable,
+        DataSource dataSource,
+        String tablePrefix,
+        Connection optionalConnection
+    ) throws InvalidNamespaceException {
+        // verify tablePrefix (namespace) is ok to use for constructing dynamic sql statements
+        ensureValidNamespace(tablePrefix);
+
         this.tablePrefix = tablePrefix;
         this.dataSource = dataSource;
+
+        // TODO: verify specTable.name is ok to use for constructing dynamic sql statements
         this.specTable = specTable;
         Connection connection1;
         try {
@@ -1016,11 +1028,12 @@ public class JdbcTableWriter implements TableWriter {
      * For some condition (where field = string value), return the set of unique int IDs for the records that match.
      */
     private static TIntSet getIdsForCondition(String tableName, String keyField, String keyValue, Connection connection) throws SQLException {
-        String idCheckSql = String.format("select id from %s where %s = '%s'", tableName, keyField, keyValue);
-        LOG.info(idCheckSql);
+        String idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
         // Create statement for counting rows selected
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(idCheckSql);
+        PreparedStatement statement = connection.prepareStatement(idCheckSql);
+        statement.setString(1, keyValue);
+        LOG.info(statement.toString());
+        ResultSet resultSet = statement.executeQuery();
         // Keep track of number of records found with key field
         TIntSet uniqueIds = new TIntHashSet();
         while (resultSet.next()) {

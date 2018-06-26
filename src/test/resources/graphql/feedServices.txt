@@ -1,0 +1,18 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    services {
+      dates
+      duration_seconds
+      durations {
+        duration_seconds
+        route_type
+      }
+      n_days_active
+      service_id
+      trips {
+        trip_id
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "stop_times" : [ {
+        "arrival_time" : 25200,
+        "departure_time" : 25200,
+        "drop_off_type" : 0,
+        "pickup_type" : 0,
+        "shape_dist_traveled" : 0.0,
+        "stop_headsign" : null,
+        "stop_id" : "4u6g",
+        "stop_sequence" : 1,
+        "timepoint" : null,
+        "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+      }, {
+        "arrival_time" : 25260,
+        "departure_time" : 25260,
+        "drop_off_type" : 0,
+        "pickup_type" : 0,
+        "shape_dist_traveled" : 341.4491961,
+        "stop_headsign" : null,
+        "stop_id" : "johv",
+        "stop_sequence" : 2,
+        "timepoint" : null,
+        "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+      }, {
+        "arrival_time" : 28800,
+        "departure_time" : 28800,
+        "drop_off_type" : 0,
+        "pickup_type" : 0,
+        "shape_dist_traveled" : 0.0,
+        "stop_headsign" : null,
+        "stop_id" : "4u6g",
+        "stop_sequence" : 1,
+        "timepoint" : null,
+        "trip_id" : "frequency-trip"
+      }, {
+        "arrival_time" : 28860,
+        "departure_time" : 28860,
+        "drop_off_type" : 0,
+        "pickup_type" : 0,
+        "shape_dist_traveled" : 341.4491961,
+        "stop_headsign" : null,
+        "stop_id" : "johv",
+        "stop_sequence" : 2,
+        "timepoint" : null,
+        "trip_id" : "frequency-trip"
+      } ]
+    }
+  }
+}

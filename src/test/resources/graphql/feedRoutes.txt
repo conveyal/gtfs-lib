@@ -1,0 +1,33 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    routes {
+      agency_id
+      count
+      id
+      pattern_count
+      patterns {
+        pattern_id
+      }
+      publicly_visible
+      route_branding_url
+      route_color
+      route_desc
+      route_id
+      route_long_name
+      route_short_name
+      route_text_color
+      route_type
+      route_url
+      status
+      stops {
+        stop_id
+      }
+      trip_count
+      trips {
+        trip_id
+      }
+      wheelchair_accessible
+    }
+  }
+}
