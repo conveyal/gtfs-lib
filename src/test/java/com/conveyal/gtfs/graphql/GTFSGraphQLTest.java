@@ -26,6 +26,11 @@ import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static com.zenika.snapshotmatcher.SnapshotMatcher.matchesSnapshot;
 import static org.hamcrest.MatcherAssert.assertThat;
 
+/**
+ * A test suite for all things related to fetching objects with GraphQL.
+ * Important note: Snapshot testing is heavily used in this test suite and can potentially result in false negatives
+ *   in cases where the order of items in a list is not important.
+ */
 public class GTFSGraphQLTest {
     private static String testDBName;
     private static DataSource testDataSource;
@@ -220,6 +225,9 @@ public class GTFSGraphQLTest {
 
     /**
      * Helper method to make a query with default variables
+     *
+     * @param queryFilename the filename that should be used to generate the GraphQL query.  This file must be present
+     *                      in the `src/test/resources/grahpql` folder
      */
     private Map<String, Object> queryGraphQL(String queryFilename) throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
@@ -229,6 +237,11 @@ public class GTFSGraphQLTest {
 
     /**
      * Helper method to execute a GraphQL query and return the result
+     *
+     * @param queryFilename the filename that should be used to generate the GraphQL query.  This file must be present
+     *                      in the `src/test/resources/grahpql` folder
+     * @param variables a Map of input variables to the graphql query about to be executed
+     * @param dataSource the datasource to use when initializing GraphQL
      */
     private Map<String, Object> queryGraphQL(
         String queryFilename,

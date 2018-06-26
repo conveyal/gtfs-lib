@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -46,7 +47,7 @@ public class SQLErrorStorage {
     // How many errors to insert at a time in a batch, for efficiency.
     private static final long INSERT_BATCH_SIZE = 500;
 
-    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
+    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) throws InvalidNamespaceException {
         ensureValidNamespace(tablePrefix);
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         errorId = 0;

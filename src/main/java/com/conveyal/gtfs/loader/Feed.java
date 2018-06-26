@@ -5,6 +5,7 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.validator.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,6 +82,8 @@ public class Feed {
         try {
             errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
         } catch (SQLException ex) {
+            throw new StorageException(ex);
+        } catch (InvalidNamespaceException ex) {
             throw new StorageException(ex);
         }
         int errorCountBeforeValidation = errorStorage.getErrorCount();

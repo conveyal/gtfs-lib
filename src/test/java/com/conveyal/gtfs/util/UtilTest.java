@@ -1,12 +1,12 @@
 package com.conveyal.gtfs.util;
 
+import org.hamcrest.core.IsInstanceOf;
 import org.junit.Before;
 import org.junit.Test;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 import static com.conveyal.gtfs.util.Util.human;
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.fail;
 
@@ -44,12 +44,10 @@ public class UtilTest {
         boolean errorThrown = false;
         try {
             ensureValidNamespace(namespace);
-        } catch (IllegalStateException e) {
+        } catch (Exception e) {
             errorThrown = true;
             if (shouldFail) {
-                assertThat(e.getMessage(), equalTo(
-                    "Namespace must only have alphanumeric characters or the underscore symbol"
-                ));
+                assertThat(e, new IsInstanceOf(InvalidNamespaceException.class));
             } else {
                 fail(String.format("ensureValidNamespace provided false positive for value: %s", namespace));
             }
