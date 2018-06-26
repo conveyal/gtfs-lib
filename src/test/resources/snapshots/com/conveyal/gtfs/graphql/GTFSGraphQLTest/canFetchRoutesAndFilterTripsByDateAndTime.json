@@ -1,0 +1,15 @@
+{
+  "data" : {
+    "feed" : {
+      "routes" : [ {
+        "route_desc" : null,
+        "route_id" : "1",
+        "route_long_name" : "Route 1",
+        "route_short_name" : "1",
+        "trips" : [ {
+          "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+        } ]
+      } ]
+    }
+  }
+}
