@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -22,6 +23,7 @@ import java.util.Map;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.intt;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.string;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
+import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.makeInClause;
 import static graphql.Scalars.GraphQLInt;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLObjectType.newObject;
@@ -56,13 +58,12 @@ public class RowCountFetcher implements DataFetcher {
     public Object get(DataFetchingEnvironment environment) {
         Map<String, Object> parentFeedMap = environment.getSource();
         Map<String, Object> arguments = environment.getArguments();
-        List<String> argKeys = new ArrayList<>();
-        argKeys.addAll(arguments.keySet());
+        List<String> argKeys = new ArrayList<>(arguments.keySet());
+        List<String> parameters = new ArrayList<>();
         String namespace = (String) parentFeedMap.get("namespace");
         Connection connection = null;
         try {
             connection = GTFSGraphQL.getConnection();
-            Statement statement = connection.createStatement();
             List<String> fields = new ArrayList<>();
             fields.add("count(*)");
             List<String> clauses = new ArrayList<>();
@@ -70,7 +71,7 @@ public class RowCountFetcher implements DataFetcher {
                 // FIXME Does this handle null cases?
                 // Add where clause to filter out non-matching results.
                 String filterValue = (String) parentFeedMap.get(filterField);
-                clauses.add(String.format(" where %s = '%s'", filterField, filterValue));
+                clauses.add(makeInClause(filterField, filterValue, parameters));
             } else if (groupByField != null) {
                 // Handle group by field and optionally handle any filter arguments passed in.
                 if (!argKeys.isEmpty()) {
@@ -84,7 +85,7 @@ public class RowCountFetcher implements DataFetcher {
                     }
                     String filterValue = (String) arguments.get(groupedFilterField);
                     if (filterValue != null) {
-                        clauses.add(String.format(" where %s = '%s'", groupedFilterField, filterValue));
+                        clauses.add(makeInClause(groupedFilterField, filterValue, parameters));
                     }
                 }
                 // Finally, add group by clause.
@@ -97,9 +98,14 @@ public class RowCountFetcher implements DataFetcher {
                     tableName,
                     String.join(" ", clauses)
             );
-            LOG.info(sql);
-            if (statement.execute(sql)) {
-                ResultSet resultSet = statement.getResultSet();
+            PreparedStatement preparedStatement = connection.prepareStatement(sql);
+            int oneBasedIndex = 1;
+            for (String parameter : parameters) {
+                preparedStatement.setString(oneBasedIndex++, parameter);
+            }
+            LOG.info(preparedStatement.toString());
+            if (preparedStatement.execute()) {
+                ResultSet resultSet = preparedStatement.getResultSet();
                 if (groupByField == null) {
                     // If not providing grouped counts, simply return the count value.
                     resultSet.next();
