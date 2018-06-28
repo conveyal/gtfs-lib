@@ -106,14 +106,19 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
             }
             LOG.info("Join values: {}", joinValues.toString());
             fetchResults = fetcher.getResults(namespace, joinValues, arguments);
-            if (i < jdbcFetchers.length - 1) {
-                // Iterate over results from current fetcher to store for next iteration for all but the last iteration
-                // (last iteration will contain the final results).
+            if (fetchResults.size() == 0) {
+                // If there are no results, the following queries will have no results to join to, so we can simply
+                // return the empty list.
+                return fetchResults;
+            } else if (i < jdbcFetchers.length - 1) {
+                // Otherwise, iterate over results from current fetcher to store for next iteration for all but the last
+                // iteration (the last iteration's fetchResults will contain the final results).
                 JDBCFetcher nextFetcher = jdbcFetchers[i + 1];
                 for (Map<String, Object> entity : fetchResults) {
                     Object joinValue = entity.get(nextFetcher.parentJoinField);
                     // Store join values in multimap for
-                    if (joinValue != null) joinValuesForJoinField.put(nextFetcher.parentJoinField, joinValue.toString());
+                    if (joinValue != null)
+                        joinValuesForJoinField.put(nextFetcher.parentJoinField, joinValue.toString());
                 }
             }
         }
