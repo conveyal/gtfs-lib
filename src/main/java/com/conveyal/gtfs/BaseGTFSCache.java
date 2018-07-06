@@ -73,10 +73,10 @@ public abstract class BaseGTFSCache<T> {
             LOG.warn("Local cache files (including .zip) will be deleted when removed from cache.");
         }
         RemovalListener<String, GTFSFeed> removalListener = removalNotification -> {
-            // delete local files ONLY if using s3
+            // delete local .zip file ONLY if using s3
             if (bucket != null) {
                 String id = removalNotification.getKey();
-                String[] extensions = {".db", ".db.p", ".zip"};
+                String[] extensions = {".zip"}; // used to include ".db", ".db.p" as well.  See #119
                 // delete local cache files (including zip) when feed removed from cache
                 for (String type : extensions) {
                     File file = new File(cacheDir, id + type);
