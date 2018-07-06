@@ -206,7 +206,7 @@
     <repository>
       <id>conveyal</id>
       <name>Conveyal Maven Repository</name>
-       <url>https://oss.sonatype.org/content/repositories/releases/</url>
+       <url>https://maven.conveyal.com</url>
     </repository>
     <repository>
       <id>osgeo</id>
