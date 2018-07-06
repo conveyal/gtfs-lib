@@ -45,17 +45,24 @@ public abstract class BaseGTFSCache<T> {
 
     public final File cacheDir;
 
-    private static final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
+    private static AmazonS3 s3 = null;
     private LoadingCache<String, T> cache;
 
     public BaseGTFSCache(String bucket, File cacheDir) {
         this(bucket, null, cacheDir);
     }
 
-    /** If bucket is null, work offline and do not use S3 */
     public BaseGTFSCache(String bucket, String bucketFolder, File cacheDir) {
-        if (bucket == null) LOG.info("No bucket specified; GTFS Cache will run locally");
-        else LOG.info("Using bucket {} for GTFS Cache", bucket);
+        this(null, bucket, bucketFolder, cacheDir);
+    }
+
+    /** If bucket is null, work offline and do not use S3 */
+    public BaseGTFSCache(String awsRegion, String bucket, String bucketFolder, File cacheDir) {
+        if (awsRegion == null || bucket == null) LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
+        else {
+            s3 = AmazonS3ClientBuilder.standard().withRegion(awsRegion).build();
+            LOG.info("Using bucket {} for GTFS Cache", bucket);
+        }
 
         this.bucket = bucket;
         this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
