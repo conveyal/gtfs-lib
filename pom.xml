@@ -9,7 +9,7 @@
   <groupId>com.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
   <!-- The release version 3.0.0 includes preliminary SQL support -->
-  <version>3.0.5-SNAPSHOT</version>
+  <version>3.0.5</version>
   <packaging>jar</packaging>
 
   <licenses>
@@ -206,7 +206,7 @@
     <repository>
       <id>conveyal</id>
       <name>Conveyal Maven Repository</name>
-       <url>https://maven.conveyal.com/</url>
+       <url>https://oss.sonatype.org/content/repositories/releases/</url>
     </repository>
     <repository>
       <id>osgeo</id>
