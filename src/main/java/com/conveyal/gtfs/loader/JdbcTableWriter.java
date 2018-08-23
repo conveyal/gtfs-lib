@@ -421,7 +421,11 @@ public class JdbcTableWriter implements TableWriter {
             // field statement above.
             for (Field field : subTable.specFields()) {
                 if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-                    referencesPerTable.put(field.referenceTable, subEntity.get(field.name).asText());
+                    JsonNode refValueNode = subEntity.get(field.name);
+                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                    if (refValueNode.isNull() && !field.isRequired()) continue;
+                    String refValue = refValueNode.asText();
+                    referencesPerTable.put(field.referenceTable, refValue);
                 }
             }
             // Insert new sub-entity.
