@@ -5,18 +5,30 @@ import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.validator.ValidationResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.io.Files;
 import org.apache.commons.cli.*;
 import org.apache.commons.dbcp2.ConnectionFactory;
 import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
 import org.apache.commons.dbcp2.PoolableConnectionFactory;
 import org.apache.commons.dbcp2.PoolingDataSource;
+import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
 /**
  * This is the public interface to the RDBMS backed functionality in gtfs-lib.
@@ -84,6 +96,36 @@ public abstract class GTFS {
         Feed feed = new Feed(dataSource, feedId);
         ValidationResult result = feed.validate();
         return result;
+    }
+
+    /**
+     * Deletes all tables for the specified feed. Simply put, this is a "drop schema" SQL statement called on the feed's
+     * namespace.
+     */
+    public static void delete (String feedId, DataSource dataSource) throws SQLException, InvalidNamespaceException {
+        LOG.info("Deleting all tables (dropping schema) for {} feed namespace.", feedId);
+        Connection connection = null;
+        try {
+            connection = dataSource.getConnection();
+            ensureValidNamespace(feedId);
+            // First, remove reference from feeds table.
+            String deleteFeedEntrySql = "DELETE FROM feeds where namespace = ?";
+            PreparedStatement deleteFeedStatement = connection.prepareStatement(deleteFeedEntrySql);
+            deleteFeedStatement.setString(1, feedId);
+            deleteFeedStatement.executeUpdate();
+            // Next, drop all tables bearing the feedId namespace.
+            // Note: It does not appear to be possible to use prepared statements with "drop schema."
+            String dropSchemaSql = String.format("DROP SCHEMA %s CASCADE", feedId);
+            Statement statement = connection.createStatement();
+            statement.executeUpdate(dropSchemaSql);
+            // Finally, commit the changes.
+            connection.commit();
+        } catch (InvalidNamespaceException | SQLException e) {
+            LOG.error(String.format("Could not drop feed for namespace %s", feedId), e);
+            throw e;
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
+        }
     }
 
     /**
