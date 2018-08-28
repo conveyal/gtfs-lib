@@ -127,6 +127,7 @@ public class JdbcGtfsLoader {
             // retry in a loop.
             // TODO handle the case where we don't want any prefix.
             this.tablePrefix = randomIdString();
+            result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
             registerFeed(gtfsFile);
             // Include the dot separator in the table prefix.
