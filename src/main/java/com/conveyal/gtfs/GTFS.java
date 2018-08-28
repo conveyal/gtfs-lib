@@ -108,17 +108,17 @@ public abstract class GTFS {
         try {
             connection = dataSource.getConnection();
             ensureValidNamespace(feedId);
-            // First, remove reference from feeds table.
-            String deleteFeedEntrySql = "DELETE FROM feeds where namespace = ?";
+            // Mark entry in feeds table as deleted.
+            String deleteFeedEntrySql = "update feeds set deleted = true where namespace = ?";
             PreparedStatement deleteFeedStatement = connection.prepareStatement(deleteFeedEntrySql);
             deleteFeedStatement.setString(1, feedId);
             deleteFeedStatement.executeUpdate();
-            // Next, drop all tables bearing the feedId namespace.
+            // Drop all tables bearing the feedId namespace.
             // Note: It does not appear to be possible to use prepared statements with "drop schema."
             String dropSchemaSql = String.format("DROP SCHEMA %s CASCADE", feedId);
             Statement statement = connection.createStatement();
             statement.executeUpdate(dropSchemaSql);
-            // Finally, commit the changes.
+            // Commit the changes.
             connection.commit();
         } catch (InvalidNamespaceException | SQLException e) {
             LOG.error(String.format("Could not drop feed for namespace %s", feedId), e);
