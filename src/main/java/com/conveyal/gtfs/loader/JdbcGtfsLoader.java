@@ -275,6 +275,7 @@ public class JdbcGtfsLoader {
         int initialErrorCount = errorStorage.getErrorCount();
         try {
             tableLoadResult.rowCount = loadInternal(table);
+            tableLoadResult.fileSize = getTableSize(table);
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);
             tableLoadResult.fatalException = ex.toString();
@@ -294,6 +295,15 @@ public class JdbcGtfsLoader {
         int finalErrorCount = errorStorage.getErrorCount();
         tableLoadResult.errorCount = finalErrorCount - initialErrorCount;
         return tableLoadResult;
+    }
+
+    /**
+     * Get the uncompressed file size in bytes for the specified GTFS table.
+     */
+    private int getTableSize(Table table) {
+        ZipEntry zipEntry = zip.getEntry(table.name + ".txt");
+        if (zipEntry == null) return 0;
+        return (int) zipEntry.getSize();
     }
 
     /**
