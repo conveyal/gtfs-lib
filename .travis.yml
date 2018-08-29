@@ -16,6 +16,10 @@ before_install: |
     gpg --import --batch maven-artifact-signing-key.asc
   fi
 
+# Install semantic-release
+before_script:
+  - yarn global add @conveyal/maven-semantic-release semantic-release
+
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
 script:
@@ -33,8 +37,10 @@ script:
 # The cache seems to be uploaded immediately after the Travis stage "script" so we include this deletion in the script.
 - rm -rf $HOME/.m2/repository/com/conveyal
 
+# Run code coverage and semantic-release
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+  - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github --verify-release @conveyal/maven-semantic-release
 
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE
 env:
@@ -52,6 +58,7 @@ sudo: false
 cache:
   directories:
     - "$HOME/.m2/repository"
+    - "$HOME/.yarn-cache"
 
 # Notify us of the build status on the Slack channel     
 notifications:
