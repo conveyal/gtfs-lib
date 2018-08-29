@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
 import java.net.URL;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Agency extends Entity {
@@ -25,6 +27,25 @@ public class Agency extends Entity {
         return agency_id;
     }
 
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#AGENCY}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, agency_id);
+        statement.setString(oneBasedIndex++, agency_name);
+        statement.setString(oneBasedIndex++, agency_url != null ? agency_url.toString() : null);
+        statement.setString(oneBasedIndex++, agency_timezone);
+        statement.setString(oneBasedIndex++, agency_lang);
+        statement.setString(oneBasedIndex++, agency_phone);
+        statement.setString(oneBasedIndex++, agency_branding_url != null ? agency_branding_url .toString() : null);
+        statement.setString(oneBasedIndex++, agency_fare_url != null ? agency_fare_url.toString() : null);
+        statement.setString(oneBasedIndex++, agency_email);
+    }
+
     public static class Loader extends Entity.Loader<Agency> {
 
         public Loader(GTFSFeed feed) {
@@ -39,7 +60,7 @@ public class Agency extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Agency a = new Agency();
-            a.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            a.id = row + 1; // offset line number by 1 to account for 0-based row index
             a.agency_id    = getStringField("agency_id", false); // can only be absent if there is a single agency -- requires a special validator.
             a.agency_name  = getStringField("agency_name", true);
             a.agency_url   = getUrlField("agency_url", true);

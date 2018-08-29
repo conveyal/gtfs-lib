@@ -114,7 +114,7 @@ public class OverlappingTripValidator extends TripValidator {
 //                String lastArrivalString = LocalTime.ofSecondOfDay(Iterables.getLast(stopTimes).arrival_time % 86399).toString();
 //                String duplicateTripId = duplicateTripHash.get(tripKey);
 //                Trip duplicateTrip = feed.trips.get(duplicateTripId);
-//                long line = trip.sourceFileLine > duplicateTrip.sourceFileLine ? trip.sourceFileLine : duplicateTrip.sourceFileLine;
+//                long line = trip.id > duplicateTrip.id ? trip.id : duplicateTrip.id;
 //                feed.errors.add(new DuplicateTripError(trip, line, duplicateTripId, patternName, firstDepartureString, lastArrivalString));
 //                isValid = false;
 //            } else {

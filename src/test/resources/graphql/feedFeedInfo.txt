@@ -1,0 +1,16 @@
+query($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    feed_info {
+      id
+      feed_publisher_name
+      feed_publisher_url
+      feed_lang
+      feed_start_date
+      feed_end_date
+      feed_version
+      default_route_color
+      default_route_type
+    }
+  }
+}

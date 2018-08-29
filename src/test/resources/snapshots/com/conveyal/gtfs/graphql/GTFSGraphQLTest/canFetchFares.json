@@ -1,0 +1,24 @@
+{
+  "data" : {
+    "feed" : {
+      "fares" : [ {
+        "currency_type" : "USD",
+        "fare_id" : "route_based_fare",
+        "fare_rules" : [ {
+          "contains_id" : null,
+          "destination_id" : null,
+          "fare_id" : "route_based_fare",
+          "id" : 2,
+          "origin_id" : null,
+          "route_id" : "1"
+        } ],
+        "id" : 2,
+        "payment_method" : 0,
+        "price" : 1.23,
+        "transfer_duration" : 0,
+        "transfers" : 0
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    stops {
+      id
+      location_type
+      parent_station
+      patterns {
+        pattern_id
+      }
+      routes {
+        route_id
+      }
+      stop_code
+      stop_desc
+      stop_id
+      stop_lat
+      stop_lon
+      stop_name
+      stop_time_count
+      stop_times {
+        stop_id
+        stop_sequence
+        trip_id
+      }
+      stop_timezone
+      stop_url
+      wheelchair_boarding
+      zone_id
+    }
+  }
+}

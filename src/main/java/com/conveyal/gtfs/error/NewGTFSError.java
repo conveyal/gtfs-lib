@@ -83,7 +83,7 @@ public class NewGTFSError {
     // Factory Builder for cases where the entity has already been decoded and an error is discovered during validation
     public static NewGTFSError forEntity(Entity entity, NewGTFSErrorType errorType) {
         NewGTFSError error = new NewGTFSError(entity.getClass(), errorType);
-        error.lineNumber = entity.sourceFileLine;
+        error.lineNumber = entity.id;
         error.entityId = entity.getId();
         error.entitySequenceNumber = entity.getSequenceNumber();
         return error;
@@ -105,4 +105,22 @@ public class NewGTFSError {
         return this;
     }
 
+    // Builder to add entity ID info
+    public NewGTFSError setEntityId(String entityId) {
+        this.entityId = entityId;
+        return this;
+    }
+
+    // Builder to add entity sequence info from string (values during load stage are passed in as strings from csv
+    // reader)
+    public NewGTFSError setSequence(String sequenceAsString) {
+        try {
+            // Parse int from string value found during load stage.
+            this.entitySequenceNumber = Integer.parseInt(sequenceAsString);
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
+            this.entitySequenceNumber = null;
+        }
+        return this;
+    }
 }

@@ -2,7 +2,6 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.storage.StorageException;
-import com.vividsolutions.jts.awt.PointShapeFactory;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import org.apache.commons.dbutils.DbUtils;
@@ -10,8 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Field;
 import java.sql.*;
+import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static java.sql.ResultSet.TYPE_FORWARD_ONLY;
 import static java.sql.ResultSet.CONCUR_READ_ONLY;
@@ -91,7 +94,7 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     @Override
     public Iterable<T> getOrdered (final String id) {
         // An iterable has a single method that produces an iterator.
-        return () -> { return new EntityIterator(id, true); };
+        return () -> new EntityIterator(id, true);
     }
 
     /**
@@ -99,7 +102,7 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
      */
     public Iterable<T> getUnordered (final String id) {
         // An iterable has a single method that produces an iterator.
-        return () -> { return new EntityIterator(id, false); };
+        return () -> new EntityIterator(id, false);
     }
 
     /**
@@ -108,7 +111,7 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     @Override
     public Iterable<T> getAll () {
         // An iterable has a single method that produces an iterator.
-        return () -> { return new EntityIterator(null, false); };
+        return () -> new EntityIterator(null, false);
     }
 
     /**
@@ -117,7 +120,7 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
     @Override
     public Iterable<T> getAllOrdered () {
         // An iterable has a single method that produces an iterator.
-        return () -> { return new EntityIterator(null, true); };
+        return () -> new EntityIterator(null, true);
     }
 
     /**
@@ -184,6 +187,10 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
                 LOG.info(preparedStatement.toString());
                 results = preparedStatement.executeQuery();
                 hasMoreEntities = results.next();
+                if (!hasMoreEntities) {
+                    // If immediately after the SQL query there are no results, close the connection immediately.
+                    connection.close();
+                }
             } catch (SQLException sqlEx) {
                 DbUtils.closeQuietly(connection);
                 if (SQL_STATE_UNDEFINED_TABLE.equals(sqlEx.getSQLState())) {
@@ -219,7 +226,7 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
                 T entity = entityPopulator.populate(results, columnForName);
                 // Set the line number on every entity the same way
                 // rather than repeating this statement in each implementation class.
-                entity.sourceFileLine = EntityPopulator.getIntIfPresent(results, "csv_line", columnForName);
+                entity.id = EntityPopulator.getIntIfPresent(results, "id", columnForName);
                 hasMoreEntities = results.next();
                 if (!hasMoreEntities) {
                     // No more entities to iterate over. We can close the database connection.

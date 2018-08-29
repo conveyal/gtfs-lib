@@ -6,6 +6,9 @@ import com.vividsolutions.jts.geom.GeometryFactory;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.apache.commons.math3.util.FastMath;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * The methods and classes in this package should eventually be part of a shared Conveyal library.
  */
@@ -80,6 +83,19 @@ public abstract class Util {
         // Add a visual separator, which makes these easier to distinguish at a glance
         chars[4] = '_';
         return new String(chars);
+    }
+
+    /**
+     * Ensures namespace is valid by ensuring it only has alphanumeric characters or the underscore
+     * for all characters in the string
+     * @param namespace
+     */
+    public static void ensureValidNamespace(String namespace) throws InvalidNamespaceException {
+        Pattern pattern = Pattern.compile("[^a-zA-Z0-9_\\.]");
+        Matcher matcher = pattern.matcher(namespace);
+        if (matcher.find()) {
+            throw new InvalidNamespaceException();
+        }
     }
 
 }

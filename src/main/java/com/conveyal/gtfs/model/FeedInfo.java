@@ -2,7 +2,11 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GeneralError;
+import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.Table;
 
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.LocalDate;
 
 import java.io.IOException;
@@ -28,6 +32,25 @@ public class FeedInfo extends Entity implements Cloneable {
         }
     }
 
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FEED_INFO}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        DateField feedStartDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_start_date");
+        DateField feedEndDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_end_date");
+        String feedPublisherUrl = feed_publisher_url != null ? feed_publisher_url.toString() : null;
+        statement.setString(oneBasedIndex++, feed_publisher_name);
+        statement.setString(oneBasedIndex++, feedPublisherUrl);
+        statement.setString(oneBasedIndex++, feed_lang);
+        feedStartDateField.setParameter(statement, oneBasedIndex++, feed_start_date);
+        feedEndDateField.setParameter(statement, oneBasedIndex++, feed_end_date);
+        statement.setString(oneBasedIndex++, feed_version);
+    }
+
     public static class Loader extends Entity.Loader<FeedInfo> {
 
         public Loader(GTFSFeed feed) {
@@ -42,7 +65,7 @@ public class FeedInfo extends Entity implements Cloneable {
         @Override
         public void loadOneRow() throws IOException {
             FeedInfo fi = new FeedInfo();
-            fi.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            fi.id = row + 1; // offset line number by 1 to account for 0-based row index
             fi.feed_id = getStringField("feed_id", false);
             fi.feed_publisher_name = getStringField("feed_publisher_name", true);
             fi.feed_publisher_url = getUrlField("feed_publisher_url", true);

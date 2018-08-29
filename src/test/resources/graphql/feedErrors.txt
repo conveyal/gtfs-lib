@@ -1,0 +1,14 @@
+query($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    errors {
+      bad_value
+      error_id
+      error_type
+      entity_id
+      entity_sequence
+      entity_type
+      line_number
+    }
+  }
+}

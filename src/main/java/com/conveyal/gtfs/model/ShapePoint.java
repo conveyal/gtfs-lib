@@ -3,6 +3,8 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 import org.mapdb.Fun.Tuple2;
@@ -24,6 +26,23 @@ public class ShapePoint extends Entity {
     @Override
     public Integer getSequenceNumber() {
         return shape_pt_sequence;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#SHAPES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, shape_id);
+        setIntParameter(statement, oneBasedIndex++, shape_pt_sequence);
+        statement.setDouble(oneBasedIndex++, shape_pt_lat);
+        statement.setDouble(oneBasedIndex++, shape_pt_lon);
+        statement.setDouble(oneBasedIndex++, shape_dist_traveled);
+        // Editor-specific field below (point_type 0 indicates no control point)
+        statement.setInt(oneBasedIndex++, 0);
     }
 
     public ShapePoint () { }
@@ -57,7 +76,7 @@ public class ShapePoint extends Entity {
             double shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE);
 
             ShapePoint s = new ShapePoint(shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled);
-            s.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            s.id = row + 1; // offset line number by 1 to account for 0-based row index
             s.feed = null; // since we're putting this into MapDB, we don't want circular serialization
             feed.shape_points.put(new Tuple2<String, Integer>(s.shape_id, s.shape_pt_sequence), s);
         }

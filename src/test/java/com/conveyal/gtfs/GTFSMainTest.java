@@ -1,11 +1,13 @@
 package com.conveyal.gtfs;
 
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.contrib.java.lang.system.ExpectedSystemExit;
 
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -15,11 +17,23 @@ import static org.hamcrest.Matchers.containsString;
  * A test suite for the GTFSMain class
  */
 public class GTFSMainTest {
+    private static String simpleGtfsZipFileName;
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
     // this is used so that it is possible to test code that calls System.exit()
     @Rule
     public final ExpectedSystemExit exit = ExpectedSystemExit.none();
+
+    @BeforeClass
+    public static void setUpClass() {
+        //executed only once, before the first test
+        simpleGtfsZipFileName = null;
+        try {
+            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 
     // setup a stream to capture the output from the program
     @Before
@@ -59,7 +73,7 @@ public class GTFSMainTest {
      */
     @Test
     public void canValidateSimpleAgency() throws Exception {
-        String[] args = {"./src/test/resources/fake-agency.zip", "-validate"};
+        String[] args = {simpleGtfsZipFileName, "-validate"};
         GTFSMain.main(args);
     }
 }

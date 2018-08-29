@@ -29,7 +29,12 @@ public class IntegerField extends Field {
     }
 
     private int validate (String string) {
-        int i = Integer.parseInt(string);
+        int i;
+        try {
+            i = Integer.parseInt(string);
+        } catch (NumberFormatException e) {
+            throw new StorageException(NewGTFSErrorType.NUMBER_PARSING, string);
+        }
         if (i < minValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_SMALL, string);
         if (i > maxValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, string);
         return i;

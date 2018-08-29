@@ -16,20 +16,31 @@ before_install: |
     gpg --import --batch maven-artifact-signing-key.asc
   fi
 
+# Install semantic-release
+before_script:
+  - yarn global add @conveyal/maven-semantic-release semantic-release
+
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
-script: |
-  # only (attempt to) deploy non-pull request commits to the master branch, dev branch, or tags
+script:
+# only (attempt to) deploy non-pull request commits to the master branch, dev branch, or tags
+# Otherwise, just run all the way up to verify, the last phase before installing and deploying.
+# Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
+- |
   if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || "$TRAVIS_BRANCH" = dev || ! -z "$TRAVIS_TAG" ]]; then
     mvn clean deploy --settings maven-settings.xml
   else
-    # Otherwise, just run all the way up to verify, the last phase before installing and deploying.
-    # Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
     mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
   fi
+# Wipe out all the Conveyal artifacts in the local Maven repo before they get cached.
+# This forces download of fresh SNAPSHOT artifacts on the next build.
+# The cache seems to be uploaded immediately after the Travis stage "script" so we include this deletion in the script.
+- rm -rf $HOME/.m2/repository/com/conveyal
 
+# Run code coverage and semantic-release
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+  - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github --verify-release @conveyal/maven-semantic-release
 
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE
 env:
@@ -43,9 +54,11 @@ env:
 sudo: false
 
 # Retain the local Maven repository to speed up builds.
+# The Conveyal subdirectory is deleted in the script above to prevent retaining Conveyal snapshot artifacts across builds.
 cache:
   directories:
     - "$HOME/.m2/repository"
+    - "$HOME/.yarn-cache"
 
 # Notify us of the build status on the Slack channel     
 notifications:

@@ -1,0 +1,19 @@
+{
+  "data" : {
+    "feed" : {
+      "agency" : [ {
+        "agency_branding_url" : null,
+        "agency_email" : null,
+        "agency_fare_url" : null,
+        "agency_id" : "1",
+        "agency_lang" : null,
+        "agency_name" : "Fake Transit",
+        "agency_phone" : null,
+        "agency_timezone" : "America/Los_Angeles",
+        "agency_url" : null,
+        "id" : 2
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}
