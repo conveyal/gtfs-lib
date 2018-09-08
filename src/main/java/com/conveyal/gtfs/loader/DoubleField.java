@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
@@ -17,13 +16,14 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.NUMBER_TOO_SMALL;
 public class DoubleField extends Field {
 
     private double minValue;
-
     private double maxValue;
+    private int outputPrecision;
 
-    public DoubleField (String name, Requirement requirement, double minValue, double maxValue) {
+    public DoubleField (String name, Requirement requirement, double minValue, double maxValue, int outputPrecision) {
         super(name, requirement);
         this.minValue = minValue;
         this.maxValue = maxValue;
+        this.outputPrecision = outputPrecision;
     }
 
     private double validate(String string) {
@@ -61,6 +61,10 @@ public class DoubleField extends Field {
     @Override
     public String getSqlTypeName () {
         return "double precision";
+    }
+
+    public int getOutputPrecision() {
+        return this.outputPrecision;
     }
 
 }

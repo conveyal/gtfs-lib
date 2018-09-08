@@ -81,8 +81,8 @@ public class JdbcGtfsExporter {
             // if exporting a feed/schema that represents an editor snapshot.
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
-            result.agency = export(Table.AGENCY);
-            result.calendar = export(Table.CALENDAR);
+            result.agency = export(Table.AGENCY, connection);
+            result.calendar = export(Table.CALENDAR, connection);
             if (fromEditor) {
                 // Export schedule exceptions in place of calendar dates if exporting a feed/schema that represents an editor snapshot.
                 GTFSFeed feed = new GTFSFeed();
@@ -142,13 +142,12 @@ public class JdbcGtfsExporter {
                 }
             } else {
                 // Otherwise, simply export the calendar dates as they were loaded in.
-                result.calendarDates = export(Table.CALENDAR_DATES);
+                result.calendarDates = export(Table.CALENDAR_DATES, connection);
             }
-            result.fareAttributes = export(Table.FARE_ATTRIBUTES);
-            result.fareRules = export(Table.FARE_RULES);
-            result.feedInfo = export(Table.FEED_INFO);
+            result.fareAttributes = export(Table.FARE_ATTRIBUTES, connection);
+            result.fareRules = export(Table.FARE_RULES, connection);
+            result.feedInfo = export(Table.FEED_INFO, connection);
             // Only write frequencies for "approved" routes using COPY TO with results of select query
-            String frequencySelectSql = null;
             if (fromEditor) {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for frequencies requires two joins to reach the routes table and a where filter on
@@ -156,32 +155,49 @@ public class JdbcGtfsExporter {
                 String scopedStartTime = qualifyField(Table.FREQUENCIES, "start_time");
                 String scopedEndTime = qualifyField(Table.FREQUENCIES, "end_time");
                 // FIXME Replace with string literal query instead of clause generators
-                frequencySelectSql = String.join(" ",
+                result.frequencies = export(
+                    Table.FREQUENCIES,
+                    String.join(
+                        " ",
                         // Convert start_time and end_time values from seconds to time format (HH:MM:SS).
                         Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
                             .replace(scopedStartTime, convertSecondsToTime(scopedStartTime, "start_time"))
                             .replace(scopedEndTime, convertSecondsToTime(scopedEndTime, "end_time")),
                         Table.FREQUENCIES.generateJoinSql(Table.TRIPS, feedIdToExport),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                        Table.TRIPS.generateJoinSql(
+                            Table.ROUTES,
+                            feedIdToExport,
+                            "route_id",
+                            false
+                        ),
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.frequencies = export(Table.FREQUENCIES, connection);
             }
-            result.frequencies = export(Table.FREQUENCIES, frequencySelectSql);
+
             // Only write "approved" routes using COPY TO with results of select query
-            String routeSelectSql = null;
             if (fromEditor) {
                 // The filter clause for routes is simple. We're just checking that the route is APPROVED.
-                routeSelectSql = String.join(" ",
+                result.routes = export(
+                    Table.ROUTES,
+                    String.join(
+                        " ",
                         Table.ROUTES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
-                        whereRouteIsApproved);
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.routes = export(Table.ROUTES, connection);
             }
-            result.routes = export(Table.ROUTES, routeSelectSql);
+
             // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
             // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
             // frequency-based pattern travel times match stop time arrivals/departures?
 //            export(Table.PATTERNS);
 //            export(Table.PATTERN_STOP);
             // Only write shapes for "approved" routes using COPY TO with results of select query
-            String shapeSelectSql = null;
             if (fromEditor) {
                 // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for shapes requires joining to trips and then to routes table and a where filter on
@@ -189,21 +205,25 @@ public class JdbcGtfsExporter {
                 // FIXME: I'm not sure that shape_id is indexed for the trips table. This could cause slow downs.
                 // FIXME: this is exporting point_type, which is not a GTFS field, but its presence shouldn't hurt.
                 String shapeFieldsToExport = Table.commaSeparatedNames(
-                        Table.SHAPES.specFields(), String.join(".", feedIdToExport, Table.SHAPES.name + "."));
+                        Table.SHAPES.specFields(),
+                    String.join(".", feedIdToExport, Table.SHAPES.name + "."),
+                    true
+                );
                 // NOTE: The below substitution uses relative indexing. All values "%<s" reference the same arg as the
                 // previous format specifier (i.e., feedIdToExport).
-                shapeSelectSql = String.format("select %s " +
+                String shapeSelectSql = String.format("select %s " +
                         "from (select distinct %s.trips.shape_id " +
                         "from %<s.trips, %<s.routes " +
                         "where %<s.trips.route_id = %<s.routes.route_id and %<s.routes.status = 2) as unique_approved_shape_ids, " +
                         "%<s.shapes where unique_approved_shape_ids.shape_id = %<s.shapes.shape_id",
                         shapeFieldsToExport,
                         feedIdToExport);
+                result.shapes = export(Table.SHAPES, shapeSelectSql);
+            } else {
+                result.shapes = export(Table.SHAPES, connection);
             }
-            result.shapes = export(Table.SHAPES, shapeSelectSql);
-            result.stops = export(Table.STOPS);
+            result.stops = export(Table.STOPS, connection);
             // Only write stop times for "approved" routes using COPY TO with results of select query
-            String stopTimesSelectSql = null;
             if (fromEditor) {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
@@ -211,30 +231,49 @@ public class JdbcGtfsExporter {
                 String scopedArrivalTime = qualifyField(Table.STOP_TIMES, "arrival_time");
                 String scopedDepartureTime = qualifyField(Table.STOP_TIMES, "departure_time");
                 // FIXME Replace with string literal query instead of clause generators
-                stopTimesSelectSql = String.join(" ",
+                result.stopTimes = export(
+                    Table.STOP_TIMES,
+                    String.join(" ",
                         // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string
                         // format.
                         Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
                             .replace(scopedArrivalTime, convertSecondsToTime(scopedArrivalTime, "arrival_time"))
                             .replace(scopedDepartureTime, convertSecondsToTime(scopedDepartureTime, "departure_time")),
                         Table.STOP_TIMES.generateJoinSql(Table.TRIPS, feedIdToExport),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                        Table.TRIPS.generateJoinSql(
+                            Table.ROUTES,
+                            feedIdToExport,
+                            "route_id",
+                            false
+                        ),
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.stopTimes = export(Table.STOP_TIMES, connection);
             }
-            result.stopTimes = export(Table.STOP_TIMES, stopTimesSelectSql);
-            result.transfers = export(Table.TRANSFERS);
-            String tripSelectSql = null;
+            result.transfers = export(Table.TRANSFERS, connection);
             if (fromEditor) {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for trips requires an inner join on the routes table and the same where check on
                 // route status.
                 // FIXME Replace with string literal query instead of clause generators
-                tripSelectSql = String.join(" ",
+                result.trips = export(
+                    Table.TRIPS,
+                    String.join(" ",
                         Table.TRIPS.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                        Table.TRIPS.generateJoinSql(
+                            Table.ROUTES,
+                            feedIdToExport,
+                            "route_id",
+                            false
+                        ),
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.trips = export(Table.TRIPS, connection);
             }
-            result.trips = export(Table.TRIPS, tripSelectSql);
 
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
@@ -299,12 +338,22 @@ public class JdbcGtfsExporter {
         LOG.info("Deleted {} empty files in {} ms", emptyTableList.size(), System.currentTimeMillis() - startTime);
     }
 
-    private TableLoadResult export (Table table) {
+    private TableLoadResult export (Table table, Connection connection) {
         if (fromEditor) {
             // Default behavior for exporting editor snapshot tables is to select only the spec fields.
             return export(table, table.generateSelectSql(feedIdToExport, Requirement.OPTIONAL));
         } else {
-            return export(table, null);
+            String existingFieldsSelect = null;
+            try {
+                existingFieldsSelect = table.generateSelectAllExistingFieldsSql(connection, feedIdToExport);
+            } catch (SQLException e) {
+                LOG.error("failed to generate select statement for existing fields");
+                TableLoadResult tableLoadResult = new TableLoadResult();
+                tableLoadResult.fatalException = e.getMessage();
+                e.printStackTrace();
+                return tableLoadResult;
+            }
+            return export(table, existingFieldsSelect);
         }
     }
 
