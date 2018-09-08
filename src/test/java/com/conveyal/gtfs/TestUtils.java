@@ -35,7 +35,11 @@ public class TestUtils {
             "AND pid <> pg_backend_pid()", dbName
         ));
         // drop the db
-        executeAndClose(String.format("DROP DATABASE %s", dbName));
+        if(executeAndClose(String.format("DROP DATABASE %s", dbName))) {
+            LOG.error(String.format("Successfully dropped database: %s", dbName));
+        } else {
+            LOG.error(String.format("Failed to drop database: %s", dbName));
+        }
     }
 
     /**
@@ -55,6 +59,7 @@ public class TestUtils {
         }
 
         try {
+            LOG.info(statement);
             connection.prepareStatement(statement).execute();
         } catch (SQLException e) {
             e.printStackTrace();

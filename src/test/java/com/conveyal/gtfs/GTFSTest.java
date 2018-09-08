@@ -2,7 +2,10 @@ package com.conveyal.gtfs;
 
 
 import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.validator.ValidationResult;
+import com.csvreader.CsvReader;
+import org.apache.commons.io.input.BOMInputStream;
 import org.hamcrest.Matcher;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
 import org.junit.Before;
@@ -12,18 +15,24 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertThat;
@@ -63,23 +72,38 @@ public class GTFSTest {
         public double doubleExpectation;
         public int intExpectation;
         public String stringExpectation;
+        public double acceptedDelta;
 
-        public RecordExpectation(String fieldName, ExpectedFieldType expectedFieldType, int intExpectation) {
+        public RecordExpectation(String fieldName, int intExpectation) {
             this.fieldName = fieldName;
-            this.expectedFieldType = expectedFieldType;
+            this.expectedFieldType = ExpectedFieldType.INT;
             this.intExpectation = intExpectation;
         }
 
-        public RecordExpectation(String fieldName, ExpectedFieldType expectedFieldType, String stringExpectation) {
+        public RecordExpectation(String fieldName, String stringExpectation) {
             this.fieldName = fieldName;
-            this.expectedFieldType = expectedFieldType;
+            this.expectedFieldType = ExpectedFieldType.STRING;
             this.stringExpectation = stringExpectation;
         }
 
-        public RecordExpectation(String fieldName, ExpectedFieldType expectedFieldType, double doubleExpectation) {
+        public RecordExpectation(String fieldName, double doubleExpectation, double acceptedDelta) {
             this.fieldName = fieldName;
-            this.expectedFieldType = expectedFieldType;
+            this.expectedFieldType = ExpectedFieldType.DOUBLE;
             this.doubleExpectation = doubleExpectation;
+            this.acceptedDelta = acceptedDelta;
+        }
+
+        public String getStringifiedExpectation() {
+            switch (expectedFieldType) {
+                case DOUBLE:
+                    return String.valueOf(doubleExpectation);
+                case INT:
+                    return String.valueOf(intExpectation);
+                case STRING:
+                    return stringExpectation;
+                default:
+                    return null;
+            }
         }
     }
 
@@ -138,296 +162,129 @@ public class GTFSTest {
                     new PersistanceExpectation(
                         "agency",
                         new RecordExpectation[]{
-                            new RecordExpectation("agency_id", ExpectedFieldType.STRING, "1"),
-                            new RecordExpectation("agency_name", ExpectedFieldType.STRING, "Fake Transit"),
-                            new RecordExpectation("agency_timezone", ExpectedFieldType.STRING, "America/Los_Angeles")
+                            new RecordExpectation("agency_id", "1"),
+                            new RecordExpectation("agency_name", "Fake Transit"),
+                            new RecordExpectation("agency_timezone", "America/Los_Angeles")
                         }
                     ),
                     new PersistanceExpectation(
                         "calendar",
                         new RecordExpectation[]{
                             new RecordExpectation(
-                                "service_id",
-                                ExpectedFieldType.STRING,
-                                "04100312-8fe1-46a5-a9f2-556f39478f57"
+                                "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
                             ),
-                            new RecordExpectation(
-                                "monday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "tuesday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "wednesday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "thursday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "friday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "saturday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "sunday",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "start_date",
-                                ExpectedFieldType.STRING,
-                                "20170915"
-                            ),
-                            new RecordExpectation(
-                                "end_date",
-                                ExpectedFieldType.STRING,
-                                "20170917"
-                            )
+                            new RecordExpectation("monday", 1),
+                            new RecordExpectation("tuesday", 1),
+                            new RecordExpectation("wednesday", 1),
+                            new RecordExpectation("thursday", 1),
+                            new RecordExpectation("friday", 1),
+                            new RecordExpectation("saturday", 1),
+                            new RecordExpectation("sunday", 1),
+                            new RecordExpectation("start_date", "20170915"),
+                            new RecordExpectation("end_date", "20170917")
                         }
                     ),
                     new PersistanceExpectation(
                         "calendar_dates",
                         new RecordExpectation[]{
                             new RecordExpectation(
-                                "service_id",
-                                ExpectedFieldType.STRING,
-                                "04100312-8fe1-46a5-a9f2-556f39478f57"
+                                "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
                             ),
-                            new RecordExpectation("date", ExpectedFieldType.INT, 20200220),
-                            new RecordExpectation("exception_type", ExpectedFieldType.INT, 2)
+                            new RecordExpectation("date", 20200220),
+                            new RecordExpectation("exception_type", 2)
                         }
                     ),
                     new PersistanceExpectation(
                         "fare_attributes",
                         new RecordExpectation[]{
-                            new RecordExpectation("fare_id", ExpectedFieldType.STRING, "route_based_fare"),
-                            new RecordExpectation("price", ExpectedFieldType.DOUBLE, 1.23),
-                            new RecordExpectation("currency_type", ExpectedFieldType.STRING, "USD")
+                            new RecordExpectation("fare_id", "route_based_fare"),
+                            new RecordExpectation("price", 1.23, 0),
+                            new RecordExpectation("currency_type", "USD")
                         }
                     ),
                     new PersistanceExpectation(
                         "fare_rules",
                         new RecordExpectation[]{
-                            new RecordExpectation("fare_id", ExpectedFieldType.STRING, "route_based_fare"),
-                            new RecordExpectation("route_id", ExpectedFieldType.STRING, "1")
+                            new RecordExpectation("fare_id", "route_based_fare"),
+                            new RecordExpectation("route_id", "1")
                         }
                     ),
                     new PersistanceExpectation(
                         "feed_info",
                         new RecordExpectation[]{
-                            new RecordExpectation(
-                                "feed_publisher_name",
-                                ExpectedFieldType.STRING,
-                                "Conveyal"
+                            new RecordExpectation("feed_publisher_name", "Conveyal"
                             ),
                             new RecordExpectation(
-                                "feed_publisher_url",
-                                ExpectedFieldType.STRING,
-                                "http://www.conveyal.com"
+                                "feed_publisher_url", "http://www.conveyal.com"
                             ),
-                            new RecordExpectation(
-                                "feed_lang",
-                                ExpectedFieldType.STRING,
-                                "en"
-                            ),
-                            new RecordExpectation(
-                                "feed_version",
-                                ExpectedFieldType.STRING,
-                                "1.0"
-                            )
+                            new RecordExpectation("feed_lang", "en"),
+                            new RecordExpectation("feed_version", "1.0")
                         }
                     ),
                     new PersistanceExpectation(
                         "frequencies",
                         new RecordExpectation[]{
-                            new RecordExpectation(
-                                "trip_id",
-                                ExpectedFieldType.STRING,
-                                "frequency-trip"
-                            ),
-                            new RecordExpectation(
-                                "start_time",
-                                ExpectedFieldType.INT,
-                                28800
-                            ),
-                            new RecordExpectation(
-                                "end_time",
-                                ExpectedFieldType.INT,
-                                32400
-                            ),
-                            new RecordExpectation(
-                                "headway_secs",
-                                ExpectedFieldType.INT,
-                                1800
-                            ),
-                            new RecordExpectation(
-                                "exact_times",
-                                ExpectedFieldType.INT,
-                                0
-                            )
+                            new RecordExpectation("trip_id", "frequency-trip"),
+                            new RecordExpectation("start_time", 28800),
+                            new RecordExpectation("end_time", 32400),
+                            new RecordExpectation("headway_secs", 1800),
+                            new RecordExpectation("exact_times", 0)
                         }
                     ),
                     new PersistanceExpectation(
                         "routes",
                         new RecordExpectation[]{
-                            new RecordExpectation(
-                                "agency_id",
-                                ExpectedFieldType.STRING,
-                                "1"
-                            ),
-                            new RecordExpectation(
-                                "route_id",
-                                ExpectedFieldType.STRING,
-                                "1"
-                            ),
-                            new RecordExpectation(
-                                "route_short_name",
-                                ExpectedFieldType.STRING,
-                                "1"
-                            ),
-                            new RecordExpectation(
-                                "route_long_name",
-                                ExpectedFieldType.STRING,
-                                "Route 1"
-                            ),
-                            new RecordExpectation(
-                                "route_type",
-                                ExpectedFieldType.INT,
-                                3
-                            ),
-                            new RecordExpectation(
-                                "route_color",
-                                ExpectedFieldType.STRING,
-                                "7CE6E7"
-                            )
+                            new RecordExpectation("agency_id", "1"),
+                            new RecordExpectation("route_id", "1"),
+                            new RecordExpectation("route_short_name", "1"),
+                            new RecordExpectation("route_long_name", "Route 1"),
+                            new RecordExpectation("route_type", 3),
+                            new RecordExpectation("route_color", "7CE6E7")
                         }
                     ),
                     new PersistanceExpectation(
                         "shapes",
                         new RecordExpectation[]{
                             new RecordExpectation(
-                                "shape_id",
-                                ExpectedFieldType.STRING,
-                                "5820f377-f947-4728-ac29-ac0102cbc34e"
+                                "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
                             ),
-                            new RecordExpectation(
-                                "shape_pt_lat",
-                                ExpectedFieldType.DOUBLE,
-                                37.061172
-                            ),
-                            new RecordExpectation(
-                                "shape_pt_lon",
-                                ExpectedFieldType.DOUBLE,
-                                -122.0075
-                            ),
-                            new RecordExpectation(
-                                "shape_pt_sequence",
-                                ExpectedFieldType.INT,
-                                2
-                            ),
-                            new RecordExpectation(
-                                "shape_dist_traveled",
-                                ExpectedFieldType.DOUBLE,
-                                7.4997067
-                            )
+                            new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
+                            new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
+                            new RecordExpectation("shape_pt_sequence", 2),
+                            new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
                         }
                     ),
                     new PersistanceExpectation(
                         "stop_times",
                         new RecordExpectation[]{
                             new RecordExpectation(
-                                "trip_id",
-                                ExpectedFieldType.STRING,
-                                "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                                "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
                             ),
-                            new RecordExpectation(
-                                "arrival_time",
-                                ExpectedFieldType.INT,
-                                25200
-                            ),
-                            new RecordExpectation(
-                                "departure_time",
-                                ExpectedFieldType.INT,
-                                25200
-                            ),
-                            new RecordExpectation(
-                                "stop_id",
-                                ExpectedFieldType.STRING,
-                                "4u6g"
-                            ),
-                            new RecordExpectation(
-                                "stop_sequence",
-                                ExpectedFieldType.INT,
-                                1
-                            ),
-                            new RecordExpectation(
-                                "pickup_type",
-                                ExpectedFieldType.INT,
-                                0
-                            ),
-                            new RecordExpectation(
-                                "drop_off_type",
-                                ExpectedFieldType.INT,
-                                0
-                            ),
-                            new RecordExpectation(
-                                "shape_dist_traveled",
-                                ExpectedFieldType.DOUBLE,
-                                0.0
-                            )
+                            new RecordExpectation("arrival_time", 25200),
+                            new RecordExpectation("departure_time", 25200),
+                            new RecordExpectation("stop_id", "4u6g"),
+                            new RecordExpectation("stop_sequence", 1),
+                            new RecordExpectation("pickup_type", 0),
+                            new RecordExpectation("drop_off_type", 0),
+                            new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
                         }
                     ),
                     new PersistanceExpectation(
                         "trips",
                         new RecordExpectation[]{
                             new RecordExpectation(
-                                "trip_id",
-                                ExpectedFieldType.STRING,
-                                "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                                "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
                             ),
                             new RecordExpectation(
-                                "service_id",
-                                ExpectedFieldType.STRING,
-                                "04100312-8fe1-46a5-a9f2-556f39478f57"
+                                "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
                             ),
+                            new RecordExpectation("route_id", "1"),
+                            new RecordExpectation("direction_id", 0),
                             new RecordExpectation(
-                                "route_id",
-                                ExpectedFieldType.STRING,
-                                "1"
+                                "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
                             ),
-                            new RecordExpectation(
-                                "direction_id",
-                                ExpectedFieldType.INT,
-                                0
-                            ),
-                            new RecordExpectation(
-                                "shape_id",
-                                ExpectedFieldType.STRING,
-                                "5820f377-f947-4728-ac29-ac0102cbc34e"
-                            ),
-                            new RecordExpectation(
-                                "bikes_allowed",
-                                ExpectedFieldType.INT,
-                                0
-                            ),
-                            new RecordExpectation(
-                                "wheelchair_accessible",
-                                ExpectedFieldType.INT,
-                                0
-                            )
+                            new RecordExpectation("bikes_allowed", 0),
+                            new RecordExpectation("wheelchair_accessible", 0)
                         }
                     )
                 }
@@ -439,6 +296,9 @@ public class GTFSTest {
     /**
      * A helper method that will run GTFS.main with a certain zip file.
      * This tests whether a GTFS zip file can be loaded without any errors.
+     *
+     * After the GTFS is loaded, this will also initiate an export of a GTFS from the database and check
+     * the integrity of the exported GTFS.
      */
     private boolean runIntegrationTest(
         String folderName,
@@ -455,6 +315,12 @@ public class GTFSTest {
         }
         String newDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
+
+        String namespace;
+
+        /***************************************************************************************************************
+         * Verify that loading the feed completes and data is stored properly
+         **************************************************************************************************************/
         try {
             // load and validate feed
             DataSource dataSource = createDataSource(
@@ -466,6 +332,7 @@ public class GTFSTest {
             ValidationResult validationResult = validate(loadResult.uniqueIdentifier, dataSource);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
+            namespace = loadResult.uniqueIdentifier;
 
             // run through testing expectations
             Connection conn = DriverManager.getConnection(dbConnectionUrl);
@@ -524,28 +391,134 @@ public class GTFSTest {
                     }
                     // all fields match expectations!  We have found the record.
                     if (allFieldsMatch) {
-                        LOG.info("Record satisfies expectations.");
+                        LOG.info("Database record satisfies expectations.");
                         foundRecord = true;
                         break;
                     }
                 }
-                assertThat(
-                    "No records found in the ResultSet",
-                    numRecordsSearched,
-                    ComparatorMatcherBuilder.<Integer>usingNaturalOrdering().greaterThan(0)
-                );
-                assertThat(
-                    "The record as defined in the PersistanceExpectation was not found.",
-                    foundRecord,
-                    equalTo(true)
-                );
+                assertThatPersistanceExpectationRecordWasFound(numRecordsSearched, foundRecord);
             }
         } catch (SQLException e) {
+            TestUtils.dropDB(newDBName);
+            e.printStackTrace();
+            return false;
+        }
+
+        /***************************************************************************************************************
+         * Verify that exporting the feed (in non-editor mode) completes and data is outputed properly
+         **************************************************************************************************************/
+        try {
+            DataSource dataSource = createDataSource(
+                dbConnectionUrl,
+                null,
+                null
+            );
+            File tempFile = File.createTempFile("snapshot", ".zip");
+            JdbcGtfsExporter exporter = new JdbcGtfsExporter(
+                namespace,
+                tempFile.getAbsolutePath(),
+                dataSource,
+                false
+            );
+            exporter.exportTables();
+
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations);
+        } catch (IOException e) {
             e.printStackTrace();
             return false;
         } finally {
             TestUtils.dropDB(newDBName);
         }
+
         return true;
+    }
+
+    /**
+     * Helper to assert that the exported GTFS matches data expectations
+     */
+    private void assertThatExportedGtfsMeetsExpectations(
+        File tempFile,
+        PersistanceExpectation[] persistanceExpectations
+    ) throws IOException {
+        ZipFile gtfsZipfile = new ZipFile(tempFile.getAbsolutePath());
+
+        // iterate through all expectations
+        for (PersistanceExpectation persistanceExpectation : persistanceExpectations) {
+            final String tableFileName = persistanceExpectation.tableName + ".txt";
+            LOG.info(String.format("reading table: %s", tableFileName));
+
+            ZipEntry entry = gtfsZipfile.getEntry(tableFileName);
+
+            // ensure file exists in zip
+            assertThat(entry, not(equalTo(nullValue())));
+
+            // prepare to read the file
+            InputStream zipInputStream = gtfsZipfile.getInputStream(entry);
+            // Skip any byte order mark that may be present. Files must be UTF-8,
+            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
+            InputStream bomInputStream = new BOMInputStream(zipInputStream);
+            CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
+            csvReader.readHeaders();
+
+            boolean foundRecord = false;
+            int numRecordsSearched = 0;
+
+            // read each record
+            while (csvReader.readRecord() && !foundRecord) {
+                numRecordsSearched++;
+                LOG.info(String.format("record %d in csv file", numRecordsSearched));
+                boolean allFieldsMatch = true;
+
+                // iterate through all rows in record to determine if it's the one we're looking for
+                for (RecordExpectation recordExpectation: persistanceExpectation.recordExpectations) {
+                    String val = csvReader.get(recordExpectation.fieldName);
+                    String expectation = recordExpectation.getStringifiedExpectation();
+                    LOG.info(String.format(
+                        "%s: %s (Expectation: %s)",
+                        recordExpectation.fieldName,
+                        val,
+                        expectation
+
+                    ));
+                    if (!val.equals(expectation)) {
+                        if (withinNumericDelta(val, recordExpectation)) continue;
+                        allFieldsMatch = false;
+                        break;
+                    }
+                }
+                // all fields match expectations!  We have found the record.
+                if (allFieldsMatch) {
+                    LOG.info("CSV record satisfies expectations.");
+                    foundRecord = true;
+                }
+            }
+            assertThatPersistanceExpectationRecordWasFound(numRecordsSearched, foundRecord);
+        }
+    }
+
+    private boolean withinNumericDelta(String val, RecordExpectation recordExpectation) {
+        if (recordExpectation.expectedFieldType != ExpectedFieldType.DOUBLE) return false;
+        double d;
+        try {
+            d = Double.parseDouble(val);
+        }
+        catch(NumberFormatException nfe)
+        {
+            return false;
+        }
+        return Math.abs(d - recordExpectation.doubleExpectation) < recordExpectation.acceptedDelta;
+    }
+
+    private void assertThatPersistanceExpectationRecordWasFound(int numRecordsSearched, boolean foundRecord) {
+        assertThat(
+            "No records found in the ResultSet/CSV file",
+            numRecordsSearched,
+            ComparatorMatcherBuilder.<Integer>usingNaturalOrdering().greaterThan(0)
+        );
+        assertThat(
+            "The record as defined in the PersistanceExpectation was not found.",
+            foundRecord,
+            equalTo(true)
+        );
     }
 }
