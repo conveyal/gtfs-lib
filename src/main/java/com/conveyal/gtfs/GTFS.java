@@ -179,8 +179,8 @@ public abstract class GTFS {
      * It also lets you run a GraphQL API for all the feeds loaded into the database.
      */
     public static void main (String[] args) throws IOException {
-        // Object mapper used for writing load or validation results to file.
-        ObjectMapper mapper = new ObjectMapper();
+        // Object mapper used for writing load or validation results to file (instantia).
+        ObjectMapper mapper = null;
         Options options = getOptions();
         CommandLine cmd;
         try {
@@ -210,6 +210,7 @@ public abstract class GTFS {
         boolean storeResults = cmd.hasOption("json");
         File directory = null;
         if (storeResults) {
+            mapper = new ObjectMapper();
             directory = cmd.getOptionValue("json") != null ? new File(cmd.getOptionValue("json")) : Files.createTempDir();
             LOG.info("Storing results in directory: {}", directory.getAbsolutePath());
         }
@@ -296,7 +297,7 @@ public abstract class GTFS {
             String namespaceToDelete = cmd.getOptionValue("delete");
 
             if (namespaceToDelete != null) {
-                LOG.info("Exporting feed with unique identifier {}", namespaceToDelete);
+                LOG.info("Deleting feed with unique identifier {}", namespaceToDelete);
                 try {
                     delete(namespaceToDelete, dataSource);
                     LOG.info("Feed {} has been successfully deleted.", namespaceToDelete);
