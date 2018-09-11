@@ -152,6 +152,7 @@ public class JdbcGtfsSnapshotter {
                     tablePrefix + table.name,
                     field.name,
                     field.getSqlTypeName());
+            LOG.info(addColumnSql);
             statement.execute(addColumnSql);
         }
     }
