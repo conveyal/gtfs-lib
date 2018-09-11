@@ -148,7 +148,7 @@ public class JdbcGtfsSnapshotter {
         LOG.info("Adding any missing columns for {}", tablePrefix + table.name);
         Statement statement = connection.createStatement();
         for (Field field : table.editorFields()) {
-            String addColumnSql = String.format("alter table %s add column if not exists %s %s",
+            String addColumnSql = String.format("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s",
                     tablePrefix + table.name,
                     field.name,
                     field.getSqlTypeName());
