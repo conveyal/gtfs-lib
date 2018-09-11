@@ -437,7 +437,7 @@ public class Table {
     /**
      * Prepend a prefix string to each field and join them with a comma + space separator.
      */
-    public static String commaSeparatedNames(List<Field> fieldsToJoin, String prefix, boolean roundOutput) {
+    public static String commaSeparatedNames(List<Field> fieldsToJoin, String prefix, boolean csvOutput) {
         return fieldsToJoin.stream()
                 // NOTE: This previously only prefixed fields that were foreign refs or key fields. However, this
                 // caused an issue where shared fields were ambiguously referenced in a select query (specifically,
@@ -446,13 +446,26 @@ public class Table {
                     String column = prefix != null // && (f.isForeignReference() || getKeyFieldName().equals(f.name))
                         ? prefix + f.name
                         : f.name;
-                    if (roundOutput && f.getSqlTypeName().equals("double precision")) {
-                        column = String.format(
-                            "round(%s::DECIMAL, %d) as %s",
-                            column,
-                            ((DoubleField)f).getOutputPrecision(),
-                            f.name
-                        );
+                    if (csvOutput) {
+                        if (f.getSqlTypeName().equals("double precision")) {
+                            column = String.format(
+                                "round(%s::DECIMAL, %d) as %s",
+                                column,
+                                ((DoubleField) f).getOutputPrecision(),
+                                f.name
+                            );
+                        } else if (TimeField.class.isInstance(f)) {
+                            /**
+                             * Returns the PostgreSQL syntax to convert seconds since midnight into time format HH:MM:SS for the specified field.
+                             *
+                             * FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
+                             */
+                            column = String.format(
+                                "TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as %s",
+                                column,
+                                f.name
+                            );
+                        }
                     }
                     return column;
                 })

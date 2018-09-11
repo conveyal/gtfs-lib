@@ -68,11 +68,13 @@ public class GTFSTest {
     private class RecordExpectation {
         public double acceptedDelta;
         public double doubleExpectation;
+        public String editorExpectation;
         public ExpectedFieldType expectedFieldType;
         public String fieldName;
         public int intExpectation;
         public String stringExpectation;
         public boolean stringExpectationInCSV = false;
+        public boolean editorStringExpectation = false;
 
         public RecordExpectation(String fieldName, int intExpectation) {
             this.fieldName = fieldName;
@@ -92,6 +94,21 @@ public class GTFSTest {
             this.stringExpectationInCSV = true;
         }
 
+        /**
+         * This extra constructor is a also hacky in that it is only used for records that have
+         * an int type when stored in the database, and different values in the CSV export depending on
+         * whether or not it is a snapshot from the editor.  Currently this only applies to stop_times.stop_sequence
+         */
+        public RecordExpectation(String fieldName, int intExpectation, String stringExpectation, String editorExpectation) {
+            this.fieldName = fieldName;
+            this.expectedFieldType = ExpectedFieldType.INT;
+            this.intExpectation = intExpectation;
+            this.stringExpectation = stringExpectation;
+            this.stringExpectationInCSV = true;
+            this.editorStringExpectation = true;
+            this.editorExpectation = editorExpectation;
+        }
+
         public RecordExpectation(String fieldName, String stringExpectation) {
             this.fieldName = fieldName;
             this.expectedFieldType = ExpectedFieldType.STRING;
@@ -105,7 +122,8 @@ public class GTFSTest {
             this.acceptedDelta = acceptedDelta;
         }
 
-        public String getStringifiedExpectation() {
+        public String getStringifiedExpectation(boolean fromEditor) {
+            if (fromEditor && editorStringExpectation) return editorExpectation;
             if (stringExpectationInCSV) return stringExpectation;
             switch (expectedFieldType) {
                 case DOUBLE:
@@ -276,7 +294,9 @@ public class GTFSTest {
                             new RecordExpectation("arrival_time", 25200, "07:00:00"),
                             new RecordExpectation("departure_time", 25200, "07:00:00"),
                             new RecordExpectation("stop_id", "4u6g"),
-                            new RecordExpectation("stop_sequence", 1),
+                            // the string expectation for stop_sequence is different because of how stop_times are
+                            // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
+                            new RecordExpectation("stop_sequence", 1, "1", "0"),
                             new RecordExpectation("pickup_type", 0),
                             new RecordExpectation("drop_off_type", 0),
                             new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
@@ -349,6 +369,7 @@ public class GTFSTest {
             namespace = loadResult.uniqueIdentifier;
 
             // run through testing expectations
+            LOG.info("testing expecations of record storage in the database");
             Connection conn = DriverManager.getConnection(dbConnectionUrl);
             for (PersistanceExpectation persistanceExpectation : persistanceExpectations) {
                 // select all entries from a table
@@ -416,6 +437,9 @@ public class GTFSTest {
             TestUtils.dropDB(newDBName);
             e.printStackTrace();
             return false;
+        } catch (AssertionError e) {
+            TestUtils.dropDB(newDBName);
+            throw e;
         }
 
         /***************************************************************************************************************
@@ -424,11 +448,14 @@ public class GTFSTest {
         try {
             LOG.info("export GTFS from created namespase");
             File tempFile = exportGtfs(namespace, dataSource, false);
-            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations, false);
         } catch (IOException e) {
             TestUtils.dropDB(newDBName);
             e.printStackTrace();
             return false;
+        } catch (AssertionError e) {
+            TestUtils.dropDB(newDBName);
+            throw e;
         }
 
         /***************************************************************************************************************
@@ -439,7 +466,7 @@ public class GTFSTest {
             FeedLoadResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
             LOG.info("export GTFS from copied namespase");
             File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
-            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations, true);
         } catch (IOException e) {
             e.printStackTrace();
             return false;
@@ -467,8 +494,11 @@ public class GTFSTest {
      */
     private void assertThatExportedGtfsMeetsExpectations(
         File tempFile,
-        PersistanceExpectation[] persistanceExpectations
+        PersistanceExpectation[] persistanceExpectations,
+        boolean fromEditor
     ) throws IOException {
+        LOG.info("testing expecations of csv outputs in an exported gtfs");
+
         ZipFile gtfsZipfile = new ZipFile(tempFile.getAbsolutePath());
 
         // iterate through all expectations
@@ -501,7 +531,7 @@ public class GTFSTest {
                 // iterate through all rows in record to determine if it's the one we're looking for
                 for (RecordExpectation recordExpectation: persistanceExpectation.recordExpectations) {
                     String val = csvReader.get(recordExpectation.fieldName);
-                    String expectation = recordExpectation.getStringifiedExpectation();
+                    String expectation = recordExpectation.getStringifiedExpectation(fromEditor);
                     LOG.info(String.format(
                         "%s: %s (Expectation: %s)",
                         recordExpectation.fieldName,
