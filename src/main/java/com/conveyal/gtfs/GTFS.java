@@ -210,6 +210,7 @@ public abstract class GTFS {
         boolean storeResults = cmd.hasOption("json");
         File directory = null;
         if (storeResults) {
+            // Instantiate mapper for use with outputting load/validation results.
             mapper = new ObjectMapper();
             directory = cmd.getOptionValue("json") != null ? new File(cmd.getOptionValue("json")) : Files.createTempDir();
             LOG.info("Storing results in directory: {}", directory.getAbsolutePath());
