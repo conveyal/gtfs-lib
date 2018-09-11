@@ -66,18 +66,30 @@ public class GTFSTest {
 
     // a helper class to verify that data got stored in a particular record
     private class RecordExpectation {
-        public String fieldName;
-        public ExpectedFieldType expectedFieldType;
-        // have a bunch of different types of expectations because java is strongly typed
+        public double acceptedDelta;
         public double doubleExpectation;
+        public ExpectedFieldType expectedFieldType;
+        public String fieldName;
         public int intExpectation;
         public String stringExpectation;
-        public double acceptedDelta;
+        public boolean stringExpectationInCSV = false;
 
         public RecordExpectation(String fieldName, int intExpectation) {
             this.fieldName = fieldName;
             this.expectedFieldType = ExpectedFieldType.INT;
             this.intExpectation = intExpectation;
+        }
+
+        /**
+         * This extra constructor is a bit hacky in that it is only used for certain records that have
+         * an int type when stored in the database, but a string type when exported to GTFS
+         */
+        public RecordExpectation(String fieldName, int intExpectation, String stringExpectation) {
+            this.fieldName = fieldName;
+            this.expectedFieldType = ExpectedFieldType.INT;
+            this.intExpectation = intExpectation;
+            this.stringExpectation = stringExpectation;
+            this.stringExpectationInCSV = true;
         }
 
         public RecordExpectation(String fieldName, String stringExpectation) {
@@ -94,6 +106,7 @@ public class GTFSTest {
         }
 
         public String getStringifiedExpectation() {
+            if (stringExpectationInCSV) return stringExpectation;
             switch (expectedFieldType) {
                 case DOUBLE:
                     return String.valueOf(doubleExpectation);
@@ -153,7 +166,7 @@ public class GTFSTest {
      * Tests whether or not a super simple 2-stop, 1-route, 1-trip, valid gtfs can be loaded
      */
     @Test
-    public void canLoadSimpleAgency() {
+    public void canLoadAndExportSimpleAgency() {
         assertThat(
             runIntegrationTest(
                 "fake-agency",
@@ -190,7 +203,7 @@ public class GTFSTest {
                             new RecordExpectation(
                                 "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
                             ),
-                            new RecordExpectation("date", 20200220),
+                            new RecordExpectation("date", 20170916),
                             new RecordExpectation("exception_type", 2)
                         }
                     ),
@@ -225,8 +238,8 @@ public class GTFSTest {
                         "frequencies",
                         new RecordExpectation[]{
                             new RecordExpectation("trip_id", "frequency-trip"),
-                            new RecordExpectation("start_time", 28800),
-                            new RecordExpectation("end_time", 32400),
+                            new RecordExpectation("start_time", 28800, "08:00:00"),
+                            new RecordExpectation("end_time", 32400, "09:00:00"),
                             new RecordExpectation("headway_secs", 1800),
                             new RecordExpectation("exact_times", 0)
                         }
@@ -260,8 +273,8 @@ public class GTFSTest {
                             new RecordExpectation(
                                 "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
                             ),
-                            new RecordExpectation("arrival_time", 25200),
-                            new RecordExpectation("departure_time", 25200),
+                            new RecordExpectation("arrival_time", 25200, "07:00:00"),
+                            new RecordExpectation("departure_time", 25200, "07:00:00"),
                             new RecordExpectation("stop_id", "4u6g"),
                             new RecordExpectation("stop_sequence", 1),
                             new RecordExpectation("pickup_type", 0),
@@ -315,6 +328,11 @@ public class GTFSTest {
         }
         String newDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
+        DataSource dataSource = createDataSource(
+            dbConnectionUrl,
+            null,
+            null
+        );
 
         String namespace;
 
@@ -323,11 +341,7 @@ public class GTFSTest {
          **************************************************************************************************************/
         try {
             // load and validate feed
-            DataSource dataSource = createDataSource(
-                dbConnectionUrl,
-                null,
-                null
-            );
+            LOG.info("load and validate feed");
             FeedLoadResult loadResult = load(zipFileName, dataSource);
             ValidationResult validationResult = validate(loadResult.uniqueIdentifier, dataSource);
 
@@ -408,20 +422,23 @@ public class GTFSTest {
          * Verify that exporting the feed (in non-editor mode) completes and data is outputed properly
          **************************************************************************************************************/
         try {
-            DataSource dataSource = createDataSource(
-                dbConnectionUrl,
-                null,
-                null
-            );
-            File tempFile = File.createTempFile("snapshot", ".zip");
-            JdbcGtfsExporter exporter = new JdbcGtfsExporter(
-                namespace,
-                tempFile.getAbsolutePath(),
-                dataSource,
-                false
-            );
-            exporter.exportTables();
+            LOG.info("export GTFS from created namespase");
+            File tempFile = exportGtfs(namespace, dataSource, false);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations);
+        } catch (IOException e) {
+            TestUtils.dropDB(newDBName);
+            e.printStackTrace();
+            return false;
+        }
 
+        /***************************************************************************************************************
+         * Verify that making a snapshot from an existing, then exporting that snapshot to a gtfs works as expected
+         **************************************************************************************************************/
+        try {
+            LOG.info("copy GTFS from created namespase");
+            FeedLoadResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
+            LOG.info("export GTFS from copied namespase");
+            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations);
         } catch (IOException e) {
             e.printStackTrace();
@@ -431,6 +448,18 @@ public class GTFSTest {
         }
 
         return true;
+    }
+
+    private File exportGtfs(String namespace, DataSource dataSource, boolean fromEditor) throws IOException {
+        File tempFile = File.createTempFile("snapshot", ".zip");
+        JdbcGtfsExporter exporter = new JdbcGtfsExporter(
+            namespace,
+            tempFile.getAbsolutePath(),
+            dataSource,
+            fromEditor
+        );
+        exporter.exportTables();
+        return tempFile;
     }
 
     /**
