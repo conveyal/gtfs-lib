@@ -101,44 +101,57 @@ public class JdbcGtfsExporter {
                 for (ScheduleException exception : exceptionsIterator) {
                     exceptions.add(exception);
                 }
-                int calendarDateCount = 0;
-                for (Calendar cal : calendars) {
-                    Service service = new Service(cal.service_id);
-                    service.calendar = cal;
-                    for (ScheduleException ex : exceptions) {
-                        if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
-                            (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
-                            // Skip swap exception if cal is not referenced by added or removed service.
-                            // This is not technically necessary, but the output is cleaner/more intelligible.
-                            continue;
-                        }
-
-                        for (LocalDate date : ex.dates) {
-                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
-                                // No need to write dates that do not apply
+                // check whether the feed is organized in a format with the calendars.txt file
+                if (calendarsReader.getRowCount() > 0) {
+                    // feed does have calendars.txt file, continue export with strategy of matching exceptions
+                    // to calendar to output calendar_dates.txt
+                    int calendarDateCount = 0;
+                    for (Calendar cal : calendars) {
+                        Service service = new Service(cal.service_id);
+                        service.calendar = cal;
+                        for (ScheduleException ex : exceptions) {
+                            if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
+                                (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
+                                // Skip swap exception if cal is not referenced by added or removed service.
+                                // This is not technically necessary, but the output is cleaner/more intelligible.
                                 continue;
                             }
 
-                            CalendarDate calendarDate = new CalendarDate();
-                            calendarDate.date = date;
-                            calendarDate.service_id = cal.service_id;
-                            calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
-                            LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
+                            for (LocalDate date : ex.dates) {
+                                if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
+                                    // No need to write dates that do not apply
+                                    continue;
+                                }
 
-                            if (service.calendar_dates.containsKey(date))
-                                throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
+                                CalendarDate calendarDate = new CalendarDate();
+                                calendarDate.date = date;
+                                calendarDate.service_id = cal.service_id;
+                                calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
+                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
 
-                            service.calendar_dates.put(date, calendarDate);
-                            calendarDateCount += 1;
+                                if (service.calendar_dates.containsKey(date))
+                                    throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
+
+                                service.calendar_dates.put(date, calendarDate);
+                                calendarDateCount += 1;
+                            }
                         }
+                        feed.services.put(cal.service_id, service);
                     }
-                    feed.services.put(cal.service_id, service);
-                }
-                if (calendarDateCount == 0) {
-                    LOG.info("No calendar dates found. Skipping table.");
+                    if (calendarDateCount == 0) {
+                        LOG.info("No calendar dates found. Skipping table.");
+                    } else {
+                        LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
+                        new CalendarDate.Writer(feed).writeTable(zipOutputStream);
+                    }
                 } else {
-                    LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
-                    new CalendarDate.Writer(feed).writeTable(zipOutputStream);
+                    // No calendar records exist, export calendar_dates as is and hope for the best.
+                    // This situation will occur in at least 2 scenarios:
+                    // 1.  A GTFS has been loaded into the editor that had only the calendar_dates.txt file
+                    //     and no further edits were made before exporting to a snapshot
+                    // 2.  A new GTFS has been created from scratch and calendar information has yet to be added.
+                    //     This will result in an invalid GTFS, but it was what the user wanted so ¯\_(ツ)_/¯
+                    result.calendarDates = export(Table.CALENDAR_DATES, connection);
                 }
             } else {
                 // Otherwise, simply export the calendar dates as they were loaded in.

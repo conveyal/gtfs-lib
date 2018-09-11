@@ -274,6 +274,7 @@ public class JdbcGtfsLoader {
         int initialErrorCount = errorStorage.getErrorCount();
         try {
             tableLoadResult.rowCount = loadInternal(table);
+            LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);
             tableLoadResult.fatalException = ex.toString();
@@ -302,6 +303,7 @@ public class JdbcGtfsLoader {
     private int loadInternal (Table table) throws Exception {
         CsvReader csvReader = getCsvReader(table);
         if (csvReader == null) {
+            LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
             // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
             return 0;
