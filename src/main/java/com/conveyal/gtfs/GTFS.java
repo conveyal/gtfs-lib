@@ -2,7 +2,9 @@ package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
+import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.validator.ValidationResult;
 import org.apache.commons.cli.*;
 import org.apache.commons.dbcp2.ConnectionFactory;
@@ -28,6 +30,15 @@ public abstract class GTFS {
     private static final String DEFAULT_DATABASE_URL = "jdbc:postgresql://localhost/gtfs";
 
     /**
+     * Export a feed ID from the database to a zipped GTFS file in the specified export directory.
+     */
+    public static FeedLoadResult export (String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
+        JdbcGtfsExporter exporter = new JdbcGtfsExporter(feedId, outFile, dataSource, fromEditor);
+        FeedLoadResult result = exporter.exportTables();
+        return result;
+    }
+
+    /**
      * Load the GTFS data in the specified file into the given JDBC DataSource.
      *
      * About loading from an object on S3:
@@ -45,6 +56,24 @@ public abstract class GTFS {
     public static FeedLoadResult load (String filePath, DataSource dataSource) {
         JdbcGtfsLoader loader = new JdbcGtfsLoader(filePath, dataSource);
         FeedLoadResult result = loader.loadTables();
+        return result;
+    }
+
+    /**
+     * Copy all tables for a given feed ID (schema namespace) into a new namespace in the given JDBC DataSource.
+     *
+     * The resulting snapshot from this operation is intended to be edited, so there are a handful of changes made to
+     * the newly copied tables:
+     *   1. The tables' id column has been modified to be auto-incrementing.
+     *   2. Primary keys may be added to certain columns/tables.
+     *   3. Additional editor-specific columns are added to certain tables.
+     * @param feedId        feed ID (schema namespace) to copy from
+     * @param dataSource    JDBC connection to existing database
+     * @return              FIXME should this be a separate SnapshotResult object?
+     */
+    public static FeedLoadResult makeSnapshot (String feedId, DataSource dataSource) {
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource);
+        FeedLoadResult result = snapshotter.copyTables();
         return result;
     }
 
@@ -130,8 +159,8 @@ public abstract class GTFS {
             return;
         }
 
-        if (!(cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
-            LOG.error("Must specify one of 'load', 'validate', or 'graphql'.");
+        if (!(cmd.hasOption("export") || cmd.hasOption("snapshot") || cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
+            LOG.error("Must specify one of 'snapshot', 'load', 'validate', 'export', or 'graphql'.");
             printHelp(options);
             return;
         }
@@ -171,6 +200,35 @@ public abstract class GTFS {
             }
         }
 
+        if (cmd.hasOption("snapshot")) {
+            String namespaceToSnapshot = cmd.getOptionValue("snapshot");
+            if (namespaceToSnapshot == null && loadResult != null) {
+                namespaceToSnapshot = loadResult.uniqueIdentifier;
+            }
+            if (namespaceToSnapshot != null) {
+                LOG.info("Snapshotting feed with unique identifier {}", namespaceToSnapshot);
+                FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource);
+                LOG.info("Done snapshotting.");
+            } else {
+                LOG.error("No feed to snapshot. Specify one, or load a feed in the same command.");
+            }
+        }
+
+        if (cmd.hasOption("export")) {
+            String namespaceToExport = cmd.getOptionValue("export");
+            String outFile = cmd.getOptionValue("outFile");
+            if (namespaceToExport == null && loadResult != null) {
+                namespaceToExport = loadResult.uniqueIdentifier;
+            }
+            if (namespaceToExport != null) {
+                LOG.info("Exporting feed with unique identifier {}", namespaceToExport);
+                FeedLoadResult exportResult = export(namespaceToExport, outFile, dataSource, true);
+                LOG.info("Done exporting.");
+            } else {
+                LOG.error("No feed to export. Specify one, or load a feed in the same command.");
+            }
+        }
+
         if (cmd.hasOption("graphql")) {
             Integer port = Integer.parseInt(cmd.getOptionValue("graphql"));
             LOG.info("Starting GraphQL server on port {}", port);
@@ -186,10 +244,18 @@ public abstract class GTFS {
     private static Options getOptions () {
         Options options = new Options();
         options.addOption(Option.builder("h").longOpt("help").desc("print this message").build());
+        options.addOption(Option.builder().longOpt("export").hasArg()
+                .argName("feedId")
+                .desc("export GTFS data from the given database feedId to the given directory").build());
+        options.addOption(Option.builder().longOpt("outFile").hasArg()
+                .argName("file")
+                .desc("zip file path for the exported GTFS").build());
         options.addOption(Option.builder().longOpt("load").hasArg()
                 .argName("file").desc("load GTFS data from the given file").build());
         options.addOption(Option.builder().longOpt("validate").hasArg().optionalArg(true).argName("feed")
                 .desc("validate the specified feed. defaults to the feed loaded with the --load option").build());
+        options.addOption(Option.builder().longOpt("snapshot").hasArg()
+                .argName("feedId").desc("snapshot GTFS data from the given database feedId").build());
         options.addOption(Option.builder("d").longOpt("database")
                 .hasArg().argName("url").desc("JDBC URL for the database. Defaults to " + DEFAULT_DATABASE_URL).build());
         options.addOption(Option.builder("u").longOpt("user")

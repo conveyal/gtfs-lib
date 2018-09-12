@@ -4,6 +4,8 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -22,6 +24,23 @@ public class FareAttribute extends Entity {
     @Override
     public String getId () {
         return fare_id;
+    }
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#FARE_ATTRIBUTES}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, fare_id);
+        statement.setDouble(oneBasedIndex++, price);
+        statement.setString(oneBasedIndex++, currency_type);
+        setIntParameter(statement, oneBasedIndex++, payment_method);
+        // FIXME Entity.INT_MISSING causing out of range error on small int
+        setIntParameter(statement, oneBasedIndex++, transfers);
+        setIntParameter(statement, oneBasedIndex++, transfer_duration);
     }
 
     public static class Loader extends Entity.Loader<FareAttribute> {
@@ -47,7 +66,7 @@ public class FareAttribute extends Entity {
                 feed.errors.add(new DuplicateKeyError(tableName, row, "fare_id"));
             } else {
                 FareAttribute fa = new FareAttribute();
-                fa.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+                fa.id = row + 1; // offset line number by 1 to account for 0-based row index
                 fa.fare_id = fareId;
                 fa.price = getDoubleField("price", true, 0, Integer.MAX_VALUE);
                 fa.currency_type = getStringField("currency_type", true);

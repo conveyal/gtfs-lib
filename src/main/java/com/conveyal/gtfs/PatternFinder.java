@@ -1,11 +1,20 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.CoordinateList;
+import com.vividsolutions.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +27,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.util.Util.human;
 
@@ -36,7 +46,7 @@ public class PatternFinder {
     // A multi-map that groups trips together by their sequence of stops
     private Multimap<TripPatternKey, Trip> tripsForPattern = HashMultimap.create();
 
-    private int nTripsProessed = 0;
+    private int nTripsProcessed = 0;
 
     /**
      * Bin all trips by the sequence of stops they visit.
@@ -53,9 +63,9 @@ public class PatternFinder {
 //
 //    }
 
-    public void processTrip (Trip trip, List<StopTime> orderedStopTimes) {
-        if (++nTripsProessed % 100000 == 0) {
-            LOG.info("trip {}", human(nTripsProessed));
+    public void processTrip(Trip trip, Iterable<StopTime> orderedStopTimes) {
+        if (++nTripsProcessed % 100000 == 0) {
+            LOG.info("trip {}", human(nTripsProcessed));
         }
         // No need to scope the route ID here, patterns are built within the context of a single feed.
         // Create a key that might already be in the map (by semantic equality)
@@ -69,22 +79,36 @@ public class PatternFinder {
 
     /**
      * Once all trips have been processed, call this method to produce the final Pattern objects representing all the
-     * unique sequences of stops encountered.
+     * unique sequences of stops encountered. Returns map of patterns to their keys so that downstream functions can
+     * make use of trip pattern keys for constructing pattern stops or other derivative objects.
      */
-    public List<Pattern> createPatternObjects () {
-        int nextPatternId = 0;
+    public Map<TripPatternKey, Pattern> createPatternObjects(Map<String, Stop> stopById, SQLErrorStorage errorStorage) {
+        // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
+        int nextPatternId = 1;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
-        List<Pattern> patterns = new ArrayList<>();
+        Map<TripPatternKey, Pattern> patterns = new HashMap<>();
         // TODO assign patterns sequential small integer IDs (may include route)
         for (TripPatternKey key : tripsForPattern.keySet()) {
             Collection<Trip> trips = tripsForPattern.get(key);
             Pattern pattern = new Pattern(key.stops, trips, null);
             // Overwrite long UUID with sequential integer pattern ID
             pattern.pattern_id = Integer.toString(nextPatternId++);
-            patterns.add(pattern);
+            // FIXME: Should associated shapes be a single entry?
+            pattern.associatedShapes = new HashSet<>();
+            trips.stream().forEach(trip -> pattern.associatedShapes.add(trip.shape_id));
+            if (pattern.associatedShapes.size() > 1 && errorStorage != null) {
+                // Store an error if there is more than one shape per pattern. Note: error storage is null if called via
+                // MapDB implementation.
+                // TODO: Should shape ID be added to trip pattern key?
+                errorStorage.storeError(NewGTFSError.forEntity(
+                        pattern,
+                        NewGTFSErrorType.MULTIPLE_SHAPES_FOR_PATTERN)
+                            .setBadValue(pattern.associatedShapes.toString()));
+            }
+            patterns.put(key, pattern);
         }
-        // TODO Attempt to assign more human-readable names to all these patterns.
-        // renamePatterns(patterns, stopById);
+        // Name patterns before storing in SQL database.
+        renamePatterns(patterns.values(), stopById);
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
         return patterns;
     }
@@ -94,7 +118,7 @@ public class PatternFinder {
      * This process requires access to all the stops in the feed.
      * Some validators already cache a map of all the stops. There's probably a cleaner way to do this.
      */
-    private void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
+    public static void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
         LOG.info("Generating unique names for patterns");
 
         Map<String, PatternNamingInfo> namingInfoForRoute = new HashMap<>();

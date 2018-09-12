@@ -1,0 +1,18 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_info" : [ {
+        "default_route_color" : null,
+        "default_route_type" : null,
+        "feed_end_date" : null,
+        "feed_lang" : "en",
+        "feed_publisher_name" : "Conveyal",
+        "feed_publisher_url" : "http://www.conveyal.com",
+        "feed_start_date" : null,
+        "feed_version" : "1.0",
+        "id" : 2
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}

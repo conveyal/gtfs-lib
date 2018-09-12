@@ -1,10 +1,10 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.validator.*;
 import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.util.Util;
@@ -26,6 +26,7 @@ import org.mapdb.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -47,8 +48,6 @@ import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
-
-import static com.conveyal.gtfs.util.Util.human;
 
 /**
  * All entities must be from a single feed namespace.
@@ -227,6 +226,11 @@ public class GTFSFeed implements Cloneable, Closeable {
         loadFromFile(zip, null);
     }
 
+    public FeedLoadResult toSQL (DataSource dataSource) {
+        JdbcGTFSFeedConverter converter = new JdbcGTFSFeedConverter(this, dataSource);
+        return converter.loadTables();
+    }
+
     public void toFile (String file) {
         try {
             File out = new File(file);
@@ -389,6 +393,27 @@ public class GTFSFeed implements Cloneable, Closeable {
     public Shape getShape (String shape_id) {
         Shape shape = new Shape(this, shape_id);
         return shape.shape_dist_traveled.length > 0 ? shape : null;
+    }
+
+    /**
+     * MapDB-based implementation to find patterns.
+     *
+     * FIXME: Remove and make pattern finding happen during validation? We want to share the pattern finder between the
+     * two implementations (MapDB and RDBMS), apply the same validation process to both kinds of storage, and produce
+     * Patterns in the same way in both cases, during validation. This prevents us from iterating over every stopTime
+     * twice, since we're already iterating over all of them in validation. However, in this case it might not be costly
+     * to simply retrieve the stop times from the stop_times map.
+     */
+    public void findPatterns () {
+        PatternFinder patternFinder = new PatternFinder();
+        // Iterate over trips and process each trip and its stop times.
+        for (Trip trip : this.trips.values()) {
+            Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
+            patternFinder.processTrip(trip, orderedStopTimesForTrip);
+        }
+        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null);
+        this.patterns.putAll(patternObjects.values().stream()
+                .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
 
     /**

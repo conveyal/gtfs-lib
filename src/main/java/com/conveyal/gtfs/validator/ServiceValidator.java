@@ -15,10 +15,7 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +28,6 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -55,7 +51,7 @@ import java.util.Set;
  */
 public class ServiceValidator extends TripValidator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PatternFinderValidator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ServiceValidator.class);
 
     private Map<String, ServiceInfo> serviceInfoForServiceId = new HashMap<>();
 
@@ -81,8 +77,10 @@ public class ServiceValidator extends TripValidator {
         // Get the map from modes to service durations in seconds for this trip's service ID.
         // Create a new empty map if it doesn't yet exist.
         ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(trip.service_id, ServiceInfo::new);
-        // Increment the service duration for this trip's transport mode and service ID.
-        serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
+        if (route != null) {
+            // Increment the service duration for this trip's transport mode and service ID.
+            serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
+        }
         // Record which trips occur on each service_id.
         serviceInfo.tripIds.add(trip.trip_id);
         // TODO validate mode codes
@@ -157,7 +155,10 @@ public class ServiceValidator extends TripValidator {
                 // This service must have been referenced by trips but is never active on any day.
                 registerError(NewGTFSError.forFeed(NewGTFSErrorType.SERVICE_NEVER_ACTIVE, serviceInfo.serviceId));
                 for (String tripId : serviceInfo.tripIds) {
-                    registerError(NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE).setBadValue(tripId));
+                    registerError(
+                            NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE)
+                                    .setEntityId(tripId)
+                                    .setBadValue(tripId));
                 }
             }
             if (serviceInfo.tripIds.isEmpty()) {

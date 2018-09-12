@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.sql.SQLType;
 
 /**
@@ -20,9 +21,15 @@ import java.sql.SQLType;
  */
 public abstract class Field {
 
-    final String name;
+    public final String name;
     final Requirement requirement;
+    /**
+     * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
+     * integrity when loading a feed.
+     * */
+    Table referenceTable = null;
     private boolean shouldBeIndexed;
+    private boolean emptyValuePermitted;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
@@ -40,9 +47,14 @@ public abstract class Field {
 
     public abstract void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string);
 
+    public void setNull(PreparedStatement preparedStatement, int oneBasedIndex) throws SQLException {
+        preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
+    }
+
     public abstract SQLType getSqlType ();
 
-    // Overridden to create exception for "double precision", since its enum value is just called DOUBLE.
+    // Overridden to create exception for "double precision", since its enum value is just called DOUBLE, and ARRAY types,
+    // which require "string[]" syntax.
     public String getSqlTypeName () {
         return getSqlType().getName().toLowerCase();
     }
@@ -80,7 +92,17 @@ public abstract class Field {
     }
 
     /**
+     * More than one foreign reference should not be created on the same table to the same foreign table. This is what
+     * allows us to embed updates to a sub-table in nested JSON because this creates a many-to-one reference instead of
+     * a many-to-many reference.
+     */
+    public boolean isForeignReference () {
+        return this.referenceTable != null;
+    }
+
+    /**
      * Fluent method that indicates that a newly constructed field should be indexed after the table is loaded.
+     * FIXME: should shouldBeIndexed be determined based on presence of referenceTable?
      * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
      */
     public Field indexThisColumn () {
@@ -92,4 +114,30 @@ public abstract class Field {
         return shouldBeIndexed;
     }
 
+    /**
+     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument.
+     * @param table
+     * @return this same Field instance
+     */
+    public Field isReferenceTo(Table table) {
+        this.referenceTable = table;
+        return this;
+    }
+
+    /**
+     * Fluent method to permit empty values for this field. Used for cases like fare_attributes#transfers, where empty
+     * values are OK on a required field.
+     * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
+     */
+    public Field permitEmptyValue () {
+        this.emptyValuePermitted = true;
+        return this;
+    }
+
+    /**
+     * Check if empty values are permitted for this field.
+     */
+    public boolean isEmptyValuePermitted() {
+        return this.emptyValuePermitted;
+    }
 }

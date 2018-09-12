@@ -3,6 +3,8 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.Iterator;
 
 public class Transfer extends Entity {
@@ -16,6 +18,20 @@ public class Transfer extends Entity {
     public String to_route_id;
     public String from_trip_id;
     public String to_trip_id;
+
+    /**
+     * Sets the parameters for a prepared statement following the parameter order defined in
+     * {@link com.conveyal.gtfs.loader.Table#TRANSFERS}. JDBC prepared statement parameters use a one-based index.
+     */
+    @Override
+    public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, from_stop_id);
+        statement.setString(oneBasedIndex++, to_stop_id);
+        setIntParameter(statement, oneBasedIndex++, transfer_type);
+        setIntParameter(statement, oneBasedIndex++, min_transfer_time);
+    }
 
     // TODO: Add id method for Transfer.
 //    @Override
@@ -37,7 +53,7 @@ public class Transfer extends Entity {
         @Override
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
-            tr.sourceFileLine    = row + 1; // offset line number by 1 to account for 0-based row index
+            tr.id = row + 1; // offset line number by 1 to account for 0-based row index
             tr.from_stop_id      = getStringField("from_stop_id", true);
             tr.to_stop_id        = getStringField("to_stop_id", true);
             tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
