@@ -214,20 +214,25 @@ public class JdbcGtfsExporter {
                 // FIXME: I'm not sure that shape_id is indexed for the trips table. This could cause slow downs.
                 // FIXME: this is exporting point_type, which is not a GTFS field, but its presence shouldn't hurt.
                 String shapeFieldsToExport = Table.commaSeparatedNames(
-                        Table.SHAPES.specFields(),
+                    Table.SHAPES.specFields(),
                     String.join(".", feedIdToExport, Table.SHAPES.name + "."),
                     true
                 );
                 // NOTE: The below substitution uses relative indexing. All values "%<s" reference the same arg as the
                 // previous format specifier (i.e., feedIdToExport).
-                String shapeSelectSql = String.format("select %s " +
-                        "from (select distinct %s.trips.shape_id " +
-                        "from %<s.trips, %<s.routes " +
-                        "where %<s.trips.route_id = %<s.routes.route_id and %<s.routes.status = 2) as unique_approved_shape_ids, " +
-                        "%<s.shapes where unique_approved_shape_ids.shape_id = %<s.shapes.shape_id",
+                result.shapes = export(
+                    Table.SHAPES,
+                    String.format(
+                        "select %s " +
+                            "from (select distinct %s.trips.shape_id " +
+                            "from %<s.trips, %<s.routes " +
+                            "where %<s.trips.route_id = %<s.routes.route_id and " +
+                            "%<s.routes.status = 2) as unique_approved_shape_ids, " +
+                            "%<s.shapes where unique_approved_shape_ids.shape_id = %<s.shapes.shape_id",
                         shapeFieldsToExport,
-                        feedIdToExport);
-                result.shapes = export(Table.SHAPES, shapeSelectSql);
+                        feedIdToExport
+                    )
+                );
             } else {
                 result.shapes = export(Table.SHAPES, connection);
             }

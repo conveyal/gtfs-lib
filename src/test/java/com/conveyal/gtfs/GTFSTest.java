@@ -372,7 +372,8 @@ public class GTFSTest {
         }
 
         /***************************************************************************************************************
-         * Verify that making a snapshot from an existing, then exporting that snapshot to a gtfs works as expected
+         * Verify that making a snapshot from an existing feed database,
+         * then exporting that snapshot to a GTFS zip file works as expected
          **************************************************************************************************************/
         try {
             LOG.info("copy GTFS from created namespase");
@@ -526,10 +527,11 @@ public class GTFSTest {
                         recordExpectation.fieldName,
                         val,
                         expectation
-
                     ));
                     if (!val.equals(expectation)) {
-                        if (withinNumericDelta(val, recordExpectation)) continue;
+                        // sometimes there are slight differences in decimal precision in various fields
+                        // check if the decimal delta is acceptable
+                        if (equalsWithNumericDelta(val, recordExpectation)) continue;
                         allFieldsMatch = false;
                         break;
                     }
@@ -544,7 +546,10 @@ public class GTFSTest {
         }
     }
 
-    private boolean withinNumericDelta(String val, RecordExpectation recordExpectation) {
+    /**
+     * Check whether a potentially numeric value is equal given potentially small decimal deltas
+     */
+    private boolean equalsWithNumericDelta(String val, RecordExpectation recordExpectation) {
         if (recordExpectation.expectedFieldType != ExpectedFieldType.DOUBLE) return false;
         double d;
         try {
@@ -557,6 +562,9 @@ public class GTFSTest {
         return Math.abs(d - recordExpectation.doubleExpectation) < recordExpectation.acceptedDelta;
     }
 
+    /**
+     * Helper method to make sure a persistance expectation was actually found after searching through records
+     */
     private void assertThatPersistanceExpectationRecordWasFound(int numRecordsSearched, boolean foundRecord) {
         assertThat(
             "No records found in the ResultSet/CSV file",

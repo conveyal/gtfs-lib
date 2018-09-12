@@ -447,7 +447,7 @@ public class Table {
                         ? prefix + f.name
                         : f.name;
                     if (csvOutput) {
-                        if (f.getSqlTypeName().equals("double precision")) {
+                        if (DoubleField.class.isInstance(f)) {
                             column = String.format(
                                 "round(%s::DECIMAL, %d) as %s",
                                 column,
@@ -518,6 +518,7 @@ public class Table {
      */
     public String generateSelectAllExistingFieldsSql(Connection connection, String namespace) throws SQLException {
         // select all columns from table
+        // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
         PreparedStatement statement = connection.prepareStatement(
             "SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ?"
         );
