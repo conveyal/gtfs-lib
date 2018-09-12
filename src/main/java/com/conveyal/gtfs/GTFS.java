@@ -179,8 +179,6 @@ public abstract class GTFS {
      * It also lets you run a GraphQL API for all the feeds loaded into the database.
      */
     public static void main (String[] args) throws IOException {
-        // Object mapper used for writing load or validation results to file (instantia).
-        ObjectMapper mapper = null;
         Options options = getOptions();
         CommandLine cmd;
         try {
@@ -208,6 +206,8 @@ public abstract class GTFS {
             return;
         }
         boolean storeResults = cmd.hasOption("json");
+        // Object mapper and directory used for writing load or validation results to file if required.
+        ObjectMapper mapper = null;
         File directory = null;
         if (storeResults) {
             // Instantiate mapper for use with outputting load/validation results.
