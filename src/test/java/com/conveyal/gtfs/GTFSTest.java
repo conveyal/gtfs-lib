@@ -2,7 +2,6 @@ package com.conveyal.gtfs;
 
 
 import com.conveyal.gtfs.loader.FeedLoadResult;
-import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
@@ -27,9 +26,6 @@ import java.sql.SQLException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.gtfs.GTFS.createDataSource;
-import static com.conveyal.gtfs.GTFS.load;
-import static com.conveyal.gtfs.GTFS.validate;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.equalTo;
@@ -325,7 +321,7 @@ public class GTFSTest {
         }
         String newDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
-        DataSource dataSource = createDataSource(
+        DataSource dataSource = GTFS.createDataSource(
             dbConnectionUrl,
             null,
             null
@@ -339,8 +335,8 @@ public class GTFSTest {
         try {
             // load and validate feed
             LOG.info("load and validate feed");
-            FeedLoadResult loadResult = load(zipFileName, dataSource);
-            ValidationResult validationResult = validate(loadResult.uniqueIdentifier, dataSource);
+            FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
@@ -393,13 +389,7 @@ public class GTFSTest {
 
     private File exportGtfs(String namespace, DataSource dataSource, boolean fromEditor) throws IOException {
         File tempFile = File.createTempFile("snapshot", ".zip");
-        JdbcGtfsExporter exporter = new JdbcGtfsExporter(
-            namespace,
-            tempFile.getAbsolutePath(),
-            dataSource,
-            fromEditor
-        );
-        exporter.exportTables();
+        GTFS.export(namespace, tempFile.getAbsolutePath(), dataSource, fromEditor);
         return tempFile;
     }
 
