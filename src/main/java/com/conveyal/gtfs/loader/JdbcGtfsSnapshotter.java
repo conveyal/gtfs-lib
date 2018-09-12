@@ -1,15 +1,23 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.validator.ServiceValidator;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
@@ -79,7 +87,7 @@ public class JdbcGtfsSnapshotter {
             // FIXME: Find some place to store errors encountered on copy for patterns and pattern stops.
             copy(Table.PATTERNS, true);
             copy(Table.PATTERN_STOP, true);
-            copy(Table.SCHEDULE_EXCEPTIONS, true);
+            createScheduleExceptionsTable();
             result.shapes = copy(Table.SHAPES, true);
             result.stops = copy(Table.STOPS, true);
             // TODO: Should we defer index creation on stop times?
@@ -139,6 +147,155 @@ public class JdbcGtfsSnapshotter {
             LOG.error("Error: ", ex);
         }
         return tableLoadResult;
+    }
+
+    /**
+     * Special logic is needed for creating the schedule_exceptions table.
+     * If the calendar_dates table does not exist in the feed being copied from, it might have been the case that the
+     * imported feed did not have a calendars.txt file. If that was the case, then the schedule exceptions need to be
+     * generated from the calendar_dates table and also the calendars table needs to be populated with dummy entries so
+     * that it is possible to export the data to a GTFS because of current logic in JdbcGtfsExporter.  This all may
+     * change in a future iteration of development.
+     */
+    private TableLoadResult createScheduleExceptionsTable() {
+        // check to see if the schedule_exceptions table exists
+        boolean scheduleExceptionsTableExists;
+        String scheduleExceptionsTableName = tablePrefix + "schedule_exceptions";
+        if (feedIdToSnapshot == null) {
+            scheduleExceptionsTableExists = false;
+        } else {
+            scheduleExceptionsTableExists = tableExists(feedIdToSnapshot, "schedule_exceptions");
+        }
+
+        if (scheduleExceptionsTableExists) {
+            // schedule_exceptions table already exists in namespace being copied from.  Therefore, we simply copy it.
+            return copy(Table.SCHEDULE_EXCEPTIONS, true);
+        } else {
+            // schedule_exceptions does not exist.  Therefore, we generate schedule_exceptions from the calendar_dates.
+            TableLoadResult tableLoadResult = new TableLoadResult();
+            try {
+                String sql = String.format(
+                    "create table %s (id serial, name varchar, dates text[], exemplar smallint," +
+                        "custom_schedule text[], added_service text[], removed_service text[])",
+                    scheduleExceptionsTableName
+                );
+                LOG.info(sql);
+                Statement statement = connection.createStatement();
+                statement.execute(sql);
+                sql = String.format(
+                    "insert into %s (name, dates, exemplar, added_service, removed_service)" +
+                        "values (?, ?, ?, ?, ?)",
+                    scheduleExceptionsTableName
+                );
+                PreparedStatement scheduleExceptionsStatement = connection.prepareStatement(sql);
+                final ServiceValidator.BatchTracker scheduleExceptionsTracker = new ServiceValidator.BatchTracker(
+                    "schedule_exceptions",
+                    scheduleExceptionsStatement
+                );
+
+                JDBCTableReader<CalendarDate> calendarDatesReader = new JDBCTableReader(
+                    Table.CALENDAR_DATES,
+                    dataSource,
+                    feedIdToSnapshot + ".",
+                    EntityPopulator.CALENDAR_DATE
+                );
+                Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
+
+                // keep track of calendars by service id in case we need to add dummy calendar entries
+                HashMap<String, Calendar> calendarsByServiceId = new HashMap<>();
+
+                // iterate through all calendarDates and add a corresponding entry into schedule_exceptions on a 1-1
+                // basis to make things a straightforward as possible
+                for (CalendarDate calendarDate : calendarDates) {
+                    String dateWithException = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
+                    Array empty = connection.createArrayOf("text", new ArrayList<>().toArray());
+                    Array service = connection.createArrayOf("text", new String[]{calendarDate.service_id});
+
+                    scheduleExceptionsStatement.setString(1, dateWithException);
+                    scheduleExceptionsStatement.setArray(
+                        2,
+                        connection.createArrayOf("text", new String[]{dateWithException})
+                    );
+                    scheduleExceptionsStatement.setInt(3, 9); // FIXME use better static type
+                    if (calendarDate.exception_type == 1) {
+                        scheduleExceptionsStatement.setArray(4, service);
+                        scheduleExceptionsStatement.setArray(5, empty);
+                        // create (if needed) and extend range of dummy calendar that would need to be created if we are
+                        // copying from a feed that doesn't have the calendar.txt file
+                        Calendar calendar = calendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+                        calendar.service_id = calendarDate.service_id;
+                        if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
+                            calendar.start_date = calendarDate.date;
+                        }
+                        if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
+                            calendar.end_date = calendarDate.date;
+                        }
+                        calendarsByServiceId.put(calendarDate.service_id, calendar);
+                    } else {
+                        scheduleExceptionsStatement.setArray(4, empty);
+                        scheduleExceptionsStatement.setArray(5, service);
+                    }
+                    scheduleExceptionsTracker.addBatch();
+                }
+                scheduleExceptionsTracker.executeRemaining();
+
+                // determine if we appear to be working with a calendar_dates-only feed.
+                // If so, we must also add dummy entries to the calendar table
+                if (!tableExists(feedIdToSnapshot, "calendar") && calendarDatesReader.getRowCount() > 0) {
+                    sql = String.format(
+                        "insert into %s (service_id, start_date, end_date)" +
+                            "values (?, ?, ?)",
+                        tablePrefix + "calendar"
+                    );
+                    PreparedStatement calendarStatement = connection.prepareStatement(sql);
+                    final ServiceValidator.BatchTracker calendarsTracker = new ServiceValidator.BatchTracker(
+                        "calendar",
+                        calendarStatement
+                    );
+                    for (Calendar calendar : calendarsByServiceId.values()) {
+                        calendarStatement.setString(1, calendar.service_id);
+                        calendarStatement.setString(
+                            2,
+                            calendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                        );
+                        calendarStatement.setString(
+                            3,
+                            calendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                        );
+                        calendarsTracker.addBatch();
+                    }
+                    calendarsTracker.executeRemaining();
+                }
+
+                connection.commit();
+            } catch (SQLException e) {
+                tableLoadResult.fatalException = e.getMessage();
+                LOG.error("Error creating schedule Exceptions: ", e);
+                e.printStackTrace();
+            }
+            LOG.info("done creating schedule exceptions");
+            return tableLoadResult;
+        }
+    }
+
+    /**
+     * Helper method to determine if a table exists within a namespace.
+     * FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
+     */
+    private boolean tableExists(String namespace, String tableName) {
+        try {
+            PreparedStatement tableExistsStatement = connection.prepareStatement(
+                "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = ? AND table_name = ?)"
+            );
+            tableExistsStatement.setString(1, namespace);
+            tableExistsStatement.setString(2, tableName);
+            ResultSet resultSet = tableExistsStatement.executeQuery();
+            resultSet.next();
+            return resultSet.getBoolean(1);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     /**

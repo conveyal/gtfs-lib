@@ -82,7 +82,20 @@ public class JdbcGtfsExporter {
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             result.agency = export(Table.AGENCY, connection);
-            result.calendar = export(Table.CALENDAR, connection);
+            if (fromEditor) {
+                // only export calendar entries that have at least one day of service set
+                // this could happen in cases where a feed was imported that only had calendar_dates.txt
+                result.calendar = export(
+                    Table.CALENDAR,
+                    String.join(
+                        " ",
+                        Table.CALENDAR.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
+                        "WHERE monday=1 OR tuesday=1 OR wednesday=1 OR thursday=1 OR friday=1 OR saturday=1 OR sunday=1"
+                    )
+                );
+            } else {
+                result.calendar = export(Table.CALENDAR, connection);
+            }
             if (fromEditor) {
                 // Export schedule exceptions in place of calendar dates if exporting a feed/schema that represents an editor snapshot.
                 GTFSFeed feed = new GTFSFeed();

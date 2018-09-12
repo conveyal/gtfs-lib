@@ -26,9 +26,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -311,72 +309,6 @@ public class ServiceValidator extends TripValidator {
             }
             serviceDurationTracker.executeRemaining();
             // No need to build indexes because (service_id, route_type) is already the primary key of this table.
-
-            // Add data to the schedule_exceptions table to properly represent calendar_dates
-            String scheduleExceptionsTableName = feed.tablePrefix + "schedule_exceptions";
-            sql = String.format(
-                "create table %s (id serial, name varchar, dates text[], exemplar smallint," +
-                "custom_schedule text[], added_service text[], removed_service text[])",
-                scheduleExceptionsTableName
-            );
-            LOG.info(sql);
-            statement.execute(sql);
-            sql = String.format(
-                "insert into %s (name, dates, exemplar, added_service, removed_service)" +
-                "values (?, ?, ?, ?, ?)",
-                scheduleExceptionsTableName
-            );
-            PreparedStatement scheduleExceptionsStatement = connection.prepareStatement(sql);
-            final BatchTracker scheduleExceptionsTracker = new BatchTracker(
-                "schedule_exceptions",
-                scheduleExceptionsStatement
-            );
-
-            // iterate through calendar dates to build up to get list of dates with exceptions
-            HashMap<String, List<String>> removedServiceDays = new HashMap<>();
-            HashMap<String, List<String>> addedServiceDays = new HashMap<>();
-            List<String> datesWithExceptions = new ArrayList<>();
-            for (CalendarDate calendarDate : feed.calendarDates) {
-                String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
-                datesWithExceptions.add(date);
-
-                if (calendarDate.exception_type == 1) {
-                    List<String> dateAddedServices = addedServiceDays.getOrDefault(date, new ArrayList<>());
-                    dateAddedServices.add(calendarDate.service_id);
-                    addedServiceDays.put(date, dateAddedServices);
-                } else {
-                    List<String> dateRemovedServices = removedServiceDays.getOrDefault(date, new ArrayList<>());
-                    dateRemovedServices.add(calendarDate.service_id);
-                    removedServiceDays.put(date, dateRemovedServices);
-                }
-            }
-
-            // iterate through days and add to database
-            // for usability and simplicity of code, don't attempt to find all dates with similar
-            // added and removed services, but simply create an entry for each found date
-            for (String dateWithException : datesWithExceptions) {
-                scheduleExceptionsStatement.setString(1, dateWithException);
-                String[] dates = {dateWithException};
-                scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
-                scheduleExceptionsStatement.setInt(3, 9); // FIXME use better static type
-                scheduleExceptionsStatement.setArray(
-                    4,
-                    connection.createArrayOf(
-                        "text",
-                        addedServiceDays.getOrDefault(dateWithException, new ArrayList<>()).toArray()
-                    )
-                );
-                scheduleExceptionsStatement.setArray(
-                    5,
-                    connection.createArrayOf(
-                        "text",
-                        removedServiceDays.getOrDefault(dateWithException, new ArrayList<>()).toArray()
-                    )
-                );
-                scheduleExceptionsTracker.addBatch();
-            }
-
-            scheduleExceptionsTracker.executeRemaining();
 
             connection.commit();
         } catch (SQLException e) {

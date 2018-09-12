@@ -63,7 +63,7 @@ public class TestUtils {
             connection.prepareStatement(statement).execute();
         } catch (SQLException e) {
             e.printStackTrace();
-            LOG.error("Error creating new database!");
+            LOG.error(String.format("Error executing statement: %s", statement));
             return false;
         }
 
