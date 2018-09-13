@@ -243,8 +243,9 @@ public class JdbcGtfsSnapshotter {
                 // If so, we must also add dummy entries to the calendar table
                 if (!tableExists(feedIdToSnapshot, "calendar") && calendarDatesReader.getRowCount() > 0) {
                     sql = String.format(
-                        "insert into %s (service_id, start_date, end_date)" +
-                            "values (?, ?, ?)",
+                        "insert into %s (service_id, description, start_date, end_date, " +
+                            "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
+                            "values (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)",
                         tablePrefix + "calendar"
                     );
                     PreparedStatement calendarStatement = connection.prepareStatement(sql);
@@ -254,12 +255,13 @@ public class JdbcGtfsSnapshotter {
                     );
                     for (Calendar calendar : calendarsByServiceId.values()) {
                         calendarStatement.setString(1, calendar.service_id);
+                        calendarStatement.setString(2, calendar.service_id);
                         calendarStatement.setString(
-                            2,
+                            3,
                             calendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
                         );
                         calendarStatement.setString(
-                            3,
+                            4,
                             calendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
                         );
                         calendarsTracker.addBatch();
