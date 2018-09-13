@@ -318,28 +318,44 @@ public abstract class GTFS {
     private static Options getOptions () {
         Options options = new Options();
         options.addOption(Option.builder("h").longOpt("help").desc("print this message").build());
-        options.addOption(Option.builder().longOpt("export").hasArg()
-                .argName("feedId")
-                .desc("export GTFS data from the given database feedId to the given directory").build());
-        options.addOption(Option.builder().longOpt("outFile").hasArg()
+        options.addOption(Option.builder()
+                .longOpt("export").hasArg()
+                .argName("namespace")
+                .desc("export GTFS data from the given database namespace (feed) to the given directory").build());
+        options.addOption(Option.builder()
+                .longOpt("outFile").hasArg()
                 .argName("file")
                 .desc("zip file path for the exported GTFS").build());
-        options.addOption(Option.builder().longOpt("load").hasArg()
-                .argName("file").desc("load GTFS data from the given file").build());
-        options.addOption(Option.builder().longOpt("validate").hasArg().optionalArg(true).argName("feedId")
+        options.addOption(Option.builder()
+                .longOpt("load").hasArg()
+                .argName("file")
+                .desc("load GTFS data from the given file").build());
+        options.addOption(Option.builder()
+                .longOpt("validate").hasArg().optionalArg(true)
+                .argName("namespace")
                 .desc("validate the specified feed. defaults to the feed loaded with the --load option").build());
-        options.addOption(Option.builder().longOpt("snapshot").hasArg()
-                .argName("feedId").desc("snapshot GTFS data from the given database feedId").build());
-        options.addOption(Option.builder("d").longOpt("database")
-                .hasArg().argName("url").desc("JDBC URL for the database. Defaults to " + DEFAULT_DATABASE_URL).build());
-        options.addOption(Option.builder("u").longOpt("user")
-                .hasArg().argName("username").desc("database username").build());
-        options.addOption(Option.builder("p").longOpt("password")
-                .hasArg().argName("password").desc("database password").build());
-        options.addOption(Option.builder().longOpt("delete")
-                .hasArg().argName("feedId").desc("delete the specified feed.").build());
-        options.addOption(Option.builder().longOpt("json")
-                .hasArg().optionalArg(true).argName("directory")
+        options.addOption(Option.builder()
+                .longOpt("snapshot").hasArg()
+                .argName("namespace")
+                .desc("snapshot GTFS data from the given database namespace (feed)").build());
+        options.addOption(Option.builder("d")
+                .longOpt("database").hasArg()
+                .argName("url")
+                .desc("JDBC URL for the database. Defaults to " + DEFAULT_DATABASE_URL).build());
+        options.addOption(Option.builder("u").longOpt("user").hasArg()
+                .argName("username")
+                .desc("database username").build());
+        options.addOption(Option.builder("p")
+                .longOpt("password").hasArg()
+                .argName("password")
+                .desc("database password").build());
+        options.addOption(Option.builder()
+                .longOpt("delete").hasArg()
+                .argName("namespace")
+                .desc("delete the feed for the specified namespace.").build());
+        options.addOption(Option.builder()
+                .longOpt("json").hasArg().optionalArg(true)
+                .argName("directory")
                 .desc("optionally store results in specified directory (defaults to system temp)").build());
         return options;
     }
