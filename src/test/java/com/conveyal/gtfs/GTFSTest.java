@@ -86,8 +86,8 @@ public class GTFSTest {
      */
     @Test
     public void canLoadAndExportSimpleAgency() {
-        PersistanceExpectation[] persistanceExpectations = new PersistanceExpectation[]{
-            new PersistanceExpectation(
+        PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[]{
+            new PersistenceExpectation(
                 "agency",
                 new RecordExpectation[]{
                     new RecordExpectation("agency_id", "1"),
@@ -95,7 +95,7 @@ public class GTFSTest {
                     new RecordExpectation("agency_timezone", "America/Los_Angeles")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "calendar",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -112,7 +112,7 @@ public class GTFSTest {
                     new RecordExpectation("end_date", "20170917")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "calendar_dates",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -122,7 +122,7 @@ public class GTFSTest {
                     new RecordExpectation("exception_type", 2)
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "fare_attributes",
                 new RecordExpectation[]{
                     new RecordExpectation("fare_id", "route_based_fare"),
@@ -130,14 +130,14 @@ public class GTFSTest {
                     new RecordExpectation("currency_type", "USD")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "fare_rules",
                 new RecordExpectation[]{
                     new RecordExpectation("fare_id", "route_based_fare"),
                     new RecordExpectation("route_id", "1")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "feed_info",
                 new RecordExpectation[]{
                     new RecordExpectation("feed_publisher_name", "Conveyal"
@@ -149,7 +149,7 @@ public class GTFSTest {
                     new RecordExpectation("feed_version", "1.0")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "frequencies",
                 new RecordExpectation[]{
                     new RecordExpectation("trip_id", "frequency-trip"),
@@ -159,7 +159,7 @@ public class GTFSTest {
                     new RecordExpectation("exact_times", 0)
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "routes",
                 new RecordExpectation[]{
                     new RecordExpectation("agency_id", "1"),
@@ -170,7 +170,7 @@ public class GTFSTest {
                     new RecordExpectation("route_color", "7CE6E7")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "shapes",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -182,7 +182,7 @@ public class GTFSTest {
                     new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "stop_times",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -199,7 +199,7 @@ public class GTFSTest {
                     new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "trips",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -222,7 +222,7 @@ public class GTFSTest {
             runIntegrationTest(
                 "fake-agency",
                 nullValue(),
-                persistanceExpectations
+                persistenceExpectations
             ),
             equalTo(true)
         );
@@ -233,8 +233,8 @@ public class GTFSTest {
      */
     @Test
     public void canLoadAndExportSimpleAgencyWithOnlyCalendarDates() {
-        PersistanceExpectation[] persistanceExpectations = new PersistanceExpectation[]{
-            new PersistanceExpectation(
+        PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[]{
+            new PersistenceExpectation(
                 "agency",
                 new RecordExpectation[]{
                     new RecordExpectation("agency_id", "1"),
@@ -242,7 +242,7 @@ public class GTFSTest {
                     new RecordExpectation("agency_timezone", "America/Los_Angeles")
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "calendar_dates",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -252,7 +252,7 @@ public class GTFSTest {
                     new RecordExpectation("exception_type", 1)
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "stop_times",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -269,7 +269,7 @@ public class GTFSTest {
                     new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
                 }
             ),
-            new PersistanceExpectation(
+            new PersistenceExpectation(
                 "trips",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -292,7 +292,7 @@ public class GTFSTest {
             runIntegrationTest(
                 "fake-agency-only-calendar-dates",
                 nullValue(),
-                persistanceExpectations
+                persistenceExpectations
             ),
             equalTo(true)
         );
@@ -309,7 +309,7 @@ public class GTFSTest {
     private boolean runIntegrationTest(
         String folderName,
         Matcher<Object> fatalExceptionExpectation,
-        PersistanceExpectation[] persistanceExpectations
+        PersistenceExpectation[] persistenceExpectations
     ) {
         // zip up test folder into temp zip file
         String zipFileName = null;
@@ -329,9 +329,7 @@ public class GTFSTest {
 
         String namespace;
 
-        /***************************************************************************************************************
-         * Verify that loading the feed completes and data is stored properly
-         **************************************************************************************************************/
+        // Verify that loading the feed completes and data is stored properly
         try {
             // load and validate feed
             LOG.info("load and validate feed");
@@ -341,7 +339,7 @@ public class GTFSTest {
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
 
-            assertThatImportedGtfsMeetsExpectations(dbConnectionUrl, namespace, persistanceExpectations);
+            assertThatImportedGtfsMeetsExpectations(dbConnectionUrl, namespace, persistenceExpectations);
         } catch (SQLException e) {
             TestUtils.dropDB(newDBName);
             e.printStackTrace();
@@ -351,13 +349,11 @@ public class GTFSTest {
             throw e;
         }
 
-        /***************************************************************************************************************
-         * Verify that exporting the feed (in non-editor mode) completes and data is outputed properly
-         **************************************************************************************************************/
+        // Verify that exporting the feed (in non-editor mode) completes and data is outputed properly
         try {
             LOG.info("export GTFS from created namespase");
             File tempFile = exportGtfs(namespace, dataSource, false);
-            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations, false);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, false);
         } catch (IOException e) {
             TestUtils.dropDB(newDBName);
             e.printStackTrace();
@@ -367,16 +363,14 @@ public class GTFSTest {
             throw e;
         }
 
-        /***************************************************************************************************************
-         * Verify that making a snapshot from an existing feed database,
-         * then exporting that snapshot to a GTFS zip file works as expected
-         **************************************************************************************************************/
+        // Verify that making a snapshot from an existing feed database, then exporting that snapshot to a GTFS zip file
+        // works as expected
         try {
             LOG.info("copy GTFS from created namespase");
             FeedLoadResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
             LOG.info("export GTFS from copied namespase");
             File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
-            assertThatExportedGtfsMeetsExpectations(tempFile, persistanceExpectations, true);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
         } catch (IOException e) {
             e.printStackTrace();
             return false;
@@ -396,17 +390,17 @@ public class GTFSTest {
     private void assertThatImportedGtfsMeetsExpectations(
         String dbConnectionUrl,
         String namespace,
-        PersistanceExpectation[] persistanceExpectations
+        PersistenceExpectation[] persistenceExpectations
     ) throws SQLException {
         // run through testing expectations
         LOG.info("testing expecations of record storage in the database");
         Connection conn = DriverManager.getConnection(dbConnectionUrl);
-        for (PersistanceExpectation persistanceExpectation : persistanceExpectations) {
+        for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
             // select all entries from a table
             String sql = String.format(
                 "select * from %s.%s",
                 namespace,
-                persistanceExpectation.tableName
+                persistenceExpectation.tableName
             );
             LOG.info(sql);
             ResultSet rs = conn.prepareStatement(sql).executeQuery();
@@ -416,7 +410,7 @@ public class GTFSTest {
                 numRecordsSearched++;
                 LOG.info(String.format("record %d in ResultSet", numRecordsSearched));
                 boolean allFieldsMatch = true;
-                for (RecordExpectation recordExpectation: persistanceExpectation.recordExpectations) {
+                for (RecordExpectation recordExpectation: persistenceExpectation.recordExpectations) {
                     switch (recordExpectation.expectedFieldType) {
                         case DOUBLE:
                             LOG.info(String.format(
@@ -461,7 +455,7 @@ public class GTFSTest {
                     break;
                 }
             }
-            assertThatPersistanceExpectationRecordWasFound(numRecordsSearched, foundRecord);
+            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord);
         }
     }
 
@@ -470,7 +464,7 @@ public class GTFSTest {
      */
     private void assertThatExportedGtfsMeetsExpectations(
         File tempFile,
-        PersistanceExpectation[] persistanceExpectations,
+        PersistenceExpectation[] persistenceExpectations,
         boolean fromEditor
     ) throws IOException {
         LOG.info("testing expecations of csv outputs in an exported gtfs");
@@ -478,8 +472,8 @@ public class GTFSTest {
         ZipFile gtfsZipfile = new ZipFile(tempFile.getAbsolutePath());
 
         // iterate through all expectations
-        for (PersistanceExpectation persistanceExpectation : persistanceExpectations) {
-            final String tableFileName = persistanceExpectation.tableName + ".txt";
+        for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
+            final String tableFileName = persistenceExpectation.tableName + ".txt";
             LOG.info(String.format("reading table: %s", tableFileName));
 
             ZipEntry entry = gtfsZipfile.getEntry(tableFileName);
@@ -509,7 +503,7 @@ public class GTFSTest {
                 boolean allFieldsMatch = true;
 
                 // iterate through all rows in record to determine if it's the one we're looking for
-                for (RecordExpectation recordExpectation: persistanceExpectation.recordExpectations) {
+                for (RecordExpectation recordExpectation: persistenceExpectation.recordExpectations) {
                     String val = csvReader.get(recordExpectation.fieldName);
                     String expectation = recordExpectation.getStringifiedExpectation(fromEditor);
                     LOG.info(String.format(
@@ -532,7 +526,7 @@ public class GTFSTest {
                     foundRecord = true;
                 }
             }
-            assertThatPersistanceExpectationRecordWasFound(numRecordsSearched, foundRecord);
+            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord);
         }
     }
 
@@ -553,31 +547,31 @@ public class GTFSTest {
     }
 
     /**
-     * Helper method to make sure a persistance expectation was actually found after searching through records
+     * Helper method to make sure a persistence expectation was actually found after searching through records
      */
-    private void assertThatPersistanceExpectationRecordWasFound(int numRecordsSearched, boolean foundRecord) {
+    private void assertThatPersistenceExpectationRecordWasFound(int numRecordsSearched, boolean foundRecord) {
         assertThat(
             "No records found in the ResultSet/CSV file",
             numRecordsSearched,
             ComparatorMatcherBuilder.<Integer>usingNaturalOrdering().greaterThan(0)
         );
         assertThat(
-            "The record as defined in the PersistanceExpectation was not found.",
+            "The record as defined in the PersistenceExpectation was not found.",
             foundRecord,
             equalTo(true)
         );
     }
 
     // a helper class to verify that data got stored in a particular table
-    private class PersistanceExpectation {
+    private class PersistenceExpectation {
         public String tableName;
-        // each persistance expectation has an array of record expectations which all must reference a single row
+        // each persistence expectation has an array of record expectations which all must reference a single row
         // if looking for multiple records in the same table,
-        // create numerous PersistanceExpectations with the same tableName
+        // create numerous PersistenceExpectations with the same tableName
         public RecordExpectation[] recordExpectations;
 
 
-        public PersistanceExpectation(String tableName, RecordExpectation[] recordExpectations) {
+        public PersistenceExpectation(String tableName, RecordExpectation[] recordExpectations) {
             this.tableName = tableName;
             this.recordExpectations = recordExpectations;
         }

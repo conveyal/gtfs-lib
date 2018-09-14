@@ -362,10 +362,20 @@ public class JdbcGtfsExporter {
         }
     }
 
+    /**
+     * Export a table to the zipOutputStream to be written to the GTFS.
+     */
     private TableLoadResult export (Table table, String filterSql) {
         long startTime = System.currentTimeMillis();
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {
+            if (filterSql == null) {
+                throw new IllegalArgumentException("filterSql argument cannot be null");
+            } else {
+                // Surround filter SQL in parentheses.
+                filterSql = String.format("(%s)", filterSql);
+            }
+
             // Create entry for table
             String textFileName = table.name + ".txt";
             ZipEntry zipEntry = new ZipEntry(textFileName);
@@ -373,13 +383,6 @@ public class JdbcGtfsExporter {
 
             // don't let CSVWriter close the stream when it is garbage-collected
             OutputStream protectedOut = new FilterOutputStream(zipOutputStream);
-            if (filterSql == null) {
-                // If there is no filter SQL specified, simply copy out the whole table.
-                filterSql = String.format("%s.%s", feedIdToExport, table.name);
-            } else {
-                // Surround filter SQL in parentheses.
-                filterSql = String.format("(%s)", filterSql);
-            }
             String copySql = String.format("copy %s to STDOUT DELIMITER ',' CSV HEADER", filterSql);
             LOG.info(copySql);
             // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
@@ -392,7 +395,7 @@ public class JdbcGtfsExporter {
             zipOutputStream.closeEntry();
             LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, table.name, System.currentTimeMillis() - startTime);
             connection.commit();
-        } catch (SQLException | IOException e) {
+        } catch (SQLException | IOException | IllegalArgumentException e) {
             // Rollback connection so that fatal exception does not impact loading of other tables.
             try {
                 connection.rollback();

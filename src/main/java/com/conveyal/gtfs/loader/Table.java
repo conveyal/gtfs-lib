@@ -158,7 +158,7 @@ public class Table {
             new IntegerField("shape_pt_sequence", REQUIRED),
             new DoubleField("shape_pt_lat", REQUIRED, -80, 80, 6),
             new DoubleField("shape_pt_lon", REQUIRED, -180, 180, 6),
-            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, -1),
             // Editor-specific field that represents a shape point's behavior in UI.
             // 0 - regular shape point
             // 1 - user-designated anchor point (handle with which the user can manipulate shape)
@@ -202,7 +202,7 @@ public class Table {
             new IntegerField("default_dwell_time", EDITOR, 0, Integer.MAX_VALUE),
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
-            new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", EDITOR, 1)
     ).withParentTable(PATTERNS);
 
@@ -436,6 +436,9 @@ public class Table {
 
     /**
      * Prepend a prefix string to each field and join them with a comma + space separator.
+     * Also, if an export to GTFS is being performed, certain fields need a translation from the database format to the
+     * GTFS format.  Otherwise, the fields are assumed to be asked in order to do a database-to-database export and so
+     * the verbatim values of the fields are needed.
      */
     public static String commaSeparatedNames(List<Field> fieldsToJoin, String prefix, boolean csvOutput) {
         return fieldsToJoin.stream()
@@ -446,8 +449,10 @@ public class Table {
                     String column = prefix != null // && (f.isForeignReference() || getKeyFieldName().equals(f.name))
                         ? prefix + f.name
                         : f.name;
+                    // perform translations of certain fields if exporting to a GTFS
                     if (csvOutput) {
-                        if (DoubleField.class.isInstance(f)) {
+                        if (DoubleField.class.isInstance(f) && ((DoubleField) f).getOutputPrecision() > 0) {
+                            // do a rounding of certain fields to avoid excessive unneeded precision
                             column = String.format(
                                 "round(%s::DECIMAL, %d) as %s",
                                 column,
@@ -455,11 +460,9 @@ public class Table {
                                 f.name
                             );
                         } else if (TimeField.class.isInstance(f)) {
-                            /**
-                             * Returns the PostgreSQL syntax to convert seconds since midnight into time format HH:MM:SS for the specified field.
-                             *
-                             * FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-                             */
+                            // Returns the PostgreSQL syntax to convert seconds since midnight into time format
+                            // HH:MM:SS for the specified field.
+                            // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
                             column = String.format(
                                 "TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as %s",
                                 column,
@@ -514,7 +517,9 @@ public class Table {
     }
 
     /**
-     * Generate a select statement from the columns that actually exist in the database table
+     * Generate a select statement from the columns that actually exist in the database table.  This method is intended
+     * to be used when exporting to a GTFS and eventually generates the select all with each individual field and
+     * applicable transformations listed out.
      */
     public String generateSelectAllExistingFieldsSql(Connection connection, String namespace) throws SQLException {
         // select all columns from table
@@ -527,12 +532,12 @@ public class Table {
         ResultSet result = statement.executeQuery();
 
         // get result and add fields that are defined in this table
-        List<Field> exitingFields = new ArrayList<>();
+        List<Field> existingFields = new ArrayList<>();
         while (result.next()) {
             String columnName = result.getString(1);
             for (Field f : fields) {
                 if (f.name.equals(columnName)) {
-                    exitingFields.add(f);
+                    existingFields.add(f);
                     break;
                 }
             }
@@ -541,7 +546,7 @@ public class Table {
         String tableName = String.join(".", namespace, name);
         String fieldPrefix = tableName + ".";
         return String.format(
-            "select %s from %s", commaSeparatedNames(exitingFields, fieldPrefix, true), tableName
+            "select %s from %s", commaSeparatedNames(existingFields, fieldPrefix, true), tableName
         );
     }
 

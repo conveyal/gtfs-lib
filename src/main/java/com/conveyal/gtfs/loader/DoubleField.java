@@ -17,6 +17,9 @@ public class DoubleField extends Field {
 
     private double minValue;
     private double maxValue;
+    // This field dictates how many decimal places this field should be rounded to when exporting to a GTFS.
+    // The place where the rounding happens during exports is in Table.commaSeparatedNames.
+    // A value less than 0 indicates that no rounding should happen.
     private int outputPrecision;
 
     public DoubleField (String name, Requirement requirement, double minValue, double maxValue, int outputPrecision) {

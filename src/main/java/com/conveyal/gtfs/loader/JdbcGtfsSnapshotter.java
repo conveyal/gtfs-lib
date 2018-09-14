@@ -2,7 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.validator.ServiceValidator;
+import com.conveyal.gtfs.model.ScheduleException;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,9 +15,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Map;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
@@ -87,6 +87,7 @@ public class JdbcGtfsSnapshotter {
             // FIXME: Find some place to store errors encountered on copy for patterns and pattern stops.
             copy(Table.PATTERNS, true);
             copy(Table.PATTERN_STOP, true);
+            // see method comments fo why different logic is needed for this table
             createScheduleExceptionsTable();
             result.shapes = copy(Table.SHAPES, true);
             result.stops = copy(Table.STOPS, true);
@@ -151,21 +152,27 @@ public class JdbcGtfsSnapshotter {
 
     /**
      * Special logic is needed for creating the schedule_exceptions table.
-     * If the calendar_dates table does not exist in the feed being copied from, it might have been the case that the
-     * imported feed did not have a calendars.txt file. If that was the case, then the schedule exceptions need to be
-     * generated from the calendar_dates table and also the calendars table needs to be populated with dummy entries so
-     * that it is possible to export the data to a GTFS because of current logic in JdbcGtfsExporter.  This all may
-     * change in a future iteration of development.
+     *
+     * gtfs-lib has some more advanced data types in addition to those available in the calendar_dates.txt file of the
+     * GTFS specification.  The schedule_exceptions table is the source of truth for exceptions to regular schedules.
+     * When exporting to a GTFS, the calendar_dates table is completely ignored if the schedule_exceptions table exists.
+     *
+     * When creating a snapshot, if the schedule_exceptions table doesn't currently exist, it is assumed that the feed
+     * being copied has just been imported and additional data to explain schedule_exceptions has not been generated yet.
+     * If the schedule_exceptions does already exist, that table is simply copied over.
+     *
+     * If the calendar table does not exist in the feed being copied from, it might have been the case that the
+     * imported feed did not have a calendar.txt file. If that was the case, then the schedule exceptions need to be
+     * generated from the calendar_dates table and also the calendar table needs to be populated with dummy entries so
+     * that it is possible to export the data to a GTFS because of current logic in JdbcGtfsExporter.  Furthermore, the
+     * dummy calendar entries are currently needed for the downstream library datatools-server/datatools-ui to work
+     * properly.
      */
     private TableLoadResult createScheduleExceptionsTable() {
         // check to see if the schedule_exceptions table exists
-        boolean scheduleExceptionsTableExists;
+        boolean scheduleExceptionsTableExists = feedIdToSnapshot != null &&
+            tableExists(feedIdToSnapshot, "schedule_exceptions");
         String scheduleExceptionsTableName = tablePrefix + "schedule_exceptions";
-        if (feedIdToSnapshot == null) {
-            scheduleExceptionsTableExists = false;
-        } else {
-            scheduleExceptionsTableExists = tableExists(feedIdToSnapshot, "schedule_exceptions");
-        }
 
         if (scheduleExceptionsTableExists) {
             // schedule_exceptions table already exists in namespace being copied from.  Therefore, we simply copy it.
@@ -174,21 +181,17 @@ public class JdbcGtfsSnapshotter {
             // schedule_exceptions does not exist.  Therefore, we generate schedule_exceptions from the calendar_dates.
             TableLoadResult tableLoadResult = new TableLoadResult();
             try {
-                String sql = String.format(
-                    "create table %s (id serial, name varchar, dates text[], exemplar smallint," +
-                        "custom_schedule text[], added_service text[], removed_service text[])",
-                    scheduleExceptionsTableName
+                Table.SCHEDULE_EXCEPTIONS.createSqlTable(
+                    connection,
+                    tablePrefix.replace(".", ""),
+                    true
                 );
-                LOG.info(sql);
-                Statement statement = connection.createStatement();
-                statement.execute(sql);
-                sql = String.format(
-                    "insert into %s (name, dates, exemplar, added_service, removed_service)" +
-                        "values (?, ?, ?, ?, ?)",
+                String sql = String.format(
+                    "insert into %s (name, dates, exemplar, added_service, removed_service) values (?, ?, ?, ?, ?)",
                     scheduleExceptionsTableName
                 );
                 PreparedStatement scheduleExceptionsStatement = connection.prepareStatement(sql);
-                final ServiceValidator.BatchTracker scheduleExceptionsTracker = new ServiceValidator.BatchTracker(
+                final BatchTracker scheduleExceptionsTracker = new BatchTracker(
                     "schedule_exceptions",
                     scheduleExceptionsStatement
                 );
@@ -202,13 +205,13 @@ public class JdbcGtfsSnapshotter {
                 Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
 
                 // keep track of calendars by service id in case we need to add dummy calendar entries
-                HashMap<String, Calendar> calendarsByServiceId = new HashMap<>();
+                Map<String, Calendar> calendarsByServiceId = new HashMap<>();
 
                 // iterate through all calendarDates and add a corresponding entry into schedule_exceptions on a 1-1
                 // basis to make things a straightforward as possible
                 for (CalendarDate calendarDate : calendarDates) {
                     String dateWithException = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
-                    Array empty = connection.createArrayOf("text", new ArrayList<>().toArray());
+                    Array empty = connection.createArrayOf("text", new String[]{});
                     Array service = connection.createArrayOf("text", new String[]{calendarDate.service_id});
 
                     scheduleExceptionsStatement.setString(1, dateWithException);
@@ -216,10 +219,16 @@ public class JdbcGtfsSnapshotter {
                         2,
                         connection.createArrayOf("text", new String[]{dateWithException})
                     );
-                    scheduleExceptionsStatement.setInt(3, 9); // FIXME use better static type
+                    scheduleExceptionsStatement.setInt(
+                        3,
+                        ScheduleException.ExemplarServiceDescriptor.SWAP.getValue()
+                    );
+                    // check if calendar_date represents added or removed service
                     if (calendarDate.exception_type == 1) {
+                        // calendar_date represents added service
                         scheduleExceptionsStatement.setArray(4, service);
                         scheduleExceptionsStatement.setArray(5, empty);
+
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
                         Calendar calendar = calendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
@@ -232,6 +241,7 @@ public class JdbcGtfsSnapshotter {
                         }
                         calendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
+                        // calendare_date represents removed service
                         scheduleExceptionsStatement.setArray(4, empty);
                         scheduleExceptionsStatement.setArray(5, service);
                     }
@@ -249,13 +259,16 @@ public class JdbcGtfsSnapshotter {
                         tablePrefix + "calendar"
                     );
                     PreparedStatement calendarStatement = connection.prepareStatement(sql);
-                    final ServiceValidator.BatchTracker calendarsTracker = new ServiceValidator.BatchTracker(
+                    final BatchTracker calendarsTracker = new BatchTracker(
                         "calendar",
                         calendarStatement
                     );
                     for (Calendar calendar : calendarsByServiceId.values()) {
                         calendarStatement.setString(1, calendar.service_id);
-                        calendarStatement.setString(2, calendar.service_id);
+                        calendarStatement.setString(
+                            2,
+                            String.format("%s (auto-generated)", calendar.service_id)
+                        );
                         calendarStatement.setString(
                             3,
                             calendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
@@ -302,11 +315,13 @@ public class JdbcGtfsSnapshotter {
 
     /**
      * Add columns for any required, optional, or editor fields that don't already exist as columns on the table.
+     * This method contains a SQL statement that requires PostgreSQL 9.6+.
      */
     private void addEditorSpecificFields(Connection connection, String tablePrefix, Table table) throws SQLException {
         LOG.info("Adding any missing columns for {}", tablePrefix + table.name);
         Statement statement = connection.createStatement();
         for (Field field : table.editorFields()) {
+            // The following statement requires PostgreSQL 9.6+.
             String addColumnSql = String.format("ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s",
                     tablePrefix + table.name,
                     field.name,
