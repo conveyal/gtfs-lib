@@ -1,8 +1,23 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.ShapePoint;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,12 +28,20 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
-import static com.conveyal.gtfs.loader.Requirement.*;
+import static com.conveyal.gtfs.loader.Requirement.EDITOR;
+import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
+import static com.conveyal.gtfs.loader.Requirement.OPTIONAL;
+import static com.conveyal.gtfs.loader.Requirement.REQUIRED;
+import static com.conveyal.gtfs.loader.Requirement.UNKNOWN;
 
 
 /**
@@ -535,12 +558,7 @@ public class Table {
         List<Field> existingFields = new ArrayList<>();
         while (result.next()) {
             String columnName = result.getString(1);
-            for (Field f : fields) {
-                if (f.name.equals(columnName)) {
-                    existingFields.add(f);
-                    break;
-                }
-            }
+            existingFields.add(getFieldForName(columnName));
         }
 
         String tableName = String.join(".", namespace, name);
