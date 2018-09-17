@@ -87,7 +87,9 @@ public class SpeedTripValidator extends TripValidator {
         if (travelTimeSeconds < 0) {
             registerError(stopTime, TRAVEL_TIME_NEGATIVE, travelTimeSeconds);
             good = false;
-        } else if (travelTimeSeconds == 0) {
+        // Some bus stops are very close, and timetable can be rounded to a minute
+        // 300m is the distance traveled at 18 km/h in one minute
+        } else if (travelTimeSeconds == 0 && distanceMeters > 300) {
             registerError(stopTime, TRAVEL_TIME_ZERO);
             good = false;
         }
