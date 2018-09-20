@@ -2,21 +2,21 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.ScheduleException;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
@@ -146,6 +146,11 @@ public class JdbcGtfsSnapshotter {
         } catch (Exception ex) {
             tableLoadResult.fatalException = ex.getMessage();
             LOG.error("Error: ", ex);
+            try {
+                connection.rollback();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
         }
         return tableLoadResult;
     }
@@ -164,9 +169,10 @@ public class JdbcGtfsSnapshotter {
      * If the calendar table does not exist in the feed being copied from, it might have been the case that the
      * imported feed did not have a calendar.txt file. If that was the case, then the schedule exceptions need to be
      * generated from the calendar_dates table and also the calendar table needs to be populated with dummy entries so
-     * that it is possible to export the data to a GTFS because of current logic in JdbcGtfsExporter.  Furthermore, the
-     * dummy calendar entries are currently needed for the downstream library datatools-server/datatools-ui to work
-     * properly.
+     * that it is possible to export the data to a GTFS because of current logic in JdbcGtfsExporter.  The way
+     * JdbcGtfsExporter will only export calendar_dates that have a corresponding entry in the calendar table and have a
+     * service span that applies to a schedule_exception.  Furthermore, the dummy calendar entries are currently needed
+     * for the downstream library datatools-server/datatools-ui to work properly.
      */
     private TableLoadResult createScheduleExceptionsTable() {
         // check to see if the schedule_exceptions table exists
@@ -207,27 +213,17 @@ public class JdbcGtfsSnapshotter {
                 // keep track of calendars by service id in case we need to add dummy calendar entries
                 Map<String, Calendar> calendarsByServiceId = new HashMap<>();
 
-                // iterate through all calendarDates and add a corresponding entry into schedule_exceptions on a 1-1
-                // basis to make things a straightforward as possible
+                // iterate through calendar dates to build up to get list of dates with exceptions
+                HashMap<String, List<String>> removedServiceDays = new HashMap<>();
+                HashMap<String, List<String>> addedServiceDays = new HashMap<>();
+                List<String> datesWithExceptions = new ArrayList<>();
                 for (CalendarDate calendarDate : calendarDates) {
-                    String dateWithException = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
-                    Array empty = connection.createArrayOf("text", new String[]{});
-                    Array service = connection.createArrayOf("text", new String[]{calendarDate.service_id});
-
-                    scheduleExceptionsStatement.setString(1, dateWithException);
-                    scheduleExceptionsStatement.setArray(
-                        2,
-                        connection.createArrayOf("text", new String[]{dateWithException})
-                    );
-                    scheduleExceptionsStatement.setInt(
-                        3,
-                        ScheduleException.ExemplarServiceDescriptor.SWAP.getValue()
-                    );
-                    // check if calendar_date represents added or removed service
+                    String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
+                    datesWithExceptions.add(date);
                     if (calendarDate.exception_type == 1) {
-                        // calendar_date represents added service
-                        scheduleExceptionsStatement.setArray(4, service);
-                        scheduleExceptionsStatement.setArray(5, empty);
+                        List<String> dateAddedServices = addedServiceDays.getOrDefault(date, new ArrayList<>());
+                        dateAddedServices.add(calendarDate.service_id);
+                        addedServiceDays.put(date, dateAddedServices);
 
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
@@ -241,10 +237,34 @@ public class JdbcGtfsSnapshotter {
                         }
                         calendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
-                        // calendare_date represents removed service
-                        scheduleExceptionsStatement.setArray(4, empty);
-                        scheduleExceptionsStatement.setArray(5, service);
+                        List<String> dateRemovedServices = removedServiceDays.getOrDefault(date, new ArrayList<>());
+                        dateRemovedServices.add(calendarDate.service_id);
+                        removedServiceDays.put(date, dateRemovedServices);
                     }
+                }
+
+                // iterate through days and add to database
+                // for usability and simplicity of code, don't attempt to find all dates with similar
+                // added and removed services, but simply create an entry for each found date
+                for (String dateWithException : datesWithExceptions) {
+                    scheduleExceptionsStatement.setString(1, dateWithException);
+                    String[] dates = {dateWithException};
+                    scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
+                    scheduleExceptionsStatement.setInt(3, 9); // FIXME use better static type
+                    scheduleExceptionsStatement.setArray(
+                        4,
+                        connection.createArrayOf(
+                            "text",
+                            addedServiceDays.getOrDefault(dateWithException, new ArrayList<>()).toArray()
+                        )
+                    );
+                    scheduleExceptionsStatement.setArray(
+                        5,
+                        connection.createArrayOf(
+                            "text",
+                            removedServiceDays.getOrDefault(dateWithException, new ArrayList<>()).toArray()
+                        )
+                    );
                     scheduleExceptionsTracker.addBatch();
                 }
                 scheduleExceptionsTracker.executeRemaining();
@@ -287,6 +307,11 @@ public class JdbcGtfsSnapshotter {
                 tableLoadResult.fatalException = e.getMessage();
                 LOG.error("Error creating schedule Exceptions: ", e);
                 e.printStackTrace();
+                try {
+                    connection.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
             }
             LOG.info("done creating schedule exceptions");
             return tableLoadResult;
@@ -295,10 +320,10 @@ public class JdbcGtfsSnapshotter {
 
     /**
      * Helper method to determine if a table exists within a namespace.
-     * FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
      */
     private boolean tableExists(String namespace, String tableName) {
         try {
+            // This statement is postgres-specific.
             PreparedStatement tableExistsStatement = connection.prepareStatement(
                 "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = ? AND table_name = ?)"
             );
