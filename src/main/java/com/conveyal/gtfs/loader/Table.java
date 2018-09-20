@@ -468,33 +468,7 @@ public class Table {
                 // NOTE: This previously only prefixed fields that were foreign refs or key fields. However, this
                 // caused an issue where shared fields were ambiguously referenced in a select query (specifically,
                 // wheelchair_accessible in routes and trips). So this filter has been removed.
-                .map(f -> {
-                    String column = prefix != null // && (f.isForeignReference() || getKeyFieldName().equals(f.name))
-                        ? prefix + f.name
-                        : f.name;
-                    // perform translations of certain fields if exporting to a GTFS
-                    if (csvOutput) {
-                        if (DoubleField.class.isInstance(f) && ((DoubleField) f).getOutputPrecision() > 0) {
-                            // do a rounding of certain fields to avoid excessive unneeded precision
-                            column = String.format(
-                                "round(%s::DECIMAL, %d) as %s",
-                                column,
-                                ((DoubleField) f).getOutputPrecision(),
-                                f.name
-                            );
-                        } else if (TimeField.class.isInstance(f)) {
-                            // Returns the PostgreSQL syntax to convert seconds since midnight into time format
-                            // HH:MM:SS for the specified field.
-                            // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-                            column = String.format(
-                                "TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as %s",
-                                column,
-                                f.name
-                            );
-                        }
-                    }
-                    return column;
-                })
+                .map(f -> f.getColumnExpression(prefix, csvOutput))
                 .collect(Collectors.joining(", "));
     }
 
