@@ -15,7 +15,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +22,7 @@ import java.util.Map;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.intt;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.string;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
-import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.makeInClause;
+import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.filterEquals;
 import static graphql.Scalars.GraphQLInt;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 import static graphql.schema.GraphQLObjectType.newObject;
@@ -70,9 +69,13 @@ public class RowCountFetcher implements DataFetcher {
             if (filterField != null) {
                 // FIXME Does this handle null cases?
                 // Add where clause to filter out non-matching results.
-                String filterValue = (String) parentFeedMap.get(filterField);
-                String inClause = makeInClause(filterField, filterValue, parameters);
-                clauses.add(String.join(" ", "where", inClause));
+                clauses.add(
+                    String.join(
+                        " ",
+                        "where",
+                        filterEquals(filterField, (String) parentFeedMap.get(filterField), parameters)
+                    )
+                );
             } else if (groupByField != null) {
                 // Handle group by field and optionally handle any filter arguments passed in.
                 if (!argKeys.isEmpty()) {
@@ -86,8 +89,13 @@ public class RowCountFetcher implements DataFetcher {
                     }
                     String filterValue = (String) arguments.get(groupedFilterField);
                     if (filterValue != null) {
-                        String inClause = makeInClause(groupedFilterField, filterValue, parameters);
-                        clauses.add(String.join(" ", "where", inClause));
+                        clauses.add(
+                            String.join(
+                                " ",
+                                "where",
+                                filterEquals(groupedFilterField, filterValue, parameters)
+                            )
+                        );
                     }
                 }
                 // Finally, add group by clause.

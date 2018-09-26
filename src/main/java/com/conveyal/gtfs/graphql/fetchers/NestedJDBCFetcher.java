@@ -11,11 +11,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
+import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.makeInClause;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 
 /**
@@ -75,54 +78,124 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
         // FIXME: NestedJDBCFetcher may need to be refactored so that it avoids conventions of JDBCFetcher (like the
         // implied limit of 50 records). For now, the autoLimit field has been added to JDBCFetcher, so that certain
         // fetchers (like the nested ones used solely for joins here) will not apply the limit by default.
-        Map<String, Object> arguments = null;
+        Map<String, Object> graphQLQueryArguemnts = environment.getArguments();;
 
-        // Store each iteration's fetch results here.
-        List<Map<String, Object>> fetchResults = null;
+//        // Store each iteration's fetch results here.
+//        List<Map<String, Object>> fetchResults = null;
+//        for (int i = 0; i < jdbcFetchers.length; i++) {
+//            JDBCFetcher fetcher = jdbcFetchers[i];
+//            List<String> joinValues;
+//            if (i == 0) {
+//                // For first iteration of fetching, use parent entity to get join values.
+//                Map<String, Object> enclosingEntity = environment.getSource();
+//                // FIXME SQL injection: enclosing entity's ID could contain malicious character sequences; quote and sanitize the string.
+//                // FIXME: THIS IS BROKEN if parentJoinValue is null!!!!
+//                Object parentJoinValue = enclosingEntity.get(fetcher.parentJoinField);
+//                // Check for null parentJoinValue to protect against NPE.
+//                joinValues = new ArrayList<>();
+//                String parentJoinString = parentJoinValue == null ? null : parentJoinValue.toString();
+//                joinValues.add(parentJoinString);
+//                if (parentJoinValue == null) {
+//                    return new ArrayList<>();
+//                }
+//            } else {
+//                // Otherwise, get join values stored by previous fetcher.
+//                joinValues = joinValuesForJoinField.get(fetcher.parentJoinField);
+//                if (i == jdbcFetchers.length - 1) {
+//                    // Apply arguments only to the final fetched table
+//                    arguments = environment.getArguments();
+//                    LOG.info("{} args: {}", fetcher.tableName, arguments.keySet().toString());
+//                }
+//            }
+//            LOG.info("Join values: {}", joinValues.toString());
+//            fetchResults = fetcher.getResults(namespace, joinValues, arguments);
+//            if (fetchResults.size() == 0) {
+//                // If there are no results, the following queries will have no results to join to, so we can simply
+//                // return the empty list.
+//                return fetchResults;
+//            } else if (i < jdbcFetchers.length - 1) {
+//                // Otherwise, iterate over results from current fetcher to store for next iteration for all but the last
+//                // iteration (the last iteration's fetchResults will contain the final results).
+//                JDBCFetcher nextFetcher = jdbcFetchers[i + 1];
+//                for (Map<String, Object> entity : fetchResults) {
+//                    Object joinValue = entity.get(nextFetcher.parentJoinField);
+//                    // Store join values in multimap for
+//                    if (joinValue != null)
+//                        joinValuesForJoinField.put(nextFetcher.parentJoinField, joinValue.toString());
+//                }
+//            }
+//        }
+//        // Last iteration should finally return results.
+//        return null;
+
+        JDBCFetcher lastFetcher = null;
+        List<String> preparedStatementParameters = new ArrayList<>();
+        Set<String> fromTables = new HashSet<>();
+        List<String> whereConditions = new ArrayList<>();
         for (int i = 0; i < jdbcFetchers.length; i++) {
             JDBCFetcher fetcher = jdbcFetchers[i];
-            List<String> joinValues;
+            String tableName = nameSpacedTableName(namespace, fetcher.tableName);
             if (i == 0) {
-                // For first iteration of fetching, use parent entity to get join values.
+                // For first iteration of fetching, use parent entity to get in clause values.
+                // Also, we add this directly to conditions since the table and field will be different than in the
+                // final fetcher.
+                List<String> inClauseValues = new ArrayList<>();
                 Map<String, Object> enclosingEntity = environment.getSource();
-                // FIXME SQL injection: enclosing entity's ID could contain malicious character sequences; quote and sanitize the string.
-                // FIXME: THIS IS BROKEN if parentJoinValue is null!!!!
-                Object parentJoinValue = enclosingEntity.get(fetcher.parentJoinField);
+                String inClauseValue = (String) enclosingEntity.get(fetcher.parentJoinField);
                 // Check for null parentJoinValue to protect against NPE.
-                joinValues = new ArrayList<>();
-                String parentJoinString = parentJoinValue == null ? null : parentJoinValue.toString();
-                joinValues.add(parentJoinString);
-                if (parentJoinValue == null) {
+                if (inClauseValue == null) {
                     return new ArrayList<>();
+                } else {
+                    inClauseValues.add(inClauseValue);
                 }
+                // add the base table and in clause that this whole query is based off of.  We specific the namespaced table field
+                // name to avoid conflicts resulting from selecting from other similarly named table fields
+                fromTables.add(tableName);
+                whereConditions.add(makeInClause(
+                    nameSpacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField),
+                    inClauseValues,
+                    preparedStatementParameters
+                ));
             } else {
-                // Otherwise, get join values stored by previous fetcher.
-                joinValues = joinValuesForJoinField.get(fetcher.parentJoinField);
+                // add nested table join by using a where condition
+                fromTables.add(tableName);
+                whereConditions.add(String.format(
+                    "%s = %s",
+                    nameSpacedTableFieldName(namespace, lastFetcher.tableName, fetcher.parentJoinField),
+                    nameSpacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField)
+                ));
+                // check if we have reached the final nested table
                 if (i == jdbcFetchers.length - 1) {
-                    // Apply arguments only to the final fetched table
-                    arguments = environment.getArguments();
-                    LOG.info("{} args: {}", fetcher.tableName, arguments.keySet().toString());
+                    // final nested table reached!
+                    // create a sqlBuilder to select all values from the final table
+                    StringBuilder sqlStatementStringBuilder = new StringBuilder();
+                    sqlStatementStringBuilder.append("select ");
+                    sqlStatementStringBuilder.append(
+                        nameSpacedTableFieldName(namespace, fetcher.tableName, "*")
+                    );
+                    // Make the query and return the results!
+                    return fetcher.getResults(
+                        namespace,
+                        new ArrayList<>(),
+                        graphQLQueryArguemnts,
+                        preparedStatementParameters,
+                        whereConditions,
+                        fromTables,
+                        sqlStatementStringBuilder
+                    );
                 }
             }
-            LOG.info("Join values: {}", joinValues.toString());
-            fetchResults = fetcher.getResults(namespace, joinValues, arguments);
-            if (fetchResults.size() == 0) {
-                // If there are no results, the following queries will have no results to join to, so we can simply
-                // return the empty list.
-                return fetchResults;
-            } else if (i < jdbcFetchers.length - 1) {
-                // Otherwise, iterate over results from current fetcher to store for next iteration for all but the last
-                // iteration (the last iteration's fetchResults will contain the final results).
-                JDBCFetcher nextFetcher = jdbcFetchers[i + 1];
-                for (Map<String, Object> entity : fetchResults) {
-                    Object joinValue = entity.get(nextFetcher.parentJoinField);
-                    // Store join values in multimap for
-                    if (joinValue != null)
-                        joinValuesForJoinField.put(nextFetcher.parentJoinField, joinValue.toString());
-                }
-            }
+            lastFetcher = fetcher;
         }
         // Last iteration should finally return results.
-        return fetchResults;
+        return new ArrayList<>();
+    }
+
+    private String nameSpacedTableName (String namespace, String tableName) {
+        return String.format("%s.%s", namespace, tableName);
+    }
+
+    private String nameSpacedTableFieldName (String namespace, String tableName, String tableField) {
+        return String.format("%s.%s.%s", namespace, tableName, tableField);
     }
 }

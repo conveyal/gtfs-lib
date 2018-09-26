@@ -146,73 +146,94 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
 
         // If we are fetching an item nested within a GTFS entity in the GraphQL query, we want to add an SQL "where"
         // clause using the values found here. Note, these are used in the below getResults call.
-        List<String> parentJoinValues = new ArrayList<>();
+        List<String> inClauseValues = new ArrayList<>();
         if (parentJoinField != null) {
             Map<String, Object> enclosingEntity = environment.getSource();
             // FIXME: THIS IS BROKEN if parentJoinValue is null!!!!
-            Object parentJoinValue = enclosingEntity.get(parentJoinField);
+            Object inClauseValue = enclosingEntity.get(parentJoinField);
             // Check for null parentJoinValue to protect against NPE.
-            String parentJoinString = parentJoinValue == null ? null : parentJoinValue.toString();
-            parentJoinValues.add(parentJoinString);
-            if (parentJoinValue == null) {
+            String inClauseString = inClauseValue == null ? null : inClauseValue.toString();
+            inClauseValues.add(inClauseString);
+            if (inClauseValue == null) {
                 return new ArrayList<>();
             }
         }
         Map<String, Object> arguments = environment.getArguments();
 
-        return getResults(namespace, parentJoinValues, arguments);
+        return getResults(namespace, inClauseValues, arguments);
+    }
+
+    List<Map<String, Object>> getResults (
+        String namespace,
+        List<String> inClauseValues,
+        Map<String, Object> arguments
+    ) {
+        // We could select only the requested fields by examining environment.getFields(), but we just get them all.
+        // The advantage of selecting * is that we don't need to validate the field names.
+        // All the columns will be loaded into the Map<String, Object>,
+        // but only the requested fields will be fetched from that Map using a MapFetcher.
+        StringBuilder sqlBuilder = new StringBuilder();
+        sqlBuilder.append("select *");
+        return getResults(
+            namespace,
+            inClauseValues,
+            arguments,
+            // No additional prepared statement parameters, where conditions or tables are needed beyond those added by
+            // default in the next method.
+            new ArrayList<>(),
+            new ArrayList<>(),
+            new HashSet<>(),
+            sqlBuilder
+        );
     }
 
     /**
      * Handle fetching functionality for a given namespace, set of join values, and arguments. This is broken out from
      * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher)
      */
-    List<Map<String, Object>> getResults (String namespace, List<String> parentJoinValues, Map<String, Object> arguments) {
-        // Track the parameters for setting prepared statement parameters
-        List<String> parameters = new ArrayList<>();
+    List<Map<String, Object>> getResults (
+        String namespace,
+        List<String> inClauseValues,
+        Map<String, Object> graphQLQueryArguments,
+        List<String> preparedStatementParameters,
+        List<String> whereConditions,
+        Set<String> fromTables,
+        StringBuilder sqlStatementStringBuilder
+    ) {
         // This will contain one Map<String, Object> for each row fetched from the database table.
         List<Map<String, Object>> results = new ArrayList<>();
-        if (arguments == null) arguments = new HashMap<>();
+        if (graphQLQueryArguments == null) graphQLQueryArguments = new HashMap<>();
         // Ensure namespace exists and is clean. Note: FeedFetcher will have executed before this and validated that an
         // entry exists in the feeds table and the schema actually exists in the database.
         validateNamespace(namespace);
-        StringBuilder sqlBuilder = new StringBuilder();
 
-        // We could select only the requested fields by examining environment.getFields(), but we just get them all.
-        // The advantage of selecting * is that we don't need to validate the field names.
-        // All the columns will be loaded into the Map<String, Object>,
-        // but only the requested fields will be fetched from that Map using a MapFetcher.
-        Set<String> fromTables = new HashSet<>();
-        // By default, select only from the primary table. Other tables may be added to this list to handle joins.
+        // The primary table being selected from is added here. Other tables may have been / will be added to this list to handle joins.
         fromTables.add(String.join(".", namespace, tableName));
-        sqlBuilder.append("select *");
 
-        // We will build up additional sql clauses in this List (note: must be a List so that the order is preserved).
-        List<String> conditions = new ArrayList<>();
         // The order by clause will go here.
         String sortBy = "";
         // If we are fetching an item nested within a GTFS entity in the GraphQL query, we want to add an SQL "where"
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
         // Note, this is assuming the type of the field in the parent is a string.
-        if (parentJoinField != null && parentJoinValues != null && !parentJoinValues.isEmpty()) {
-            conditions.add(makeInClause(parentJoinField, parentJoinValues, parameters));
+        if (parentJoinField != null && inClauseValues != null && !inClauseValues.isEmpty()) {
+            whereConditions.add(makeInClause(parentJoinField, inClauseValues, preparedStatementParameters));
         }
         if (sortField != null) {
             // Sort field is not provided by user input, so it's ok to add here (i.e., it's not prone to SQL injection).
             sortBy = String.format(" order by %s", sortField);
         }
-        Set<String> argumentKeys = arguments.keySet();
+        Set<String> argumentKeys = graphQLQueryArguments.keySet();
         for (String key : argumentKeys) {
             // The pagination, bounding box, and date/time args should all be skipped here because they are handled
             // separately below from standard args (pagination becomes limit/offset clauses, bounding box applies to
             // stops table, and date/time args filter stop times. All other args become "where X in A, B, C" clauses.
             if (argsToSkip.contains(key)) continue;
             if (ID_ARG.equals(key)) {
-                Integer value = (Integer) arguments.get(key);
-                conditions.add(String.join(" = ", "id", value.toString()));
+                Integer value = (Integer) graphQLQueryArguments.get(key);
+                whereConditions.add(String.join(" = ", "id", value.toString()));
             } else {
-                List<String> values = (List<String>) arguments.get(key);
-                if (values != null && !values.isEmpty()) conditions.add(makeInClause(key, values, parameters));
+                List<String> values = (List<String>) graphQLQueryArguments.get(key);
+                if (values != null && !values.isEmpty()) whereConditions.add(makeInClause(key, values, preparedStatementParameters));
             }
         }
         if (argumentKeys.containsAll(boundingBoxArgs)) {
@@ -222,7 +243,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             // operating on the patterns table, a SELECT DISTINCT patterns query will be constructed with a join to
             // stops and pattern stops.
             for (String bound : boundingBoxArgs) {
-                Double value = (Double) arguments.get(bound);
+                Double value = (Double) graphQLQueryArguments.get(bound);
                 // Determine delimiter/equality operator based on min/max
                 String delimiter = bound.startsWith("max") ? " <= " : " >= ";
                 // Determine field based on lat/lon
@@ -232,7 +253,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
                 boundsConditions.add(String.join(delimiter, fieldWithNamespace, value.toString()));
             }
             if ("stops".equals(tableName)) {
-                conditions.addAll(boundsConditions);
+                whereConditions.addAll(boundsConditions);
             } else if ("patterns".equals(tableName)) {
                 // Add from table as unique_pattern_ids_in_bounds to match patterns table -> pattern stops -> stops
                 fromTables.add(
@@ -243,7 +264,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
                                 String.join(" and ", boundsConditions),
                                 namespace
                         ));
-                conditions.add(String.format("%s.patterns.pattern_id = unique_pattern_ids_in_bounds.pattern_id", namespace));
+                whereConditions.add(String.format("%s.patterns.pattern_id = unique_pattern_ids_in_bounds.pattern_id", namespace));
             }
         }
         if (argumentKeys.contains(DATE_ARG)) {
@@ -253,7 +274,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             // service_dates table. In other words, feeds generated by the editor cannot be queried with the date/time args.
             String tripsTable = String.format("%s.trips", namespace);
             fromTables.add(tripsTable);
-            String date = getDateArgument(arguments);
+            String date = getDateArgument(graphQLQueryArguments);
             // Gather all service IDs that run on the provided date.
             fromTables.add(String.format(
                     "(select distinct service_id from %s.service_dates where service_date = ?) as unique_service_ids_in_operation",
@@ -261,11 +282,11 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             );
             // Add date to beginning of parameters list (it is used to pre-select a table in the from clause before any
             // other conditions or parameters are appended).
-            parameters.add(0, date);
+            preparedStatementParameters.add(0, date);
             if (argumentKeys.contains(FROM_ARG) && argumentKeys.contains(TO_ARG)) {
                 // Determine which trips start in the specified time window by joining to filtered stop times.
                 String timeFilteredTrips = "trips_beginning_in_time_period";
-                conditions.add(String.format("%s.trip_id = %s.trip_id", timeFilteredTrips, tripsTable));
+                whereConditions.add(String.format("%s.trip_id = %s.trip_id", timeFilteredTrips, tripsTable));
                 // Select all trip IDs that start during the specified time window. Note: the departure and arrival times
                 // are divided by 86399 to account for trips that begin after midnight. FIXME: Should this be 86400?
                 fromTables.add(String.format(
@@ -273,16 +294,16 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
                         "from (select distinct on (trip_id) * from %s.stop_times order by trip_id, stop_sequence) as first_stop_times " +
                         "where departure_time %% 86399 >= %d and departure_time %% 86399 <= %d) as %s",
                         namespace,
-                        (int) arguments.get(FROM_ARG),
-                        (int) arguments.get(TO_ARG),
+                        (int) graphQLQueryArguments.get(FROM_ARG),
+                        (int) graphQLQueryArguments.get(TO_ARG),
                         timeFilteredTrips));
             }
             // Join trips to service_dates (unique_service_ids_in_operation).
-            conditions.add(String.format("%s.service_id = unique_service_ids_in_operation.service_id", tripsTable));
+            whereConditions.add(String.format("%s.service_id = unique_service_ids_in_operation.service_id", tripsTable));
         }
         if (argumentKeys.contains(SEARCH_ARG)) {
             // Handle string search argument
-            String value = (String) arguments.get(SEARCH_ARG);
+            String value = (String) graphQLQueryArguments.get(SEARCH_ARG);
             if (!value.isEmpty()) {
                 // Only apply string search if string is not empty.
                 Set<String> searchFields = getSearchFields(namespace);
@@ -292,23 +313,23 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
                     // FIXME: is ILIKE compatible with non-Postgres? LIKE doesn't work well enough (even when setting
                     // the strings to lower case).
                     searchClauses.add(String.format("%s ILIKE ?", field));
-                    parameters.add(String.format("%%%s%%", value));
+                    preparedStatementParameters.add(String.format("%%%s%%", value));
                 }
                 if (!searchClauses.isEmpty()) {
                     // Wrap string search in parentheses to isolate from other conditions.
-                    conditions.add(String.format(("(%s)"), String.join(" OR ", searchClauses)));
+                    whereConditions.add(String.format(("(%s)"), String.join(" OR ", searchClauses)));
                 }
             }
         }
-        sqlBuilder.append(String.format(" from %s", String.join(", ", fromTables)));
-        if (!conditions.isEmpty()) {
-            sqlBuilder.append(" where ");
-            sqlBuilder.append(String.join(" and ", conditions));
+        sqlStatementStringBuilder.append(String.format(" from %s", String.join(", ", fromTables)));
+        if (!whereConditions.isEmpty()) {
+            sqlStatementStringBuilder.append(" where ");
+            sqlStatementStringBuilder.append(String.join(" and ", whereConditions));
         }
         // The default value for sortBy is an empty string, so it's safe to always append it here. Also, there is no
         // threat of SQL injection because the sort field value is not user input.
-        sqlBuilder.append(sortBy);
-        Integer limit = (Integer) arguments.get(LIMIT_ARG);
+        sqlStatementStringBuilder.append(sortBy);
+        Integer limit = (Integer) graphQLQueryArguments.get(LIMIT_ARG);
         if (limit == null) {
             limit = autoLimit ? DEFAULT_ROWS_TO_FETCH : -1;
         }
@@ -320,18 +341,18 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             // empty simply because it is clearer to define the condition in this way (vs. if limit > 0).
             // FIXME: Skipping limit is not scalable in many cases and should possibly be removed/limited.
         } else {
-            sqlBuilder.append(" limit ").append(limit);
+            sqlStatementStringBuilder.append(" limit ").append(limit);
         }
-        Integer offset = (Integer) arguments.get(OFFSET_ARG);
+        Integer offset = (Integer) graphQLQueryArguments.get(OFFSET_ARG);
         if (offset != null && offset >= 0) {
-            sqlBuilder.append(" offset ").append(offset);
+            sqlStatementStringBuilder.append(" offset ").append(offset);
         }
         Connection connection = null;
         try {
             connection = GTFSGraphQL.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(sqlBuilder.toString());
+            PreparedStatement preparedStatement = connection.prepareStatement(sqlStatementStringBuilder.toString());
             int oneBasedIndex = 1;
-            for (String parameter : parameters) {
+            for (String parameter : preparedStatementParameters) {
                 preparedStatement.setString(oneBasedIndex++, parameter);
             }
             // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
@@ -437,7 +458,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     /**
      * Construct filter clause with '=' (single string) and add values to list of parameters.
      * */
-    static String makeInClause(String filterField, String string, List<String> parameters) {
+    static String filterEquals(String filterField, String string, List<String> parameters) {
         // Add string to list of parameters (to be later used to set parameters for prepared statement).
         parameters.add(string);
         return String.format("%s = ?", filterField);
@@ -448,7 +469,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      * */
     static String makeInClause(String filterField, List<String> strings, List<String> parameters) {
         if (strings.size() == 1) {
-            return makeInClause(filterField, strings.get(0), parameters);
+            return filterEquals(filterField, strings.get(0), parameters);
         } else {
             // Add strings to list of parameters (to be later used to set parameters for prepared statement).
             parameters.addAll(strings);
