@@ -181,6 +181,8 @@ public class ServiceValidator extends TripValidator {
             LocalDate firstDate = LocalDate.MAX;
             LocalDate lastDate = LocalDate.MIN;
             for (LocalDate date : dateInfoForDate.keySet()) {
+                // If the date is invalid, skip.
+                if (date == null) continue;
                 if (date.isBefore(firstDate)) firstDate = date;
                 if (date.isAfter(lastDate)) lastDate = date;
             }
