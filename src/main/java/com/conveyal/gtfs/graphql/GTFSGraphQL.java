@@ -1,11 +1,13 @@
 package com.conveyal.gtfs.graphql;
 
-import com.conveyal.gtfs.GTFS;
 import graphql.GraphQL;
+import graphql.execution.instrumentation.dataloader.DataLoaderDispatcherInstrumentation;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
+
+import static com.conveyal.gtfs.graphql.GraphQLGtfsSchema.makeRegistry;
 
 /**
  * This provides a GraphQL API around the gtfs-lib JDBC storage.
@@ -23,7 +25,12 @@ public class GTFSGraphQL {
     /** Username and password can be null if connecting to a local instance with host-based authentication. */
     public static void initialize (DataSource dataSource) {
         GTFSGraphQL.dataSource = dataSource;
-        GRAPHQL = new GraphQL(GraphQLGtfsSchema.feedBasedSchema);
+        GRAPHQL = GraphQL.newGraphQL(GraphQLGtfsSchema.feedBasedSchema)
+            // this instrumentation implementation will dispatch all the dataloaders
+            // as each level fo the graphql query is executed and hence make batched objects
+            // available to the query and the associated DataFetchers
+            .instrumentation(new DataLoaderDispatcherInstrumentation(makeRegistry()))
+            .build();
     }
 
     public static Connection getConnection() {
@@ -37,5 +44,4 @@ public class GTFSGraphQL {
     public static GraphQL getGraphQl () {
         return GRAPHQL;
     }
-
 }

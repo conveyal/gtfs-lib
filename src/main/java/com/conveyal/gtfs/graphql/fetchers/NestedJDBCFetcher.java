@@ -15,6 +15,8 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
+import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableFieldName;
+import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableName;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
 import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.makeInClause;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
@@ -25,7 +27,7 @@ import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
  * routes that serve a specific stop, starting with a top-level stop type, we can nest joins from stop ABC -> pattern
  * stops -> patterns -> routes (see below example implementation for more details).
  */
-public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
+public class NestedJDBCFetcher implements DataFetcher<Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NestedJDBCFetcher.class);
     private final JDBCFetcher[] jdbcFetchers;
@@ -60,7 +62,7 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
     }
 
     @Override
-    public List<Map<String, Object>> get (DataFetchingEnvironment environment) {
+    public Object get (DataFetchingEnvironment environment) {
         // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
         // the parent feed (FeedFetcher).
         Map<String, Object> parentEntityMap = environment.getSource();
@@ -81,7 +83,7 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
         List<String> whereConditions = new ArrayList<>();
         for (int i = 0; i < jdbcFetchers.length; i++) {
             JDBCFetcher fetcher = jdbcFetchers[i];
-            String tableName = nameSpacedTableName(namespace, fetcher.tableName);
+            String tableName = namespacedTableName(namespace, fetcher.tableName);
             if (i == 0) {
                 // For first iteration of fetching, use parent entity to get in clause values.
                 // Also, we add this directly to conditions since the table and field will be different than in the
@@ -99,7 +101,7 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                 // name to avoid conflicts resulting from selecting from other similarly named table fields
                 fromTables.add(tableName);
                 whereConditions.add(makeInClause(
-                    nameSpacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField),
+                    namespacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField),
                     inClauseValues,
                     preparedStatementParameters
                 ));
@@ -108,8 +110,8 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                 fromTables.add(tableName);
                 whereConditions.add(String.format(
                     "%s = %s",
-                    nameSpacedTableFieldName(namespace, lastFetcher.tableName, fetcher.parentJoinField),
-                    nameSpacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField)
+                    namespacedTableFieldName(namespace, lastFetcher.tableName, fetcher.parentJoinField),
+                    namespacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField)
                 ));
                 // check if we have reached the final nested table
                 if (i == jdbcFetchers.length - 1) {
@@ -118,7 +120,7 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                     StringBuilder sqlStatementStringBuilder = new StringBuilder();
                     sqlStatementStringBuilder.append("select ");
                     sqlStatementStringBuilder.append(
-                        nameSpacedTableFieldName(namespace, fetcher.tableName, "*")
+                        namespacedTableFieldName(namespace, fetcher.tableName, "*")
                     );
                     // Make the query and return the results!
                     return fetcher.getResults(
@@ -137,13 +139,5 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
         // This piece of code will never be reached because of how things get returned above.
         // But it's here to make java happy.
         return new ArrayList<>();
-    }
-
-    private String nameSpacedTableName (String namespace, String tableName) {
-        return String.format("%s.%s", namespace, tableName);
-    }
-
-    private String nameSpacedTableFieldName (String namespace, String tableName, String tableField) {
-        return String.format("%s.%s.%s", namespace, tableName, tableField);
     }
 }

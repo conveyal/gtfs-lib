@@ -7,6 +7,9 @@ import graphql.schema.DataFetchingEnvironment;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLList;
 import org.apache.commons.dbutils.DbUtils;
+import org.dataloader.BatchLoaderEnvironment;
+import org.dataloader.DataLoader;
+import org.dataloader.MappedBatchLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,7 +26,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -34,7 +39,7 @@ import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 /**
  * A generic fetcher to get fields out of an SQL database table.
  */
-public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
+public class JDBCFetcher implements DataFetcher<Object> {
 
     public static final Logger LOG = LoggerFactory.getLogger(JDBCFetcher.class);
 
@@ -69,6 +74,61 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     final String parentJoinField;
     private final String sortField;
     private final boolean autoLimit;
+
+    public static final MappedBatchLoader<JdbcQuery, List<Map<String, Object>>> sqlBatchLoader =
+        (jdbcQueries) -> CompletableFuture.supplyAsync(() -> getSqlQueryResults(jdbcQueries));
+
+    private static Map<JdbcQuery, List<Map<String, Object>>> getSqlQueryResults(Set<JdbcQuery> jdbcQueries) {
+        Map<JdbcQuery, List<Map<String, Object>>> allResults = new HashMap<>();
+        Connection connection = null;
+        try {
+            connection = GTFSGraphQL.getConnection();
+            for (JdbcQuery jdbcQuery : jdbcQueries) {
+                allResults.put(jdbcQuery, getSqlQueryResult(jdbcQuery, connection));
+            }
+        } finally {
+            DbUtils.closeQuietly(connection);
+        }
+        return allResults;
+    }
+
+    public static List<Map<String, Object>> getSqlQueryResult (JdbcQuery jdbcQuery, Connection connection) {
+        try {
+            List<Map<String, Object>> results = new ArrayList<>();
+            PreparedStatement preparedStatement = connection.prepareStatement(jdbcQuery.sqlStatement);
+            int oneBasedIndex = 1;
+            for (String parameter : jdbcQuery.preparedStatementParameters) {
+                preparedStatement.setString(oneBasedIndex++, parameter);
+            }
+            // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
+            //            LOG.info("table name={}", tableName);
+            LOG.info("SQL: {}", preparedStatement.toString());
+            if (preparedStatement.execute()) {
+                ResultSet resultSet = preparedStatement.getResultSet();
+                ResultSetMetaData meta = resultSet.getMetaData();
+                int nColumns = meta.getColumnCount();
+                // Iterate over result rows
+                while (resultSet.next()) {
+                    // Create a Map to hold the contents of this row, injecting the sql schema namespace into every map
+                    Map<String, Object> resultMap = new HashMap<>();
+                    resultMap.put("namespace", jdbcQuery.namespace);
+                    // One-based iteration: start at one and use <=.
+                    for (int i = 1; i <= nColumns; i++) {
+                        resultMap.put(meta.getColumnName(i), resultSet.getObject(i));
+                    }
+                    results.add(resultMap);
+                }
+            }
+            LOG.info("Result size: {}", results.size());
+            // Return a List of Maps, one Map for each row in the result.
+            return results;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static final DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader =
+        DataLoader.newMappedDataLoader(sqlBatchLoader);
 
     /**
      * Constructor for tables that need neither restriction by a where clause nor sorting based on the enclosing entity.
@@ -130,7 +190,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     // But what are the internal GraphQL objects, i.e. what does an ExecutionResult return? Are they Map<String, Object>?
 
     @Override
-    public List<Map<String, Object>> get (DataFetchingEnvironment environment) {
+    public Object get (DataFetchingEnvironment environment) {
         // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
         // the parent feed (FeedFetcher).
         Map<String, Object> parentEntityMap = environment.getSource();
@@ -163,7 +223,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         return getResults(namespace, inClauseValues, arguments);
     }
 
-    List<Map<String, Object>> getResults (
+    Object getResults (
         String namespace,
         List<String> inClauseValues,
         Map<String, Object> arguments
@@ -178,7 +238,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             namespace,
             inClauseValues,
             arguments,
-            // No additional prepared statement parameters, where conditions or tables are needed beyond those added by
+            // No additional prepared sqlStatement preparedStatementParameters, where conditions or tables are needed beyond those added by
             // default in the next method.
             new ArrayList<>(),
             new ArrayList<>(),
@@ -191,7 +251,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      * Handle fetching functionality for a given namespace, set of join values, and arguments. This is broken out from
      * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher)
      */
-    List<Map<String, Object>> getResults (
+    Object getResults (
         String namespace,
         List<String> inClauseValues,
         Map<String, Object> graphQLQueryArguments,
@@ -280,8 +340,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
                     "(select distinct service_id from %s.service_dates where service_date = ?) as unique_service_ids_in_operation",
                     namespace)
             );
-            // Add date to beginning of parameters list (it is used to pre-select a table in the from clause before any
-            // other conditions or parameters are appended).
+            // Add date to beginning of preparedStatementParameters list (it is used to pre-select a table in the from clause before any
+            // other conditions or preparedStatementParameters are appended).
             preparedStatementParameters.add(0, date);
             if (argumentKeys.contains(FROM_ARG) && argumentKeys.contains(TO_ARG)) {
                 // Determine which trips start in the specified time window by joining to filtered stop times.
@@ -347,41 +407,11 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         if (offset != null && offset >= 0) {
             sqlStatementStringBuilder.append(" offset ").append(offset);
         }
-        Connection connection = null;
-        try {
-            connection = GTFSGraphQL.getConnection();
-            PreparedStatement preparedStatement = connection.prepareStatement(sqlStatementStringBuilder.toString());
-            int oneBasedIndex = 1;
-            for (String parameter : preparedStatementParameters) {
-                preparedStatement.setString(oneBasedIndex++, parameter);
-            }
-            // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
-//            LOG.info("table name={}", tableName);
-            LOG.info("SQL: {}", preparedStatement.toString());
-            if (preparedStatement.execute()) {
-                ResultSet resultSet = preparedStatement.getResultSet();
-                ResultSetMetaData meta = resultSet.getMetaData();
-                int nColumns = meta.getColumnCount();
-                // Iterate over result rows
-                while (resultSet.next()) {
-                    // Create a Map to hold the contents of this row, injecting the sql schema namespace into every map
-                    Map<String, Object> resultMap = new HashMap<>();
-                    resultMap.put("namespace", namespace);
-                    // One-based iteration: start at one and use <=.
-                    for (int i = 1; i <= nColumns; i++) {
-                        resultMap.put(meta.getColumnName(i), resultSet.getObject(i));
-                    }
-                    results.add(resultMap);
-                }
-            }
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
-        } finally {
-            DbUtils.closeQuietly(connection);
-        }
-        LOG.info("Result size: {}", results.size());
-        // Return a List of Maps, one Map for each row in the result.
-        return results;
+        return jdbcDataLoader.load(new JdbcQuery(
+            namespace,
+            preparedStatementParameters,
+            sqlStatementStringBuilder.toString()
+        ));
     }
 
     private static String getDateArgument(Map<String, Object> arguments) {
@@ -402,7 +432,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      * @param namespace database schema namespace/table prefix
      * @return
      */
-    private static void validateNamespace(String namespace) {
+    public static void validateNamespace(String namespace) {
         if (namespace == null) {
             // If namespace is null, do no attempt a query on a namespace that does not exist.
             throw new IllegalArgumentException("Namespace prefix must be provided.");
@@ -456,25 +486,53 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     }
 
     /**
-     * Construct filter clause with '=' (single string) and add values to list of parameters.
+     * Construct filter clause with '=' (single string) and add values to list of preparedStatementParameters.
      * */
     static String filterEquals(String filterField, String string, List<String> parameters) {
-        // Add string to list of parameters (to be later used to set parameters for prepared statement).
+        // Add string to list of preparedStatementParameters (to be later used to set preparedStatementParameters for prepared sqlStatement).
         parameters.add(string);
         return String.format("%s = ?", filterField);
     }
 
     /**
-     * Construct filter clause with '=' (single string) or 'in' (multiple strings) and add values to list of parameters.
+     * Construct filter clause with '=' (single string) or 'in' (multiple strings) and add values to list of preparedStatementParameters.
      * */
     static String makeInClause(String filterField, List<String> strings, List<String> parameters) {
         if (strings.size() == 1) {
             return filterEquals(filterField, strings.get(0), parameters);
         } else {
-            // Add strings to list of parameters (to be later used to set parameters for prepared statement).
+            // Add strings to list of preparedStatementParameters (to be later used to set preparedStatementParameters for prepared sqlStatement).
             parameters.addAll(strings);
             String questionMarks = String.join(", ", Collections.nCopies(strings.size(), "?"));
             return String.format("%s in (%s)", filterField, questionMarks);
+        }
+    }
+
+    public static class JdbcQuery {
+        public String namespace;
+        public List<String> preparedStatementParameters;
+        public String sqlStatement;
+
+
+        public JdbcQuery(String namespace, List<String> preparedStatementParameters, String sqlStatement) {
+            this.namespace = namespace;
+            this.preparedStatementParameters = preparedStatementParameters;
+            this.sqlStatement = sqlStatement;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            JdbcQuery jdbcQuery = (JdbcQuery) o;
+            return Objects.equals(namespace, jdbcQuery.namespace) &&
+                Objects.equals(preparedStatementParameters, jdbcQuery.preparedStatementParameters) &&
+                Objects.equals(sqlStatement, jdbcQuery.sqlStatement);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(namespace, preparedStatementParameters, sqlStatement);
         }
     }
 

@@ -57,4 +57,11 @@ public class GraphQLUtil {
                 .build();
     }
 
+    public static String namespacedTableName(String namespace, String tableName) {
+        return String.format("%s.%s", namespace, tableName);
+    }
+
+    public static String namespacedTableFieldName(String namespace, String tableName, String tableField) {
+        return String.format("%s.%s.%s", namespace, tableName, tableField);
+    }
 }

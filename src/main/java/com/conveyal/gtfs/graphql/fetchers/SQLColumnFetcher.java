@@ -1,13 +1,21 @@
 package com.conveyal.gtfs.graphql.fetchers;
 
+import com.conveyal.gtfs.graphql.GTFSGraphQL;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
+import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.sql.Connection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+
+import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableFieldName;
+import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableName;
+import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.validateNamespace;
 
 /**
  * This wraps an SQL row fetcher, extracting only a single column of the specified type.
@@ -29,17 +37,52 @@ public class SQLColumnFetcher<T> implements DataFetcher<List<T>> {
     public SQLColumnFetcher(String tableName, String parentJoinField, String columnName) {
         this.columnName = columnName;
         this.jdbcFetcher = new JDBCFetcher(tableName, parentJoinField);
-
     }
 
+    /**
+     * This get method does not use the JdbcFetcher get method because the query ultimately returns a list of values
+     * instead of a List of a Map of Objects.
+     */
     @Override
     public List<T> get (DataFetchingEnvironment environment) {
-        List<T> result = new ArrayList<>();
-        // Ideally we'd only fetch one column in the wrapped row fetcher.
-        for (Map<String, Object> row : jdbcFetcher.get(environment)) {
-            result.add((T)row.get(columnName));
+        // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
+        // the parent feed (FeedFetcher).
+        Map<String, Object> parentEntityMap = environment.getSource();
+        String namespace = (String) parentEntityMap.get("namespace");
+        validateNamespace(namespace);
+
+        // get id to filter by
+        String filterValue = (String) parentEntityMap.get(jdbcFetcher.parentJoinField);
+        if (filterValue == null) {
+            return new ArrayList<>();
         }
-        return result;
+
+        StringBuilder sqlStatementBuilder = new StringBuilder();
+        sqlStatementBuilder.append(String.format(
+            "select %s from %s where %s = ?",
+            namespacedTableFieldName(namespace, jdbcFetcher.tableName, columnName),
+            namespacedTableName(namespace, jdbcFetcher.tableName),
+            namespacedTableFieldName(namespace, jdbcFetcher.tableName, jdbcFetcher.parentJoinField)
+        ));
+
+        List<T> results = new ArrayList<>();
+        Connection connection = null;
+        try {
+            connection = GTFSGraphQL.getConnection();
+            for (Map<String, Object> row : jdbcFetcher.getSqlQueryResult(
+                new JDBCFetcher.JdbcQuery(
+                    namespace,
+                    Arrays.asList(filterValue),
+                    sqlStatementBuilder.toString()
+                ),
+                connection
+            )) {
+                results.add((T) row.get(columnName));
+            }
+        } finally {
+            DbUtils.closeQuietly(connection);
+        }
+        return results;
     }
 
 }
