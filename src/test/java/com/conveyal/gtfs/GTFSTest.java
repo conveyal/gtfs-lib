@@ -381,12 +381,19 @@ public class GTFSTest {
         return true;
     }
 
+    /**
+     * Helper function to export a GTFS from the database to a temporary zip file.
+     */
     private File exportGtfs(String namespace, DataSource dataSource, boolean fromEditor) throws IOException {
         File tempFile = File.createTempFile("snapshot", ".zip");
         GTFS.export(namespace, tempFile.getAbsolutePath(), dataSource, fromEditor);
         return tempFile;
     }
 
+    /**
+     * Run through the list of persistence expectations to make sure that the feed was imported properly into the
+     * database.
+     */
     private void assertThatImportedGtfsMeetsExpectations(
         String dbConnectionUrl,
         String namespace,
@@ -460,7 +467,8 @@ public class GTFSTest {
     }
 
     /**
-     * Helper to assert that the exported GTFS matches data expectations
+     * Helper to assert that the GTFS that was exported to a zip file matches all data expectations defined in the
+     * persistence expectations.
      */
     private void assertThatExportedGtfsMeetsExpectations(
         File tempFile,
