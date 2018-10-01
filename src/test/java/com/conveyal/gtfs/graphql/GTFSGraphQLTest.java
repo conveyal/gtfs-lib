@@ -3,11 +3,12 @@ package com.conveyal.gtfs.graphql;
 import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import graphql.GraphQL;
 import org.apache.commons.io.IOUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.FileInputStream;
@@ -32,6 +33,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
  *   in cases where the order of items in a list is not important.
  */
 public class GTFSGraphQLTest {
+    public static final Logger LOG = LoggerFactory.getLogger(GTFSGraphQLTest.class);
+
     private static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
@@ -72,13 +75,6 @@ public class GTFSGraphQLTest {
     public static void tearDownClass() {
         TestUtils.dropDB(testDBName);
         TestUtils.dropDB(testInjectionDBName);
-    }
-
-    // tests that the graphQL schema can initialize
-    @Test(timeout=5000)
-    public void canInitialize() {
-        GTFSGraphQL.initialize(testDataSource);
-        GraphQL graphQL = GTFSGraphQL.getGraphQl();
     }
 
     // tests that the root element of a feed can be fetched
@@ -181,6 +177,12 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("feedStopsStopTimeLimit.txt"), matchesSnapshot());
     }
 
+    // tests that the limit argument applies properly to a fetcher defined with autolimit set to false
+    @Test(timeout=5000)
+    public void canFetchMultiNestedEntities() throws IOException {
+        assertThat(queryGraphQL("superNested.txt"), matchesSnapshot());
+    }
+
     /**
      * attempt to fetch more than one record with SQL injection as inputs
      * the graphql library should properly escape the string and return 0 results for stops
@@ -248,15 +250,13 @@ public class GTFSGraphQLTest {
         Map<String,Object> variables,
         DataSource dataSource
     ) throws IOException {
-        GTFSGraphQL.initialize(dataSource);
-        FileInputStream inputStream = new FileInputStream(
-            getResourceFileName(String.format("graphql/%s", queryFilename))
-        );
-        return GTFSGraphQL.getGraphQl().execute(
-            IOUtils.toString(inputStream),
-            null,
-            null,
+        LOG.info("Query GraphQL with query: " + queryFilename);
+        return GTFSGraphQL.run(
+            dataSource,
+            IOUtils.toString(
+                new FileInputStream(getResourceFileName(String.format("graphql/%s", queryFilename)))
+            ),
             variables
-        ).toSpecification();
+        );
     }
 }

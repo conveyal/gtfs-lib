@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.conveyal.gtfs.graphql.GTFSGraphQL.getDataSourceFromContext;
+import static com.conveyal.gtfs.graphql.GTFSGraphQL.getJdbcQueryDataLoaderFromContext;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableFieldName;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableName;
@@ -124,6 +126,8 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
                     );
                     // Make the query and return the results!
                     return fetcher.getResults(
+                        getJdbcQueryDataLoaderFromContext(environment),
+                        getDataSourceFromContext(environment),
                         namespace,
                         new ArrayList<>(),
                         graphQLQueryArguemnts,

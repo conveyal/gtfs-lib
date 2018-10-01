@@ -7,7 +7,9 @@ import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,6 +52,7 @@ public class SQLColumnFetcher<T> implements DataFetcher<List<T>> {
         Map<String, Object> parentEntityMap = environment.getSource();
         String namespace = (String) parentEntityMap.get("namespace");
         validateNamespace(namespace);
+        DataSource dataSource = GTFSGraphQL.getDataSourceFromContext(environment);
 
         // get id to filter by
         String filterValue = (String) parentEntityMap.get(jdbcFetcher.parentJoinField);
@@ -68,7 +71,7 @@ public class SQLColumnFetcher<T> implements DataFetcher<List<T>> {
         List<T> results = new ArrayList<>();
         Connection connection = null;
         try {
-            connection = GTFSGraphQL.getConnection();
+            connection = dataSource.getConnection();
             for (Map<String, Object> row : jdbcFetcher.getSqlQueryResult(
                 new JDBCFetcher.JdbcQuery(
                     namespace,
@@ -79,6 +82,8 @@ public class SQLColumnFetcher<T> implements DataFetcher<List<T>> {
             )) {
                 results.add((T) row.get(columnName));
             }
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         } finally {
             DbUtils.closeQuietly(connection);
         }

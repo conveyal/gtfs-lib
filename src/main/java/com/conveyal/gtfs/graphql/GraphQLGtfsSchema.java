@@ -14,7 +14,6 @@ import graphql.schema.GraphQLObjectType;
 import graphql.schema.GraphQLScalarType;
 import graphql.schema.GraphQLSchema;
 import graphql.schema.GraphQLTypeReference;
-import org.dataloader.DataLoaderRegistry;
 
 import java.sql.Array;
 import java.sql.SQLException;
@@ -36,7 +35,6 @@ import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.MIN_LON;
 import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.OFFSET_ARG;
 import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.SEARCH_ARG;
 import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.TO_ARG;
-import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.jdbcDataLoader;
 import static graphql.Scalars.GraphQLFloat;
 import static graphql.Scalars.GraphQLInt;
 import static graphql.Scalars.GraphQLString;
@@ -794,13 +792,6 @@ public class GraphQLGtfsSchema {
             // TODO: Add mutations.
             // .mutation(someMutation)
             .build();
-
-    public static DataLoaderRegistry makeRegistry() {
-        // DataLoaderRegistry is a place to register all data loaders in that needs to be dispatched together
-        DataLoaderRegistry registry = new DataLoaderRegistry();
-        registry.register("jdbcfetcher", jdbcDataLoader);
-        return registry;
-    }
 
     private static class StringCoercing implements Coercing {
         @Override

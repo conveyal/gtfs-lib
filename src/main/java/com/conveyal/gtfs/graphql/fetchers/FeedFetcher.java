@@ -6,6 +6,7 @@ import graphql.schema.DataFetchingEnvironment;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
@@ -27,12 +28,13 @@ public class FeedFetcher implements DataFetcher {
     @Override
     public Map<String, Object> get (DataFetchingEnvironment environment) {
         String namespace = environment.getArgument("namespace"); // This is the unique table prefix (the "schema").
+        DataSource dataSource = GTFSGraphQL.getDataSourceFromContext(environment);
         validateNamespace(namespace);
         StringBuilder sqlBuilder = new StringBuilder();
         sqlBuilder.append(String.format("select * from feeds where namespace = '%s'", namespace));
         Connection connection = null;
         try {
-            connection = GTFSGraphQL.getConnection();
+            connection = dataSource.getConnection();
             Statement statement = connection.createStatement();
             LOG.info("SQL: {}", sqlBuilder.toString());
             if (statement.execute(sqlBuilder.toString())) {

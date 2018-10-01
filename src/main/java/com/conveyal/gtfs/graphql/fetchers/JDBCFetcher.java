@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.graphql.fetchers;
 
-import com.conveyal.gtfs.graphql.GTFSGraphQL;
 import com.conveyal.gtfs.graphql.GraphQLGtfsSchema;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
@@ -9,10 +8,11 @@ import graphql.schema.GraphQLList;
 import org.apache.commons.dbutils.DbUtils;
 import org.dataloader.BatchLoaderEnvironment;
 import org.dataloader.DataLoader;
-import org.dataloader.MappedBatchLoader;
+import org.dataloader.MappedBatchLoaderWithContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -32,6 +32,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.conveyal.gtfs.graphql.GTFSGraphQL.getDataSourceFromContext;
+import static com.conveyal.gtfs.graphql.GTFSGraphQL.getJdbcQueryDataLoaderFromContext;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.stringArg;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
@@ -75,19 +77,35 @@ public class JDBCFetcher implements DataFetcher<Object> {
     private final String sortField;
     private final boolean autoLimit;
 
-    public static final MappedBatchLoader<JdbcQuery, List<Map<String, Object>>> sqlBatchLoader =
-        (jdbcQueries) -> CompletableFuture.supplyAsync(() -> getSqlQueryResults(jdbcQueries));
+    /**
+     * This batched
+     */
+    public static final MappedBatchLoaderWithContext<JdbcQuery, List<Map<String, Object>>> sqlBatchLoader =
+        (jdbcQueries, context) -> CompletableFuture.supplyAsync(() -> getSqlQueryResults(jdbcQueries, context));
 
-    private static Map<JdbcQuery, List<Map<String, Object>>> getSqlQueryResults(Set<JdbcQuery> jdbcQueries) {
+    private static Map<JdbcQuery, List<Map<String, Object>>> getSqlQueryResults(
+        Set<JdbcQuery> jdbcQueries,
+        BatchLoaderEnvironment context
+    ) {
         Map<JdbcQuery, List<Map<String, Object>>> allResults = new HashMap<>();
-        Connection connection = null;
-        try {
-            connection = GTFSGraphQL.getConnection();
-            for (JdbcQuery jdbcQuery : jdbcQueries) {
-                allResults.put(jdbcQuery, getSqlQueryResult(jdbcQuery, connection));
+        Map<Object, Object> keyContexts = context.getKeyContexts();
+        for (JdbcQuery jdbcQuery : jdbcQueries) {
+            Connection connection = null;
+            try {
+                DataSource dataSource = ((DataSource) keyContexts.get(jdbcQuery));
+                connection = dataSource.getConnection();
+                allResults.put(
+                    jdbcQuery,
+                    getSqlQueryResult(
+                        jdbcQuery,
+                        connection
+                    )
+                );
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            } finally {
+                DbUtils.closeQuietly(connection);
             }
-        } finally {
-            DbUtils.closeQuietly(connection);
         }
         return allResults;
     }
@@ -127,8 +145,9 @@ public class JDBCFetcher implements DataFetcher<Object> {
         }
     }
 
-    public static final DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader =
-        DataLoader.newMappedDataLoader(sqlBatchLoader);
+    public static DataLoader<JdbcQuery, List<Map<String, Object>>> newJdbcDataLoader() {
+        return DataLoader.newMappedDataLoader(sqlBatchLoader);
+    }
 
     /**
      * Constructor for tables that need neither restriction by a where clause nor sorting based on the enclosing entity.
@@ -220,14 +239,6 @@ public class JDBCFetcher implements DataFetcher<Object> {
         }
         Map<String, Object> arguments = environment.getArguments();
 
-        return getResults(namespace, inClauseValues, arguments);
-    }
-
-    Object getResults (
-        String namespace,
-        List<String> inClauseValues,
-        Map<String, Object> arguments
-    ) {
         // We could select only the requested fields by examining environment.getFields(), but we just get them all.
         // The advantage of selecting * is that we don't need to validate the field names.
         // All the columns will be loaded into the Map<String, Object>,
@@ -235,6 +246,8 @@ public class JDBCFetcher implements DataFetcher<Object> {
         StringBuilder sqlBuilder = new StringBuilder();
         sqlBuilder.append("select *");
         return getResults(
+            getJdbcQueryDataLoaderFromContext(environment),
+            getDataSourceFromContext(environment),
             namespace,
             inClauseValues,
             arguments,
@@ -252,6 +265,8 @@ public class JDBCFetcher implements DataFetcher<Object> {
      * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher)
      */
     Object getResults (
+        DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader,
+        DataSource dataSource,
         String namespace,
         List<String> inClauseValues,
         Map<String, Object> graphQLQueryArguments,
@@ -366,7 +381,7 @@ public class JDBCFetcher implements DataFetcher<Object> {
             String value = (String) graphQLQueryArguments.get(SEARCH_ARG);
             if (!value.isEmpty()) {
                 // Only apply string search if string is not empty.
-                Set<String> searchFields = getSearchFields(namespace);
+                Set<String> searchFields = getSearchFields(dataSource, namespace);
                 List<String> searchClauses = new ArrayList<>();
                 for (String field : searchFields) {
                     // Double percent signs format as single percents, which are used for the string matching.
@@ -407,11 +422,14 @@ public class JDBCFetcher implements DataFetcher<Object> {
         if (offset != null && offset >= 0) {
             sqlStatementStringBuilder.append(" offset ").append(offset);
         }
-        return jdbcDataLoader.load(new JdbcQuery(
-            namespace,
-            preparedStatementParameters,
-            sqlStatementStringBuilder.toString()
-        ));
+        return jdbcDataLoader.load(
+            new JdbcQuery(
+                namespace,
+                preparedStatementParameters,
+                sqlStatementStringBuilder.toString()
+            ),
+            dataSource
+        );
     }
 
     private static String getDateArgument(Map<String, Object> arguments) {
@@ -447,14 +465,14 @@ public class JDBCFetcher implements DataFetcher<Object> {
      * Get the list of fields to perform a string search on for the provided table. Each table included here must have
      * the {@link #SEARCH_ARG} argument applied in the query definition.
      */
-    private Set<String> getSearchFields(String namespace) {
+    private Set<String> getSearchFields(DataSource dataSource, String namespace) {
         // Check table metadata for presence of columns.
 //        long startTime = System.currentTimeMillis();
         Set<String> columnsForTable = new HashSet<>();
         List<String> searchColumns = new ArrayList<>();
         Connection connection = null;
         try {
-            connection = GTFSGraphQL.getConnection();
+            connection = dataSource.getConnection();
             ResultSet columns = connection.getMetaData().getColumns(null, namespace, tableName, null);
             while (columns.next()) {
                 String column = columns.getString(4);

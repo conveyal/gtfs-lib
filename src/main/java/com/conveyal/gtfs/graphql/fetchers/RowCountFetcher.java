@@ -11,6 +11,7 @@ import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -57,12 +58,13 @@ public class RowCountFetcher implements DataFetcher {
     public Object get(DataFetchingEnvironment environment) {
         Map<String, Object> parentFeedMap = environment.getSource();
         Map<String, Object> arguments = environment.getArguments();
+        DataSource dataSource = GTFSGraphQL.getDataSourceFromContext(environment);
         List<String> argKeys = new ArrayList<>(arguments.keySet());
         List<String> parameters = new ArrayList<>();
         String namespace = (String) parentFeedMap.get("namespace");
         Connection connection = null;
         try {
-            connection = GTFSGraphQL.getConnection();
+            connection = dataSource.getConnection();
             List<String> fields = new ArrayList<>();
             fields.add("count(*)");
             List<String> clauses = new ArrayList<>();

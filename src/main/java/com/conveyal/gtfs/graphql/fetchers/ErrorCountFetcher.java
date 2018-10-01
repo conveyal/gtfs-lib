@@ -8,6 +8,7 @@ import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -37,9 +38,10 @@ public class ErrorCountFetcher implements DataFetcher {
         List<ErrorCount> errorCounts = new ArrayList();
         Map<String, Object> parentFeedMap = environment.getSource();
         String namespace = (String) parentFeedMap.get("namespace");
+        DataSource dataSource = GTFSGraphQL.getDataSourceFromContext(environment);
         Connection connection = null;
         try {
-            connection = GTFSGraphQL.getConnection();
+            connection = dataSource.getConnection();
             Statement statement = connection.createStatement();
             String sql = String.format("select error_type, count(*) from %s.errors group by error_type", namespace);
             LOG.info("SQL: {}", sql);
