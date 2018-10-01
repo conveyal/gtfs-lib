@@ -57,10 +57,16 @@ public class GraphQLUtil {
                 .build();
     }
 
+    /**
+     * Helper method to get the namespaced table name
+     */
     public static String namespacedTableName(String namespace, String tableName) {
         return String.format("%s.%s", namespace, tableName);
     }
 
+    /**
+     * Helper method to get the string of the column name with the namespace and table name
+     */
     public static String namespacedTableFieldName(String namespace, String tableName, String tableField) {
         return String.format("%s.%s.%s", namespace, tableName, tableField);
     }

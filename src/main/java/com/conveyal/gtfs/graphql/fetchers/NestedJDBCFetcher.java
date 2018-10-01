@@ -24,10 +24,10 @@ import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.makeInClause;
 import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 
 /**
- * This fetcher uses nested calls to the general JDBCFetcher for SQL data. It uses the parent entity and a series of
- * joins to leap frog from one entity to another more distantly-related entity. For example, if we want to know the
- * routes that serve a specific stop, starting with a top-level stop type, we can nest joins from stop ABC -> pattern
- * stops -> patterns -> routes (see below example implementation for more details).
+ * This fetcher creates one big query by joining tables in the order specified in the initial definition.  The data
+ * returned will only consist of the columns from the final table definition.  All other tables are assumed to be
+ * intermediate tables used to create joins to obtain filtered data from the final table.  Also, any grqphQL arguments
+ * are applied only to the final table.
  */
 public class NestedJDBCFetcher implements DataFetcher<Object> {
 
@@ -63,6 +63,11 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
                 .build();
     }
 
+    /**
+     * get the data for the nested query by making a sql query.  The sql query is constructed by adding tables to be
+     * queried and joining them via where clauses.  This ultimately returns a CompleteableFuture value that is
+     * executed by graphQL at some strategic point in time.
+     */
     @Override
     public Object get (DataFetchingEnvironment environment) {
         // GetSource is the context in which this this DataFetcher has been created, in this case a map representing

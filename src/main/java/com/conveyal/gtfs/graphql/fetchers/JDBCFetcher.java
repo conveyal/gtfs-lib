@@ -8,7 +8,6 @@ import graphql.schema.GraphQLList;
 import org.apache.commons.dbutils.DbUtils;
 import org.dataloader.BatchLoaderEnvironment;
 import org.dataloader.DataLoader;
-import org.dataloader.MappedBatchLoaderWithContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,11 +77,17 @@ public class JDBCFetcher implements DataFetcher<Object> {
     private final boolean autoLimit;
 
     /**
-     * This batched
+     * Get a new MappedBatchLoaderWithContext batch loader that is able to batch multiple queries and cache the results.
      */
-    public static final MappedBatchLoaderWithContext<JdbcQuery, List<Map<String, Object>>> sqlBatchLoader =
-        (jdbcQueries, context) -> CompletableFuture.supplyAsync(() -> getSqlQueryResults(jdbcQueries, context));
+    public static DataLoader<JdbcQuery, List<Map<String, Object>>> newJdbcDataLoader() {
+        return DataLoader.newMappedDataLoader(
+            (jdbcQueries, context) -> CompletableFuture.supplyAsync(() -> getSqlQueryResults(jdbcQueries, context))
+        );
+    }
 
+    /**
+     * Method where batched sql queries are all ran at once.
+     */
     private static Map<JdbcQuery, List<Map<String, Object>>> getSqlQueryResults(
         Set<JdbcQuery> jdbcQueries,
         BatchLoaderEnvironment context
@@ -92,6 +97,7 @@ public class JDBCFetcher implements DataFetcher<Object> {
         for (JdbcQuery jdbcQuery : jdbcQueries) {
             Connection connection = null;
             try {
+                // get the dataSource from the context of this specific jdbcQuery
                 DataSource dataSource = ((DataSource) keyContexts.get(jdbcQuery));
                 connection = dataSource.getConnection();
                 allResults.put(
@@ -110,6 +116,12 @@ public class JDBCFetcher implements DataFetcher<Object> {
         return allResults;
     }
 
+    /**
+     * Helper method to actually execute some sql.
+     *
+     * @param jdbcQuery The query to execute.  Object includes namespace, statement, and preparedStatementParameters
+     * @param connection The database connection to use
+     */
     public static List<Map<String, Object>> getSqlQueryResult (JdbcQuery jdbcQuery, Connection connection) {
         try {
             List<Map<String, Object>> results = new ArrayList<>();
@@ -143,10 +155,6 @@ public class JDBCFetcher implements DataFetcher<Object> {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public static DataLoader<JdbcQuery, List<Map<String, Object>>> newJdbcDataLoader() {
-        return DataLoader.newMappedDataLoader(sqlBatchLoader);
     }
 
     /**
@@ -194,20 +202,9 @@ public class JDBCFetcher implements DataFetcher<Object> {
                 .build();
     }
 
-    // Horrifically, we're going from SQL response to Gtfs-lib Java model object to GraphQL Java object to JSON.
-    // What if we did direct SQL->JSON?
-    // Could we transform JDBC ResultSets directly to JSON?
-    // With Jackson streaming API we can make a ResultSet serializer: https://stackoverflow.com/a/8120442
-
-    // We could apply a transformation from ResultSet to Gtfs-lib model object, but then more DataFetchers
-    // need to be defined to pull the fields out of those model objects. I'll try to skip those intermediate objects.
-
-    // Unfortunately we can't just apply DataFetchers directly to the ResultSets because they're cursors, and we'd
-    // have to somehow advance them at the right moment. So we need to transform the SQL results into fully materialized
-    // Java objects, then transform those into GraphQL fields. Fortunately the final transformation is trivial fetching
-    // from a Map<String, Object>.
-    // But what are the internal GraphQL objects, i.e. what does an ExecutionResult return? Are they Map<String, Object>?
-
+    /**
+     * get some data by fetching data from the database.
+     */
     @Override
     public Object get (DataFetchingEnvironment environment) {
         // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
@@ -262,7 +259,11 @@ public class JDBCFetcher implements DataFetcher<Object> {
 
     /**
      * Handle fetching functionality for a given namespace, set of join values, and arguments. This is broken out from
-     * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher)
+     * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher).  This method
+     * ultimately returns a CompletableFuture result by calling the load method on the jdbcDataLoader argument.
+     * Therefore, this can't be directly used to get the results of a sql query.  Instead it is intended to be used only
+     * by DataFetchers that get their data by making a sql query and get their results in the format of
+     * List<Map<String, Object>>.
      */
     Object getResults (
         DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader,
@@ -526,6 +527,9 @@ public class JDBCFetcher implements DataFetcher<Object> {
         }
     }
 
+    /**
+     * Helper class for batching sql queries to the dataloader
+     */
     public static class JdbcQuery {
         public String namespace;
         public List<String> preparedStatementParameters;
