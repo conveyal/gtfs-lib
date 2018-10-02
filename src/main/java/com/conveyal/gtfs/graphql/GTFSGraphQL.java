@@ -4,6 +4,7 @@ import com.conveyal.gtfs.graphql.fetchers.JDBCFetcher;
 import graphql.ExecutionInput;
 import graphql.GraphQL;
 import graphql.execution.instrumentation.dataloader.DataLoaderDispatcherInstrumentation;
+import graphql.introspection.IntrospectionQuery;
 import graphql.schema.DataFetchingEnvironment;
 import org.dataloader.DataLoader;
 import org.dataloader.DataLoaderRegistry;
@@ -50,6 +51,11 @@ public class GTFSGraphQL {
             )
             .toSpecification();
     }
+
+    public static final Map<String, Object> introspectedSchema = GraphQL.newGraphQL(GraphQLGtfsSchema.feedBasedSchema)
+        .build()
+        .execute(IntrospectionQuery.INTROSPECTION_QUERY)
+        .toSpecification();
 
     /**
      * Helper to obtain the jdbcQueryLoader.  It is critical that the same dataloader in the DataloaderRegistry /
