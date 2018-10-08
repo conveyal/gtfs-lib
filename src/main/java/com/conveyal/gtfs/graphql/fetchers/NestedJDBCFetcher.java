@@ -13,6 +13,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import static com.conveyal.gtfs.graphql.GTFSGraphQL.getDataSourceFromContext;
 import static com.conveyal.gtfs.graphql.GTFSGraphQL.getJdbcQueryDataLoaderFromContext;
@@ -69,7 +70,7 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
      * executed by graphQL at some strategic point in time.
      */
     @Override
-    public Object get (DataFetchingEnvironment environment) {
+    public CompletableFuture<List<Map<String, Object>>> get (DataFetchingEnvironment environment) {
         // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
         // the parent feed (FeedFetcher).
         Map<String, Object> parentEntityMap = environment.getSource();
@@ -100,7 +101,7 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
                 String inClauseValue = (String) enclosingEntity.get(fetcher.parentJoinField);
                 // Check for null parentJoinValue to protect against NPE.
                 if (inClauseValue == null) {
-                    return new ArrayList<>();
+                    return new CompletableFuture<>();
                 } else {
                     inClauseValues.add(inClauseValue);
                 }
@@ -147,6 +148,6 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
         }
         // This piece of code will never be reached because of how things get returned above.
         // But it's here to make java happy.
-        return new ArrayList<>();
+        return new CompletableFuture<>();
     }
 }

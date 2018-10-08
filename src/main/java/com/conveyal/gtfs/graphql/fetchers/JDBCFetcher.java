@@ -206,7 +206,7 @@ public class JDBCFetcher implements DataFetcher<Object> {
      * get some data by fetching data from the database.
      */
     @Override
-    public Object get (DataFetchingEnvironment environment) {
+    public CompletableFuture<List<Map<String, Object>>> get (DataFetchingEnvironment environment) {
         // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
         // the parent feed (FeedFetcher).
         Map<String, Object> parentEntityMap = environment.getSource();
@@ -231,7 +231,7 @@ public class JDBCFetcher implements DataFetcher<Object> {
             String inClauseString = inClauseValue == null ? null : inClauseValue.toString();
             inClauseValues.add(inClauseString);
             if (inClauseValue == null) {
-                return new ArrayList<>();
+                return new CompletableFuture<>();
             }
         }
         Map<String, Object> arguments = environment.getArguments();
@@ -265,7 +265,7 @@ public class JDBCFetcher implements DataFetcher<Object> {
      * by DataFetchers that get their data by making a sql query and get their results in the format of
      * List<Map<String, Object>>.
      */
-    Object getResults (
+    CompletableFuture<List<Map<String, Object>>> getResults (
         DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader,
         DataSource dataSource,
         String namespace,
