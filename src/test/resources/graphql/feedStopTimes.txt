@@ -1,0 +1,17 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    stop_times {
+      arrival_time
+      departure_time
+      drop_off_type
+      pickup_type
+      shape_dist_traveled
+      stop_headsign
+      stop_id
+      stop_sequence
+      timepoint
+      trip_id
+    }
+  }
+}

@@ -1,12 +1,18 @@
 package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.sql.DataSource;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Map;
+
+import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
 /**
  * This is an abstraction for something that stores GTFS loading and validation errors one by one.
@@ -27,8 +33,6 @@ public class SQLErrorStorage {
     // record errors.
     private Connection connection;
 
-    private int errorCount; // This serves as a unique ID, so it must persist across multiple validator runs.
-
     private PreparedStatement insertError;
     private PreparedStatement insertInfo;
 
@@ -36,13 +40,17 @@ public class SQLErrorStorage {
     // Should include any dot or other separator. May also be the empty string if you want no prefix added.
     private String tablePrefix;
 
+    // This serves as a unique ID, so it must persist across multiple validator runs. It is, however, distinct from the
+    // count, which should only be determined with a SQL query.
+    private int errorId;
+
     // How many errors to insert at a time in a batch, for efficiency.
     private static final long INSERT_BATCH_SIZE = 500;
 
-    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) {
-        // TablePrefix should always be internally generated so doesn't need to be sanitized.
+    public SQLErrorStorage (Connection connection, String tablePrefix, boolean createTables) throws InvalidNamespaceException {
+        ensureValidNamespace(tablePrefix);
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
-        errorCount = 0;
+        errorId = 0;
         this.connection = connection;
         if (createTables) createErrorTables();
         else reconnectErrorTables();
@@ -52,7 +60,7 @@ public class SQLErrorStorage {
     public void storeError (NewGTFSError error) {
         try {
             // Insert one row for the error itself
-            insertError.setInt(1, errorCount);
+            insertError.setInt(1, errorId);
             insertError.setString(2, error.errorType.name());
             // Using SetObject to allow null values, do all target DBs support this?
             insertError.setObject(3, error.entityType == null ? null : error.entityType.getSimpleName());
@@ -63,35 +71,60 @@ public class SQLErrorStorage {
             insertError.addBatch();
             // Insert all key-value info pairs for the error
             for (Map.Entry<String, String> entry : error.errorInfo.entrySet()) {
-                insertInfo.setInt(1, errorCount);
+                insertInfo.setInt(1, errorId);
                 insertInfo.setString(2, entry.getKey());
                 insertInfo.setString(3, entry.getValue());
                 insertInfo.addBatch();
             }
-            if (errorCount % INSERT_BATCH_SIZE == 0) {
+            if (errorId % INSERT_BATCH_SIZE == 0) {
                 insertError.executeBatch();
                 insertInfo.executeBatch();
             }
-            errorCount += 1;
+            errorId += 1;
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }
     }
 
+    /**
+     * Commits any outstanding error inserts and returns the error count via a SQL query.
+     */
     public int getErrorCount () {
-        return errorCount;
+        try {
+            // Ensure any outstanding inserts are committed so that count is accurate.
+            this.commit();
+            Statement statement = connection.createStatement();
+            statement.execute(String.format("select count(*) from %serrors", tablePrefix));
+            ResultSet resultSet = statement.getResultSet();
+            resultSet.next();
+            int count = resultSet.getInt(1);
+            return count;
+        } catch (SQLException ex) {
+            throw new StorageException(ex);
+        }
     }
 
     /**
-     * This commits any remaining inserts, commits the transaction, and closes the connection permanently.
-     * commitAndClose() should only be called when access to SQLErrorStorage is no longer needed.
+     * This executes any remaining inserts and commits the transaction.
      */
-    public void commitAndClose() {
+    private void commit() {
         try {
             // Execute any remaining batch inserts and commit the transaction.
             insertError.executeBatch();
             insertInfo.executeBatch();
             connection.commit();
+        } catch (SQLException ex) {
+            throw new StorageException(ex);
+        }
+    }
+
+    /**
+     * This executes any remaining inserts, commits the transaction, and closes the connection permanently.
+     * commitAndClose() should only be called when access to SQLErrorStorage is no longer needed.
+     */
+    public void commitAndClose() {
+        try {
+            this.commit();
             // Close the connection permanently (should be called only after errorStorage instance no longer needed).
             connection.close();
         } catch (SQLException ex) {
@@ -137,9 +170,9 @@ public class SQLErrorStorage {
             statement.execute(String.format("select max(error_id) from %serrors", tablePrefix));
             ResultSet resultSet = statement.getResultSet();
             resultSet.next();
-            errorCount = resultSet.getInt(1);
-            LOG.info("Reconnected to errors table, max error ID is {}.", errorCount);
-            errorCount += 1; // Error count is zero based, add one to avoid duplicate error key
+            errorId = resultSet.getInt(1);
+            LOG.info("Reconnected to errors table, max error ID is {}.", errorId);
+            errorId += 1; // Error count is zero based, add one to avoid duplicate error key
         } catch (SQLException ex) {
             throw new StorageException(ex);
         }

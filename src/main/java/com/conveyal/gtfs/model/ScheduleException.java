@@ -67,11 +67,11 @@ public class ScheduleException extends Entity {
             case CUSTOM:
                 return customSchedule != null && customSchedule.contains(calendar.service_id);
             case SWAP:
-                // new case to either swap one service id for another or add/remove a specific service
+                // Exception type which explicitly adds or removes a specific service for the provided dates.
                 if (addedService != null && addedService.contains(calendar.service_id)) {
                     return true;
                 }
-                else if (removedService != null && removedService.contains(calendar.service_id)) {
+                if (removedService != null && removedService.contains(calendar.service_id)) {
                     return false;
                 }
             default:

@@ -1,0 +1,22 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "services" : [ {
+        "dates" : [ "20170915", "20170917", "20170916" ],
+        "duration_seconds" : "120",
+        "durations" : [ {
+          "duration_seconds" : 120,
+          "route_type" : 3
+        } ],
+        "n_days_active" : "3",
+        "service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57",
+        "trips" : [ {
+          "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+        }, {
+          "trip_id" : "frequency-trip"
+        } ]
+      } ]
+    }
+  }
+}

@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.graphql;
 
-import com.conveyal.gtfs.GTFS;
 import graphql.GraphQL;
 
 import javax.sql.DataSource;
@@ -23,7 +22,8 @@ public class GTFSGraphQL {
     /** Username and password can be null if connecting to a local instance with host-based authentication. */
     public static void initialize (DataSource dataSource) {
         GTFSGraphQL.dataSource = dataSource;
-        GRAPHQL = new GraphQL(GraphQLGtfsSchema.feedBasedSchema);
+        GRAPHQL = GraphQL.newGraphQL(GraphQLGtfsSchema.feedBasedSchema)
+            .build();
     }
 
     public static Connection getConnection() {

@@ -189,7 +189,7 @@ public class JdbcGTFSFeedConverter {
             // FIXME: will this throw an NPE if feedId or feedVersion are empty?
             insertStatement.setString(4, feedId.isEmpty() ? null : feedId);
             insertStatement.setString(5, feedVersion.isEmpty() ? null : feedVersion);
-            insertStatement.setString(6, "mapdb_gtfs_feed"); // snapshotOf
+            insertStatement.setString(6, "mapdb_gtfs_feed"); // filename
             insertStatement.execute();
             connection.commit();
             LOG.info("Created new feed namespace: {}", insertStatement);

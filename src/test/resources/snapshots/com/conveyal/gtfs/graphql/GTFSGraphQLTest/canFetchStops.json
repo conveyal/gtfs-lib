@@ -1,0 +1,68 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "stops" : [ {
+        "id" : 2,
+        "location_type" : 0,
+        "parent_station" : null,
+        "patterns" : [ {
+          "pattern_id" : "1"
+        } ],
+        "routes" : [ {
+          "route_id" : "1"
+        } ],
+        "stop_code" : null,
+        "stop_desc" : null,
+        "stop_id" : "4u6g",
+        "stop_lat" : 37.0612132,
+        "stop_lon" : -122.0074332,
+        "stop_name" : "Butler Ln",
+        "stop_time_count" : 2,
+        "stop_times" : [ {
+          "stop_id" : "4u6g",
+          "stop_sequence" : 1,
+          "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+        }, {
+          "stop_id" : "4u6g",
+          "stop_sequence" : 1,
+          "trip_id" : "frequency-trip"
+        } ],
+        "stop_timezone" : null,
+        "stop_url" : null,
+        "wheelchair_boarding" : null,
+        "zone_id" : null
+      }, {
+        "id" : 3,
+        "location_type" : 0,
+        "parent_station" : null,
+        "patterns" : [ {
+          "pattern_id" : "1"
+        } ],
+        "routes" : [ {
+          "route_id" : "1"
+        } ],
+        "stop_code" : null,
+        "stop_desc" : null,
+        "stop_id" : "johv",
+        "stop_lat" : 37.0590172,
+        "stop_lon" : -122.0096058,
+        "stop_name" : "Scotts Valley Dr & Victor Sq",
+        "stop_time_count" : 2,
+        "stop_times" : [ {
+          "stop_id" : "johv",
+          "stop_sequence" : 2,
+          "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+        }, {
+          "stop_id" : "johv",
+          "stop_sequence" : 2,
+          "trip_id" : "frequency-trip"
+        } ],
+        "stop_timezone" : null,
+        "stop_url" : null,
+        "wheelchair_boarding" : null,
+        "zone_id" : null
+      } ]
+    }
+  }
+}

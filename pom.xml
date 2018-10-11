@@ -8,7 +8,7 @@
 
   <groupId>com.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
-  <version>3.4.0-SNAPSHOT</version>
+  <version>4.0.1-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <licenses>
@@ -212,6 +212,11 @@
       <name>Open Source Geospatial Foundation Repository</name>
       <url>http://download.osgeo.org/webdav/geotools/</url>
     </repository>
+    <!--  used for importing java projects from github -->
+    <repository>
+      <id>jitpack.io</id>
+      <url>https://jitpack.io</url>
+    </repository>
   </repositories>
 
   <dependencies>
@@ -256,6 +261,12 @@
       <groupId>org.hamcrest</groupId>
       <artifactId>java-hamcrest</artifactId>
       <version>2.0.0.0</version>
+    </dependency>
+    <!-- Snapshotting library for testing -->
+    <dependency>
+      <groupId>com.github.Zenika</groupId>
+      <artifactId>java-snapshot-matcher</artifactId>
+      <version>7e6ed4049eb637334e56f84bdd23ea74da05f141</version>
     </dependency>
     <!-- Disk-backed storage that looks like a Java map. -->
     <dependency>
