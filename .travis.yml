@@ -4,6 +4,9 @@ language: java
 jdk:
   - oraclejdk8
 
+addons:
+  postgresql: "9.6"
+
 # Replace Travis's default Maven installation step with a no-op.
 # This avoids redundantly pre-running 'mvn install -DskipTests' every time.
 install: true
@@ -15,6 +18,10 @@ before_install: |
     openssl aes-256-cbc -K $encrypted_c5b9f071c998_key -iv $encrypted_c5b9f071c998_iv -in maven-artifact-signing-key.asc.enc -out maven-artifact-signing-key.asc -d
     gpg --import --batch maven-artifact-signing-key.asc
   fi
+
+# Install semantic-release
+before_script:
+  - yarn global add @conveyal/maven-semantic-release semantic-release
 
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
@@ -33,9 +40,6 @@ script:
 # The cache seems to be uploaded immediately after the Travis stage "script" so we include this deletion in the script.
 - rm -rf $HOME/.m2/repository/com/conveyal
 
-after_success:
-  - bash <(curl -s https://codecov.io/bash)
-
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE
 env:
   global:
@@ -52,11 +56,13 @@ sudo: false
 cache:
   directories:
     - "$HOME/.m2/repository"
+    - "$HOME/.yarn-cache"
 
 # Notify us of the build status on the Slack channel     
 notifications:
   slack: conveyal:WQxmWiu8PdmujwLw4ziW72Gc
 
-# Push results to codecov.io
+# Push results to codecov.io and run semantic-release (releases only created on pushes to the master branch).
 after_success:
   - bash <(curl -s https://codecov.io/bash)
+  - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github --verify-release @conveyal/maven-semantic-release

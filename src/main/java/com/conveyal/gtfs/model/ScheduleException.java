@@ -3,7 +3,6 @@ package com.conveyal.gtfs.model;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -91,6 +90,10 @@ public class ScheduleException extends Entity {
 
         ExemplarServiceDescriptor(int value) {
             this.value = value;
+        }
+
+        public int getValue() {
+            return value;
         }
     }
 
