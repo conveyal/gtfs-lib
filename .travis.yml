@@ -4,6 +4,9 @@ language: java
 jdk:
   - oraclejdk8
 
+addons:
+  postgresql: "9.6"
+
 # Replace Travis's default Maven installation step with a no-op.
 # This avoids redundantly pre-running 'mvn install -DskipTests' every time.
 install: true

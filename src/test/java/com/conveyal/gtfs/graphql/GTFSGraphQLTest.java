@@ -166,7 +166,7 @@ public class GTFSGraphQLTest {
     public void canFetchRoutesAndFilterTripsByDateAndTime() throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("namespace", testNamespace);
-        variables.put("date", "20170916");
+        variables.put("date", "20170915");
         variables.put("from", 24000);
         variables.put("to", 28000);
         assertThat(
