@@ -105,6 +105,7 @@ public class Table {
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
+        new StringField("agency_id", OPTIONAL), // FIXME? only required if there are more than one
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
@@ -112,7 +113,7 @@ public class Table {
     // feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
-        new StringField("feed_publisher_url", REQUIRED),
+        new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
@@ -129,8 +130,9 @@ public class Table {
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
-        // FIXME: Should the route type max value be equivalent to GTFS spec's max?
-        new IntegerField("route_type", REQUIRED, 999),
+        // Max route type according to the GTFS spec is 7; however, there is a GTFS proposal that could see this 
+        // max value grow to around 1800: https://groups.google.com/forum/#!msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J
+        new IntegerField("route_type", REQUIRED, 1800),
         new URLField("route_url",  OPTIONAL),
         new URLField("route_branding_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
@@ -138,6 +140,7 @@ public class Table {
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
+        new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
