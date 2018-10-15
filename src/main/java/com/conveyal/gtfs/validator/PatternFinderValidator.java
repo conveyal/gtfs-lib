@@ -157,6 +157,7 @@ public class PatternFinderValidator extends TripValidator {
                         : departure - arrival;
 
                     insertPatternStopStatement.setString(1, pattern.pattern_id);
+                    // Stop sequence is zero-based.
                     setIntParameter(insertPatternStopStatement, 2, i);
                     insertPatternStopStatement.setString(3, stopId);
                     setIntParameter(insertPatternStopStatement,4, travelTime);

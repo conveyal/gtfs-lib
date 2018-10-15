@@ -16,6 +16,7 @@ import java.io.Serializable;
 public class FeedLoadResult implements Serializable {
 
     private static final long serialVersionUID = 1L;
+    public String filename;
     public String uniqueIdentifier;
     public int errorCount;
     public String fatalException;
