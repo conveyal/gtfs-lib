@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 
-import static com.conveyal.gtfs.graphql.GTFSGraphQL.getDataSourceFromContext;
-import static com.conveyal.gtfs.graphql.GTFSGraphQL.getJdbcQueryDataLoaderFromContext;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.multiStringArg;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableFieldName;
 import static com.conveyal.gtfs.graphql.GraphQLUtil.namespacedTableName;
@@ -79,16 +77,16 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
         // So it should always be represented as a map with a namespace key.
         String namespace = (String) parentEntityMap.get("namespace");
 
-        // Arguments are only applied for the final fetcher iteration.
-        // FIXME: NestedJDBCFetcher may need to be refactored so that it avoids conventions of JDBCFetcher (like the
-        // implied limit of 50 records). For now, the autoLimit field has been added to JDBCFetcher, so that certain
-        // fetchers (like the nested ones used solely for joins here) will not apply the limit by default.
-        Map<String, Object> graphQLQueryArguemnts = environment.getArguments();;
-
+        // the lastFetcher is used to keep track of the last JdbcFetcher seen.  This is used to create join conditions
+        // and eventually execute the query.
         JDBCFetcher lastFetcher = null;
-        List<String> preparedStatementParameters = new ArrayList<>();
+
+        // The statement needs to be built to specific a namespaced table name in order to select only the fields from
+        // the last fetcher
+        StringBuilder sqlStatementStringBuilder = new StringBuilder();
         Set<String> fromTables = new HashSet<>();
         List<String> whereConditions = new ArrayList<>();
+        List<String> preparedStatementParameters = new ArrayList<>();
         for (int i = 0; i < jdbcFetchers.length; i++) {
             JDBCFetcher fetcher = jdbcFetchers[i];
             String tableName = namespacedTableName(namespace, fetcher.tableName);
@@ -124,30 +122,23 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
                 // check if we have reached the final nested table
                 if (i == jdbcFetchers.length - 1) {
                     // final nested table reached!
-                    // create a sqlBuilder to select all values from the final table
-                    StringBuilder sqlStatementStringBuilder = new StringBuilder();
+                    // Add the namespaced select * to the sqlStatementStringBuilder to select all values from only the
+                    // final table.
                     sqlStatementStringBuilder.append("select ");
                     sqlStatementStringBuilder.append(
                         namespacedTableFieldName(namespace, fetcher.tableName, "*")
-                    );
-                    // Make the query and return the results!
-                    return fetcher.getResults(
-                        getJdbcQueryDataLoaderFromContext(environment),
-                        getDataSourceFromContext(environment),
-                        namespace,
-                        new ArrayList<>(),
-                        graphQLQueryArguemnts,
-                        preparedStatementParameters,
-                        whereConditions,
-                        fromTables,
-                        sqlStatementStringBuilder
                     );
                 }
             }
             lastFetcher = fetcher;
         }
-        // This piece of code will never be reached because of how things get returned above.
-        // But it's here to make java happy.
-        return new CompletableFuture<>();
+        // Make the query and return the results!
+        return lastFetcher.getResults(
+            environment,
+            sqlStatementStringBuilder,
+            fromTables,
+            whereConditions,
+            preparedStatementParameters
+        );
     }
 }

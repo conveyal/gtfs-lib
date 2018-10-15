@@ -207,22 +207,11 @@ public class JDBCFetcher implements DataFetcher<Object> {
      */
     @Override
     public CompletableFuture<List<Map<String, Object>>> get (DataFetchingEnvironment environment) {
-        // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
-        // the parent feed (FeedFetcher).
-        Map<String, Object> parentEntityMap = environment.getSource();
-
-        // Apparently you can't get the arguments from the parent - how do you have arguments on sub-fields?
-        // It looks like you have to redefine the argument on each subfield and pass it explicitly in the GraphQL request.
-
-        // String namespace = environment.getArgument("namespace"); // This is going to be the unique prefix, not the feedId in the usual sense
-        // This DataFetcher only makes sense when the enclosing parent object is a feed or something in a feed.
-        // So it should always be represented as a map with a namespace key.
-
-        String namespace = (String) parentEntityMap.get("namespace");
-
         // If we are fetching an item nested within a GTFS entity in the GraphQL query, we want to add an SQL "where"
         // clause using the values found here. Note, these are used in the below getResults call.
         List<String> inClauseValues = new ArrayList<>();
+        List<String> whereConditions = new ArrayList<>();
+        List<String> preparedStatementParameters = new ArrayList<>();
         if (parentJoinField != null) {
             Map<String, Object> enclosingEntity = environment.getSource();
             // FIXME: THIS IS BROKEN if parentJoinValue is null!!!!
@@ -233,8 +222,8 @@ public class JDBCFetcher implements DataFetcher<Object> {
             if (inClauseValue == null) {
                 return new CompletableFuture<>();
             }
+            whereConditions.add(makeInClause(parentJoinField, inClauseValues, preparedStatementParameters));
         }
-        Map<String, Object> arguments = environment.getArguments();
 
         // We could select only the requested fields by examining environment.getFields(), but we just get them all.
         // The advantage of selecting * is that we don't need to validate the field names.
@@ -243,17 +232,11 @@ public class JDBCFetcher implements DataFetcher<Object> {
         StringBuilder sqlBuilder = new StringBuilder();
         sqlBuilder.append("select *");
         return getResults(
-            getJdbcQueryDataLoaderFromContext(environment),
-            getDataSourceFromContext(environment),
-            namespace,
-            inClauseValues,
-            arguments,
-            // No additional prepared sqlStatement preparedStatementParameters, where conditions or tables are needed beyond those added by
-            // default in the next method.
-            new ArrayList<>(),
-            new ArrayList<>(),
-            new HashSet<>(),
-            sqlBuilder
+            environment,
+            sqlBuilder,
+            new HashSet<>(), // No additional tables are needed beyond those added by default in the next method.
+            whereConditions,
+            preparedStatementParameters
         );
     }
 
@@ -264,18 +247,39 @@ public class JDBCFetcher implements DataFetcher<Object> {
      * Therefore, this can't be directly used to get the results of a sql query.  Instead it is intended to be used only
      * by DataFetchers that get their data by making a sql query and get their results in the format of
      * List<Map<String, Object>>.
+     *
+     * @param environment The datafetching environement of the current GraphQL entity being fetched.
+     * @param sqlStatementStringBuilder The beginnings of the sql statement string.  The NestedJdbcFetcher must select
+     *                                  only from the final table, so this argument is needed.
+     * @param fromTables The tables to select from.
+     * @param whereConditions A list of where conditions to apply to the query.
+     * @param preparedStatementParameters A list of prepared statement parameters to be sent to the prepared statement
+     *                                    once the query is ran.
      */
     CompletableFuture<List<Map<String, Object>>> getResults (
-        DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader,
-        DataSource dataSource,
-        String namespace,
-        List<String> inClauseValues,
-        Map<String, Object> graphQLQueryArguments,
-        List<String> preparedStatementParameters,
-        List<String> whereConditions,
+        DataFetchingEnvironment environment,
+        StringBuilder sqlStatementStringBuilder,
         Set<String> fromTables,
-        StringBuilder sqlStatementStringBuilder
+        List<String> whereConditions,
+        List<String> preparedStatementParameters
     ) {
+        // GetSource is the context in which this this DataFetcher has been created, in this case a map representing
+        // the parent feed (FeedFetcher).
+        Map<String, Object> parentEntityMap = environment.getSource();
+
+        // This DataFetcher only makes sense when the enclosing parent object is a feed or something in a feed.
+        // So it should always be represented as a map with a namespace key.
+        String namespace = (String) parentEntityMap.get("namespace");
+
+        // these can be additional arguments to apply to the query such as a limit on the amount of results
+        Map<String, Object> graphQLQueryArguments = environment.getArguments();
+
+        // Use the datasource defined in theDataFetching environment to query the database.
+        DataSource dataSource = getDataSourceFromContext(environment);
+
+        // Make sure to get the dataloader defined in the environment to avoid caching sql results in future requests.
+        DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader = getJdbcQueryDataLoaderFromContext(environment);
+
         // This will contain one Map<String, Object> for each row fetched from the database table.
         List<Map<String, Object>> results = new ArrayList<>();
         if (graphQLQueryArguments == null) graphQLQueryArguments = new HashMap<>();
@@ -288,12 +292,6 @@ public class JDBCFetcher implements DataFetcher<Object> {
 
         // The order by clause will go here.
         String sortBy = "";
-        // If we are fetching an item nested within a GTFS entity in the GraphQL query, we want to add an SQL "where"
-        // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
-        // Note, this is assuming the type of the field in the parent is a string.
-        if (parentJoinField != null && inClauseValues != null && !inClauseValues.isEmpty()) {
-            whereConditions.add(makeInClause(parentJoinField, inClauseValues, preparedStatementParameters));
-        }
         if (sortField != null) {
             // Sort field is not provided by user input, so it's ok to add here (i.e., it's not prone to SQL injection).
             sortBy = String.format(" order by %s", sortField);
@@ -528,7 +526,10 @@ public class JDBCFetcher implements DataFetcher<Object> {
     }
 
     /**
-     * Helper class for batching sql queries to the dataloader
+     * Helper class for batching sql queries to the dataloader.  The dataloader is sent instances of this class which it
+     * will use to create queries.  We need to override the equals and hashcode methods to ensure proper equality checks
+     * when the dataloader is matching the results of the query to the place where it should return the result as part
+     * of the graphql response.
      */
     public static class JdbcQuery {
         public String namespace;
