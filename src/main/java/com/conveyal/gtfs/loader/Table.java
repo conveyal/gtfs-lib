@@ -130,7 +130,9 @@ public class Table {
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
-        new IntegerField("route_type", REQUIRED, 7),
+        // Max route type according to the GTFS spec is 7; however, there is a GTFS proposal that could see this 
+        // max value grow to around 1800: https://groups.google.com/forum/#!msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J
+        new IntegerField("route_type", REQUIRED, 1800),
         new URLField("route_url",  OPTIONAL),
         new URLField("route_branding_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
