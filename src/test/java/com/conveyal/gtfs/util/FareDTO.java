@@ -15,6 +15,6 @@ public class FareDTO {
     public Integer payment_method;
     public Integer transfers;
     public String agency_id;
-    public Double transfer_duration;
+    public Integer transfer_duration;
     public FareRuleDTO[] fare_rules;
 }

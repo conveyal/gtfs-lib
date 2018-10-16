@@ -161,8 +161,9 @@ public class JDBCTableWriterTest {
         fareInput.price = 2.50;
         fareInput.agency_id = "RTA";
         fareInput.payment_method = 0;
-        // Empty value should be permitted
+        // Empty value should be permitted for transfers and transfer_duration
         fareInput.transfers = null;
+        fareInput.transfer_duration = null;
         FareRuleDTO fareRuleInput = new FareRuleDTO();
         // Fare ID should be assigned to "child entity" by editor automatically.
         fareRuleInput.fare_id = null;
