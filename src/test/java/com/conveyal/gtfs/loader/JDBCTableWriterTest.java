@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.util.FareDTO;
+import com.conveyal.gtfs.util.FareRuleDTO;
 import com.conveyal.gtfs.util.FeedInfoDTO;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -160,8 +161,17 @@ public class JDBCTableWriterTest {
         fareInput.price = 2.50;
         fareInput.agency_id = "RTA";
         fareInput.payment_method = 0;
+        // Empty value should be permitted
         fareInput.transfers = null;
-        fareInput.fare_rules = new FareDTO.FareRuleDTO[]{};
+        FareRuleDTO fareRuleInput = new FareRuleDTO();
+        // Fare ID should be assigned to "child entity" by editor automatically.
+        fareRuleInput.fare_id = null;
+        fareRuleInput.route_id = null;
+        // FIXME There is currently no check for valid zone_id values in contains_id, origin_id, and destination_id.
+        fareRuleInput.contains_id = "any";
+        fareRuleInput.origin_id = "value";
+        fareRuleInput.destination_id = "permitted";
+        fareInput.fare_rules = new FareRuleDTO[]{fareRuleInput};
 
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(fareTable);
@@ -174,6 +184,7 @@ public class JDBCTableWriterTest {
 
         // make sure saved data matches expected data
         assertThat(createdFare.fare_id, equalTo(fareId));
+        assertThat(createdFare.fare_rules[0].fare_id, equalTo(fareId));
 
         // try to update record
         String updatedFareId = "3B";
@@ -193,6 +204,7 @@ public class JDBCTableWriterTest {
 
         // make sure saved data matches expected data
         assertThat(updatedFareDTO.fare_id, equalTo(updatedFareId));
+        assertThat(updatedFareDTO.fare_rules[0].fare_id, equalTo(updatedFareId));
 
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(fareTable);
@@ -203,7 +215,7 @@ public class JDBCTableWriterTest {
         LOG.info("delete output:");
         LOG.info(updateOutput);
 
-        // make sure record does not exist in DB
+        // make sure fare_attributes record does not exist in DB
         String sql = String.format(
                 "select * from %s.%s where id=%d",
                 testNamespace,
@@ -213,6 +225,17 @@ public class JDBCTableWriterTest {
         LOG.info(sql);
         ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
         assertThat(rs.getFetchSize(), equalTo(0));
+
+        // make sure fare_rules record does not exist in DB
+        String fareRulesSql = String.format(
+                "select * from %s.%s where id=%d",
+                testNamespace,
+                Table.FARE_RULES.name,
+                createdFare.fare_rules[0].id
+        );
+        LOG.info(fareRulesSql);
+        ResultSet fareRulesResultSet = testDataSource.getConnection().prepareStatement(fareRulesSql).executeQuery();
+        assertThat(fareRulesResultSet.getFetchSize(), equalTo(0));
     }
 
     @AfterClass
