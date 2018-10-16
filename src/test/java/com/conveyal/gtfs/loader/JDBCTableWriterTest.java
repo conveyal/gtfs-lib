@@ -5,6 +5,7 @@ import com.conveyal.gtfs.util.FareDTO;
 import com.conveyal.gtfs.util.FareRuleDTO;
 import com.conveyal.gtfs.util.FeedInfoDTO;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.util.RouteDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -74,7 +75,7 @@ public class JDBCTableWriterTest {
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(feedInfoTable);
         String createOutput = createTableWriter.create(mapper.writeValueAsString(feedInfoInput), true);
-        LOG.info("create output:");
+        LOG.info("create {} output:", feedInfoTable.name);
         LOG.info(createOutput);
 
         // parse output
@@ -94,7 +95,7 @@ public class JDBCTableWriterTest {
             mapper.writeValueAsString(createdFeedInfo),
             true
         );
-        LOG.info("update output:");
+        LOG.info("update {} output:", feedInfoTable.name);
         LOG.info(updateOutput);
 
         FeedInfoDTO updatedFeedInfoDTO = mapper.readValue(updateOutput, feedInfoDTOClass);
@@ -108,7 +109,7 @@ public class JDBCTableWriterTest {
             createdFeedInfo.id,
             true
         );
-        LOG.info("delete output:");
+        LOG.info("delete {} output:", feedInfoTable.name);
         LOG.info(updateOutput);
 
         // make sure record does not exist in DB
@@ -177,7 +178,7 @@ public class JDBCTableWriterTest {
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(fareTable);
         String createOutput = createTableWriter.create(mapper.writeValueAsString(fareInput), true);
-        LOG.info("create output:");
+        LOG.info("create {} output:", fareTable.name);
         LOG.info(createOutput);
 
         // parse output
@@ -198,7 +199,7 @@ public class JDBCTableWriterTest {
                 mapper.writeValueAsString(createdFare),
                 true
         );
-        LOG.info("update output:");
+        LOG.info("update {} output:", fareTable.name);
         LOG.info(updateOutput);
 
         FareDTO updatedFareDTO = mapper.readValue(updateOutput, fareDTOClass);
@@ -213,7 +214,7 @@ public class JDBCTableWriterTest {
                 createdFare.id,
                 true
         );
-        LOG.info("delete output:");
+        LOG.info("delete {} output:", fareTable.name);
         LOG.info(updateOutput);
 
         // make sure fare_attributes record does not exist in DB
@@ -237,6 +238,74 @@ public class JDBCTableWriterTest {
         LOG.info(fareRulesSql);
         ResultSet fareRulesResultSet = testDataSource.getConnection().prepareStatement(fareRulesSql).executeQuery();
         assertThat(fareRulesResultSet.getFetchSize(), equalTo(0));
+    }
+
+    @Test
+    public void canCreateUpdateAndDeleteRoutes() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table routeTable = Table.ROUTES;
+        final Class<RouteDTO> routeDTOClass = RouteDTO.class;
+
+        // create new object to be saved
+        RouteDTO routeInput = new RouteDTO();
+        String routeId = "500";
+        routeInput.route_id = routeId;
+        routeInput.agency_id = "RTA";
+        // Empty value should be permitted for transfers and transfer_duration
+        routeInput.route_short_name = "500";
+        routeInput.route_long_name = "Hollingsworth";
+        routeInput.route_type = 3;
+
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(routeTable);
+        String createOutput = createTableWriter.create(mapper.writeValueAsString(routeInput), true);
+        LOG.info("create {} output:", routeTable.name);
+        LOG.info(createOutput);
+
+        // parse output
+        RouteDTO createdFare = mapper.readValue(createOutput, routeDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(createdFare.route_id, equalTo(routeId));
+
+        // try to update record
+        String updatedRouteId = "600";
+        createdFare.route_id = updatedRouteId;
+
+        // covert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(routeTable);
+        String updateOutput = updateTableWriter.update(
+                createdFare.id,
+                mapper.writeValueAsString(createdFare),
+                true
+        );
+        LOG.info("update {} output:", routeTable.name);
+        LOG.info(updateOutput);
+
+        RouteDTO updatedRouteDTO = mapper.readValue(updateOutput, routeDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedRouteDTO.route_id, equalTo(updatedRouteId));
+
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(routeTable);
+        int deleteOutput = deleteTableWriter.delete(
+                createdFare.id,
+                true
+        );
+        LOG.info("delete {} output:", routeTable.name);
+        LOG.info(updateOutput);
+
+        // make sure route record does not exist in DB
+        String sql = String.format(
+                "select * from %s.%s where id=%d",
+                testNamespace,
+                routeTable.name,
+                createdFare.id
+        );
+        LOG.info(sql);
+        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
+        assertThat(rs.getFetchSize(), equalTo(0));
     }
 
     @AfterClass
