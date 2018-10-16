@@ -292,10 +292,13 @@ public class JdbcTableWriter implements TableWriter {
                 continue;
             }
             JsonNode value = jsonObject.get(field.name);
-//            LOG.info("{}={}", field.name, value);
+            LOG.debug("{}={}", field.name, value);
             try {
                 if (value == null || value.isNull()) {
-                    if (field.isRequired()) {
+                    if (field.isRequired() && !field.isEmptyValuePermitted()) {
+                        // Only register the field as missing if the value is null, the field is required, and empty
+                        // values are not permitted. For example, a null value for fare_attributes#transfers should not
+                        // trigger a missing field exception.
                         missingFieldNames.add(field.name);
                         continue;
                     }
@@ -318,7 +321,7 @@ public class JdbcTableWriter implements TableWriter {
                     // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
                     // currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
                     try {
-                        if (value == null ||value.isNull()) {
+                        if (value == null || value.isNull()) {
                             if (field.isRequired()) {
                                 missingFieldNames.add(field.name);
                                 continue;
