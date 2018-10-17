@@ -18,13 +18,19 @@ import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.newJdbcDataLoader;
 public class GTFSGraphQL {
 
     /**
-     * Execute a graphQL request.  This method creates a new graphQL runner that is able to cache and batch sql queries
-     * during the course of obtaining the data according to the graphQL query.
+     * Execute a graphQL request.  This method creates and executes a new graphQL runner that is able to cache and batch
+     * sql queries during the course of obtaining the data according to the graphQL query.  The resulting output is a
+     * map of objects.  This map is typically converted to JSON or some other kind of output via a downstream
+     * application using this method.
+     *
+     * A DataLoader (https://github.com/graphql-java/java-dataloader) handles The batching and caching of requests.
+     * java-dataloader requires manual dispatching in order to actually execute the code to fetch data.  However, there
+     * is a helper class called DataLoaderDispatcherInstrumentation that automatically dispatches dataloaders.  This was
+     * setup according to this guide: https://www.graphql-java.com/documentation/v10/batching/
      *
      * @param dataSource The dataSource to use in connecting to a database to make sql queries.
      * @param query The graphQL query
      * @param variables The variables to apply to the graphQL query
-     * @return
      */
     public static Map<String, Object> run (DataSource dataSource, String query, Map<String,Object> variables) {
         // the registry and dataLoaders must be created upon each request to avoid caching loaded data after each request
@@ -33,9 +39,12 @@ public class GTFSGraphQL {
         registry.register("jdbcfetcher", jdbcQueryDataLoader);
 
         return GraphQL.newGraphQL(GraphQLGtfsSchema.feedBasedSchema)
-            // this instrumentation implementation will dispatch all the dataloaders as each level fo the graphql query
-            // is executed and hence make batched objects available to the query and the associated DataFetchers.  This
-            // must be created new each time to avoid caching load results in future requests.
+            // This instrumentation implementation will dispatch all the dataloaders as each level of the graphql query
+            // is executed and hence make batched objects available to the query and the associated DataFetchers.  If
+            // the dataloader was not recreated on each request and reused between different graphql queries, the
+            // dataloader could end up returning cached data for the result of a sql query even if the actual data in
+            // the database had changed.  Therefore, the dataloader and registry must be created new each time to avoid
+            // caching sql query results in future requests.
             .instrumentation(new DataLoaderDispatcherInstrumentation(registry))
             .build()
             // we now have a graphQL schema with dataloaders instrumented.  Time to make a query
@@ -68,7 +77,9 @@ public class GTFSGraphQL {
     }
 
     /**
-     * Helper method to return the DataSource from the DataFetchingEnvironment
+     * Helper method to extract the DataSource from the DataFetchingEnvironment.  Whenever we a sql query needs to be
+     * made, this method will have to be called to make sure the same dataSource is being used within the same graphQL
+     * query.
      */
     public static DataSource getDataSourceFromContext (DataFetchingEnvironment environment) {
         DataSource dataSource = ((GraphQLExecutionContext)environment.getContext()).dataSource;

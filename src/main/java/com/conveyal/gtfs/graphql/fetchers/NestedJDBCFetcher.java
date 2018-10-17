@@ -24,11 +24,11 @@ import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 
 /**
  * This fetcher creates one big query by joining tables in the order specified in the initial definition.  The data
- * returned will only consist of the columns from the final table definition.  All other tables are assumed to be
- * intermediate tables used to create joins to obtain filtered data from the final table.  Also, any grqphQL arguments
- * are applied only to the final table.
+ * returned will only consist of the columns from the final table definition in the jdbcFetchers array.  All other
+ * tables are assumed to be intermediate tables used to create joins to obtain filtered data from the final table.
+ * Also, any grqphQL arguments are applied only to the final table.
  */
-public class NestedJDBCFetcher implements DataFetcher<Object> {
+public class NestedJDBCFetcher implements DataFetcher<CompletableFuture<List<Map<String, Object>>>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NestedJDBCFetcher.class);
     private final JDBCFetcher[] jdbcFetchers;
@@ -77,9 +77,9 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
         // So it should always be represented as a map with a namespace key.
         String namespace = (String) parentEntityMap.get("namespace");
 
-        // the lastFetcher is used to keep track of the last JdbcFetcher seen.  This is used to create join conditions
+        // the previousFetcher is used to keep track of the last JdbcFetcher seen.  This is used to create join conditions
         // and eventually execute the query.
-        JDBCFetcher lastFetcher = null;
+        JDBCFetcher previousFetcher = null;
 
         // The statement needs to be built to specific a namespaced table name in order to select only the fields from
         // the last fetcher
@@ -116,7 +116,7 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
                 fromTables.add(tableName);
                 whereConditions.add(String.format(
                     "%s = %s",
-                    namespacedTableFieldName(namespace, lastFetcher.tableName, fetcher.parentJoinField),
+                    namespacedTableFieldName(namespace, previousFetcher.tableName, fetcher.parentJoinField),
                     namespacedTableFieldName(namespace, fetcher.tableName, fetcher.parentJoinField)
                 ));
                 // check if we have reached the final nested table
@@ -130,10 +130,10 @@ public class NestedJDBCFetcher implements DataFetcher<Object> {
                     );
                 }
             }
-            lastFetcher = fetcher;
+            previousFetcher = fetcher;
         }
         // Make the query and return the results!
-        return lastFetcher.getResults(
+        return previousFetcher.getResults(
             environment,
             sqlStatementStringBuilder,
             fromTables,

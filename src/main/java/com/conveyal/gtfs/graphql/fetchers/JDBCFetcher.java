@@ -40,7 +40,7 @@ import static graphql.schema.GraphQLFieldDefinition.newFieldDefinition;
 /**
  * A generic fetcher to get fields out of an SQL database table.
  */
-public class JDBCFetcher implements DataFetcher<Object> {
+public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<String, Object>>>> {
 
     public static final Logger LOG = LoggerFactory.getLogger(JDBCFetcher.class);
 
@@ -529,7 +529,7 @@ public class JDBCFetcher implements DataFetcher<Object> {
      * Helper class for batching sql queries to the dataloader.  The dataloader is sent instances of this class which it
      * will use to create queries.  We need to override the equals and hashcode methods to ensure proper equality checks
      * when the dataloader is matching the results of the query to the place where it should return the result as part
-     * of the graphql response.
+     * of the graphql response.  This class also serves as a lookup key for the dataloader cache.
      */
     public static class JdbcQuery {
         public String namespace;
