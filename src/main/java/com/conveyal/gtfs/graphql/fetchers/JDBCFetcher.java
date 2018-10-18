@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -86,75 +88,103 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
     }
 
     /**
-     * Method where batched sql queries are all ran at once.
+     * Method where batched sql queries are to be run.  This method first iterates through all queries to see if there
+     * are ran any possibilities for combining multiple similar queries into one query where the results can be
+     * extracted and returned to the appropriate jdbcQuery.
+     *
+     * For now, only certain kinds of queries can be combined.  See the CombinedQuery class for more details.
      */
     private static Map<JdbcQuery, List<Map<String, Object>>> getSqlQueryResults(
         Set<JdbcQuery> jdbcQueries,
         BatchLoaderEnvironment context
     ) {
+        // create output map for all results
         Map<JdbcQuery, List<Map<String, Object>>> allResults = new HashMap<>();
+
+        // get all key contexts
         Map<Object, Object> keyContexts = context.getKeyContexts();
+
+        // prepare a list of sql queries that will actually get executed
+        List<CombinedQuery> combinedQueries = new ArrayList<>();
+
+        // iterate through all batched jdbcQueries and combine combineable queries
         for (JdbcQuery jdbcQuery : jdbcQueries) {
-            Connection connection = null;
-            try {
-                // get the dataSource from the context of this specific jdbcQuery
-                DataSource dataSource = ((DataSource) keyContexts.get(jdbcQuery));
-                connection = dataSource.getConnection();
-                allResults.put(
-                    jdbcQuery,
-                    getSqlQueryResult(
-                        jdbcQuery,
-                        connection
-                    )
-                );
-            } catch (SQLException e) {
-                throw new RuntimeException(e);
-            } finally {
-                DbUtils.closeQuietly(connection);
+            // get the dataSource from the context of this specific jdbcQuery
+            DataSource dataSource = ((DataSource) keyContexts.get(jdbcQuery));
+
+            // add first query to list
+            if (combinedQueries.isEmpty()) {
+                combinedQueries.add(new CombinedQuery(jdbcQuery, dataSource));
+                continue;
+            }
+
+            // check if subsequent queries can be merged with other queries
+            boolean foundOtherQueryToCombineWith = false;
+            for (CombinedQuery combinedQuery : combinedQueries) {
+                if (combinedQuery.combineWith(jdbcQuery)) {
+                    foundOtherQueryToCombineWith = true;
+                    break;
+                }
+            }
+
+            // wasn't able to merge with another query, so add as another query to execute
+            if (!foundOtherQueryToCombineWith) {
+                combinedQueries.add(new CombinedQuery(jdbcQuery, dataSource));
             }
         }
+
+        // execute each combineable query and add to the results
+        for (CombinedQuery combinedQuery : combinedQueries) {
+            combinedQuery.executeAndAddToResults(allResults);
+        }
+
         return allResults;
     }
 
     /**
      * Helper method to actually execute some sql.
      *
-     * @param jdbcQuery The query to execute.  Object includes namespace, statement, and preparedStatementParameters
      * @param connection The database connection to use
+     * @param namespace The database namespace that will be included in the output
+     * @param statement The sql statement to be executed
+     * @param preparedStatementParameters A list of parameters to apply to the prepared statement.  Assumes that all
+     *                                    parameters are strings.
+     * @throws SQLException
      */
-    public static List<Map<String, Object>> getSqlQueryResult (JdbcQuery jdbcQuery, Connection connection) {
-        try {
-            List<Map<String, Object>> results = new ArrayList<>();
-            PreparedStatement preparedStatement = connection.prepareStatement(jdbcQuery.sqlStatement);
-            int oneBasedIndex = 1;
-            for (String parameter : jdbcQuery.preparedStatementParameters) {
-                preparedStatement.setString(oneBasedIndex++, parameter);
-            }
-            // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
-            //            LOG.info("table name={}", tableName);
-            LOG.info("SQL: {}", preparedStatement.toString());
-            if (preparedStatement.execute()) {
-                ResultSet resultSet = preparedStatement.getResultSet();
-                ResultSetMetaData meta = resultSet.getMetaData();
-                int nColumns = meta.getColumnCount();
-                // Iterate over result rows
-                while (resultSet.next()) {
-                    // Create a Map to hold the contents of this row, injecting the sql schema namespace into every map
-                    Map<String, Object> resultMap = new HashMap<>();
-                    resultMap.put("namespace", jdbcQuery.namespace);
-                    // One-based iteration: start at one and use <=.
-                    for (int i = 1; i <= nColumns; i++) {
-                        resultMap.put(meta.getColumnName(i), resultSet.getObject(i));
-                    }
-                    results.add(resultMap);
-                }
-            }
-            LOG.info("Result size: {}", results.size());
-            // Return a List of Maps, one Map for each row in the result.
-            return results;
-        } catch (SQLException e) {
-            throw new RuntimeException(e);
+    public static List<Map<String, Object>> getSqlQueryResult (
+        Connection connection,
+        String namespace,
+        String statement,
+        List<String> preparedStatementParameters
+    ) throws SQLException {
+        List<Map<String, Object>> results = new ArrayList<>();
+        PreparedStatement preparedStatement = connection.prepareStatement(statement);
+        int oneBasedIndex = 1;
+        for (String parameter : preparedStatementParameters) {
+            preparedStatement.setString(oneBasedIndex++, parameter);
         }
+        // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
+        //            LOG.info("table name={}", tableName);
+        LOG.info("SQL: {}", preparedStatement.toString());
+        if (preparedStatement.execute()) {
+            ResultSet resultSet = preparedStatement.getResultSet();
+            ResultSetMetaData meta = resultSet.getMetaData();
+            int nColumns = meta.getColumnCount();
+            // Iterate over result rows
+            while (resultSet.next()) {
+                // Create a Map to hold the contents of this row, injecting the sql schema namespace into every map
+                Map<String, Object> resultMap = new HashMap<>();
+                resultMap.put("namespace", namespace);
+                // One-based iteration: start at one and use <=.
+                for (int i = 1; i <= nColumns; i++) {
+                    resultMap.put(meta.getColumnName(i), resultSet.getObject(i));
+                }
+                results.add(resultMap);
+            }
+        }
+        LOG.info("Result size: {}", results.size());
+        // Return a List of Maps, one Map for each row in the result.
+        return results;
     }
 
     /**
@@ -225,15 +255,13 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
             whereConditions.add(makeInClause(parentJoinField, inClauseValues, preparedStatementParameters));
         }
 
-        // We could select only the requested fields by examining environment.getFields(), but we just get them all.
-        // The advantage of selecting * is that we don't need to validate the field names.
-        // All the columns will be loaded into the Map<String, Object>,
-        // but only the requested fields will be fetched from that Map using a MapFetcher.
-        StringBuilder sqlBuilder = new StringBuilder();
-        sqlBuilder.append("select *");
         return getResults(
             environment,
-            sqlBuilder,
+            // We could select only the requested fields by examining environment.getFields(), but we just get them all.
+            // The advantage of selecting * is that we don't need to validate the field names.
+            // All the columns will be loaded into the Map<String, Object>,
+            // but only the requested fields will be fetched from that Map using a MapFetcher.
+            "select *",
             new HashSet<>(), // No additional tables are needed beyond those added by default in the next method.
             whereConditions,
             preparedStatementParameters
@@ -249,8 +277,8 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
      * List<Map<String, Object>>.
      *
      * @param environment The datafetching environement of the current GraphQL entity being fetched.
-     * @param sqlStatementStringBuilder The beginnings of the sql statement string.  The NestedJdbcFetcher must select
-     *                                  only from the final table, so this argument is needed.
+     * @param selectStatement The beginnings of the sql statement string.  The NestedJdbcFetcher must select only from
+     *                        the final table, so this argument is needed.
      * @param fromTables The tables to select from.
      * @param whereConditions A list of where conditions to apply to the query.
      * @param preparedStatementParameters A list of prepared statement parameters to be sent to the prepared statement
@@ -258,7 +286,7 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
      */
     CompletableFuture<List<Map<String, Object>>> getResults (
         DataFetchingEnvironment environment,
-        StringBuilder sqlStatementStringBuilder,
+        String selectStatement,
         Set<String> fromTables,
         List<String> whereConditions,
         List<String> preparedStatementParameters
@@ -277,9 +305,6 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
         // Use the datasource defined in theDataFetching environment to query the database.
         DataSource dataSource = getDataSourceFromContext(environment);
 
-        // Make sure to get the dataloader defined in the environment to avoid caching sql results in future requests.
-        DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader = getJdbcQueryDataLoaderFromContext(environment);
-
         // This will contain one Map<String, Object> for each row fetched from the database table.
         List<Map<String, Object>> results = new ArrayList<>();
         if (graphQLQueryArguments == null) graphQLQueryArguments = new HashMap<>();
@@ -290,12 +315,6 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
         // The primary table being selected from is added here. Other tables may have been / will be added to this list to handle joins.
         fromTables.add(String.join(".", namespace, tableName));
 
-        // The order by clause will go here.
-        String sortBy = "";
-        if (sortField != null) {
-            // Sort field is not provided by user input, so it's ok to add here (i.e., it's not prone to SQL injection).
-            sortBy = String.format(" order by %s", sortField);
-        }
         Set<String> argumentKeys = graphQLQueryArguments.keySet();
         for (String key : argumentKeys) {
             // The pagination, bounding box, and date/time args should all be skipped here because they are handled
@@ -395,14 +414,14 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
                 }
             }
         }
-        sqlStatementStringBuilder.append(String.format(" from %s", String.join(", ", fromTables)));
-        if (!whereConditions.isEmpty()) {
-            sqlStatementStringBuilder.append(" where ");
-            sqlStatementStringBuilder.append(String.join(" and ", whereConditions));
-        }
+
         // The default value for sortBy is an empty string, so it's safe to always append it here. Also, there is no
         // threat of SQL injection because the sort field value is not user input.
-        sqlStatementStringBuilder.append(sortBy);
+        String sortBy = "";
+        if (sortField != null) {
+            // Sort field is not provided by user input, so it's ok to add here (i.e., it's not prone to SQL injection).
+            sortBy = String.format(" order by %s", sortField);
+        }
         Integer limit = (Integer) graphQLQueryArguments.get(LIMIT_ARG);
         if (limit == null) {
             limit = autoLimit ? DEFAULT_ROWS_TO_FETCH : -1;
@@ -410,22 +429,23 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
         if (limit > MAX_ROWS_TO_FETCH) {
             limit = MAX_ROWS_TO_FETCH;
         }
-        if (limit == -1) {
-            // Do not append limit if explicitly set to -1 or autoLimit is disabled. NOTE: this conditional block is
-            // empty simply because it is clearer to define the condition in this way (vs. if limit > 0).
-            // FIXME: Skipping limit is not scalable in many cases and should possibly be removed/limited.
-        } else {
-            sqlStatementStringBuilder.append(" limit ").append(limit);
-        }
         Integer offset = (Integer) graphQLQueryArguments.get(OFFSET_ARG);
-        if (offset != null && offset >= 0) {
-            sqlStatementStringBuilder.append(" offset ").append(offset);
-        }
+
+        // Make sure to get the dataloader defined in the environment to avoid caching sql results in future requests.
+        DataLoader<JdbcQuery, List<Map<String, Object>>> jdbcDataLoader = getJdbcQueryDataLoaderFromContext(environment);
+
+        // add a new JdbcQuery to the DataLoader.  The DataLoader returns a completeable future and will obtain the
+        // result of the query either from a cache or by executing some sql.
         return jdbcDataLoader.load(
             new JdbcQuery(
                 namespace,
-                preparedStatementParameters,
-                sqlStatementStringBuilder.toString()
+                selectStatement,
+                fromTables,
+                whereConditions,
+                sortBy,
+                limit,
+                offset,
+                preparedStatementParameters
             ),
             dataSource
         );
@@ -532,15 +552,34 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
      * of the graphql response.  This class also serves as a lookup key for the dataloader cache.
      */
     public static class JdbcQuery {
-        public String namespace;
-        public List<String> preparedStatementParameters;
-        public String sqlStatement;
+        private final String namespace;
+        private final String selectStatement;
+        private final Set<String> fromTables;
+        private List<String> whereConditions;
+        public String sortBy;
+        private final Integer limit;
+        private final Integer offset;
+        private final List<String> preparedStatementParameters;
 
 
-        public JdbcQuery(String namespace, List<String> preparedStatementParameters, String sqlStatement) {
+        public JdbcQuery(
+            String namespace,
+            String selectStatement,
+            Set<String> fromTables,
+            List<String> whereConditions,
+            String sortBy,
+            Integer limit,
+            Integer offset,
+            List<String> preparedStatementParameters
+        ) {
             this.namespace = namespace;
+            this.selectStatement = selectStatement;
+            this.fromTables = fromTables;
+            this.whereConditions = whereConditions;
+            this.sortBy = sortBy;
+            this.limit = limit;
+            this.offset = offset;
             this.preparedStatementParameters = preparedStatementParameters;
-            this.sqlStatement = sqlStatement;
         }
 
         @Override
@@ -549,14 +588,248 @@ public class JDBCFetcher implements DataFetcher<CompletableFuture<List<Map<Strin
             if (o == null || getClass() != o.getClass()) return false;
             JdbcQuery jdbcQuery = (JdbcQuery) o;
             return Objects.equals(namespace, jdbcQuery.namespace) &&
-                Objects.equals(preparedStatementParameters, jdbcQuery.preparedStatementParameters) &&
-                Objects.equals(sqlStatement, jdbcQuery.sqlStatement);
+                Objects.equals(selectStatement, jdbcQuery.selectStatement) &&
+                Objects.equals(fromTables, jdbcQuery.fromTables) &&
+                Objects.equals(whereConditions, jdbcQuery.whereConditions) &&
+                Objects.equals(sortBy, jdbcQuery.sortBy) &&
+                Objects.equals(limit, jdbcQuery.limit) &&
+                Objects.equals(offset, jdbcQuery.offset) &&
+                Objects.equals(preparedStatementParameters, jdbcQuery.preparedStatementParameters);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(namespace, preparedStatementParameters, sqlStatement);
+            return Objects.hash(
+                namespace,
+                selectStatement,
+                fromTables,
+                whereConditions,
+                sortBy,
+                limit,
+                offset,
+                preparedStatementParameters
+            );
         }
     }
 
+    /**
+     * A helper class that keeps track of queries that are combined from various individual JdbcQueries.  In a lot of
+     * cases there will be numerous JdbcQueries that look very similar yet differ only in that the value that is being
+     * selected.  For example, two queries could be
+     *   `select id from trip where route_id = 1` and
+     *   `select id from trip where route_id = 2`
+     * The above 2 queries can be combined into one by using an in clause:
+     *   `select id from trip where route_id in (1, 2)`
+     */
+    private static class CombinedQuery {
+        // the field used as the in clause in the combined query
+        private String inClauseField;
+
+        // a StringBuilder is used to build up the inCondition
+        private StringBuilder inConditionClause = new StringBuilder();
+
+        // whether or not this query can be combined with other queries
+        private final boolean isCombinable;
+
+        // whether or not at least 2 queries are being combined
+        private boolean isCombination = false;
+        private List<String> combinedPreparedStatementParameters = new ArrayList<>();
+
+        // a Map of the prepared statement parameter to the JdbcQuery it came from.  This is used when mapping
+        private Map<String, JdbcQuery> combinedQueries = new HashMap<>();
+
+        // a list of where conditions excluding the original where condition with a parameter.  That is instead stored
+        // in the inConditionClause.
+        private List<String> combinedWhereConditions = new ArrayList<>();
+
+        // Assume that the same DataSource can be used to make a combined query.  This should be OK because GraphQL
+        // requests in this library take in a DataSource for each GraphQL request.
+        private final DataSource underlyingDataSource;
+        private JdbcQuery underlyingQuery;
+
+
+        /**
+         * Instantiate the combined query.  It could be the case that the query is not combinable, so do a few checks
+         * and prepare some other variables for later use.
+         */
+        public CombinedQuery(JdbcQuery jdbcQuery, DataSource dataSource) {
+            underlyingDataSource = dataSource;
+            underlyingQuery = jdbcQuery;
+            isCombinable = underlyingQuery.limit == -1 &&
+                underlyingQuery.offset == null &&
+                underlyingQuery.preparedStatementParameters.size() == 1 &&
+                parseWhereQueries();
+
+            // do some extra prep work if it's possible to combine the underlying query
+            if (isCombinable) {
+                String preparedStatementParameter = underlyingQuery.preparedStatementParameters.get(0);
+                combinedQueries.put(preparedStatementParameter, jdbcQuery);
+                combinedPreparedStatementParameters.add(preparedStatementParameter);
+            }
+        }
+
+        /**
+         * Helper function to parse the where conditions.  This method returns true if it finds that only one of
+         * the where conditions has a question mark.
+         */
+        private boolean parseWhereQueries() {
+            // FIXME: this won't match a where statement where the question mark is first.
+            Pattern parameretizedWherePattern = Pattern.compile("(.*?)\\s*=\\s*\\?");
+            boolean foundCombinableWhereClause = false;
+            for (String whereCondition : underlyingQuery.whereConditions) {
+                Matcher matcher = parameretizedWherePattern.matcher(whereCondition);
+                if (matcher.find()) {
+                    // if a combinable where clause has already been found, return false because this current
+                    // implementation only supports 1 parameratized where clause
+                    if (foundCombinableWhereClause) return false;
+
+                    // begin creating the inConditionClause
+                    inClauseField = matcher.group(1);
+                    inConditionClause.append(inClauseField);
+                    inConditionClause.append(" IN (?");
+
+                    foundCombinableWhereClause = true;
+                } else {
+                    combinedWhereConditions.add(whereCondition);
+                }
+            }
+            // return the result.  If no combinable where clauses were found then this returns false.  If just one is
+            // found this returns true.  Otherwise the return in the above for loop returns false.
+            return foundCombinableWhereClause;
+        }
+
+        /**
+         * Combine a given JdbcQueries if possible to this combined query which may already have other queries that have
+         * been combined.
+         *
+         * For 2 JdbcQueries to be combinable, the queries must not meet the following criteria:
+         * - be from the same namespace
+         * - not have a limit or an offset
+         * - have the exact same select string, from tables and ordering
+         * - have at least 1 where clause
+         * - have only 1 prepared statement parameter
+         */
+        public boolean combineWith(JdbcQuery other) {
+            boolean canCombineQueries = isCombinable &&
+                underlyingQuery.namespace.equals(other.namespace) &&
+                other.limit == -1 &&
+                other.offset == null &&
+                underlyingQuery.selectStatement.equals(other.selectStatement) &&
+                underlyingQuery.fromTables.equals(other.fromTables) &&
+                // technically, the ordering shouldn't change the actual records that are returned, it's just more work
+                // to do postprocessing to resort the fields
+                underlyingQuery.sortBy.equals(other.sortBy) &&
+                // FIXME
+                // the where conditions are strings in the form %s = %s, so it's possible that there will be a false
+                // negative where one where condition is a = b and the other is b = a.
+                underlyingQuery.whereConditions.equals(other.whereConditions) &&
+                other.preparedStatementParameters.size() == 1;
+
+            // if it's not possible to combine, return false immediately
+            if (!canCombineQueries) return canCombineQueries;
+
+            // queries can be combined, proceed with adding the query
+            isCombination = true;
+            String otherFirstParameter = other.preparedStatementParameters.get(0);
+            combinedQueries.put(otherFirstParameter, other);
+            combinedPreparedStatementParameters.add(otherFirstParameter);
+            inConditionClause.append(", ?");
+
+            return true;
+        }
+
+        /**
+         * execute the combined (or underlying query if it wasn't combine-able) and then add the results to the passed
+         * map
+         */
+        public void executeAndAddToResults(Map<JdbcQuery, List<Map<String, Object>>> allResults) {
+            // build up the sql statement to execute
+            StringBuilder sqlStatement = new StringBuilder();
+
+            // SELECT
+            sqlStatement.append(underlyingQuery.selectStatement);
+            String inClauseFieldAlias = null;
+            if (isCombination) {
+                // also add the field that is used in the IN clause.  We need this data to match the row to the original
+                // JdbcQuery.  Replace the field's .'s with _ to ensure an exact match in the output
+                inClauseFieldAlias = String.format("%s_alias", inClauseField.replace(".", "_"));
+                sqlStatement.append(String.format(
+                    ", %s as %s",
+                    inClauseField,
+                    inClauseFieldAlias
+                ));
+            }
+
+            // FROM
+            sqlStatement.append(String.format(" from %s", String.join(", ", underlyingQuery.fromTables)));
+
+            // WHERE
+            if (isCombination) {
+                sqlStatement.append(" where ");
+                // complete the in clause and add it to the where conditions
+                inConditionClause.append(")");
+                combinedWhereConditions.add(inConditionClause.toString());
+                sqlStatement.append(String.join(" and ", combinedWhereConditions));
+            } else {
+                if (!underlyingQuery.whereConditions.isEmpty()) {
+                    sqlStatement
+                        .append(" where ")
+                        .append(String.join(" and ", underlyingQuery.whereConditions));
+                }
+            }
+
+            // ORDER BY
+            sqlStatement.append(underlyingQuery.sortBy);
+
+            // limit and offset only apply if the combined query is not a combination
+            if (!isCombination) {
+                if (underlyingQuery.limit == -1) {
+                    // Do not append limit if explicitly set to -1 or autoLimit is disabled. NOTE: this conditional block is
+                    // empty simply because it is clearer to define the condition in this way (vs. if limit > 0).
+                    // FIXME: Skipping limit is not scalable in many cases and should possibly be removed/limited.
+                } else {
+                    sqlStatement.append(" limit ").append(underlyingQuery.limit);
+                }
+                if (underlyingQuery.offset != null && underlyingQuery.offset >= 0) {
+                    sqlStatement.append(" offset ").append(underlyingQuery.offset);
+                }
+            }
+
+            // Execute the query
+            Connection connection = null;
+            try {
+                connection = underlyingDataSource.getConnection();
+                List<Map<String, Object>> results = getSqlQueryResult(
+                    connection,
+                    underlyingQuery.namespace,
+                    sqlStatement.toString(),
+                    isCombination ? combinedPreparedStatementParameters : underlyingQuery.preparedStatementParameters
+                );
+
+                if (isCombination) {
+                    // iterate throught the results and assign each Map to the corresponding entry in allResults
+                    for (Map<String, Object> result : results) {
+                        JdbcQuery query = combinedQueries.get(result.get(inClauseFieldAlias));
+                        List<Map<String, Object>> queryResults = allResults.containsKey(query)
+                            ? allResults.get(query)
+                            : new ArrayList<>();
+
+                        // remove the alias field
+                        result.remove(inClauseFieldAlias);
+                        queryResults.add(result);
+
+                        allResults.put(query, queryResults);
+                    }
+                } else {
+                    // query was not combined, so we can add all of these results with the underlying query as the key
+                    allResults.put(underlyingQuery, results);
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+                throw new RuntimeException(e);
+            } finally {
+                DbUtils.closeQuietly(connection);
+            }
+        }
+    }
 }

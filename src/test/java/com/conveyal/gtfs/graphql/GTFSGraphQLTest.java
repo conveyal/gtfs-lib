@@ -177,10 +177,19 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("feedStopsStopTimeLimit.txt"), matchesSnapshot());
     }
 
-    // tests that the limit argument applies properly to a fetcher defined with autolimit set to false
+    // tests whether a graphQL query that has superflous and redundant nesting can find the right result
+    // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
     @Test(timeout=5000)
     public void canFetchMultiNestedEntities() throws IOException {
         assertThat(queryGraphQL("superNested.txt"), matchesSnapshot());
+    }
+
+    // tests whether a graphQL query that has superflous and redundant nesting can find the right result
+    // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
+    // furthermore, some queries should have been combined together
+    @Test(timeout=5000)
+    public void canFetchMultiNestedEntitiesWithoutLimits() throws IOException {
+        assertThat(queryGraphQL("superNestedNoLimits.txt"), matchesSnapshot());
     }
 
     /**

@@ -73,13 +73,12 @@ public class SQLColumnFetcher<T> implements DataFetcher<List<T>> {
         try {
             connection = dataSource.getConnection();
             for (Map<String, Object> row : jdbcFetcher.getSqlQueryResult(
-                new JDBCFetcher.JdbcQuery(
-                    namespace,
-                    Arrays.asList(filterValue),
-                    sqlStatementBuilder.toString()
-                ),
-                connection
-            )) {
+                connection,
+                namespace,
+                sqlStatementBuilder.toString(),
+                Arrays.asList(filterValue)
+                )
+            ) {
                 results.add((T) row.get(columnName));
             }
         } catch (SQLException e) {

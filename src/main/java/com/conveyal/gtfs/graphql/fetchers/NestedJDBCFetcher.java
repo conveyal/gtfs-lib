@@ -135,7 +135,7 @@ public class NestedJDBCFetcher implements DataFetcher<CompletableFuture<List<Map
         // Make the query and return the results!
         return previousFetcher.getResults(
             environment,
-            sqlStatementStringBuilder,
+            sqlStatementStringBuilder.toString(),
             fromTables,
             whereConditions,
             preparedStatementParameters
