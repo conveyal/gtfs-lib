@@ -229,6 +229,21 @@ public class GTFSTest {
     }
 
     /**
+     * Tests that a GTFS feed with bad date values in calendars.txt and calendar_dates.txt can pass the integration test.
+     */
+    @Test
+    public void canLoadFeedWithBadDates () {
+        assertThat(
+                runIntegrationTest(
+                        "fake-agency-bad-calendar-date",
+                        nullValue(),
+                        new PersistanceExpectation[]{}
+                ),
+                equalTo(true)
+        );
+    }
+
+    /**
      * Tests whether the simple gtfs can be loaded and exported if it has only calendar_dates.txt
      */
     @Test
@@ -473,7 +488,7 @@ public class GTFSTest {
         PersistanceExpectation[] persistanceExpectations,
         boolean fromEditor
     ) throws IOException {
-        LOG.info("testing expecations of csv outputs in an exported gtfs");
+        LOG.info("testing expectations of csv outputs in an exported gtfs");
 
         ZipFile gtfsZipfile = new ZipFile(tempFile.getAbsolutePath());
 
