@@ -127,6 +127,7 @@ public class JdbcGtfsLoader {
             // retry in a loop.
             // TODO handle the case where we don't want any prefix.
             this.tablePrefix = randomIdString();
+            result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
             registerFeed(gtfsFile);
             // Include the dot separator in the table prefix.
@@ -274,6 +275,7 @@ public class JdbcGtfsLoader {
         int initialErrorCount = errorStorage.getErrorCount();
         try {
             tableLoadResult.rowCount = loadInternal(table);
+            tableLoadResult.fileSize = getTableSize(table);
             LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);
@@ -294,6 +296,15 @@ public class JdbcGtfsLoader {
         int finalErrorCount = errorStorage.getErrorCount();
         tableLoadResult.errorCount = finalErrorCount - initialErrorCount;
         return tableLoadResult;
+    }
+
+    /**
+     * Get the uncompressed file size in bytes for the specified GTFS table.
+     */
+    private int getTableSize(Table table) {
+        ZipEntry zipEntry = zip.getEntry(table.name + ".txt");
+        if (zipEntry == null) return 0;
+        return (int) zipEntry.getSize();
     }
 
     /**

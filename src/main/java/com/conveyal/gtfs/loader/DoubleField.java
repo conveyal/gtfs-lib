@@ -17,6 +17,9 @@ public class DoubleField extends Field {
 
     private double minValue;
     private double maxValue;
+    // This field dictates how many decimal places this field should be rounded to when exporting to a GTFS.
+    // The place where the rounding happens during exports is in Table.commaSeparatedNames.
+    // A value less than 0 indicates that no rounding should happen.
     private int outputPrecision;
 
     public DoubleField (String name, Requirement requirement, double minValue, double maxValue, int outputPrecision) {
@@ -63,8 +66,20 @@ public class DoubleField extends Field {
         return "double precision";
     }
 
-    public int getOutputPrecision() {
-        return this.outputPrecision;
+    /**
+     * When outputting to csv, round fields that have been created with an outputPrecision > -1 to avoid excessive
+     * precision.
+     */
+    @Override
+    public String getColumnExpression(String prefix, boolean csvOutput) {
+        String columnName = super.getColumnExpression(prefix, csvOutput);
+        if (!csvOutput || this.outputPrecision < 0) return columnName;
+        return String.format(
+            "round(%s::DECIMAL, %d) as %s",
+            columnName,
+            this.outputPrecision,
+            name
+        );
     }
 
 }

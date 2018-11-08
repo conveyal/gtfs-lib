@@ -3,9 +3,9 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.BatchTracker;
 import com.conveyal.gtfs.loader.DateField;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -361,51 +361,6 @@ public class ServiceValidator extends TripValidator {
                 return true; // Continue iteration.
             });
             tripCount += serviceInfo.tripIds.size();
-        }
-    }
-
-    /**
-     * Avoid Java's "effectively final" nonsense when using prepared statements in foreach loops.
-     * Automatically push execute batches of prepared statements before the batch gets too big.
-     * TODO there's probably something like this in an Apache Commons util library
-     */
-    public static class BatchTracker {
-
-        private final String recordType;
-        private PreparedStatement preparedStatement;
-        private int currentBatchSize = 0;
-        private int totalRecordsProcessed = 0;
-
-        public BatchTracker(String recordType, PreparedStatement preparedStatement) {
-            this.preparedStatement = preparedStatement;
-            this.recordType = recordType;
-        }
-
-        public void addBatch() throws SQLException {
-            preparedStatement.addBatch();
-            currentBatchSize += 1;
-            if (currentBatchSize > JdbcGtfsLoader.INSERT_BATCH_SIZE) {
-                preparedStatement.executeBatch();
-                totalRecordsProcessed += currentBatchSize;
-                currentBatchSize = 0;
-            }
-        }
-
-        public void executeRemaining() throws SQLException {
-            if (currentBatchSize > 0) {
-                totalRecordsProcessed += currentBatchSize;
-                preparedStatement.executeBatch();
-                currentBatchSize = 0;
-            }
-            // Avoid reuse, signal that this was cleanly closed.
-            preparedStatement = null;
-            LOG.info(String.format("Inserted %d %s records", totalRecordsProcessed, recordType));
-        }
-
-        public void finalize () {
-            if (preparedStatement != null || currentBatchSize > 0) {
-                throw new RuntimeException("BUG: It looks like someone did not call executeRemaining on a BatchTracker.");
-            }
         }
     }
 }
