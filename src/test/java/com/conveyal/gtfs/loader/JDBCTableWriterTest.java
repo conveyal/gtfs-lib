@@ -109,19 +109,15 @@ public class JDBCTableWriterTest {
             createdFeedInfo.id,
             true
         );
-        LOG.info("delete {} output:", feedInfoTable.name);
-        LOG.info(updateOutput);
+        LOG.info("deleted {} records from {}", deleteOutput, feedInfoTable.name);
 
         // make sure record does not exist in DB
-        String sql = String.format(
+        assertThatSqlQueryYieldsZeroRows(String.format(
             "select * from %s.%s where id=%d",
             testNamespace,
             feedInfoTable.name,
             createdFeedInfo.id
-        );
-        LOG.info(sql);
-        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        assertThat(rs.getFetchSize(), equalTo(0));
+        ));
     }
 
     @Test
@@ -214,30 +210,33 @@ public class JDBCTableWriterTest {
                 createdFare.id,
                 true
         );
-        LOG.info("delete {} output:", fareTable.name);
-        LOG.info(updateOutput);
+        LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        String sql = String.format(
+        assertThatSqlQueryYieldsZeroRows(String.format(
                 "select * from %s.%s where id=%d",
                 testNamespace,
                 fareTable.name,
                 createdFare.id
-        );
-        LOG.info(sql);
-        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        assertThat(rs.getFetchSize(), equalTo(0));
+        ));
 
         // make sure fare_rules record does not exist in DB
-        String fareRulesSql = String.format(
+        assertThatSqlQueryYieldsZeroRows(String.format(
                 "select * from %s.%s where id=%d",
                 testNamespace,
                 Table.FARE_RULES.name,
                 createdFare.fare_rules[0].id
-        );
-        LOG.info(fareRulesSql);
-        ResultSet fareRulesResultSet = testDataSource.getConnection().prepareStatement(fareRulesSql).executeQuery();
-        assertThat(fareRulesResultSet.getFetchSize(), equalTo(0));
+        ));
+    }
+
+    private void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
+        assertThatSqlQueryYieldsRowCount(sql, 0);
+    }
+
+    private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
+        LOG.info(sql);
+        ResultSet resultSet = testDataSource.getConnection().prepareStatement(sql).executeQuery();
+        assertThat(resultSet.getFetchSize(), equalTo(expectedRowCount));
     }
 
     @Test
@@ -263,20 +262,22 @@ public class JDBCTableWriterTest {
         LOG.info(createOutput);
 
         // parse output
-        RouteDTO createdFare = mapper.readValue(createOutput, routeDTOClass);
+        RouteDTO createdRoute = mapper.readValue(createOutput, routeDTOClass);
 
         // make sure saved data matches expected data
-        assertThat(createdFare.route_id, equalTo(routeId));
+        assertThat(createdRoute.route_id, equalTo(routeId));
+        // TODO: Verify with a SQL query that the database now contains the created data (we may need to use the same
+        //       db connection to do this successfully?)
 
         // try to update record
         String updatedRouteId = "600";
-        createdFare.route_id = updatedRouteId;
+        createdRoute.route_id = updatedRouteId;
 
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(routeTable);
         String updateOutput = updateTableWriter.update(
-                createdFare.id,
-                mapper.writeValueAsString(createdFare),
+                createdRoute.id,
+                mapper.writeValueAsString(createdRoute),
                 true
         );
         LOG.info("update {} output:", routeTable.name);
@@ -286,26 +287,24 @@ public class JDBCTableWriterTest {
 
         // make sure saved data matches expected data
         assertThat(updatedRouteDTO.route_id, equalTo(updatedRouteId));
+        // TODO: Verify with a SQL query that the database now contains the updated data (we may need to use the same
+        //       db connection to do this successfully?)
 
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(routeTable);
         int deleteOutput = deleteTableWriter.delete(
-                createdFare.id,
+                createdRoute.id,
                 true
         );
-        LOG.info("delete {} output:", routeTable.name);
-        LOG.info(updateOutput);
+        LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
         // make sure route record does not exist in DB
-        String sql = String.format(
+        assertThatSqlQueryYieldsZeroRows(String.format(
                 "select * from %s.%s where id=%d",
                 testNamespace,
                 routeTable.name,
-                createdFare.id
-        );
-        LOG.info(sql);
-        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        assertThat(rs.getFetchSize(), equalTo(0));
+                createdRoute.id
+        ));
     }
 
     @AfterClass
