@@ -237,7 +237,7 @@ public class GTFSTest {
                 runIntegrationTest(
                         "fake-agency-bad-calendar-date",
                         nullValue(),
-                        new PersistanceExpectation[]{}
+                        new PersistenceExpectation[]{}
                 ),
                 equalTo(true)
         );
