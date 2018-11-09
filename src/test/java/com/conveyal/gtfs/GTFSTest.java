@@ -33,7 +33,7 @@ import static org.hamcrest.core.IsNull.nullValue;
 import static org.junit.Assert.assertThat;
 
 /**
- * A test suite for the GTFS Class
+ * A test suite for the {@link GTFS} Class.
  */
 public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
@@ -585,7 +585,9 @@ public class GTFSTest {
         );
     }
 
-    // a helper class to verify that data got stored in a particular table
+    /**
+     * A helper class to verify that data got stored in a particular table.
+     */
     private class PersistenceExpectation {
         public String tableName;
         // each persistence expectation has an array of record expectations which all must reference a single row
@@ -605,7 +607,9 @@ public class GTFSTest {
         DOUBLE, STRING
     }
 
-    // a helper class to verify that data got stored in a particular record
+    /**
+     * A helper class to verify that data got stored in a particular record.
+     */
     private class RecordExpectation {
         public double acceptedDelta;
         public double doubleExpectation;

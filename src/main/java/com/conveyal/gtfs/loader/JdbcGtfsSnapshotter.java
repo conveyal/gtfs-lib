@@ -176,8 +176,7 @@ public class JdbcGtfsSnapshotter {
      */
     private TableLoadResult createScheduleExceptionsTable() {
         // check to see if the schedule_exceptions table exists
-        boolean scheduleExceptionsTableExists = feedIdToSnapshot != null &&
-            tableExists(feedIdToSnapshot, "schedule_exceptions");
+        boolean scheduleExceptionsTableExists = tableExists(feedIdToSnapshot, "schedule_exceptions");
         String scheduleExceptionsTableName = tablePrefix + "schedule_exceptions";
 
         if (scheduleExceptionsTableExists) {
@@ -271,7 +270,11 @@ public class JdbcGtfsSnapshotter {
 
                 // determine if we appear to be working with a calendar_dates-only feed.
                 // If so, we must also add dummy entries to the calendar table
-                if (!tableExists(feedIdToSnapshot, "calendar") && calendarDatesReader.getRowCount() > 0) {
+                if (
+                    feedIdToSnapshot != null &&
+                    !tableExists(feedIdToSnapshot, "calendar") &&
+                    calendarDatesReader.getRowCount() > 0
+                ) {
                     sql = String.format(
                         "insert into %s (service_id, description, start_date, end_date, " +
                             "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
@@ -322,6 +325,8 @@ public class JdbcGtfsSnapshotter {
      * Helper method to determine if a table exists within a namespace.
      */
     private boolean tableExists(String namespace, String tableName) {
+        // Preempt SQL check with null check of either namespace or table name.
+        if (namespace == null || tableName == null) return false;
         try {
             // This statement is postgres-specific.
             PreparedStatement tableExistsStatement = connection.prepareStatement(
