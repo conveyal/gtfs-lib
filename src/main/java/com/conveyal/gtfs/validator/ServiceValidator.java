@@ -117,7 +117,7 @@ public class ServiceValidator extends TripValidator {
                     }
                 }
             } catch (Exception ex) {
-                LOG.error(ex.getMessage());
+                LOG.error("Error validating service entries (merging calendars and calendar_dates)");
                 ex.printStackTrace();
                 // Continue on to next calendar entry.
             }
@@ -182,7 +182,10 @@ public class ServiceValidator extends TripValidator {
             LocalDate lastDate = LocalDate.MIN;
             for (LocalDate date : dateInfoForDate.keySet()) {
                 // If the date is invalid, skip.
-                if (date == null) continue;
+                if (date == null) {
+                    LOG.error("Encountered null date. Did something go wrong with computeIfAbsent?");
+                    continue;
+                }
                 if (date.isBefore(firstDate)) firstDate = date;
                 if (date.isAfter(lastDate)) lastDate = date;
             }
@@ -190,7 +193,8 @@ public class ServiceValidator extends TripValidator {
             validationResult.firstCalendarDate = firstDate;
             validationResult.lastCalendarDate = lastDate;
             // Is this any different? firstDate.until(lastDate, ChronoUnit.DAYS);
-            int nDays = (int) ChronoUnit.DAYS.between(firstDate, lastDate) + 1;
+            // If no days were found in the dateInfoForDate, nDays is a very large negative number, so we default to 0.
+            int nDays = Math.max(0, (int) ChronoUnit.DAYS.between(firstDate, lastDate) + 1);
             validationResult.dailyBusSeconds = new int[nDays];
             validationResult.dailyTramSeconds = new int[nDays];
             validationResult.dailyMetroSeconds = new int[nDays];

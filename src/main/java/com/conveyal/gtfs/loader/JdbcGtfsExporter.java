@@ -309,7 +309,7 @@ public class JdbcGtfsExporter {
             // TableLoadResult.
             LOG.error("Exception while creating snapshot: {}", ex.toString());
             ex.printStackTrace();
-            result.fatalException = ex.getMessage();
+            result.fatalException = ex.toString();
         }
         return result;
     }
@@ -354,7 +354,7 @@ public class JdbcGtfsExporter {
             } catch (SQLException e) {
                 LOG.error("failed to generate select statement for existing fields");
                 TableLoadResult tableLoadResult = new TableLoadResult();
-                tableLoadResult.fatalException = e.getMessage();
+                tableLoadResult.fatalException = e.toString();
                 e.printStackTrace();
                 return tableLoadResult;
             }
@@ -402,7 +402,7 @@ public class JdbcGtfsExporter {
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
-            tableLoadResult.fatalException = e.getMessage();
+            tableLoadResult.fatalException = e.toString();
             LOG.error("Exception while exporting tables", e);
         }
         return tableLoadResult;

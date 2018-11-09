@@ -5,6 +5,7 @@ import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
+import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -83,9 +84,9 @@ public abstract class GTFS {
      * @param dataSource    JDBC connection to existing database
      * @return              FIXME should this be a separate SnapshotResult object?
      */
-    public static FeedLoadResult makeSnapshot (String feedId, DataSource dataSource) {
+    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource) {
         JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource);
-        FeedLoadResult result = snapshotter.copyTables();
+        SnapshotResult result = snapshotter.copyTables();
         return result;
     }
 
