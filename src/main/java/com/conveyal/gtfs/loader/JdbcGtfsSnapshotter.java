@@ -217,6 +217,11 @@ public class JdbcGtfsSnapshotter {
                 HashMap<String, List<String>> addedServiceDays = new HashMap<>();
                 List<String> datesWithExceptions = new ArrayList<>();
                 for (CalendarDate calendarDate : calendarDates) {
+                    // Skip any null dates
+                    if (calendarDate.date == null) {
+                        LOG.warn("Encountered calendar date record with null value for date field. Skipping.");
+                        continue;
+                    }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
                     datesWithExceptions.add(date);
                     if (calendarDate.exception_type == 1) {

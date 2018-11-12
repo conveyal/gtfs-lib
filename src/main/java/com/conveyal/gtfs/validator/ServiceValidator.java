@@ -117,8 +117,7 @@ public class ServiceValidator extends TripValidator {
                     }
                 }
             } catch (Exception ex) {
-                LOG.error("Error validating service entries (merging calendars and calendar_dates)");
-                ex.printStackTrace();
+                LOG.error("Error validating service entries (merging calendars and calendar_dates)", ex);
                 // Continue on to next calendar entry.
             }
         }
