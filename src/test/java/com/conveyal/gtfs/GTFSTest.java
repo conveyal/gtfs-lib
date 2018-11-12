@@ -414,8 +414,7 @@ public class GTFSTest {
             DataSource ds = GTFS.createDataSource(
                     dataSource.getConnection().getMetaData().getURL(),
                     null,
-                    null,
-                    true
+                    null
             );
             assertThatLoadIsErrorFree(loadResult);
             assertThat(validationResult.fatalException, is(nullValue()));
