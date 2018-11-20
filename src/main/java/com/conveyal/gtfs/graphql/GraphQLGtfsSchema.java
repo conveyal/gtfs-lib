@@ -347,6 +347,7 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(routeType))
                     .argument(stringArg("namespace"))
                     .argument(stringArg(SEARCH_ARG))
+                    .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new NestedJDBCFetcher(
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id", null, false),
