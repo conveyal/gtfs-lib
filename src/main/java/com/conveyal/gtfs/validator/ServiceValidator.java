@@ -3,9 +3,9 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.BatchTracker;
 import com.conveyal.gtfs.loader.DateField;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -235,10 +235,11 @@ public class ServiceValidator extends TripValidator {
             // this somewhat redundant materialized view to serve as a master list of all services.
             String servicesTableName = feed.tablePrefix + "services";
             String sql = String.format("create table %s (service_id varchar, n_days_active integer, duration_seconds integer, n_trips integer)", servicesTableName);
+            LOG.info(sql);
             statement.execute(sql);
             sql = String.format("insert into %s values (?, ?, ?, ?)", servicesTableName);
             PreparedStatement serviceStatement = connection.prepareStatement(sql);
-            final BatchTracker serviceTracker = new BatchTracker(serviceStatement);
+            final BatchTracker serviceTracker = new BatchTracker("services", serviceStatement);
             for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
                 serviceStatement.setString(1, serviceInfo.serviceId);
                 serviceStatement.setInt(2, serviceInfo.datesActive.size());
@@ -251,10 +252,11 @@ public class ServiceValidator extends TripValidator {
             // Create a table that shows on which dates each service is active.
             String serviceDatesTableName = feed.tablePrefix + "service_dates";
             sql = String.format("create table %s (service_date varchar, service_id varchar)", serviceDatesTableName);
+            LOG.info(sql);
             statement.execute(sql);
             sql = String.format("insert into %s values (?, ?)", serviceDatesTableName);
             PreparedStatement serviceDateStatement = connection.prepareStatement(sql);
-            final BatchTracker serviceDateTracker = new BatchTracker(serviceDateStatement);
+            final BatchTracker serviceDateTracker = new BatchTracker("service_dates", serviceDateStatement);
             for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
                 for (LocalDate date : serviceInfo.datesActive) {
                     if (date == null) continue; // TODO ERR? Can happen with bad data (unparseable dates).
@@ -269,6 +271,7 @@ public class ServiceValidator extends TripValidator {
 
             }
             serviceDateTracker.executeRemaining();
+
             LOG.info("Indexing...");
             statement.execute(String.format("create index service_dates_service_date on %s (service_date)", serviceDatesTableName));
             statement.execute(String.format("create index service_dates_service_id on %s (service_id)", serviceDatesTableName));
@@ -283,10 +286,14 @@ public class ServiceValidator extends TripValidator {
             String serviceDurationsTableName = feed.tablePrefix + "service_durations";
             sql = String.format("create table %s (service_id varchar, route_type integer, " +
                     "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
+            LOG.info(sql);
             statement.execute(sql);
             sql = String.format("insert into %s values (?, ?, ?)", serviceDurationsTableName);
             PreparedStatement serviceDurationStatement = connection.prepareStatement(sql);
-            final BatchTracker serviceDurationTracker = new BatchTracker(serviceDurationStatement);
+            final BatchTracker serviceDurationTracker = new BatchTracker(
+                "service_durations",
+                serviceDurationStatement
+            );
             for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
                 serviceInfo.durationByRouteType.forEachEntry((routeType, serviceDurationSeconds) -> {
                     try {
@@ -302,8 +309,10 @@ public class ServiceValidator extends TripValidator {
             }
             serviceDurationTracker.executeRemaining();
             // No need to build indexes because (service_id, route_type) is already the primary key of this table.
+
             connection.commit();
         } catch (SQLException e) {
+            e.printStackTrace();
             throw new RuntimeException(e);
         } finally {
             DbUtils.closeQuietly(connection);
@@ -352,45 +361,4 @@ public class ServiceValidator extends TripValidator {
             tripCount += serviceInfo.tripIds.size();
         }
     }
-
-    /**
-     * Avoid Java's "effectively final" nonsense when using prepared statements in foreach loops.
-     * Automatically push execute batches of prepared statements before the batch gets too big.
-     * TODO there's probably something like this in an Apache Commons util library
-     */
-    public static class BatchTracker {
-
-        private PreparedStatement preparedStatement;
-        private int currentBatchSize = 0;
-
-        public BatchTracker(PreparedStatement preparedStatement) {
-            this.preparedStatement = preparedStatement;
-        }
-
-        public void addBatch() throws SQLException {
-            preparedStatement.addBatch();
-            currentBatchSize += 1;
-            if (currentBatchSize > JdbcGtfsLoader.INSERT_BATCH_SIZE) {
-                preparedStatement.executeBatch();
-                currentBatchSize = 0;
-            }
-        }
-
-        public void executeRemaining() throws SQLException {
-            if (currentBatchSize > 0) {
-                preparedStatement.executeBatch();
-                currentBatchSize = 0;
-            }
-            // Avoid reuse, signal that this was cleanly closed.
-            preparedStatement = null;
-        }
-
-        public void finalize () {
-            if (preparedStatement != null || currentBatchSize > 0) {
-                throw new RuntimeException("BUG: It looks like someone did not call executeRemaining on a BatchTracker.");
-            }
-        }
-
-    }
-
 }

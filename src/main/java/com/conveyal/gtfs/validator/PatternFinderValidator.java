@@ -3,8 +3,8 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.PatternFinder;
 import com.conveyal.gtfs.TripPatternKey;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.BatchTracker;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.Requirement;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Pattern;
@@ -14,18 +14,13 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import org.apache.commons.dbutils.DbUtils;
-import org.postgresql.copy.CopyManager;
-import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.PrintStream;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -103,11 +98,12 @@ public class PatternFinderValidator extends TripValidator {
             // Create pattern stops table with serial ID
             patternStopsTable.createSqlTable(connection, null, true);
             PreparedStatement insertPatternStatement = connection.prepareStatement(
-                    String.format("insert into %s values (DEFAULT, ?, ?, ?, ?)", patternsTableName));
+                    String.format("insert into %s values (DEFAULT, ?, ?, ?, ?)", patternsTableName)
+            );
+            BatchTracker patternTracker = new BatchTracker("pattern", insertPatternStatement);
             PreparedStatement insertPatternStopStatement = connection.prepareStatement(insertPatternStopSql);
-            int totalSize = 0;
+            BatchTracker patternStopTracker = new BatchTracker("pattern stop", insertPatternStopStatement);
             int currentPatternIndex = 0;
-            int batchSize = 0;
             LOG.info("Storing patterns and pattern stops");
             // If using Postgres, load pattern to trips mapping into temp table for quick updating.
             boolean postgresText = (connection.getMetaData().getDatabaseProductName().equals("PostgreSQL"));
@@ -135,7 +131,7 @@ public class PatternFinderValidator extends TripValidator {
                 // FIXME: This could be null...
                 String shapeId = pattern.associatedShapes.iterator().next();
                 insertPatternStatement.setString(4, shapeId);
-                insertPatternStatement.addBatch();
+                patternTracker.addBatch();
                 // Construct pattern stops based on values in trip pattern key.
                 // FIXME: Use pattern stops table here?
                 int lastValidDeparture = key.departureTimes.get(0);
@@ -161,6 +157,7 @@ public class PatternFinderValidator extends TripValidator {
                         : departure - arrival;
 
                     insertPatternStopStatement.setString(1, pattern.pattern_id);
+                    // Stop sequence is zero-based.
                     setIntParameter(insertPatternStopStatement, 2, i);
                     insertPatternStopStatement.setString(3, stopId);
                     setIntParameter(insertPatternStopStatement,4, travelTime);
@@ -169,8 +166,7 @@ public class PatternFinderValidator extends TripValidator {
                     setIntParameter(insertPatternStopStatement,7, key.pickupTypes.get(i));
                     setDoubleParameter(insertPatternStopStatement, 8, key.shapeDistances.get(i));
                     setIntParameter(insertPatternStopStatement,9, key.timepoints.get(i));
-                    insertPatternStopStatement.addBatch();
-                    batchSize += 1;
+                    patternStopTracker.addBatch();
                 }
                 // Finally, update all trips on this pattern to reference this pattern's ID.
                 String questionMarks = String.join(", ", Collections.nCopies(pattern.associatedTrips.size(), "?"));
@@ -197,18 +193,11 @@ public class PatternFinderValidator extends TripValidator {
                     LOG.info("Updating {} trips with pattern ID {} (%d/%d)", pattern.associatedTrips.size(), pattern.pattern_id, currentPatternIndex, patterns.size());
                     updateTripStatement.executeUpdate();
                 }
-                // If we've accumulated a lot of prepared statement calls, pass them on to the database backend.
-                if (batchSize > JdbcGtfsLoader.INSERT_BATCH_SIZE) {
-                    totalSize += batchSize;
-                    insertPatternStatement.executeBatch();
-                    insertPatternStopStatement.executeBatch();
-                    batchSize = 0;
-                }
                 currentPatternIndex += 1;
             }
             // Send any remaining prepared statement calls to the database backend.
-            insertPatternStatement.executeBatch();
-            insertPatternStopStatement.executeBatch();
+            patternTracker.executeRemaining();
+            patternStopTracker.executeRemaining();
             LOG.info("Done storing patterns and pattern stops.");
             if (postgresText) {
                 // Finally, copy the pattern for trips text file into a table, create an index on trip IDs, and update

@@ -166,7 +166,7 @@ public class GTFSGraphQLTest {
     public void canFetchRoutesAndFilterTripsByDateAndTime() throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("namespace", testNamespace);
-        variables.put("date", "20170916");
+        variables.put("date", "20170915");
         variables.put("from", 24000);
         variables.put("to", 28000);
         assertThat(
@@ -227,7 +227,7 @@ public class GTFSGraphQLTest {
      * Helper method to make a query with default variables
      *
      * @param queryFilename the filename that should be used to generate the GraphQL query.  This file must be present
-     *                      in the `src/test/resources/grahpql` folder
+     *                      in the `src/test/resources/graphql` folder
      */
     private Map<String, Object> queryGraphQL(String queryFilename) throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
@@ -239,7 +239,7 @@ public class GTFSGraphQLTest {
      * Helper method to execute a GraphQL query and return the result
      *
      * @param queryFilename the filename that should be used to generate the GraphQL query.  This file must be present
-     *                      in the `src/test/resources/grahpql` folder
+     *                      in the `src/test/resources/graphql` folder
      * @param variables a Map of input variables to the graphql query about to be executed
      * @param dataSource the datasource to use when initializing GraphQL
      */

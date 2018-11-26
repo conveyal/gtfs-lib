@@ -5,18 +5,30 @@ import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.validator.ValidationResult;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.io.Files;
 import org.apache.commons.cli.*;
 import org.apache.commons.dbcp2.ConnectionFactory;
 import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
 import org.apache.commons.dbcp2.PoolableConnectionFactory;
 import org.apache.commons.dbcp2.PoolingDataSource;
+import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
+import java.io.File;
+import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+
+import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
 /**
  * This is the public interface to the RDBMS backed functionality in gtfs-lib.
@@ -87,6 +99,36 @@ public abstract class GTFS {
     }
 
     /**
+     * Deletes all tables for the specified feed. Simply put, this is a "drop schema" SQL statement called on the feed's
+     * namespace.
+     */
+    public static void delete (String feedId, DataSource dataSource) throws SQLException, InvalidNamespaceException {
+        LOG.info("Deleting all tables (dropping schema) for {} feed namespace.", feedId);
+        Connection connection = null;
+        try {
+            connection = dataSource.getConnection();
+            ensureValidNamespace(feedId);
+            // Mark entry in feeds table as deleted.
+            String deleteFeedEntrySql = "update feeds set deleted = true where namespace = ?";
+            PreparedStatement deleteFeedStatement = connection.prepareStatement(deleteFeedEntrySql);
+            deleteFeedStatement.setString(1, feedId);
+            deleteFeedStatement.executeUpdate();
+            // Drop all tables bearing the feedId namespace.
+            // Note: It does not appear to be possible to use prepared statements with "drop schema."
+            String dropSchemaSql = String.format("DROP SCHEMA %s CASCADE", feedId);
+            Statement statement = connection.createStatement();
+            statement.executeUpdate(dropSchemaSql);
+            // Commit the changes.
+            connection.commit();
+        } catch (InvalidNamespaceException | SQLException e) {
+            LOG.error(String.format("Could not drop feed for namespace %s", feedId), e);
+            throw e;
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
+        }
+    }
+
+    /**
      * Create an automatically managed pool of database connections to the supplied JDBC database URL.
      *
      * Creating new database connections is usually an expensive operation,
@@ -136,10 +178,9 @@ public abstract class GTFS {
      * A command-line interface that lets you load GTFS feeds into a database and validate the loaded feeds.
      * It also lets you run a GraphQL API for all the feeds loaded into the database.
      */
-    public static void main (String[] args) {
-
+    public static void main (String[] args) throws IOException {
         Options options = getOptions();
-        CommandLine cmd = null;
+        CommandLine cmd;
         try {
             cmd = new DefaultParser().parse(options, args);
         } catch (ParseException e) {
@@ -159,12 +200,21 @@ public abstract class GTFS {
             return;
         }
 
-        if (!(cmd.hasOption("export") || cmd.hasOption("snapshot") || cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("graphql"))) {
-            LOG.error("Must specify one of 'snapshot', 'load', 'validate', 'export', or 'graphql'.");
+        if (!(cmd.hasOption("export") || cmd.hasOption("snapshot") || cmd.hasOption("load") || cmd.hasOption("validate") || cmd.hasOption("delete"))) {
+            LOG.error("Must specify one of 'snapshot', 'load', 'validate', 'export', or 'delete'.");
             printHelp(options);
             return;
         }
-
+        boolean storeResults = cmd.hasOption("json");
+        // Object mapper and directory used for writing load or validation results to file if required.
+        ObjectMapper mapper = null;
+        File directory = null;
+        if (storeResults) {
+            // Instantiate mapper for use with outputting load/validation results.
+            mapper = new ObjectMapper();
+            directory = cmd.getOptionValue("json") != null ? new File(cmd.getOptionValue("json")) : Files.createTempDir();
+            LOG.info("Storing results in directory: {}", directory.getAbsolutePath());
+        }
         String databaseUrl = cmd.getOptionValue("database", DEFAULT_DATABASE_URL);
         String databaseUser = cmd.getOptionValue("user");
         String databasePassword = cmd.getOptionValue("password");
@@ -179,6 +229,11 @@ public abstract class GTFS {
         if (cmd.hasOption("load")) {
             String filePath = cmd.getOptionValue("load");
             loadResult = load(filePath, dataSource);
+            if (storeResults) {
+                File loadResultFile = new File(directory, String.format("%s-load.json", loadResult.uniqueIdentifier));
+                LOG.info("Storing load result at {}", loadResultFile.getAbsolutePath());
+                mapper.writerWithDefaultPrettyPrinter().writeValue(loadResultFile, loadResult);
+            }
             LOG.info("The unique identifier for this feed is: {}", loadResult.uniqueIdentifier);
         }
 
@@ -194,6 +249,11 @@ public abstract class GTFS {
             if (feedToValidate != null) {
                 LOG.info("Validating feed with unique identifier {}", feedToValidate);
                 ValidationResult validationResult = validate (feedToValidate, dataSource);
+                if (storeResults) {
+                    File validationResultFile = new File(directory, String.format("%s-validation.json", feedToValidate));
+                    LOG.info("Storing validation result at {}", validationResultFile.getAbsolutePath());
+                    mapper.writerWithDefaultPrettyPrinter().writeValue(validationResultFile, validationResult);
+                }
                 LOG.info("Done validating.");
             } else {
                 LOG.error("No feed to validate. Specify one, or load a feed in the same command.");
@@ -208,7 +268,12 @@ public abstract class GTFS {
             if (namespaceToSnapshot != null) {
                 LOG.info("Snapshotting feed with unique identifier {}", namespaceToSnapshot);
                 FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource);
-                LOG.info("Done snapshotting.");
+                if (storeResults) {
+                    File snapshotResultFile = new File(directory, String.format("%s-snapshot.json", snapshotResult.uniqueIdentifier));
+                    LOG.info("Storing validation result at {}", snapshotResultFile.getAbsolutePath());
+                    mapper.writerWithDefaultPrettyPrinter().writeValue(snapshotResultFile, snapshotResult);
+                }
+                LOG.info("Done snapshotting. The unique identifier for this snapshot is: {}", snapshotResult.uniqueIdentifier);
             } else {
                 LOG.error("No feed to snapshot. Specify one, or load a feed in the same command.");
             }
@@ -229,12 +294,21 @@ public abstract class GTFS {
             }
         }
 
-        if (cmd.hasOption("graphql")) {
-            Integer port = Integer.parseInt(cmd.getOptionValue("graphql"));
-            LOG.info("Starting GraphQL server on port {}", port);
-            throw new UnsupportedOperationException();
-        }
+        if (cmd.hasOption("delete")) {
+            String namespaceToDelete = cmd.getOptionValue("delete");
 
+            if (namespaceToDelete != null) {
+                LOG.info("Deleting feed with unique identifier {}", namespaceToDelete);
+                try {
+                    delete(namespaceToDelete, dataSource);
+                    LOG.info("Feed {} has been successfully deleted.", namespaceToDelete);
+                } catch (SQLException | InvalidNamespaceException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                LOG.error("No feed to delete. Specify one with the --delete argument.");
+            }
+        }
     }
 
     /**
@@ -244,27 +318,45 @@ public abstract class GTFS {
     private static Options getOptions () {
         Options options = new Options();
         options.addOption(Option.builder("h").longOpt("help").desc("print this message").build());
-        options.addOption(Option.builder().longOpt("export").hasArg()
-                .argName("feedId")
-                .desc("export GTFS data from the given database feedId to the given directory").build());
-        options.addOption(Option.builder().longOpt("outFile").hasArg()
+        options.addOption(Option.builder()
+                .longOpt("export").hasArg()
+                .argName("namespace")
+                .desc("export GTFS data from the given database namespace (feed) to the given directory").build());
+        options.addOption(Option.builder()
+                .longOpt("outFile").hasArg()
                 .argName("file")
                 .desc("zip file path for the exported GTFS").build());
-        options.addOption(Option.builder().longOpt("load").hasArg()
-                .argName("file").desc("load GTFS data from the given file").build());
-        options.addOption(Option.builder().longOpt("validate").hasArg().optionalArg(true).argName("feed")
+        options.addOption(Option.builder()
+                .longOpt("load").hasArg()
+                .argName("file")
+                .desc("load GTFS data from the given file").build());
+        options.addOption(Option.builder()
+                .longOpt("validate").hasArg().optionalArg(true)
+                .argName("namespace")
                 .desc("validate the specified feed. defaults to the feed loaded with the --load option").build());
-        options.addOption(Option.builder().longOpt("snapshot").hasArg()
-                .argName("feedId").desc("snapshot GTFS data from the given database feedId").build());
-        options.addOption(Option.builder("d").longOpt("database")
-                .hasArg().argName("url").desc("JDBC URL for the database. Defaults to " + DEFAULT_DATABASE_URL).build());
-        options.addOption(Option.builder("u").longOpt("user")
-                .hasArg().argName("username").desc("database username").build());
-        options.addOption(Option.builder("p").longOpt("password")
-                .hasArg().argName("password").desc("database password").build());
-        options.addOption(Option.builder().longOpt("graphql")
-                .desc("start a GraphQL API on the given port").optionalArg(true).build());
-        options.addOption(Option.builder().longOpt("json").desc("optionally store in result.json").build());
+        options.addOption(Option.builder()
+                .longOpt("snapshot").hasArg()
+                .argName("namespace")
+                .desc("snapshot GTFS data from the given database namespace (feed)").build());
+        options.addOption(Option.builder("d")
+                .longOpt("database").hasArg()
+                .argName("url")
+                .desc("JDBC URL for the database. Defaults to " + DEFAULT_DATABASE_URL).build());
+        options.addOption(Option.builder("u").longOpt("user").hasArg()
+                .argName("username")
+                .desc("database username").build());
+        options.addOption(Option.builder("p")
+                .longOpt("password").hasArg()
+                .argName("password")
+                .desc("database password").build());
+        options.addOption(Option.builder()
+                .longOpt("delete").hasArg()
+                .argName("namespace")
+                .desc("delete the feed for the specified namespace.").build());
+        options.addOption(Option.builder()
+                .longOpt("json").hasArg().optionalArg(true)
+                .argName("directory")
+                .desc("optionally store results in specified directory (defaults to system temp)").build());
         return options;
     }
 
