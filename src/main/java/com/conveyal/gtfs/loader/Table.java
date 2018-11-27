@@ -695,6 +695,10 @@ public class Table {
      * FIXME: add foreign reference indexes?
      */
     public void createIndexes(Connection connection, String namespace) throws SQLException {
+        if ("agency".equals(name)) {
+            LOG.info("Skipping indexes for {} table", name);
+            return;
+        }
         LOG.info("Indexing...");
         String tableName;
         if (namespace == null) {
