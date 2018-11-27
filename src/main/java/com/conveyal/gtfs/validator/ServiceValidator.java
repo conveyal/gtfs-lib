@@ -185,8 +185,8 @@ public class ServiceValidator extends TripValidator {
                 if (date.isAfter(lastDate)) lastDate = date;
             }
             // Copy some useful information into the ValidationResult object to return to the caller.
-            validationResult.firstCalendarDate = firstDate;
-            validationResult.lastCalendarDate = lastDate;
+            validationResult.firstDateOfService = firstDate;
+            validationResult.lastDateOfService = lastDate;
             // Is this any different? firstDate.until(lastDate, ChronoUnit.DAYS);
             int nDays = (int) ChronoUnit.DAYS.between(firstDate, lastDate) + 1;
             validationResult.dailyBusSeconds = new int[nDays];
