@@ -269,6 +269,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("wheelchair_accessible"))
             .field(MapFetcher.field("publicly_visible", GraphQLInt))
             .field(MapFetcher.field("status", GraphQLInt))
+            .field(MapFetcher.field("route_sort_order"))
             // FIXME ^^
             .field(RowCountFetcher.field("trip_count", "trips", "route_id"))
             .field(RowCountFetcher.field("pattern_count", "patterns", "route_id"))
