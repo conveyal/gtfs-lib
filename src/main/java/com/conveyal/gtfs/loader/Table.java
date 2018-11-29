@@ -696,6 +696,8 @@ public class Table {
      */
     public void createIndexes(Connection connection, String namespace) throws SQLException {
         if ("agency".equals(name)) {
+            // Skip indexing for the agency table, which usually has so few records that indexes are unlikely to
+            // improve query performance. NOTE: other tables could be added here in the future as needed.
             LOG.info("Skipping indexes for {} table", name);
             return;
         }
