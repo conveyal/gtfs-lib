@@ -695,7 +695,14 @@ public class Table {
      * FIXME: add foreign reference indexes?
      */
     public void createIndexes(Connection connection, String namespace) throws SQLException {
-        LOG.info("Indexing...");
+        if ("agency".equals(name) || "feed_info".equals(name)) {
+            // Skip indexing for the small tables that have so few records that indexes are unlikely to
+            // improve query performance or that are unlikely to be joined to other tables. NOTE: other tables could be
+            // added here in the future as needed.
+            LOG.info("Skipping indexes for {} table", name);
+            return;
+        }
+        LOG.info("Indexing {}...", name);
         String tableName;
         if (namespace == null) {
             throw new IllegalStateException("Schema namespace must be provided!");
