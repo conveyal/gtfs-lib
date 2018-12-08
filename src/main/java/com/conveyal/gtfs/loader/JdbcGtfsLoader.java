@@ -129,11 +129,12 @@ public class JdbcGtfsLoader {
             this.tablePrefix = randomIdString();
             result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
-            registerFeed(gtfsFile);
+            createSchema(tablePrefix);
             // Include the dot separator in the table prefix.
             // This allows everything to work even when there's no prefix.
+            this.errorStorage = new SQLErrorStorage(connection, tablePrefix + ".", true);
+            registerFeed(gtfsFile);
             this.tablePrefix += ".";
-            this.errorStorage = new SQLErrorStorage(connection, tablePrefix, true);
             this.referenceTracker = new ReferenceTracker(errorStorage);
             // Load each table in turn, saving some summary information about what happened during each table load
             result.agency = load(Table.AGENCY);
@@ -163,6 +164,20 @@ public class JdbcGtfsLoader {
             result.fatalException = ex.getMessage();
         }
         return result;
+    }
+    
+    private void createSchema (String tablePrefix) {    
+        try {
+            Statement statement = connection.createStatement();
+            // FIXME do the following only on databases that support schemas.
+            // SQLite does not support them. Is there any advantage of schemas over flat tables?
+            statement.execute("create schema " + tablePrefix);
+            connection.commit();
+            LOG.info("Created new feed schema: {}", statement);
+        } catch (Exception ex) {
+            LOG.error("Exception while registering new feed namespace in feeds table: {}", ex.getMessage());
+            DbUtils.closeQuietly(connection);
+        }
     }
 
     /**
@@ -204,9 +219,6 @@ public class JdbcGtfsLoader {
             // TODO try to get the feed_id and feed_version out of the feed_info table
             // statement.execute("select * from feed_info");
 
-            // FIXME do the following only on databases that support schemas.
-            // SQLite does not support them. Is there any advantage of schemas over flat tables?
-            statement.execute("create schema " + tablePrefix);
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
             statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
