@@ -56,7 +56,7 @@ public class GTFSFeedTest {
         //executed only once, before the first test
         simpleGtfsZipFileName = null;
         try {
-            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency");
+            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -190,7 +190,7 @@ public class GTFSFeedTest {
     public void canGetInterpolatedTimes() throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes, IOException {
         String tripId = "a30277f8-e50a-4a85-9141-b1e0da9d429d";
 
-        String gtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-interpolated-stop-times");
+        String gtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-interpolated-stop-times", true);
 
         GTFSFeed feed = GTFSFeed.fromFile(gtfsZipFileName);
         Iterable<StopTime> stopTimes = feed.getInterpolatedStopTimesForTrip(tripId);

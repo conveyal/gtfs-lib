@@ -6,7 +6,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
@@ -104,27 +103,29 @@ public class TestUtils {
     /**
      * Zip files in a folder into a temporary zip file
      */
-    public static String zipFolderFiles(String folderName) throws IOException {
+    public static String zipFolderFiles(String folderName, boolean isRelativeToResourcesPath) throws IOException {
         // create temporary zip file
         File tempFile = File.createTempFile("temp-gtfs-zip-", ".zip");
         tempFile.deleteOnExit();
         String tempFilePath = tempFile.getAbsolutePath();
-        compressZipfile(TestUtils.getResourceFileName(folderName), tempFilePath);
+        // If folder name is relative to resources path, get full path. Otherwise, it is assumed to be an absolute path.
+        String folderPath = isRelativeToResourcesPath ? getResourceFileName(folderName) : folderName;
+        compressZipfile(folderPath, tempFilePath);
         return tempFilePath;
     }
 
-    private static void compressZipfile(String sourceDir, String outputFile) throws IOException, FileNotFoundException {
+    private static void compressZipfile(String sourceDir, String outputFile) throws IOException {
         ZipOutputStream zipFile = new ZipOutputStream(new FileOutputStream(outputFile));
         compressDirectoryToZipfile(sourceDir, sourceDir, zipFile);
         IOUtils.closeQuietly(zipFile);
     }
 
-    private static void compressDirectoryToZipfile(String rootDir, String sourceDir, ZipOutputStream out) throws IOException, FileNotFoundException {
+    private static void compressDirectoryToZipfile(String rootDir, String sourceDir, ZipOutputStream out) throws IOException {
         for (File file : new File(sourceDir).listFiles()) {
             if (file.isDirectory()) {
-                compressDirectoryToZipfile(rootDir, sourceDir + File.separator + file.getName(), out);
+                compressDirectoryToZipfile(rootDir, fileNameWithDir(sourceDir, file.getName()), out);
             } else {
-                ZipEntry entry = new ZipEntry(sourceDir.replace(rootDir, "") + file.getName());
+                ZipEntry entry = new ZipEntry(fileNameWithDir(sourceDir.replace(rootDir, ""), file.getName()));
                 out.putNextEntry(entry);
 
                 FileInputStream in = new FileInputStream(file.getAbsolutePath());
@@ -132,5 +133,9 @@ public class TestUtils {
                 IOUtils.closeQuietly(in);
             }
         }
+    }
+
+    public static String fileNameWithDir(String directory, String filename) {
+        return String.join(File.separator, directory, filename);
     }
 }
