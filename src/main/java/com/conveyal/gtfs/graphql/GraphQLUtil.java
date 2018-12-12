@@ -1,9 +1,9 @@
 package com.conveyal.gtfs.graphql;
 
-import graphql.schema.FieldDataFetcher;
 import graphql.schema.GraphQLArgument;
 import graphql.schema.GraphQLFieldDefinition;
 import graphql.schema.GraphQLList;
+import graphql.schema.PropertyDataFetcher;
 
 import static graphql.Scalars.GraphQLFloat;
 import static graphql.Scalars.GraphQLInt;
@@ -17,7 +17,7 @@ public class GraphQLUtil {
         return newFieldDefinition()
                 .name(name)
                 .type(GraphQLString)
-                .dataFetcher(new FieldDataFetcher(name))
+                .dataFetcher(new PropertyDataFetcher(name))
                 .build();
     }
 
@@ -25,7 +25,7 @@ public class GraphQLUtil {
         return newFieldDefinition()
                 .name(name)
                 .type(GraphQLInt)
-                .dataFetcher(new FieldDataFetcher(name))
+                .dataFetcher(new PropertyDataFetcher(name))
                 .build();
     }
 
