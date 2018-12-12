@@ -26,9 +26,11 @@ public class ValidationResult implements Serializable {
 
     /**
      * the actual first and last date of service which is calculated in {@link ServiceValidator#complete}
+     * These variables are actually not directly tied to data in the calendar_dates.txt file.  Instead, they represent
+     * the first and last date respectively of any entry in the calendar.txt and calendar_dates.txt files.
      */
-    public LocalDate firstDateOfService;
-    public LocalDate lastDateOfService;
+    public LocalDate firstCalendarDate;
+    public LocalDate lastCalendarDate;
 
     public int[] dailyBusSeconds;
     public int[] dailyTramSeconds;
