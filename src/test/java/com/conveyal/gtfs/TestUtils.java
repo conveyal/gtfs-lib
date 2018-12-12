@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,22 +111,31 @@ public class TestUtils {
         String tempFilePath = tempFile.getAbsolutePath();
         // If folder name is relative to resources path, get full path. Otherwise, it is assumed to be an absolute path.
         String folderPath = isRelativeToResourcesPath ? getResourceFileName(folderName) : folderName;
-        compressZipfile(folderPath, tempFilePath);
+        // Do not nest files under a subdirectory if directly zipping a folder in src/main/resources
+        compressZipfile(folderPath, tempFilePath, !isRelativeToResourcesPath);
         return tempFilePath;
     }
 
-    private static void compressZipfile(String sourceDir, String outputFile) throws IOException {
+    private static void compressZipfile(String sourceDir, String outputFile, boolean nestDirectory) throws IOException {
         ZipOutputStream zipFile = new ZipOutputStream(new FileOutputStream(outputFile));
-        compressDirectoryToZipfile(sourceDir, sourceDir, zipFile);
+        compressDirectoryToZipfile(sourceDir, sourceDir, zipFile, nestDirectory);
         IOUtils.closeQuietly(zipFile);
     }
 
-    private static void compressDirectoryToZipfile(String rootDir, String sourceDir, ZipOutputStream out) throws IOException {
+    /**
+     * Convenience method for zipping a directory.
+     * @param nestDirectory whether nested folders should be preserved as subdirectories
+     */
+    private static void compressDirectoryToZipfile(String rootDir, String sourceDir, ZipOutputStream out, boolean nestDirectory) throws IOException {
         for (File file : new File(sourceDir).listFiles()) {
             if (file.isDirectory()) {
-                compressDirectoryToZipfile(rootDir, fileNameWithDir(sourceDir, file.getName()), out);
+                compressDirectoryToZipfile(rootDir, fileNameWithDir(sourceDir, file.getName()), out, nestDirectory);
             } else {
-                ZipEntry entry = new ZipEntry(fileNameWithDir(sourceDir.replace(rootDir, ""), file.getName()));
+                String folderName = sourceDir.replace(rootDir, "");
+                String zipEntryName = nestDirectory
+                    ? fileNameWithDir(folderName, file.getName())
+                    : String.join("", folderName, file.getName());
+                ZipEntry entry = new ZipEntry(zipEntryName);
                 out.putNextEntry(entry);
 
                 FileInputStream in = new FileInputStream(file.getAbsolutePath());
