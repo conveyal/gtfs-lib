@@ -129,12 +129,20 @@ public class JdbcGtfsLoader {
             this.tablePrefix = randomIdString();
             result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
-            createSchema(tablePrefix);
-            // Include the dot separator in the table prefix.
-            // This allows everything to work even when there's no prefix.
-            this.errorStorage = new SQLErrorStorage(connection, tablePrefix + ".", true);
-            registerFeed(gtfsFile);
-            this.tablePrefix += ".";
+            
+            //The order of the following four lines should not be changed because the schema needs to be in place
+            //before the error storage can be constructed, which in turn needs to exist in case any errors are
+            //encountered during the loading process.
+            {
+                createSchema(connection, tablePrefix);
+                //the SQLErrorStorage constructor expects the tablePrefix to contain the dot separator.
+                this.errorStorage = new SQLErrorStorage(connection, tablePrefix + ".", true);
+                //registerFeed accesses this.tablePrefix which shouldn't contain the dot separator.
+                registerFeed(gtfsFile);
+                // Include the dot separator in the table prefix from this point onwards.
+                // This allows everything to work even when there's no prefix.
+                this.tablePrefix += ".";
+            }
             this.referenceTracker = new ReferenceTracker(errorStorage);
             // Load each table in turn, saving some summary information about what happened during each table load
             result.agency = load(Table.AGENCY);
@@ -166,12 +174,19 @@ public class JdbcGtfsLoader {
         return result;
     }
     
-    private void createSchema (String tablePrefix) {    
+    /**
+     * Creates a schema/namespace in the database.
+     * This does *not* setup any other tables or enter the schema name in a registry (@see #registerFeed).
+     * 
+     * @param connection Connection to the database to create the schema on.
+     * @param schemaName Name of the schema (i.e. table prefix). Should not include the dot suffix.
+     */
+    private static void createSchema (Connection connection, String schemaName) {    
         try {
             Statement statement = connection.createStatement();
             // FIXME do the following only on databases that support schemas.
             // SQLite does not support them. Is there any advantage of schemas over flat tables?
-            statement.execute("create schema " + tablePrefix);
+            statement.execute("create schema " + schemaName);
             connection.commit();
             LOG.info("Created new feed schema: {}", statement);
         } catch (Exception ex) {
