@@ -8,7 +8,7 @@ import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.util.Util;
 import com.google.common.collect.Iterables;
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Coordinate;
 import org.mapdb.Fun;
 
 import java.util.ArrayList;

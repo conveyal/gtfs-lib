@@ -5,7 +5,7 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.base.Strings;
-import com.vividsolutions.jts.geom.*;
+import org.locationtech.jts.geom.*;
 import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

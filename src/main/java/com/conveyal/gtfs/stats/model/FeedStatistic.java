@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.stats.model;
 
 import com.conveyal.gtfs.stats.FeedStats;
-import com.vividsolutions.jts.geom.Geometry;
+import org.locationtech.jts.geom.Geometry;
 
 import java.awt.geom.Rectangle2D;
 import java.io.Serializable;

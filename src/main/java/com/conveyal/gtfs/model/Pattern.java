@@ -1,7 +1,7 @@
 package com.conveyal.gtfs.model;
 
 import com.google.common.base.Joiner;
-import com.vividsolutions.jts.geom.LineString;
+import org.locationtech.jts.geom.LineString;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;

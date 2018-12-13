@@ -243,9 +243,9 @@
     	<version>18.0</version>
     </dependency>
     <dependency>
-    	<groupId>com.vividsolutions</groupId>
-    	<artifactId>jts</artifactId>
-    	<version>1.13</version>
+    	<groupId>org.locationtech.jts</groupId>
+    	<artifactId>jts-core</artifactId>
+    	<version>1.16.0</version>
     </dependency>
     <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
     <dependency>

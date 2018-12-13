@@ -1,7 +1,7 @@
 package com.conveyal.gtfs;
 
-import com.vividsolutions.jts.geom.*;
-import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.impl.PackedCoordinateSequence;
 
 /**
  * Make some bounding geometries for use in cropping.
@@ -483,7 +483,7 @@ public class Geometries {
                         6.023293, 50.752340,
                         5.982748, 50.749850,
                         5.958986, 50.759260,
-                        5.920645, 50.748480}, 2);
+                        5.920645, 50.748480}, 2, 0);
         Polygon boundary = geometryFactory.createPolygon(netherlandsBoundaryCoordinates);
         return boundary;
     }

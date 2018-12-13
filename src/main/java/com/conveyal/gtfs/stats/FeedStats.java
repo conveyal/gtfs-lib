@@ -6,7 +6,7 @@ import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.model.AgencyStatistic;
-import com.vividsolutions.jts.geom.Geometry;
+import org.locationtech.jts.geom.Geometry;
 
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
