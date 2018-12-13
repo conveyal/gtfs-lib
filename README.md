@@ -6,7 +6,7 @@ Based on observations over several years of experience using the OneBusAway GTFS
 
 The main design goals are:
 
-- Avoid all reflection tricks and work imperatively even if it is a bit verbose
+- Avoid all reflection tricks and use imperative code style even if it is a bit verbose
 - Allow loading and processing GTFS feeds (much) bigger than available memory
 - Introduce the concept of feed IDs, and do not use agency IDs for this purpose.
 - Perform extensive syntax and semantic validation of feed contents
