@@ -49,7 +49,7 @@ public class GTFSGraphQLTest {
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = createDataSource(dbConnectionUrl, null, null);
         // zip up test folder into temp zip file
-        String zipFileName = TestUtils.zipFolderFiles("fake-agency");
+        String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
         // load feed into db
         FeedLoadResult feedLoadResult = load(zipFileName, testDataSource);
         testNamespace = feedLoadResult.uniqueIdentifier;
