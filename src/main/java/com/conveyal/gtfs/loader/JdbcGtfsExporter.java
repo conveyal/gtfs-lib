@@ -81,8 +81,21 @@ public class JdbcGtfsExporter {
             // if exporting a feed/schema that represents an editor snapshot.
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
-            result.agency = export(Table.AGENCY);
-            result.calendar = export(Table.CALENDAR);
+            result.agency = export(Table.AGENCY, connection);
+            if (fromEditor) {
+                // only export calendar entries that have at least one day of service set
+                // this could happen in cases where a feed was imported that only had calendar_dates.txt
+                result.calendar = export(
+                    Table.CALENDAR,
+                    String.join(
+                        " ",
+                        Table.CALENDAR.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
+                        "WHERE monday=1 OR tuesday=1 OR wednesday=1 OR thursday=1 OR friday=1 OR saturday=1 OR sunday=1"
+                    )
+                );
+            } else {
+                result.calendar = export(Table.CALENDAR, connection);
+            }
             if (fromEditor) {
                 // Export schedule exceptions in place of calendar dates if exporting a feed/schema that represents an editor snapshot.
                 GTFSFeed feed = new GTFSFeed();
@@ -101,87 +114,112 @@ public class JdbcGtfsExporter {
                 for (ScheduleException exception : exceptionsIterator) {
                     exceptions.add(exception);
                 }
-                int calendarDateCount = 0;
-                for (Calendar cal : calendars) {
-                    Service service = new Service(cal.service_id);
-                    service.calendar = cal;
-                    for (ScheduleException ex : exceptions) {
-                        if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
-                            (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
-                            // Skip swap exception if cal is not referenced by added or removed service.
-                            // This is not technically necessary, but the output is cleaner/more intelligible.
-                            continue;
-                        }
-
-                        for (LocalDate date : ex.dates) {
-                            if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
-                                // No need to write dates that do not apply
+                // check whether the feed is organized in a format with the calendars.txt file
+                if (calendarsReader.getRowCount() > 0) {
+                    // feed does have calendars.txt file, continue export with strategy of matching exceptions
+                    // to calendar to output calendar_dates.txt
+                    int calendarDateCount = 0;
+                    for (Calendar cal : calendars) {
+                        Service service = new Service(cal.service_id);
+                        service.calendar = cal;
+                        for (ScheduleException ex : exceptions) {
+                            if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
+                                (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
+                                // Skip swap exception if cal is not referenced by added or removed service.
+                                // This is not technically necessary, but the output is cleaner/more intelligible.
                                 continue;
                             }
 
-                            CalendarDate calendarDate = new CalendarDate();
-                            calendarDate.date = date;
-                            calendarDate.service_id = cal.service_id;
-                            calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
-                            LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
+                            for (LocalDate date : ex.dates) {
+                                if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
+                                    // No need to write dates that do not apply
+                                    continue;
+                                }
 
-                            if (service.calendar_dates.containsKey(date))
-                                throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
+                                CalendarDate calendarDate = new CalendarDate();
+                                calendarDate.date = date;
+                                calendarDate.service_id = cal.service_id;
+                                calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
+                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
 
-                            service.calendar_dates.put(date, calendarDate);
-                            calendarDateCount += 1;
+                                if (service.calendar_dates.containsKey(date))
+                                    throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
+
+                                service.calendar_dates.put(date, calendarDate);
+                                calendarDateCount += 1;
+                            }
                         }
+                        feed.services.put(cal.service_id, service);
                     }
-                    feed.services.put(cal.service_id, service);
-                }
-                if (calendarDateCount == 0) {
-                    LOG.info("No calendar dates found. Skipping table.");
+                    if (calendarDateCount == 0) {
+                        LOG.info("No calendar dates found. Skipping table.");
+                    } else {
+                        LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
+                        new CalendarDate.Writer(feed).writeTable(zipOutputStream);
+                    }
                 } else {
-                    LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
-                    new CalendarDate.Writer(feed).writeTable(zipOutputStream);
+                    // No calendar records exist, export calendar_dates as is and hope for the best.
+                    // This situation will occur in at least 2 scenarios:
+                    // 1.  A GTFS has been loaded into the editor that had only the calendar_dates.txt file
+                    //     and no further edits were made before exporting to a snapshot
+                    // 2.  A new GTFS has been created from scratch and calendar information has yet to be added.
+                    //     This will result in an invalid GTFS, but it was what the user wanted so ¯\_(ツ)_/¯
+                    result.calendarDates = export(Table.CALENDAR_DATES, connection);
                 }
             } else {
                 // Otherwise, simply export the calendar dates as they were loaded in.
-                result.calendarDates = export(Table.CALENDAR_DATES);
+                result.calendarDates = export(Table.CALENDAR_DATES, connection);
             }
-            result.fareAttributes = export(Table.FARE_ATTRIBUTES);
-            result.fareRules = export(Table.FARE_RULES);
-            result.feedInfo = export(Table.FEED_INFO);
+            result.fareAttributes = export(Table.FARE_ATTRIBUTES, connection);
+            result.fareRules = export(Table.FARE_RULES, connection);
+            result.feedInfo = export(Table.FEED_INFO, connection);
             // Only write frequencies for "approved" routes using COPY TO with results of select query
-            String frequencySelectSql = null;
             if (fromEditor) {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for frequencies requires two joins to reach the routes table and a where filter on
                 // route status.
-                String scopedStartTime = qualifyField(Table.FREQUENCIES, "start_time");
-                String scopedEndTime = qualifyField(Table.FREQUENCIES, "end_time");
                 // FIXME Replace with string literal query instead of clause generators
-                frequencySelectSql = String.join(" ",
+                result.frequencies = export(
+                    Table.FREQUENCIES,
+                    String.join(
+                        " ",
                         // Convert start_time and end_time values from seconds to time format (HH:MM:SS).
-                        Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
-                            .replace(scopedStartTime, convertSecondsToTime(scopedStartTime, "start_time"))
-                            .replace(scopedEndTime, convertSecondsToTime(scopedEndTime, "end_time")),
+                        Table.FREQUENCIES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
                         Table.FREQUENCIES.generateJoinSql(Table.TRIPS, feedIdToExport),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                        Table.TRIPS.generateJoinSql(
+                            Table.ROUTES,
+                            feedIdToExport,
+                            "route_id",
+                            false
+                        ),
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.frequencies = export(Table.FREQUENCIES, connection);
             }
-            result.frequencies = export(Table.FREQUENCIES, frequencySelectSql);
+
             // Only write "approved" routes using COPY TO with results of select query
-            String routeSelectSql = null;
             if (fromEditor) {
                 // The filter clause for routes is simple. We're just checking that the route is APPROVED.
-                routeSelectSql = String.join(" ",
+                result.routes = export(
+                    Table.ROUTES,
+                    String.join(
+                        " ",
                         Table.ROUTES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
-                        whereRouteIsApproved);
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.routes = export(Table.ROUTES, connection);
             }
-            result.routes = export(Table.ROUTES, routeSelectSql);
+
             // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
             // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
             // frequency-based pattern travel times match stop time arrivals/departures?
 //            export(Table.PATTERNS);
 //            export(Table.PATTERN_STOP);
             // Only write shapes for "approved" routes using COPY TO with results of select query
-            String shapeSelectSql = null;
             if (fromEditor) {
                 // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for shapes requires joining to trips and then to routes table and a where filter on
@@ -189,52 +227,74 @@ public class JdbcGtfsExporter {
                 // FIXME: I'm not sure that shape_id is indexed for the trips table. This could cause slow downs.
                 // FIXME: this is exporting point_type, which is not a GTFS field, but its presence shouldn't hurt.
                 String shapeFieldsToExport = Table.commaSeparatedNames(
-                        Table.SHAPES.specFields(), String.join(".", feedIdToExport, Table.SHAPES.name + "."));
+                    Table.SHAPES.specFields(),
+                    String.join(".", feedIdToExport, Table.SHAPES.name + "."),
+                    true
+                );
                 // NOTE: The below substitution uses relative indexing. All values "%<s" reference the same arg as the
                 // previous format specifier (i.e., feedIdToExport).
-                shapeSelectSql = String.format("select %s " +
-                        "from (select distinct %s.trips.shape_id " +
-                        "from %<s.trips, %<s.routes " +
-                        "where %<s.trips.route_id = %<s.routes.route_id and %<s.routes.status = 2) as unique_approved_shape_ids, " +
-                        "%<s.shapes where unique_approved_shape_ids.shape_id = %<s.shapes.shape_id",
+                result.shapes = export(
+                    Table.SHAPES,
+                    String.format(
+                        "select %s " +
+                            "from (select distinct %s.trips.shape_id " +
+                            "from %<s.trips, %<s.routes " +
+                            "where %<s.trips.route_id = %<s.routes.route_id and " +
+                            "%<s.routes.status = 2) as unique_approved_shape_ids, " +
+                            "%<s.shapes where unique_approved_shape_ids.shape_id = %<s.shapes.shape_id",
                         shapeFieldsToExport,
-                        feedIdToExport);
+                        feedIdToExport
+                    )
+                );
+            } else {
+                result.shapes = export(Table.SHAPES, connection);
             }
-            result.shapes = export(Table.SHAPES, shapeSelectSql);
-            result.stops = export(Table.STOPS);
+            result.stops = export(Table.STOPS, connection);
             // Only write stop times for "approved" routes using COPY TO with results of select query
-            String stopTimesSelectSql = null;
             if (fromEditor) {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for stop times requires two joins to reach the routes table and a where filter on
                 // route status.
-                String scopedArrivalTime = qualifyField(Table.STOP_TIMES, "arrival_time");
-                String scopedDepartureTime = qualifyField(Table.STOP_TIMES, "departure_time");
                 // FIXME Replace with string literal query instead of clause generators
-                stopTimesSelectSql = String.join(" ",
-                        // The select clause for stop_times requires transforming the time fields to the HH:MM:SS string
-                        // format.
-                        Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL)
-                            .replace(scopedArrivalTime, convertSecondsToTime(scopedArrivalTime, "arrival_time"))
-                            .replace(scopedDepartureTime, convertSecondsToTime(scopedDepartureTime, "departure_time")),
+                result.stopTimes = export(
+                    Table.STOP_TIMES,
+                    String.join(" ",
+                        Table.STOP_TIMES.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
                         Table.STOP_TIMES.generateJoinSql(Table.TRIPS, feedIdToExport),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                        Table.TRIPS.generateJoinSql(
+                            Table.ROUTES,
+                            feedIdToExport,
+                            "route_id",
+                            false
+                        ),
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.stopTimes = export(Table.STOP_TIMES, connection);
             }
-            result.stopTimes = export(Table.STOP_TIMES, stopTimesSelectSql);
-            result.transfers = export(Table.TRANSFERS);
-            String tripSelectSql = null;
+            result.transfers = export(Table.TRANSFERS, connection);
             if (fromEditor) {
                 // Generate filter SQL for trips if exporting a feed/schema that represents an editor snapshot.
                 // The filter clause for trips requires an inner join on the routes table and the same where check on
                 // route status.
                 // FIXME Replace with string literal query instead of clause generators
-                tripSelectSql = String.join(" ",
+                result.trips = export(
+                    Table.TRIPS,
+                    String.join(" ",
                         Table.TRIPS.generateSelectSql(feedIdToExport, Requirement.OPTIONAL),
-                        Table.TRIPS.generateJoinSql(Table.ROUTES, feedIdToExport, "route_id", false),
-                        whereRouteIsApproved);
+                        Table.TRIPS.generateJoinSql(
+                            Table.ROUTES,
+                            feedIdToExport,
+                            "route_id",
+                            false
+                        ),
+                        whereRouteIsApproved
+                    )
+                );
+            } else {
+                result.trips = export(Table.TRIPS, connection);
             }
-            result.trips = export(Table.TRIPS, tripSelectSql);
 
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
@@ -253,22 +313,6 @@ public class JdbcGtfsExporter {
         }
         return result;
     }
-
-    /**
-     * Returns the PostgreSQL syntax to convert seconds since midnight into time format HH:MM:SS for the specified field.
-     *
-     * Note: the returned string should be used to replace the field name provided as an argument.
-     *
-     * FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
-     */
-    private String convertSecondsToTime (String scopedFieldName, String exportedFieldName) {
-        return String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as %s", scopedFieldName, exportedFieldName);
-    }
-
-    private String qualifyField (Table table, String field) {
-        return String.join(".", feedIdToExport, table.name, field);
-    }
-
 
     /**
      * Removes any empty zip files from the final zip file.
@@ -299,19 +343,39 @@ public class JdbcGtfsExporter {
         LOG.info("Deleted {} empty files in {} ms", emptyTableList.size(), System.currentTimeMillis() - startTime);
     }
 
-    private TableLoadResult export (Table table) {
+    private TableLoadResult export (Table table, Connection connection) {
         if (fromEditor) {
             // Default behavior for exporting editor snapshot tables is to select only the spec fields.
             return export(table, table.generateSelectSql(feedIdToExport, Requirement.OPTIONAL));
         } else {
-            return export(table, null);
+            String existingFieldsSelect = null;
+            try {
+                existingFieldsSelect = table.generateSelectAllExistingFieldsSql(connection, feedIdToExport);
+            } catch (SQLException e) {
+                LOG.error("failed to generate select statement for existing fields");
+                TableLoadResult tableLoadResult = new TableLoadResult();
+                tableLoadResult.fatalException = e.getMessage();
+                e.printStackTrace();
+                return tableLoadResult;
+            }
+            return export(table, existingFieldsSelect);
         }
     }
 
+    /**
+     * Export a table to the zipOutputStream to be written to the GTFS.
+     */
     private TableLoadResult export (Table table, String filterSql) {
         long startTime = System.currentTimeMillis();
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {
+            if (filterSql == null) {
+                throw new IllegalArgumentException("filterSql argument cannot be null");
+            } else {
+                // Surround filter SQL in parentheses.
+                filterSql = String.format("(%s)", filterSql);
+            }
+
             // Create entry for table
             String textFileName = table.name + ".txt";
             ZipEntry zipEntry = new ZipEntry(textFileName);
@@ -319,13 +383,6 @@ public class JdbcGtfsExporter {
 
             // don't let CSVWriter close the stream when it is garbage-collected
             OutputStream protectedOut = new FilterOutputStream(zipOutputStream);
-            if (filterSql == null) {
-                // If there is no filter SQL specified, simply copy out the whole table.
-                filterSql = String.format("%s.%s", feedIdToExport, table.name);
-            } else {
-                // Surround filter SQL in parentheses.
-                filterSql = String.format("(%s)", filterSql);
-            }
             String copySql = String.format("copy %s to STDOUT DELIMITER ',' CSV HEADER", filterSql);
             LOG.info(copySql);
             // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
@@ -338,7 +395,7 @@ public class JdbcGtfsExporter {
             zipOutputStream.closeEntry();
             LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, table.name, System.currentTimeMillis() - startTime);
             connection.commit();
-        } catch (SQLException | IOException e) {
+        } catch (SQLException | IOException | IllegalArgumentException e) {
             // Rollback connection so that fatal exception does not impact loading of other tables.
             try {
                 connection.rollback();

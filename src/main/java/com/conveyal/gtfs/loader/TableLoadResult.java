@@ -12,6 +12,7 @@ public class TableLoadResult implements Serializable {
     public int rowCount;
     public int errorCount;
     public String fatalException = null;
+    public int fileSize;
 
     /** No-arg constructor for Mongo */
     public TableLoadResult () { }

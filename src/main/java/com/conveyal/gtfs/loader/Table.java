@@ -1,23 +1,47 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.ShapePoint;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
-import static com.conveyal.gtfs.loader.Requirement.*;
+import static com.conveyal.gtfs.loader.Requirement.EDITOR;
+import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
+import static com.conveyal.gtfs.loader.Requirement.OPTIONAL;
+import static com.conveyal.gtfs.loader.Requirement.REQUIRED;
+import static com.conveyal.gtfs.loader.Requirement.UNKNOWN;
 
 
 /**
@@ -101,10 +125,11 @@ public class Table {
 
     public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", FareAttribute.class, OPTIONAL,
         new StringField("fare_id", REQUIRED),
-        new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE),
+        new DoubleField("price", REQUIRED, 0.0, Double.MAX_VALUE, 2),
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
+        new StringField("agency_id", OPTIONAL), // FIXME? only required if there are more than one
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
@@ -112,7 +137,7 @@ public class Table {
     // feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
-        new StringField("feed_publisher_url", REQUIRED),
+        new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
         new DateField("feed_end_date", OPTIONAL),
@@ -129,8 +154,9 @@ public class Table {
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
-        // FIXME: Should the route type max value be equivalent to GTFS spec's max?
-        new IntegerField("route_type", REQUIRED, 999),
+        // Max route type according to the GTFS spec is 7; however, there is a GTFS proposal that could see this 
+        // max value grow to around 1800: https://groups.google.com/forum/#!msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J
+        new IntegerField("route_type", REQUIRED, 1800),
         new URLField("route_url",  OPTIONAL),
         new URLField("route_branding_url",  OPTIONAL),
         new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
@@ -138,6 +164,7 @@ public class Table {
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
+        new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
@@ -155,9 +182,9 @@ public class Table {
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
             new IntegerField("shape_pt_sequence", REQUIRED),
-            new DoubleField("shape_pt_lat", REQUIRED, -80, 80),
-            new DoubleField("shape_pt_lon", REQUIRED, -180, 180),
-            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY),
+            new DoubleField("shape_pt_lat", REQUIRED, -80, 80, 6),
+            new DoubleField("shape_pt_lon", REQUIRED, -180, 180, 6),
+            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, -1),
             // Editor-specific field that represents a shape point's behavior in UI.
             // 0 - regular shape point
             // 1 - user-designated anchor point (handle with which the user can manipulate shape)
@@ -180,8 +207,8 @@ public class Table {
         new StringField("stop_code",  OPTIONAL),
         new StringField("stop_name",  REQUIRED),
         new StringField("stop_desc",  OPTIONAL),
-        new DoubleField("stop_lat", REQUIRED, -80, 80),
-        new DoubleField("stop_lon", REQUIRED, -180, 180),
+        new DoubleField("stop_lat", REQUIRED, -80, 80, 6),
+        new DoubleField("stop_lon", REQUIRED, -180, 180, 6),
         new StringField("zone_id",  OPTIONAL),
         new URLField("stop_url",  OPTIONAL),
         new ShortField("location_type", OPTIONAL, 2),
@@ -201,7 +228,7 @@ public class Table {
             new IntegerField("default_dwell_time", EDITOR, 0, Integer.MAX_VALUE),
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
-            new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY),
+            new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", EDITOR, 1)
     ).withParentTable(PATTERNS);
 
@@ -244,7 +271,7 @@ public class Table {
             new StringField("stop_headsign", OPTIONAL),
             new ShortField("pickup_type", OPTIONAL, 2),
             new ShortField("drop_off_type", OPTIONAL, 2),
-            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY),
+            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     ).withParentTable(TRIPS);
@@ -430,20 +457,21 @@ public class Table {
      * Join a list of fields with a comma + space separator.
      */
     public static String commaSeparatedNames(List<Field> fieldsToJoin) {
-        return commaSeparatedNames(fieldsToJoin, null);
+        return commaSeparatedNames(fieldsToJoin, null, false);
     }
 
     /**
      * Prepend a prefix string to each field and join them with a comma + space separator.
+     * Also, if an export to GTFS is being performed, certain fields need a translation from the database format to the
+     * GTFS format.  Otherwise, the fields are assumed to be asked in order to do a database-to-database export and so
+     * the verbatim values of the fields are needed.
      */
-    public static String commaSeparatedNames(List<Field> fieldsToJoin, String prefix) {
+    public static String commaSeparatedNames(List<Field> fieldsToJoin, String prefix, boolean csvOutput) {
         return fieldsToJoin.stream()
                 // NOTE: This previously only prefixed fields that were foreign refs or key fields. However, this
                 // caused an issue where shared fields were ambiguously referenced in a select query (specifically,
                 // wheelchair_accessible in routes and trips). So this filter has been removed.
-                .map(f -> prefix != null // && (f.isForeignReference() || getKeyFieldName().equals(f.name))
-                        ? prefix + f.name
-                        : f.name)
+                .map(f -> f.getColumnExpression(prefix, csvOutput))
                 .collect(Collectors.joining(", "));
     }
 
@@ -478,11 +506,43 @@ public class Table {
         String fieldsString;
         String tableName = String.join(".", namespace, name);
         String fieldPrefix = tableName + ".";
-        if (minimumRequirement.equals(EDITOR)) fieldsString = commaSeparatedNames(editorFields(), fieldPrefix);
-        else if (minimumRequirement.equals(OPTIONAL)) fieldsString = commaSeparatedNames(specFields(), fieldPrefix);
-        else if (minimumRequirement.equals(REQUIRED)) fieldsString = commaSeparatedNames(requiredFields(), fieldPrefix);
-        else fieldsString = "*";
+        if (minimumRequirement.equals(EDITOR)) {
+            fieldsString = commaSeparatedNames(editorFields(), fieldPrefix, true);
+        } else if (minimumRequirement.equals(OPTIONAL)) {
+            fieldsString = commaSeparatedNames(specFields(), fieldPrefix, true);
+        } else if (minimumRequirement.equals(REQUIRED)) {
+            fieldsString = commaSeparatedNames(requiredFields(), fieldPrefix, true);
+        } else fieldsString = "*";
         return String.format("select %s from %s", fieldsString, tableName);
+    }
+
+    /**
+     * Generate a select statement from the columns that actually exist in the database table.  This method is intended
+     * to be used when exporting to a GTFS and eventually generates the select all with each individual field and
+     * applicable transformations listed out.
+     */
+    public String generateSelectAllExistingFieldsSql(Connection connection, String namespace) throws SQLException {
+        // select all columns from table
+        // FIXME This is postgres-specific and needs to be made generic for non-postgres databases.
+        PreparedStatement statement = connection.prepareStatement(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = ? AND table_name = ?"
+        );
+        statement.setString(1, namespace);
+        statement.setString(2, name);
+        ResultSet result = statement.executeQuery();
+
+        // get result and add fields that are defined in this table
+        List<Field> existingFields = new ArrayList<>();
+        while (result.next()) {
+            String columnName = result.getString(1);
+            existingFields.add(getFieldForName(columnName));
+        }
+
+        String tableName = String.join(".", namespace, name);
+        String fieldPrefix = tableName + ".";
+        return String.format(
+            "select %s from %s", commaSeparatedNames(existingFields, fieldPrefix, true), tableName
+        );
     }
 
     public String generateJoinSql (Table joinTable, String namespace, String fieldName, boolean prefixTableName) {
@@ -635,7 +695,14 @@ public class Table {
      * FIXME: add foreign reference indexes?
      */
     public void createIndexes(Connection connection, String namespace) throws SQLException {
-        LOG.info("Indexing...");
+        if ("agency".equals(name) || "feed_info".equals(name)) {
+            // Skip indexing for the small tables that have so few records that indexes are unlikely to
+            // improve query performance or that are unlikely to be joined to other tables. NOTE: other tables could be
+            // added here in the future as needed.
+            LOG.info("Skipping indexes for {} table", name);
+            return;
+        }
+        LOG.info("Indexing {}...", name);
         String tableName;
         if (namespace == null) {
             throw new IllegalStateException("Schema namespace must be provided!");
@@ -869,5 +936,4 @@ public class Table {
             listOfUniqueIds.add(uniqueId);
         }
     }
-
 }

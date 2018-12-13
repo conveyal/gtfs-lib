@@ -6,7 +6,7 @@ Based on observations over several years of experience using the OneBusAway GTFS
 
 The main design goals are:
 
-- Avoid all reflection tricks and work imperatively even if it is a bit verbose
+- Avoid all reflection tricks and use imperative code style even if it is a bit verbose
 - Allow loading and processing GTFS feeds (much) bigger than available memory
 - Introduce the concept of feed IDs, and do not use agency IDs for this purpose.
 - Perform extensive syntax and semantic validation of feed contents
@@ -16,7 +16,7 @@ A gtfs-lib GTFSFeed object should faithfully represent the contents of a single 
 
 ## Usage
 
-gtfs-lib can be used as a Java library or run via the command line.
+gtfs-lib can be used as a Java library or run via the command line.  If using this library with PostgreSQL for persistence, you must use at least version 9.6 of PostgreSQL.
 
 ### Library (maven)
 
@@ -36,77 +36,165 @@ $ git clone https://github.com/conveyal/gtfs-lib.git
 $ cd gtfs-lib
 ## build the jar
 $ mvn package
-## run the validation suite on a GTFS file and save the result to result.json - change the version number to match file name in /target
-$ java -jar target/gtfs-lib-2.2.0-SNAPSHOT-shaded.jar -validate /path/to/gtfs.zip /path/to/result.json
+## Run the validation suite on a GTFS file and save the results to json files.
+## Note: Change the version number to match the shaded jar file name in /target directory.
+$ java -cp gtfs-lib-3.4.0-SNAPSHOT-shaded.jar com.conveyal.gtfs.GTFS --load /path/to/gtfs.zip --validate --json /optional/path/to/results
 ```
 
-### Validation result
+### Load and Validation results
 
-The result from running the command line validator is a json file containing
-basic info about the feed as well, geographic info (bounding box, plus a merged buffers of the stop
-locations), and a list of validation issues.
+The result from running the load or validate command line option with
+the `--json` option is a json file containing summary information about
+the feed and the process (load or validate) that was run. The results will
+be stored at `[feedId]-[load|validate].json` in the system temp directory
+or the optional directory specified with the `--json` option.
+
+#### load.json
 
 ```json
 {
-  "fileName": "/path/to/gtfs.zip",
-  "validationTimestamp": "Tue Mar 21 11:21:56 EDT 2017",
-  "feedStatistics": {
-    "feed_id": "feed-id",
-    "revenueTime": 14778300,
-    "startDate": "2017-04-10",
-    "endDate": "2017-07-02",
-    "agencyCount": 1,
-    "routeCount": 81,
-    "stopCount": 3875,
-    "tripCount": 8633,
-    "frequencyCount": 0,
-    "stopTimeCount": 385558,
-    "shapePointCount": 246084,
-    "fareAttributeCount": 10,
-    "fareRuleCount": 186,
-    "serviceCount": 3,
-    "datesOfService": [
-      "2017-04-10",
-      "2017-04-11",
-      ...
-    ],
-    "bounds": {
-      "west": -122.173638697,
-      "east": -121.54902915,
-      "south": 36.974922178,
-      "north": 37.558388156
-    },
-    "mergedBuffers": {GeoJSON MultiPolygon},
+  "filename" : "/Users/me/files/gtfs.zip",
+  "uniqueIdentifier" : "dqzn_ogndwayamkasyatagjfkoa",
+  "errorCount" : 0,
+  "fatalException" : null,
+  "agency" : {
+    "rowCount" : 1,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 165
   },
-  "errorCount": 203,
-  "errors": [
-    {
-      "file": "stops",
-      "line": 2282,
-      "field": "stop_id",
-      "affectedEntityId": "3006",
-      "errorType": "UnusedStopError",
-      "priority": "LOW",
-      "stop": {
-        "sourceFileLine": 2282,
-        "stop_id": "3006",
-        "stop_code": "63006",
-        "stop_name": "COTTLE & MALONE",
-        "stop_desc": null,
-        "stop_lat": 37.290717809,
-        "stop_lon": -121.895693535,
-        "zone_id": "1",
-        "stop_url": null,
-        "location_type": 0,
-        "parent_station": null,
-        "stop_timezone": null,
-        "wheelchair_boarding": null,
-        "feed_id": "feed-id"
-      },
-      "message": "Stop Id 3006 is not used in any trips.",
-      "messageWithContext": "stops line 2282, field 'stop_id': Stop Id 3006 is not used in any trips."
-    }
-    ...
-  ]
-} 
+  "calendar" : {
+    "rowCount" : 29,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 1503
+  },
+  "calendarDates" : {
+    "rowCount" : 176,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 4904
+  },
+  "fareAttributes" : {
+    "rowCount" : 0,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 0
+  },
+  "fareRules" : {
+    "rowCount" : 0,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 0
+  },
+  "feedInfo" : {
+    "rowCount" : 0,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 0
+  },
+  "frequencies" : {
+    "rowCount" : 0,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 0
+  },
+  "routes" : {
+    "rowCount" : 275,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 42123
+  },
+  "shapes" : {
+    "rowCount" : 715639,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 26076306
+  },
+  "stops" : {
+    "rowCount" : 4702,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 281423
+  },
+  "stopTimes" : {
+    "rowCount" : 2054189,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 128596782
+  },
+  "transfers" : {
+    "rowCount" : 0,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 0
+  },
+  "trips" : {
+    "rowCount" : 46036,
+    "errorCount" : 0,
+    "fatalException" : null,
+    "fileSize" : 4009568
+  },
+  "loadTimeMillis" : 62746,
+  "completionTime" : 1535468396785
+}
+```
+
+#### validate.json
+
+```json
+{
+  "fatalException" : null,
+  "errorCount" : 1193,
+  "declaredStartDate" : null,
+  "declaredEndDate" : null,
+  "firstCalendarDate" : {
+    "year" : 2018,
+    "month" : "JUNE",
+    "chronology" : {
+      "id" : "ISO",
+      "calendarType" : "iso8601"
+    },
+    "dayOfMonth" : 30,
+    "dayOfWeek" : "SATURDAY",
+    "era" : "CE",
+    "dayOfYear" : 181,
+    "leapYear" : false,
+    "monthValue" : 6
+  },
+  "lastCalendarDate" : {
+    "year" : 2018,
+    "month" : "SEPTEMBER",
+    "chronology" : {
+      "id" : "ISO",
+      "calendarType" : "iso8601"
+    },
+    "dayOfMonth" : 1,
+    "dayOfWeek" : "SATURDAY",
+    "era" : "CE",
+    "dayOfYear" : 244,
+    "leapYear" : false,
+    "monthValue" : 9
+  },
+  "dailyBusSeconds" : [ 9999, ... ],
+  "dailyTramSeconds" : [ 0, ... ],
+  "dailyMetroSeconds" : [ 0, ... ],
+  "dailyRailSeconds" : [ 0, ... ],
+  "dailyTotalSeconds" : [ 2220, ... ],
+  "dailyTripCounts" : [ 1, ... ],
+  "fullBounds" : {
+    "minLon" : -74.040876,
+    "minLat" : 40.572635,
+    "maxLon" : -73.779519,
+    "maxLat" : 40.762524
+  },
+  "boundsWithoutOutliers" : {
+    "minLon" : 0.0,
+    "minLat" : 0.0,
+    "maxLon" : 0.0,
+    "maxLat" : 0.0
+  },
+  "validationTime" : 16319
+}
+
 ```

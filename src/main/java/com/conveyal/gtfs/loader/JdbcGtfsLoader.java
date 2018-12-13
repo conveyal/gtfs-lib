@@ -127,6 +127,7 @@ public class JdbcGtfsLoader {
             // retry in a loop.
             // TODO handle the case where we don't want any prefix.
             this.tablePrefix = randomIdString();
+            result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
             registerFeed(gtfsFile);
             // Include the dot separator in the table prefix.
@@ -274,6 +275,8 @@ public class JdbcGtfsLoader {
         int initialErrorCount = errorStorage.getErrorCount();
         try {
             tableLoadResult.rowCount = loadInternal(table);
+            tableLoadResult.fileSize = getTableSize(table);
+            LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);
             tableLoadResult.fatalException = ex.toString();
@@ -296,12 +299,22 @@ public class JdbcGtfsLoader {
     }
 
     /**
+     * Get the uncompressed file size in bytes for the specified GTFS table.
+     */
+    private int getTableSize(Table table) {
+        ZipEntry zipEntry = zip.getEntry(table.name + ".txt");
+        if (zipEntry == null) return 0;
+        return (int) zipEntry.getSize();
+    }
+
+    /**
      * This function will throw any exception that occurs. Those exceptions will be handled by the outer load method.
      * @return number of rows that were loaded.
      */
     private int loadInternal (Table table) throws Exception {
         CsvReader csvReader = getCsvReader(table);
         if (csvReader == null) {
+            LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
             // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
             return 0;
