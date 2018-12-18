@@ -169,10 +169,12 @@ public class JdbcTableWriter implements TableWriter {
                     int entityId = isCreating ? (int) newId : id;
                     // Cast child entities to array node to iterate over.
                     ArrayNode childEntitiesArray = (ArrayNode)childEntities;
+                    boolean foreignReferenceIsFrequencyPattern = jsonObject.has("use_frequency") &&
+                        jsonObject.get("use_frequency").asBoolean();
                     updateChildTable(
                         childEntitiesArray,
                         entityId,
-                        jsonObject.get("use_frequency").asBoolean(),
+                        foreignReferenceIsFrequencyPattern,
                         isCreating,
                         referencingTable,
                         connection
