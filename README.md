@@ -16,7 +16,7 @@ A gtfs-lib GTFSFeed object should faithfully represent the contents of a single 
 
 ## Usage
 
-gtfs-lib can be used as a Java library or run via the command line.
+gtfs-lib can be used as a Java library or run via the command line.  If using this library with PostgreSQL for persistence, you must use at least version 9.6 of PostgreSQL.
 
 ### Library (maven)
 

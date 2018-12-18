@@ -1,13 +1,10 @@
 package com.conveyal.gtfs.validator;
 
-import java.awt.geom.Rectangle2D;
-import java.io.Serializable;
-import com.conveyal.gtfs.model.Pattern;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.awt.geom.Rectangle2D;
+import java.io.Serializable;
 import java.time.LocalDate;
-import java.util.List;
 
 /**
  * An instance of this class is returned by the validator.
@@ -26,8 +23,15 @@ public class ValidationResult implements Serializable {
     public int errorCount;
     public LocalDate declaredStartDate;
     public LocalDate declaredEndDate;
+
+    /**
+     * the actual first and last date of service which is calculated in {@link ServiceValidator#complete}
+     * These variables are actually not directly tied to data in the calendar_dates.txt file.  Instead, they represent
+     * the first and last date respectively of any entry in the calendar.txt and calendar_dates.txt files.
+     */
     public LocalDate firstCalendarDate;
     public LocalDate lastCalendarDate;
+
     public int[] dailyBusSeconds;
     public int[] dailyTramSeconds;
     public int[] dailyMetroSeconds;

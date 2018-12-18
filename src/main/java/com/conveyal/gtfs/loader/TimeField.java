@@ -58,4 +58,16 @@ public class TimeField extends Field {
         return JDBCType.INTEGER;
     }
 
+    /**
+     * When outputting to csv, return the PostgreSQL syntax to convert seconds since midnight into the time format
+     * HH:MM:SS for the specified field.
+     */
+    @Override
+    public String getColumnExpression(String prefix, boolean csvOutput) {
+        String columnName = super.getColumnExpression(prefix, csvOutput);
+        return csvOutput
+            ? String.format("TO_CHAR((%s || ' second')::interval, 'HH24:MI:SS') as %s", columnName, name)
+            : columnName;
+    }
+
 }
