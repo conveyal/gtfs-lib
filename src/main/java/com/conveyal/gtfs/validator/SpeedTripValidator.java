@@ -62,8 +62,9 @@ public class SpeedTripValidator extends TripValidator {
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
             // If travel times are rounded and travel time is zero, determine the maximum and minimum possible speed
             // by adding/removing one minute of slack.
-            if (bothTravelTimesRounded && travelTimeSeconds == 0)
+            if (bothTravelTimesRounded && travelTimeSeconds == 0) {
                 travelTimeSeconds += 60;
+            }
             if (checkDistanceAndTime(distanceMeters, travelTimeSeconds, currStopTime)) {
                 // If distance and time are OK, we've got valid numbers to calculate a travel speed.
                 double kph = (distanceMeters / 1000D) / (travelTimeSeconds / 60D / 60D);
