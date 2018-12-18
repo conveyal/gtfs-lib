@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -83,6 +84,12 @@ public class SQLErrorStorage {
             errorId += 1;
         } catch (SQLException ex) {
             throw new StorageException(ex);
+        }
+    }
+
+    public void storeErrors (Set<NewGTFSError> errors) {
+        for (NewGTFSError error : errors) {
+            storeError(error);
         }
     }
 
