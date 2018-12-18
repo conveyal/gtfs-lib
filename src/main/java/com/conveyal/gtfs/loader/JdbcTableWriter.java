@@ -229,7 +229,13 @@ public class JdbcTableWriter implements TableWriter {
      * tables (for now just fields in trips and stop_times) where the reference table's value should take precedence over
      * the related table (e.g., pattern_stop#timepoint should update all of its related stop_times).
      */
-    private void updateLinkedFields(Table referenceTable, ObjectNode jsonObject, String tableName, String keyField, String ...fieldNames) throws SQLException {
+    private void updateLinkedFields(
+        Table referenceTable,
+        ObjectNode jsonObject,
+        String tableName,
+        String keyField,
+        String ...fieldNames
+    ) throws SQLException {
         boolean updatingStopTimes = "stop_times".equals(tableName);
         // Collect fields, the JSON values for these fields, and the strings to add to the prepared statement into Lists.
         List<Field> fields = new ArrayList<>();
@@ -283,7 +289,14 @@ public class JdbcTableWriter implements TableWriter {
      * object here is provided as a positional argument (rather than provided via the JdbcTableWriter instance field)
      * because this method is used to update both the specTable for the primary entity and any relevant child entities.
      */
-    private PreparedStatement createPreparedUpdate(Integer id, boolean isCreating, ObjectNode jsonObject, Table table, Connection connection, boolean batch) throws SQLException {
+    private PreparedStatement createPreparedUpdate(
+        Integer id,
+        boolean isCreating,
+        ObjectNode jsonObject,
+        Table table,
+        Connection connection,
+        boolean batch
+    ) throws SQLException {
         String statementString;
         if (isCreating) {
             statementString = table.generateInsertSql(tablePrefix, true);
@@ -306,7 +319,12 @@ public class JdbcTableWriter implements TableWriter {
      * taken from JSON. Note, string values are used here in order to take advantage of setParameter method on
      * individual fields, which handles parsing string and non-string values into the appropriate SQL field types.
      */
-    private void setStatementParameters(ObjectNode jsonObject, Table table, PreparedStatement preparedStatement, Connection connection) throws SQLException {
+    private void setStatementParameters(
+        ObjectNode jsonObject,
+        Table table,
+        PreparedStatement preparedStatement,
+        Connection connection
+    ) throws SQLException {
         // JDBC SQL statements use a one-based index for setting fields/parameters
         List<String> missingFieldNames = new ArrayList<>();
         int index = 1;
@@ -380,7 +398,13 @@ public class JdbcTableWriter implements TableWriter {
         }
         if (missingFieldNames.size() > 0) {
 //            String joinedFieldNames = missingFieldNames.stream().collect(Collectors.joining(", "));
-            throw new SQLException(String.format("The following field(s) are missing from JSON %s object: %s", table.name, missingFieldNames.toString()));
+            throw new SQLException(
+                String.format(
+                    "The following field(s) are missing from JSON %s object: %s",
+                    table.name,
+                    missingFieldNames.toString()
+                )
+            );
         }
     }
 
@@ -486,13 +510,15 @@ public class JdbcTableWriter implements TableWriter {
                 boolean orderIsUnique = orderValues.add(orderValue);
                 boolean valuesAreIncrementing = ++previousOrder == orderValue;
                 if (!orderIsUnique || !valuesAreIncrementing) {
-                    throw new SQLException(String.format(
+                    throw new SQLException(
+                        String.format(
                             "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
                             subTable.name,
                             orderFieldName,
                             entityCount,
                             previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
-                            orderValue)
+                            orderValue
+                        )
                     );
                 }
             }
@@ -814,7 +840,13 @@ public class JdbcTableWriter implements TableWriter {
      * Check the stops in the changed region to ensure they remain in the same order. If not, throw an exception to
      * cancel the transaction.
      */
-    private static void verifyInteriorStopsAreUnchanged(List<String> originalStopIds, List<PatternStop> newStops, int firstDifferentIndex, int lastDifferentIndex, boolean movedRight) {
+    private static void verifyInteriorStopsAreUnchanged(
+        List<String> originalStopIds,
+        List<PatternStop> newStops,
+        int firstDifferentIndex,
+        int lastDifferentIndex,
+        boolean movedRight
+    ) {
         //Stops mapped to list of stop IDs simply for easier viewing/comparison with original IDs while debugging with
         // breakpoints.
         List<String> newStopIds = newStops.stream().map(s -> s.stop_id).collect(Collectors.toList());
@@ -839,7 +871,13 @@ public class JdbcTableWriter implements TableWriter {
      * You must call this method after updating sequences for any stop times following the starting stop sequence to
      * avoid overwriting these other stop times.
      */
-    private void insertBlankStopTimes(List<String> tripIds, List<PatternStop> newStops, int startingStopSequence, int stopTimesToAdd, Connection connection) throws SQLException {
+    private void insertBlankStopTimes(
+        List<String> tripIds,
+        List<PatternStop> newStops,
+        int startingStopSequence,
+        int stopTimesToAdd,
+        Connection connection
+    ) throws SQLException {
         if (tripIds.isEmpty()) {
             // There is no need to insert blank stop times if there are no trips for the pattern.
             return;
@@ -999,7 +1037,13 @@ public class JdbcTableWriter implements TableWriter {
      *
      * FIXME: add more detail/precise language on what this method actually does
      */
-    private static void ensureReferentialIntegrity(Connection connection, ObjectNode jsonObject, String namespace, Table table, Integer id) throws SQLException {
+    private static void ensureReferentialIntegrity(
+        Connection connection,
+        ObjectNode jsonObject,
+        String namespace,
+        Table table,
+        Integer id
+    ) throws SQLException {
         final boolean isCreating = id == null;
         String keyField = table.getKeyFieldName();
         String tableName = String.join(".", namespace, table.name);
@@ -1075,7 +1119,12 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * For some condition (where field = string value), return the set of unique int IDs for the records that match.
      */
-    private static TIntSet getIdsForCondition(String tableName, String keyField, String keyValue, Connection connection) throws SQLException {
+    private static TIntSet getIdsForCondition(
+        String tableName,
+        String keyField,
+        String keyValue,
+        Connection connection
+    ) throws SQLException {
         String idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
         // Create statement for counting rows selected
         PreparedStatement statement = connection.prepareStatement(idCheckSql);
@@ -1149,7 +1198,13 @@ public class JdbcTableWriter implements TableWriter {
      * not necessarily delete a shape that is shared by multiple trips)? I think not because we are skipping foreign refs
      * found in the table for the entity being updated/deleted. [Leaving this comment in place for now though.]
      */
-    private static void updateReferencingTables(String namespace, Table table, Connection connection, int id, String newKeyValue) throws SQLException {
+    private static void updateReferencingTables(
+        String namespace,
+        Table table,
+        Connection connection,
+        int id,
+        String newKeyValue
+    ) throws SQLException {
         Field keyField = table.getFieldForName(table.getKeyFieldName());
         Class<? extends Entity> entityClass = table.getEntityClass();
         // Determine method (update vs. delete) depending on presence of newKeyValue field.
@@ -1206,10 +1261,18 @@ public class JdbcTableWriter implements TableWriter {
                             if (table.isCascadeDeleteRestricted()) {
                                 // The entity must not have any referencing entities in order to delete it.
                                 connection.rollback();
-                                //                        List<String> idStrings = new ArrayList<>();
-                                //                        uniqueIds.forEach(uniqueId -> idStrings.add(String.valueOf(uniqueId)));
-                                //                        String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s (%s).", entityClass.getSimpleName(), keyField, keyValue, result, referencingTable.name, entityClass.getSimpleName(), String.join(",", idStrings));
-                                String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s.", entityClass.getSimpleName(), keyField.name, keyValue, result, referencingTable.name, entityClass.getSimpleName());
+                                // List<String> idStrings = new ArrayList<>();
+                                // uniqueIds.forEach(uniqueId -> idStrings.add(String.valueOf(uniqueId)));
+                                // String message = String.format("Cannot delete %s %s=%s. %d %s reference this %s (%s).", entityClass.getSimpleName(), keyField, keyValue, result, referencingTable.name, entityClass.getSimpleName(), String.join(",", idStrings));
+                                String message = String.format(
+                                    "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                    entityClass.getSimpleName(),
+                                    keyField.name,
+                                    keyValue,
+                                    result,
+                                    referencingTable.name,
+                                    entityClass.getSimpleName()
+                                );
                                 LOG.warn(message);
                                 throw new SQLException(message);
                             }
@@ -1226,12 +1289,23 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * Constructs SQL string based on method provided.
      */
-    private static String getUpdateReferencesSql(SqlMethod sqlMethod, String refTableName, Field keyField, String keyValue, String newKeyValue) throws SQLException {
+    private static String getUpdateReferencesSql(
+        SqlMethod sqlMethod,
+        String refTableName,
+        Field keyField,
+        String keyValue,
+        String newKeyValue
+    ) throws SQLException {
         boolean isArrayField = keyField.getSqlType().equals(JDBCType.ARRAY);
         switch (sqlMethod) {
             case DELETE:
                 if (isArrayField) {
-                    return String.format("delete from %s where %s @> ARRAY['%s']::text[]", refTableName, keyField.name, keyValue);
+                    return String.format(
+                        "delete from %s where %s @> ARRAY['%s']::text[]",
+                        refTableName,
+                        keyField.name,
+                        keyValue
+                    );
                 } else {
                     return String.format("delete from %s where %s = '%s'", refTableName, keyField.name, keyValue);
                 }
@@ -1240,9 +1314,25 @@ public class JdbcTableWriter implements TableWriter {
                     // If the field to be updated is an array field (of which there are only text[] types in the db),
                     // replace the old value with the new value using array contains clause.
                     // FIXME This is probably horribly postgres specific.
-                    return String.format("update %s set %s = array_replace(%s, '%s', '%s') where %s @> ARRAY['%s']::text[]", refTableName, keyField.name, keyField.name, keyValue, newKeyValue, keyField.name, keyValue);
+                    return String.format(
+                        "update %s set %s = array_replace(%s, '%s', '%s') where %s @> ARRAY['%s']::text[]",
+                        refTableName,
+                        keyField.name,
+                        keyField.name,
+                        keyValue,
+                        newKeyValue,
+                        keyField.name,
+                        keyValue
+                    );
                 } else {
-                    return String.format("update %s set %s = '%s' where %s = '%s'", refTableName, keyField.name, newKeyValue, keyField.name, keyValue);
+                    return String.format(
+                        "update %s set %s = '%s' where %s = '%s'",
+                        refTableName,
+                        keyField.name,
+                        newKeyValue,
+                        keyField.name,
+                        keyValue
+                    );
                 }
 //            case CREATE:
 //                return String.format("insert into %s ");
