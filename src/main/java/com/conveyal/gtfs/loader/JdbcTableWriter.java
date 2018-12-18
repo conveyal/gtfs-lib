@@ -428,7 +428,7 @@ public class JdbcTableWriter implements TableWriter {
      */
     private void updateChildTable(
         ArrayNode subEntities,
-        Integer id,
+        int id,
         boolean foreignReferenceIsFrequencyPattern,
         boolean isCreatingNewEntity,
         Table subTable,
