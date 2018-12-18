@@ -77,9 +77,11 @@ public class JdbcTableWriter implements TableWriter {
 
         // TODO: verify specTable.name is ok to use for constructing dynamic sql statements
         this.specTable = specTable;
+        // Below is a bit messy because the connection field on this class is set to final and we cannot set this to
+        // the optionally passed-in connection with the ternary statement unless connection1 already exists.
         Connection connection1;
         try {
-            connection1 = dataSource.getConnection();
+            connection1 = this.dataSource.getConnection();
         } catch (SQLException e) {
             e.printStackTrace();
             connection1 = null;
@@ -170,11 +172,34 @@ public class JdbcTableWriter implements TableWriter {
                     updateChildTable(childEntitiesArray, entityId, isCreating, referencingTable, connection);
                 }
             }
-            // Iterate over table's fields and apply linked values to any tables
-            if ("routes".equals(specTable.name)) {
-                updateLinkedFields(specTable, jsonObject, "trips", "route_id", "wheelchair_accessible");
-            } else if ("patterns".equals(specTable.name)) {
-                updateLinkedFields(specTable, jsonObject, "trips", "pattern_id", "direction_id");
+            // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
+            // fields that exist in one place in our tables, but are duplicated in GTFS. For example, we have a
+            // Route#wheelchair_accessible field, which is used to set the Trip#wheelchair_accessible values for all
+            // trips on a route.
+            // NOTE: pattern_stops linked fields are updated in the updateChildTable method.
+            switch (specTable.name) {
+                case "routes":
+                    updateLinkedFields(
+                        specTable,
+                        jsonObject,
+                        "trips",
+                        "route_id",
+                        "wheelchair_accessible"
+                    );
+                    break;
+                case "patterns":
+                    updateLinkedFields(
+                        specTable,
+                        jsonObject,
+                        "trips",
+                        "pattern_id",
+                        "direction_id", "shape_id"
+                    );
+                    break;
+                default:
+                    LOG.debug("No linked fields to update.");
+                    // Do nothing.
+                    break;
             }
             if (autoCommit) {
                 // If nothing failed up to this point, it is safe to assume there were no problems updating/creating the
@@ -205,6 +230,7 @@ public class JdbcTableWriter implements TableWriter {
      * the related table (e.g., pattern_stop#timepoint should update all of its related stop_times).
      */
     private void updateLinkedFields(Table referenceTable, ObjectNode jsonObject, String tableName, String keyField, String ...fieldNames) throws SQLException {
+        boolean updatingStopTimes = "stop_times".equals(tableName);
         // Collect fields, the JSON values for these fields, and the strings to add to the prepared statement into Lists.
         List<Field> fields = new ArrayList<>();
         List<JsonNode> values = new ArrayList<>();
@@ -216,12 +242,17 @@ public class JdbcTableWriter implements TableWriter {
         }
         String setFields = String.join(", ", fieldStrings);
         // If updating stop_times, use a more complex query that joins trips to stop_times in order to match on pattern_id
-        boolean updatingStopTimes = "stop_times".equals(tableName);
         Field orderField = updatingStopTimes ? referenceTable.getFieldForName(referenceTable.getOrderFieldName()) : null;
         String sql = updatingStopTimes
-            ? String.format("update %s.stop_times st set %s from %s.trips t " +
-                        "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
-                tablePrefix, setFields, tablePrefix, keyField, orderField.name)
+            ? String.format(
+                "update %s.stop_times st set %s from %s.trips t " +
+                    "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
+                tablePrefix,
+                setFields,
+                tablePrefix,
+                keyField,
+                orderField.name
+            )
             : String.format("update %s.%s set %s where %s = ?", tablePrefix, tableName, setFields, keyField);
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
@@ -371,8 +402,6 @@ public class JdbcTableWriter implements TableWriter {
         // Get parent entity's key value
         keyValue = getValueForId(id, keyField.name, tablePrefix, specTable, connection);
         String childTableName = String.join(".", tablePrefix, subTable.name);
-        // FIXME: add check for pattern stop consistency.
-        // FIXME: re-order stop times if pattern stop order changes.
         // Reconciling pattern stops MUST happen before original pattern stops are deleted in below block (with
         // getUpdateReferencesSql)
         if ("pattern_stops".equals(subTable.name)) {
@@ -390,15 +419,14 @@ public class JdbcTableWriter implements TableWriter {
             }
             reconcilePatternStops(keyValue, newPatternStops, connection);
         }
-        // FIXME: allow shapes to be updated on pattern geometry change.
         if (!isCreatingNewEntity) {
             // Delete existing sub-entities for given entity ID if the parent entity is not being newly created.
             String deleteSql = getUpdateReferencesSql(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
             LOG.info(deleteSql);
             Statement statement = connection.createStatement();
             // FIXME: Use copy on update for a pattern's shape instead of deleting the previous shape and replacing it.
-            // This would better account for GTFS data loaded from a file where multiple patterns reference a single
-            // shape.
+            //   This would better account for GTFS data loaded from a file where multiple patterns reference a single
+            //   shape.
             int result = statement.executeUpdate(deleteSql);
             LOG.info("Deleted {} {}", result, subTable.name);
             // FIXME: are there cases when an update should not return zero?
@@ -436,7 +464,7 @@ public class JdbcTableWriter implements TableWriter {
                 // If handling first iteration, create the prepared statement (later iterations will add to batch).
                 insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
             }
-            // Update linked stop times fields for updated pattern stop (e.g., timepoint, pickup/drop off type).
+            // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
             if ("pattern_stops".equals(subTable.name)) {
                 updateLinkedFields(
                         subTable,
@@ -610,8 +638,13 @@ public class JdbcTableWriter implements TableWriter {
             }
             // Increment sequences for stops that follow the inserted location (including the stop at the changed index).
             // NOTE: This should happen before the blank stop time insertion for logical consistency.
-            String updateSql = String.format("update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence >= %d AND %s",
-                    tablePrefix, tablePrefix, differenceLocation, joinToTrips);
+            String updateSql = String.format(
+                "update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence >= %d AND %s",
+                tablePrefix,
+                tablePrefix,
+                differenceLocation,
+                joinToTrips
+            );
             LOG.info(updateSql);
             PreparedStatement updateStatement = connection.prepareStatement(updateSql);
             int updated = updateStatement.executeUpdate();
@@ -638,13 +671,23 @@ public class JdbcTableWriter implements TableWriter {
                 }
             }
             // Delete stop at difference location
-            String deleteSql = String.format("delete from %s.stop_times using %s.trips where stop_sequence = %d AND %s",
-                    tablePrefix, tablePrefix, differenceLocation, joinToTrips);
+            String deleteSql = String.format(
+                "delete from %s.stop_times using %s.trips where stop_sequence = %d AND %s",
+                tablePrefix,
+                tablePrefix,
+                differenceLocation,
+                joinToTrips
+            );
             LOG.info(deleteSql);
             PreparedStatement deleteStatement = connection.prepareStatement(deleteSql);
             // Decrement all stops with sequence greater than difference location
-            String updateSql = String.format("update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND %s",
-                    tablePrefix, tablePrefix, differenceLocation, joinToTrips);
+            String updateSql = String.format(
+                "update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND %s",
+                tablePrefix,
+                tablePrefix,
+                differenceLocation,
+                joinToTrips
+            );
             LOG.info(updateSql);
             PreparedStatement updateStatement = connection.prepareStatement(updateSql);
             int deleted = deleteStatement.executeUpdate();
@@ -764,9 +807,7 @@ public class JdbcTableWriter implements TableWriter {
             insertBlankStopTimes(tripsForPattern, newStops, firstDifferentIndex, stopsToInsert, connection);
         }
         // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
-        else {
-            throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
-        }
+        else throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
     }
 
     /**

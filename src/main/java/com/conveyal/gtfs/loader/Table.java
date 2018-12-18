@@ -163,6 +163,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL),
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
+        // wheelchair_accessible is an exemplar field applied to all trips on a route.
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
@@ -196,7 +197,8 @@ public class Table {
             new StringField("pattern_id", REQUIRED),
             new StringField("route_id", REQUIRED).isReferenceTo(ROUTES),
             new StringField("name", OPTIONAL),
-            // Editor-specific fields
+            // Editor-specific fields.
+            // direction_id and shape_id are exemplar fields applied to all trips for a pattern.
             new ShortField("direction_id", EDITOR, 1),
             new ShortField("use_frequency", EDITOR, 1),
             new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
