@@ -169,7 +169,14 @@ public class JdbcTableWriter implements TableWriter {
                     int entityId = isCreating ? (int) newId : id;
                     // Cast child entities to array node to iterate over.
                     ArrayNode childEntitiesArray = (ArrayNode)childEntities;
-                    updateChildTable(childEntitiesArray, entityId, isCreating, referencingTable, connection);
+                    updateChildTable(
+                        childEntitiesArray,
+                        entityId,
+                        jsonObject.get("use_frequency").asBoolean(),
+                        isCreating,
+                        referencingTable,
+                        connection
+                    );
                 }
             }
             // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
@@ -231,19 +238,19 @@ public class JdbcTableWriter implements TableWriter {
      */
     private void updateLinkedFields(
         Table referenceTable,
-        ObjectNode jsonObject,
-        String tableName,
+        ObjectNode exemplarEntity,
+        String linkedTableName,
         String keyField,
-        String ...fieldNames
+        String ...linkedFieldsToUpdate
     ) throws SQLException {
-        boolean updatingStopTimes = "stop_times".equals(tableName);
+        boolean updatingStopTimes = "stop_times".equals(linkedTableName);
         // Collect fields, the JSON values for these fields, and the strings to add to the prepared statement into Lists.
         List<Field> fields = new ArrayList<>();
         List<JsonNode> values = new ArrayList<>();
         List<String> fieldStrings = new ArrayList<>();
-        for (String field : fieldNames) {
+        for (String field : linkedFieldsToUpdate) {
             fields.add(referenceTable.getFieldForName(field));
-            values.add(jsonObject.get(field));
+            values.add(exemplarEntity.get(field));
             fieldStrings.add(String.format("%s = ?", field));
         }
         String setFields = String.join(", ", fieldStrings);
@@ -259,7 +266,7 @@ public class JdbcTableWriter implements TableWriter {
                 keyField,
                 orderField.name
             )
-            : String.format("update %s.%s set %s where %s = ?", tablePrefix, tableName, setFields, keyField);
+            : String.format("update %s.%s set %s where %s = ?", tablePrefix, linkedTableName, setFields, keyField);
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
         int oneBasedIndex = 1;
@@ -271,16 +278,16 @@ public class JdbcTableWriter implements TableWriter {
             else field.setParameter(statement, oneBasedIndex++, newValue);
         }
         // Set "where clause" with value for key field (e.g., set values where pattern_id = '3')
-        statement.setString(oneBasedIndex++, jsonObject.get(keyField).asText());
+        statement.setString(oneBasedIndex++, exemplarEntity.get(keyField).asText());
         if (updatingStopTimes) {
             // If updating stop times set the order field parameter (stop_sequence)
-            String orderValue = jsonObject.get(orderField.name).asText();
+            String orderValue = exemplarEntity.get(orderField.name).asText();
             orderField.setParameter(statement, oneBasedIndex++, orderValue);
         }
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
-        LOG.debug("{} {} linked fields updated", entitiesUpdated, tableName);
+        LOG.debug("{} {} linked fields updated", entitiesUpdated, linkedTableName);
     }
 
     /**
@@ -417,7 +424,14 @@ public class JdbcTableWriter implements TableWriter {
      * have a hierarchical relationship.
      * FIXME develop a better way to update tables with foreign keys to the table being updated.
      */
-    private void updateChildTable(ArrayNode subEntities, Integer id, boolean isCreatingNewEntity, Table subTable, Connection connection) throws SQLException, IOException {
+    private void updateChildTable(
+        ArrayNode subEntities,
+        Integer id,
+        boolean foreignReferenceIsFrequencyPattern,
+        boolean isCreatingNewEntity,
+        Table subTable,
+        Connection connection
+    ) throws SQLException, IOException {
         // Get parent table's key field
         Field keyField;
         String keyValue;
@@ -464,6 +478,7 @@ public class JdbcTableWriter implements TableWriter {
         int previousOrder = -1;
         TIntSet orderValues = new TIntHashSet();
         Multimap<Table, String> referencesPerTable = HashMultimap.create();
+        int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
             ObjectNode subEntity = (ObjectNode)entityNode;
@@ -490,15 +505,22 @@ public class JdbcTableWriter implements TableWriter {
             }
             // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
             if ("pattern_stops".equals(subTable.name)) {
+                if (foreignReferenceIsFrequencyPattern) {
+                    // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
+                    // Default travel and dwell time behave as "linked fields" for associated stop times. In other
+                    // words, frequency trips in the editor must match the pattern stop travel times.
+                    cumulativeTravelTime += updateStopTimesForPatternStop(subEntity, cumulativeTravelTime);
+                }
+                // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
                 updateLinkedFields(
-                        subTable,
-                        subEntity,
-                        "stop_times",
-                        "pattern_id",
-                        "timepoint",
-                        "drop_off_type",
-                        "pickup_type",
-                        "shape_dist_traveled"
+                    subTable,
+                    subEntity,
+                    "stop_times",
+                    "pattern_id",
+                    "timepoint",
+                    "drop_off_type",
+                    "pickup_type",
+                    "shape_dist_traveled"
                 );
             }
             setStatementParameters(subEntity, subTable, insertStatement, connection);
@@ -544,6 +566,41 @@ public class JdbcTableWriter implements TableWriter {
         } else {
             LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
         }
+    }
+
+    /**
+     * Updates the stop times that reference the specified pattern stop.
+     * @param patternStop the pattern stop for which to update stop times
+     * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
+     *                           previous pattern stop's dwell time)
+     * @return the travel and dwell time added by this pattern stop
+     * @throws SQLException
+     */
+    private int updateStopTimesForPatternStop(ObjectNode patternStop, int previousTravelTime) throws SQLException {
+        String sql = String.format(
+            "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
+                "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
+            tablePrefix,
+            tablePrefix,
+            "pattern_id",
+            "stop_sequence"
+        );
+        // Prepare the statement and set statement parameters
+        PreparedStatement statement = connection.prepareStatement(sql);
+        int oneBasedIndex = 1;
+        int travelTime = patternStop.get("default_travel_time").asInt();
+        int arrivalTime = previousTravelTime + travelTime;
+        statement.setInt(oneBasedIndex++, arrivalTime);
+        int dwellTime = patternStop.get("default_dwell_time").asInt();
+        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
+        // Set "where clause" with value for pattern_id and stop_sequence
+        statement.setString(oneBasedIndex++, patternStop.get("pattern_id").asText());
+        statement.setInt(oneBasedIndex++, patternStop.get("stop_sequence").asInt());
+        // Log query, execute statement, and log result.
+        LOG.debug(statement.toString());
+        int entitiesUpdated = statement.executeUpdate();
+        LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
+        return travelTime + dwellTime;
     }
 
     /**
