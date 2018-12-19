@@ -281,7 +281,10 @@ public class Table {
             new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new TimeField("start_time", REQUIRED),
             new TimeField("end_time", REQUIRED),
-            new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
+            // Set max headway seconds to the equivalent of 6 hours. This should leave space for any very long headways
+            // (e.g., a ferry running exact times at a 4 hour headway), but will catch cases where milliseconds were
+            // exported accidentally.
+            new IntegerField("headway_secs", REQUIRED, 20, 60*60*6),
             new IntegerField("exact_times", OPTIONAL, 1))
             .withParentTable(TRIPS)
             .keyFieldIsNotUnique();
