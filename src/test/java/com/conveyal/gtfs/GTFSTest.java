@@ -457,7 +457,11 @@ public class GTFSTest {
         // Store field mismatches here (to provide assertion statements with more details).
         Multimap<String, ValuePair> fieldsWithMismatches = ArrayListMultimap.create();
         // Check that no validators failed during validation.
-        assertThatValidationErrorsMatchExpected(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED, 0);
+        assertThat(
+            "No validators failed during GTFS import.",
+            countValidationErrorsOfType(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED),
+            equalTo(0)
+        );
         // run through testing expectations
         LOG.info("testing expectations of record storage in the database");
         for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
@@ -540,11 +544,10 @@ public class GTFSTest {
         }
     }
 
-    private void assertThatValidationErrorsMatchExpected(
+    private static int countValidationErrorsOfType(
             Connection connection,
             String namespace,
-            NewGTFSErrorType errorType,
-            int expectedCount
+            NewGTFSErrorType errorType
     ) throws SQLException {
         String errorCheckSql = String.format(
                 "select * from %s.errors where error_type = '%s'",
@@ -556,11 +559,7 @@ public class GTFSTest {
         while (errorResults.next()) {
             errorCount++;
         }
-        assertThat(
-            String.format("%s errors encountered during validation should match the expected errors.", errorType),
-            errorCount,
-            equalTo(expectedCount)
-        );
+        return errorCount;
     }
 
     /**
