@@ -411,7 +411,7 @@ public class JDBCTableWriterTest {
             true
         );
         LOG.info("deleted {} records from {}", deleteOutput, tripsTable.name);
-        // Check that route record does not exist in DB
+        // Check that record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where id=%d",
