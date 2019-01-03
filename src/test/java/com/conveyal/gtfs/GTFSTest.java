@@ -11,7 +11,10 @@ import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
+import com.google.common.io.Files;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
+import org.hamcrest.Matcher;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
 import org.junit.Before;
 import org.junit.Test;
@@ -92,140 +95,12 @@ public class GTFSTest {
      */
     @Test
     public void canLoadAndExportSimpleAgency() {
-        PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[]{
-            new PersistenceExpectation(
-                "agency",
-                new RecordExpectation[]{
-                    new RecordExpectation("agency_id", "1"),
-                    new RecordExpectation("agency_name", "Fake Transit"),
-                    new RecordExpectation("agency_timezone", "America/Los_Angeles")
-                }
-            ),
-            new PersistenceExpectation(
-                "calendar",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("monday", 1),
-                    new RecordExpectation("tuesday", 1),
-                    new RecordExpectation("wednesday", 1),
-                    new RecordExpectation("thursday", 1),
-                    new RecordExpectation("friday", 1),
-                    new RecordExpectation("saturday", 1),
-                    new RecordExpectation("sunday", 1),
-                    new RecordExpectation("start_date", "20170915"),
-                    new RecordExpectation("end_date", "20170917")
-                }
-            ),
-            new PersistenceExpectation(
-                "calendar_dates",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("date", 20170916),
-                    new RecordExpectation("exception_type", 2)
-                }
-            ),
-            new PersistenceExpectation(
-                "fare_attributes",
-                new RecordExpectation[]{
-                    new RecordExpectation("fare_id", "route_based_fare"),
-                    new RecordExpectation("price", 1.23, 0),
-                    new RecordExpectation("currency_type", "USD")
-                }
-            ),
-            new PersistenceExpectation(
-                "fare_rules",
-                new RecordExpectation[]{
-                    new RecordExpectation("fare_id", "route_based_fare"),
-                    new RecordExpectation("route_id", "1")
-                }
-            ),
-            new PersistenceExpectation(
-                "feed_info",
-                new RecordExpectation[]{
-                    new RecordExpectation("feed_publisher_name", "Conveyal"
-                    ),
-                    new RecordExpectation(
-                        "feed_publisher_url", "http://www.conveyal.com"
-                    ),
-                    new RecordExpectation("feed_lang", "en"),
-                    new RecordExpectation("feed_version", "1.0")
-                }
-            ),
-            new PersistenceExpectation(
-                "frequencies",
-                new RecordExpectation[]{
-                    new RecordExpectation("trip_id", "frequency-trip"),
-                    new RecordExpectation("start_time", 28800, "08:00:00"),
-                    new RecordExpectation("end_time", 32400, "09:00:00"),
-                    new RecordExpectation("headway_secs", 1800),
-                    new RecordExpectation("exact_times", 0)
-                }
-            ),
-            new PersistenceExpectation(
-                "routes",
-                new RecordExpectation[]{
-                    new RecordExpectation("agency_id", "1"),
-                    new RecordExpectation("route_id", "1"),
-                    new RecordExpectation("route_short_name", "1"),
-                    new RecordExpectation("route_long_name", "Route 1"),
-                    new RecordExpectation("route_type", 3),
-                    new RecordExpectation("route_color", "7CE6E7")
-                }
-            ),
-            new PersistenceExpectation(
-                "shapes",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
-                    ),
-                    new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
-                    new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
-                    new RecordExpectation("shape_pt_sequence", 2),
-                    new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
-                }
-            ),
-            new PersistenceExpectation(
-                "stop_times",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-                    ),
-                    new RecordExpectation("arrival_time", 25200, "07:00:00"),
-                    new RecordExpectation("departure_time", 25200, "07:00:00"),
-                    new RecordExpectation("stop_id", "4u6g"),
-                    // the string expectation for stop_sequence is different because of how stop_times are
-                    // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
-                    new RecordExpectation("stop_sequence", 1, "1", "0"),
-                    new RecordExpectation("pickup_type", 0),
-                    new RecordExpectation("drop_off_type", 0),
-                    new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
-                }
-            ),
-            new PersistenceExpectation(
-                "trips",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-                    ),
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("route_id", "1"),
-                    new RecordExpectation("direction_id", 0),
-                    new RecordExpectation(
-                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
-                    ),
-                    new RecordExpectation("bikes_allowed", 0),
-                    new RecordExpectation("wheelchair_accessible", 0)
-                }
-            )
-        };
         assertThat(
-            runIntegrationTest("fake-agency", persistenceExpectations),
+            runIntegrationTestOnFolder(
+                "fake-agency",
+                nullValue(),
+                fakeAgencyPersistenceExpectations
+            ),
             equalTo(true)
         );
     }
@@ -245,7 +120,33 @@ public class GTFSTest {
         );
         assertThat(
             "Integration test passes",
-            runIntegrationTest("fake-agency-bad-calendar-date", expectations),
+            runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations),
+            equalTo(true)
+        );
+    }
+
+    /**
+     * Tests whether or not "fake-agency" GTFS can be placed in a zipped subdirectory and loaded/exported successfully.
+     */
+    @Test
+    public void canLoadAndExportSimpleAgencyInSubDirectory() {
+        String zipFileName = null;
+        // Get filename for fake-agency resource
+        String resourceFolder = TestUtils.getResourceFileName("fake-agency");
+        // Recursively copy folder into temp directory, which we zip up and run the integration test on.
+        File tempDir = Files.createTempDir();
+        tempDir.deleteOnExit();
+        File nestedDir = new File(TestUtils.fileNameWithDir(tempDir.getAbsolutePath(), "fake-agency"));
+        LOG.info("Creating temp folder with nested subdirectory at {}", tempDir.getAbsolutePath());
+        try {
+            FileUtils.copyDirectory(new File(resourceFolder), nestedDir);
+            zipFileName = TestUtils.zipFolderFiles(tempDir.getAbsolutePath(), false);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        // TODO Add error expectations argument that expects NewGTFSErrorType.TABLE_IN_SUBDIRECTORY error type.
+        assertThat(
+            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations),
             equalTo(true)
         );
     }
@@ -311,20 +212,48 @@ public class GTFSTest {
             )
         };
         assertThat(
-            runIntegrationTest("fake-agency-only-calendar-dates", persistenceExpectations),
+            runIntegrationTestOnFolder(
+                "fake-agency-only-calendar-dates",
+                nullValue(),
+                persistenceExpectations
+            ),
             equalTo(true)
         );
     }
 
 
     /**
-     * A helper method that will run GTFS.main with a certain zip file.
+     * A helper method that will zip a specified folder in test/main/resources and call
+     * {@link #runIntegrationTestOnZipFile(String, Matcher, PersistenceExpectation[])} on that file.
+     */
+    private boolean runIntegrationTestOnFolder(
+        String folderName,
+        Matcher<Object> fatalExceptionExpectation,
+        PersistenceExpectation[] persistenceExpectations
+    ) {
+        // zip up test folder into temp zip file
+        String zipFileName = null;
+        try {
+            zipFileName = TestUtils.zipFolderFiles(folderName, true);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations);
+    }
+
+    /**
+     * A helper method that will run GTFS#main with a certain zip file.
      * This tests whether a GTFS zip file can be loaded without any errors.
      *
      * After the GTFS is loaded, this will also initiate an export of a GTFS from the database and check
      * the integrity of the exported GTFS.
      */
-    private boolean runIntegrationTest(String folderName, PersistenceExpectation[] persistenceExpectations) {
+    private boolean runIntegrationTestOnZipFile(
+        String zipFileName,
+        Matcher<Object> fatalExceptionExpectation,
+        PersistenceExpectation[] persistenceExpectations
+    ) {
         String newDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
         DataSource dataSource = GTFS.createDataSource(
@@ -333,11 +262,26 @@ public class GTFSTest {
             null
         );
 
-        String namespace = zipFolderAndLoadGTFS(folderName, dataSource, persistenceExpectations);
-        if (namespace == null) {
-            // Indicates that loading failed.
+        String namespace;
+
+        // Verify that loading the feed completes and data is stored properly
+        try {
+            // load and validate feed
+            LOG.info("load and validate feed");
+            FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource);
+
+            assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
+            namespace = loadResult.uniqueIdentifier;
+
+            assertThatImportedGtfsMeetsExpectations(dataSource.getConnection(), namespace, persistenceExpectations);
+        } catch (SQLException e) {
             TestUtils.dropDB(newDBName);
+            e.printStackTrace();
             return false;
+        } catch (AssertionError e) {
+            TestUtils.dropDB(newDBName);
+            throw e;
         }
 
         // Verify that exporting the feed (in non-editor mode) completes and data is outputted properly
@@ -399,7 +343,7 @@ public class GTFSTest {
         // zip up test folder into temp zip file
         String zipFileName;
         try {
-            zipFileName = TestUtils.zipFolderFiles(folderName);
+            zipFileName = TestUtils.zipFolderFiles(folderName, true);
         } catch (IOException e) {
             e.printStackTrace();
             return null;
@@ -673,18 +617,154 @@ public class GTFSTest {
                 Collection<ValuePair> valuePairs = mismatches.get(field);
                 for (ValuePair valuePair : valuePairs) {
                     assertThat(
-                            String.format("The value expected for %s was not found", field),
-                            valuePair.expected,
-                            equalTo(valuePair.found)
+                        String.format("The value expected for %s was not found", field),
+                        valuePair.expected,
+                        equalTo(valuePair.found)
                     );
                 }
             }
         } else {
             assertThat(
-                    "The record as defined in the PersistenceExpectation was not found.",
-                    foundRecord,
-                    equalTo(true)
+                "The record as defined in the PersistenceExpectation was not found.",
+                foundRecord,
+                equalTo(true)
             );
         }
     }
+
+    /**
+     * Persistence expectations for use with the GTFS contained within the "fake-agency" resources folder.
+     */
+    private PersistenceExpectation[] fakeAgencyPersistenceExpectations = new PersistenceExpectation[]{
+        new PersistenceExpectation(
+            "agency",
+            new RecordExpectation[]{
+                new RecordExpectation("agency_id", "1"),
+                new RecordExpectation("agency_name", "Fake Transit"),
+                new RecordExpectation("agency_timezone", "America/Los_Angeles")
+            }
+        ),
+            new PersistenceExpectation(
+                "calendar",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                    ),
+                    new RecordExpectation("monday", 1),
+                    new RecordExpectation("tuesday", 1),
+                    new RecordExpectation("wednesday", 1),
+                    new RecordExpectation("thursday", 1),
+                    new RecordExpectation("friday", 1),
+                    new RecordExpectation("saturday", 1),
+                    new RecordExpectation("sunday", 1),
+                    new RecordExpectation("start_date", "20170915"),
+                    new RecordExpectation("end_date", "20170917")
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                    ),
+                    new RecordExpectation("date", 20170916),
+                    new RecordExpectation("exception_type", 2)
+                }
+            ),
+            new PersistenceExpectation(
+                "fare_attributes",
+                new RecordExpectation[]{
+                    new RecordExpectation("fare_id", "route_based_fare"),
+                    new RecordExpectation("price", 1.23, 0),
+                    new RecordExpectation("currency_type", "USD")
+                }
+            ),
+            new PersistenceExpectation(
+                "fare_rules",
+                new RecordExpectation[]{
+                    new RecordExpectation("fare_id", "route_based_fare"),
+                    new RecordExpectation("route_id", "1")
+                }
+            ),
+            new PersistenceExpectation(
+                "feed_info",
+                new RecordExpectation[]{
+                    new RecordExpectation("feed_publisher_name", "Conveyal"
+                    ),
+                    new RecordExpectation(
+                        "feed_publisher_url", "http://www.conveyal.com"
+                    ),
+                    new RecordExpectation("feed_lang", "en"),
+                    new RecordExpectation("feed_version", "1.0")
+                }
+            ),
+            new PersistenceExpectation(
+                "frequencies",
+                new RecordExpectation[]{
+                    new RecordExpectation("trip_id", "frequency-trip"),
+                    new RecordExpectation("start_time", 28800, "08:00:00"),
+                    new RecordExpectation("end_time", 32400, "09:00:00"),
+                    new RecordExpectation("headway_secs", 1800),
+                    new RecordExpectation("exact_times", 0)
+                }
+            ),
+            new PersistenceExpectation(
+                "routes",
+                new RecordExpectation[]{
+                    new RecordExpectation("agency_id", "1"),
+                    new RecordExpectation("route_id", "1"),
+                    new RecordExpectation("route_short_name", "1"),
+                    new RecordExpectation("route_long_name", "Route 1"),
+                    new RecordExpectation("route_type", 3),
+                    new RecordExpectation("route_color", "7CE6E7")
+                }
+            ),
+            new PersistenceExpectation(
+                "shapes",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                    ),
+                    new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
+                    new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
+                    new RecordExpectation("shape_pt_sequence", 2),
+                    new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
+                }
+            ),
+            new PersistenceExpectation(
+                "stop_times",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                    ),
+                    new RecordExpectation("arrival_time", 25200, "07:00:00"),
+                    new RecordExpectation("departure_time", 25200, "07:00:00"),
+                    new RecordExpectation("stop_id", "4u6g"),
+                    // the string expectation for stop_sequence is different because of how stop_times are
+                    // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
+                    new RecordExpectation("stop_sequence", 1, "1", "0"),
+                    new RecordExpectation("pickup_type", 0),
+                    new RecordExpectation("drop_off_type", 0),
+                    new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
+                }
+            ),
+            new PersistenceExpectation(
+                "trips",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                    ),
+                    new RecordExpectation(
+                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                    ),
+                    new RecordExpectation("route_id", "1"),
+                    new RecordExpectation("direction_id", 0),
+                    new RecordExpectation(
+                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                    ),
+                    new RecordExpectation("bikes_allowed", 0),
+                    new RecordExpectation("wheelchair_accessible", 0)
+                }
+            )
+    };
 }

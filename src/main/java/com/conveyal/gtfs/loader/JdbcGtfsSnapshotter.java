@@ -2,6 +2,9 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.google.common.collect.Sets;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,10 +16,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
@@ -209,13 +210,12 @@ public class JdbcGtfsSnapshotter {
                 );
                 Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
 
-                // keep track of calendars by service id in case we need to add dummy calendar entries
+                // Keep track of calendars by service id in case we need to add dummy calendar entries.
                 Map<String, Calendar> calendarsByServiceId = new HashMap<>();
 
-                // iterate through calendar dates to build up to get list of dates with exceptions
-                HashMap<String, List<String>> removedServiceDays = new HashMap<>();
-                HashMap<String, List<String>> addedServiceDays = new HashMap<>();
-                List<String> datesWithExceptions = new ArrayList<>();
+                // Iterate through calendar dates to build up to get maps from exceptions to their dates.
+                Multimap<String, String> removedServiceForDate = HashMultimap.create();
+                Multimap<String, String> addedServiceForDate = HashMultimap.create();
                 for (CalendarDate calendarDate : calendarDates) {
                     // Skip any null dates
                     if (calendarDate.date == null) {
@@ -223,12 +223,8 @@ public class JdbcGtfsSnapshotter {
                         continue;
                     }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
-                    datesWithExceptions.add(date);
                     if (calendarDate.exception_type == 1) {
-                        List<String> dateAddedServices = addedServiceDays.getOrDefault(date, new ArrayList<>());
-                        dateAddedServices.add(calendarDate.service_id);
-                        addedServiceDays.put(date, dateAddedServices);
-
+                        addedServiceForDate.put(date, calendarDate.service_id);
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
                         Calendar calendar = calendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
@@ -241,33 +237,24 @@ public class JdbcGtfsSnapshotter {
                         }
                         calendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
-                        List<String> dateRemovedServices = removedServiceDays.getOrDefault(date, new ArrayList<>());
-                        dateRemovedServices.add(calendarDate.service_id);
-                        removedServiceDays.put(date, dateRemovedServices);
+                        removedServiceForDate.put(date, calendarDate.service_id);
                     }
                 }
-
-                // iterate through days and add to database
-                // for usability and simplicity of code, don't attempt to find all dates with similar
-                // added and removed services, but simply create an entry for each found date
-                for (String dateWithException : datesWithExceptions) {
-                    scheduleExceptionsStatement.setString(1, dateWithException);
-                    String[] dates = {dateWithException};
+                // Iterate through dates with added or removed service and add to database.
+                // For usability and simplicity of code, don't attempt to find all dates with similar
+                // added and removed services, but simply create an entry for each found date.
+                for (String date : Sets.union(removedServiceForDate.keySet(), addedServiceForDate.keySet())) {
+                    scheduleExceptionsStatement.setString(1, date);
+                    String[] dates = {date};
                     scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
                     scheduleExceptionsStatement.setInt(3, 9); // FIXME use better static type
                     scheduleExceptionsStatement.setArray(
                         4,
-                        connection.createArrayOf(
-                            "text",
-                            addedServiceDays.getOrDefault(dateWithException, new ArrayList<>()).toArray()
-                        )
+                        connection.createArrayOf("text", addedServiceForDate.get(date).toArray())
                     );
                     scheduleExceptionsStatement.setArray(
                         5,
-                        connection.createArrayOf(
-                            "text",
-                            removedServiceDays.getOrDefault(dateWithException, new ArrayList<>()).toArray()
-                        )
+                        connection.createArrayOf("text", removedServiceForDate.get(date).toArray())
                     );
                     scheduleExceptionsTracker.addBatch();
                 }

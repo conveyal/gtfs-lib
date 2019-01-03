@@ -29,7 +29,7 @@ public class GTFSMainTest {
         //executed only once, before the first test
         simpleGtfsZipFileName = null;
         try {
-            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency");
+            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency", true);
         } catch (IOException e) {
             e.printStackTrace();
         }

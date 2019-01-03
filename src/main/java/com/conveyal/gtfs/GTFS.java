@@ -185,7 +185,7 @@ public abstract class GTFS {
         try {
             cmd = new DefaultParser().parse(options, args);
         } catch (ParseException e) {
-            LOG.error("Error parsing command line: " + e.getMessage());
+            LOG.error("Error parsing command line", e);
             printHelp(options);
             return;
         }

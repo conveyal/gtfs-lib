@@ -189,6 +189,9 @@ public class ServiceValidator extends TripValidator {
                 if (date.isAfter(lastDate)) lastDate = date;
             }
             // Copy some useful information into the ValidationResult object to return to the caller.
+            // These variables are actually not directly tied to data in the calendar_dates.txt file.  Instead, they
+            // represent the first and last date respectively of any entry in the calendar.txt and calendar_dates.txt
+            // files.
             validationResult.firstCalendarDate = firstDate;
             validationResult.lastCalendarDate = lastDate;
             // Is this any different? firstDate.until(lastDate, ChronoUnit.DAYS);
