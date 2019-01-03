@@ -581,11 +581,9 @@ public class JdbcTableWriter implements TableWriter {
     private int updateStopTimesForPatternStop(ObjectNode patternStop, int previousTravelTime) throws SQLException {
         String sql = String.format(
             "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
-                "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
+                "where st.trip_id = t.trip_id AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
-            tablePrefix,
-            "pattern_id",
-            "stop_sequence"
+            tablePrefix
         );
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
