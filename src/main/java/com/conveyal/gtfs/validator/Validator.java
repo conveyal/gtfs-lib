@@ -6,9 +6,7 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Set;
 
 /**
  * A Validator examines a whole GTFS feed or a single trip within a GTFS feed. It accumulates error messages for
@@ -37,6 +35,22 @@ public abstract class Validator {
      */
     public void registerError(Entity entity, NewGTFSErrorType errorType) {
         errorStorage.storeError(NewGTFSError.forEntity(entity, errorType));
+    }
+
+    /**
+     * Stores a set of errors.
+     */
+    public void storeErrors(Set<NewGTFSError> errors) {
+        errorStorage.storeErrors(errors);
+    }
+
+    /**
+     * WARNING: this method creates but DOES NOT STORE a new GTFS error. It should only be used in cases where a
+     * collection of errors need to be temporarily held before storing in batch (e.g., waiting to store travel time zero
+     * errors before it is determined that the entire feed uses travel times rounded to the minute).
+     */
+    NewGTFSError createUnregisteredError (Entity entity, NewGTFSErrorType errorType) {
+        return NewGTFSError.forEntity(entity, errorType);
     }
 
 //    /**

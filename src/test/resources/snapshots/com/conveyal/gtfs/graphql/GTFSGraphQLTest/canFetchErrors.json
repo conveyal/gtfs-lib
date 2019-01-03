@@ -18,11 +18,19 @@
         "error_type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME",
         "line_number" : 2
       }, {
-        "bad_value" : "20170916",
+        "bad_value" : null,
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
         "error_id" : 2,
+        "error_type" : "FEED_TRAVEL_TIMES_ROUNDED",
+        "line_number" : null
+      }, {
+        "bad_value" : "20170916",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 3,
         "error_type" : "DATE_NO_SERVICE",
         "line_number" : null
       } ],

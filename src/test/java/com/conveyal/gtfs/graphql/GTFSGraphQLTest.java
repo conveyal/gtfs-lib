@@ -75,74 +75,74 @@ public class GTFSGraphQLTest {
     }
 
     // tests that the graphQL schema can initialize
-    @Test
+    @Test(timeout=5000)
     public void canInitialize() {
         GTFSGraphQL.initialize(testDataSource);
         GraphQL graphQL = GTFSGraphQL.getGraphQl();
     }
 
     // tests that the root element of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchFeed() throws IOException {
         assertThat(queryGraphQL("feed.txt"), matchesSnapshot());
     }
 
     // tests that the row counts of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchFeedRowCounts() throws IOException {
         assertThat(queryGraphQL("feedRowCounts.txt"), matchesSnapshot());
     }
 
     // tests that the errors of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchErrors() throws IOException {
         assertThat(queryGraphQL("feedErrors.txt"), matchesSnapshot());
     }
 
     // tests that the feed_info of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchFeedInfo() throws IOException {
         assertThat(queryGraphQL("feedFeedInfo.txt"), matchesSnapshot());
     }
 
     // tests that the patterns of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchPatterns() throws IOException {
         assertThat(queryGraphQL("feedPatterns.txt"), matchesSnapshot());
     }
 
     // tests that the agencies of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchAgencies() throws IOException {
         assertThat(queryGraphQL("feedAgencies.txt"), matchesSnapshot());
     }
 
     // tests that the calendars of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchCalendars() throws IOException {
         assertThat(queryGraphQL("feedCalendars.txt"), matchesSnapshot());
     }
 
     // tests that the fares of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchFares() throws IOException {
         assertThat(queryGraphQL("feedFares.txt"), matchesSnapshot());
     }
 
     // tests that the routes of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchRoutes() throws IOException {
         assertThat(queryGraphQL("feedRoutes.txt"), matchesSnapshot());
     }
 
     // tests that the stops of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchStops() throws IOException {
         assertThat(queryGraphQL("feedStops.txt"), matchesSnapshot());
     }
 
     // tests that the trips of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchTrips() throws IOException {
         assertThat(queryGraphQL("feedTrips.txt"), matchesSnapshot());
     }
@@ -150,19 +150,19 @@ public class GTFSGraphQLTest {
     // TODO: make tests for schedule_exceptions / calendar_dates
 
     // tests that the stop times of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchStopTimes() throws IOException {
         assertThat(queryGraphQL("feedStopTimes.txt"), matchesSnapshot());
     }
 
     // tests that the stop times of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchServices() throws IOException {
         assertThat(queryGraphQL("feedServices.txt"), matchesSnapshot());
     }
 
     // tests that the stop times of a feed can be fetched
-    @Test
+    @Test(timeout=5000)
     public void canFetchRoutesAndFilterTripsByDateAndTime() throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("namespace", testNamespace);
@@ -176,16 +176,30 @@ public class GTFSGraphQLTest {
     }
 
     // tests that the limit argument applies properly to a fetcher defined with autolimit set to false
-    @Test
+    @Test(timeout=5000)
     public void canFetchNestedEntityWithLimit() throws IOException {
         assertThat(queryGraphQL("feedStopsStopTimeLimit.txt"), matchesSnapshot());
+    }
+
+    // tests whether a graphQL query that has superflous and redundant nesting can find the right result
+    // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
+    @Test(timeout=5000)
+    public void canFetchMultiNestedEntities() throws IOException {
+        assertThat(queryGraphQL("superNested.txt"), matchesSnapshot());
+    }
+    // tests whether a graphQL query that has superflous and redundant nesting can find the right result
+    // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
+    // furthermore, some queries should have been combined together
+    @Test(timeout=5000)
+    public void canFetchMultiNestedEntitiesWithoutLimits() throws IOException {
+        assertThat(queryGraphQL("superNestedNoLimits.txt"), matchesSnapshot());
     }
 
     /**
      * attempt to fetch more than one record with SQL injection as inputs
      * the graphql library should properly escape the string and return 0 results for stops
      */
-    @Test
+    @Test(timeout=5000)
     public void canSanitizeSQLInjectionSentAsInput() throws IOException {
         Map<String, Object> variables = new HashMap<String, Object>();
         variables.put("namespace", testInjectionNamespace);
@@ -204,7 +218,7 @@ public class GTFSGraphQLTest {
      * attempt run a graphql query when one of the pieces of data contains a SQL injection
      * the graphql library should properly escape the string and complete the queries
      */
-    @Test
+    @Test(timeout=5000)
     public void canSanitizeSQLInjectionSentAsKeyValue() throws IOException, SQLException {
         // manually update the route_id key in routes and patterns
         String injection = "'' OR 1=1; Select ''99";
