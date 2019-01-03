@@ -374,13 +374,16 @@ public class JDBCTableWriterTest {
         String routeId = "700";
         String patternId = UUID.randomUUID().toString();
         PatternDTO createdPattern = createSimpleRouteAndPattern(routeId, patternId, "The Loop");
-        // Update pattern with pattern stops and TODO shape points
+        // TODO Test that a frequency trip entry cannot be added for a timetable-based pattern.
+        // Update pattern with pattern stops, set to use frequencies, and TODO shape points
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        createdPattern.use_frequency = 1;
         createdPattern.pattern_stops = new PatternStopDTO[]{
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
         };
-        patternUpdater.update(createdPattern.id, mapper.writeValueAsString(createdPattern), true);
+        String updatedPatternOutput = patternUpdater.update(createdPattern.id, mapper.writeValueAsString(createdPattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
         // Create new trip for the pattern
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
         TripDTO tripInput = new TripDTO();
@@ -391,8 +394,6 @@ public class JDBCTableWriterTest {
             new StopTimeDTO(firstStopId, 0, 0, 0),
             new StopTimeDTO(lastStopId, 60, 60, 1)
         };
-        // FIXME: Adding a frequency entry to this trip should not be permitted because the pattern has useFrequency set
-        //  to false (0).
         FrequencyDTO frequency = new FrequencyDTO();
         int startTime = 6 * 60 * 60;
         frequency.start_time = startTime;

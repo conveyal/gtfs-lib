@@ -169,12 +169,27 @@ public class JdbcTableWriter implements TableWriter {
                     int entityId = isCreating ? (int) newId : id;
                     // Cast child entities to array node to iterate over.
                     ArrayNode childEntitiesArray = (ArrayNode)childEntities;
-                    boolean foreignReferenceIsFrequencyPattern = jsonObject.has("use_frequency") &&
-                        jsonObject.get("use_frequency").asBoolean();
+                    boolean referencedPatternUsesFrequencies = false;
+                    // If an entity references a pattern (e.g., pattern stop or trip), determine whether the pattern uses
+                    // frequencies because this impacts update behaviors, for example whether stop times are kept in
+                    // sync with default travel times or whether frequencies are allowed to be nested with a JSON trip.
+                    if (jsonObject.has("pattern_id") && !jsonObject.get("pattern_id").isNull()) {
+                        PreparedStatement statement = connection.prepareStatement(String.format(
+                            "select use_frequency from %s.%s where pattern_id = ?",
+                            tablePrefix,
+                            Table.PATTERNS.name
+                        ));
+                        statement.setString(1, jsonObject.get("pattern_id").asText());
+                        LOG.info(statement.toString());
+                        ResultSet selectResults = statement.executeQuery();
+                        while (selectResults.next()) {
+                            referencedPatternUsesFrequencies = selectResults.getBoolean(1);
+                        }
+                    }
                     updateChildTable(
                         childEntitiesArray,
                         entityId,
-                        foreignReferenceIsFrequencyPattern,
+                        referencedPatternUsesFrequencies,
                         isCreating,
                         referencingTable,
                         connection
@@ -429,7 +444,7 @@ public class JdbcTableWriter implements TableWriter {
     private void updateChildTable(
         ArrayNode subEntities,
         int id,
-        boolean foreignReferenceIsFrequencyPattern,
+        boolean referencedPatternUsesFrequencies,
         boolean isCreatingNewEntity,
         Table subTable,
         Connection connection
@@ -442,9 +457,13 @@ public class JdbcTableWriter implements TableWriter {
         // Get parent entity's key value
         keyValue = getValueForId(id, keyField.name, tablePrefix, specTable, connection);
         String childTableName = String.join(".", tablePrefix, subTable.name);
+        if (!referencedPatternUsesFrequencies && subTable.name.equals(Table.FREQUENCIES.name) && subEntities.size() > 0) {
+            // Do not permit the illegal state where frequency entries are being added/modified for a timetable pattern.
+            throw new IllegalStateException("Cannot create or update frequency entries for a timetable-based pattern.");
+        }
         // Reconciling pattern stops MUST happen before original pattern stops are deleted in below block (with
         // getUpdateReferencesSql)
-        if ("pattern_stops".equals(subTable.name)) {
+        if (Table.PATTERN_STOP.name.equals(subTable.name)) {
             List<PatternStop> newPatternStops = new ArrayList<>();
             // Clean up pattern stop ID fields (passed in as string ID from datatools-ui to avoid id collision)
             for (JsonNode node : subEntities) {
@@ -507,7 +526,7 @@ public class JdbcTableWriter implements TableWriter {
             }
             // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
             if ("pattern_stops".equals(subTable.name)) {
-                if (foreignReferenceIsFrequencyPattern) {
+                if (referencedPatternUsesFrequencies) {
                     // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
                     // Default travel and dwell time behave as "linked fields" for associated stop times. In other
                     // words, frequency trips in the editor must match the pattern stop travel times.
@@ -1232,11 +1251,11 @@ public class JdbcTableWriter implements TableWriter {
         LOG.info(selectIdSql);
         Statement selectIdStatement = connection.createStatement();
         ResultSet selectResults = selectIdStatement.executeQuery(selectIdSql);
-        String keyValue = null;
+        String value = null;
         while (selectResults.next()) {
-            keyValue = selectResults.getString(1);
+            value = selectResults.getString(1);
         }
-        return keyValue;
+        return value;
     }
 
     /**
