@@ -381,6 +381,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
             // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
             // Should this be modified to be an object, rather than a list?
@@ -390,7 +391,6 @@ public class GraphQLGtfsSchema {
                     .dataFetcher(new JDBCFetcher("stops", "stop_id"))
                     .build()
             )
-            .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .build();
 
     /**
