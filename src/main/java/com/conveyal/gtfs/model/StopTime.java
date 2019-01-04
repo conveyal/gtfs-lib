@@ -26,7 +26,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
     public String stop_headsign;
     public int    pickup_type;
     public int    drop_off_type;
-    public double shape_dist_traveled;
+    public double shape_dist_traveled = DOUBLE_MISSING;
     public int    timepoint = INT_MISSING;
 
     @Override

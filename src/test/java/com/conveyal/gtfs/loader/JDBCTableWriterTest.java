@@ -1,11 +1,19 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
+import com.conveyal.gtfs.util.CalendarDTO;
 import com.conveyal.gtfs.util.FareDTO;
 import com.conveyal.gtfs.util.FareRuleDTO;
 import com.conveyal.gtfs.util.FeedInfoDTO;
+import com.conveyal.gtfs.util.FrequencyDTO;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.util.PatternDTO;
+import com.conveyal.gtfs.util.PatternStopDTO;
 import com.conveyal.gtfs.util.RouteDTO;
+import com.conveyal.gtfs.util.ShapePointDTO;
+import com.conveyal.gtfs.util.StopDTO;
+import com.conveyal.gtfs.util.StopTimeDTO;
+import com.conveyal.gtfs.util.TripDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -24,6 +32,12 @@ import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.Assert.assertThat;
 
+/**
+ * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
+ * consists of creating a scratch database and an empty feed snapshot, which is the necessary starting condition
+ * for building a GTFS feed from scratch. It then runs the various CRUD tests and finishes by dropping the database
+ * (even if tests fail).
+ */
 public class JDBCTableWriterTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(JDBCTableWriterTest.class);
@@ -31,6 +45,9 @@ public class JDBCTableWriterTest {
     private static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
+    private static String simpleServiceId = "1";
+    private static String firstStopId = "1";
+    private static String lastStopId = "2";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private static JdbcTableWriter createTestTableWriter (Table table) throws InvalidNamespaceException {
@@ -38,8 +55,8 @@ public class JDBCTableWriterTest {
     }
 
     @BeforeClass
-    public static void setUpClass() throws SQLException {
-        // create a new database
+    public static void setUpClass() throws SQLException, IOException, InvalidNamespaceException {
+        // Create a new database
         testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = createDataSource (dbConnectionUrl, null, null);
@@ -51,10 +68,13 @@ public class JDBCTableWriterTest {
                 "snapshot_of varchar)");
         connection.commit();
         LOG.info("feeds table created");
-
-        // create an empty snapshot to create a new namespace and all the tables
+        // Create an empty snapshot to create a new namespace and all the tables
         FeedLoadResult result = makeSnapshot(null, testDataSource);
         testNamespace = result.uniqueIdentifier;
+        // Create a service calendar and two stops, both of which are necessary to perform pattern and trip tests.
+        createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
+        createSimpleStop(firstStopId, "First Stop", 34.2222, -87.333);
+        createSimpleStop(lastStopId, "Last Stop", 34.2233, -87.334);
     }
 
     @Test
@@ -120,6 +140,10 @@ public class JDBCTableWriterTest {
         ));
     }
 
+    /**
+     * Ensure that potentially malicious SQL injection is sanitized properly during create operations.
+     * TODO: We might should perform this check on multiple entities and for update and/or delete operations.
+     */
     @Test
     public void canPreventSQLInjection() throws IOException, SQLException, InvalidNamespaceException {
         // create new object to be saved
@@ -229,14 +253,16 @@ public class JDBCTableWriterTest {
         ));
     }
 
-    private void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
+    void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
         assertThatSqlQueryYieldsRowCount(sql, 0);
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
         LOG.info(sql);
-        ResultSet resultSet = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        assertThat(resultSet.getFetchSize(), equalTo(expectedRowCount));
+        int recordCount = 0;
+        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
+        while (rs.next()) recordCount++;
+        assertThat("Records matching query should equal expected count.", recordCount, equalTo(expectedRowCount));
     }
 
     @Test
@@ -246,23 +272,8 @@ public class JDBCTableWriterTest {
         final Class<RouteDTO> routeDTOClass = RouteDTO.class;
 
         // create new object to be saved
-        RouteDTO routeInput = new RouteDTO();
         String routeId = "500";
-        routeInput.route_id = routeId;
-        routeInput.agency_id = "RTA";
-        // Empty value should be permitted for transfers and transfer_duration
-        routeInput.route_short_name = "500";
-        routeInput.route_long_name = "Hollingsworth";
-        routeInput.route_type = 3;
-
-        // convert object to json and save it
-        JdbcTableWriter createTableWriter = createTestTableWriter(routeTable);
-        String createOutput = createTableWriter.create(mapper.writeValueAsString(routeInput), true);
-        LOG.info("create {} output:", routeTable.name);
-        LOG.info(createOutput);
-
-        // parse output
-        RouteDTO createdRoute = mapper.readValue(createOutput, routeDTOClass);
+        RouteDTO createdRoute = createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
 
         // make sure saved data matches expected data
         assertThat(createdRoute.route_id, equalTo(routeId));
@@ -305,6 +316,169 @@ public class JDBCTableWriterTest {
                 routeTable.name,
                 createdRoute.id
         ));
+    }
+
+    /**
+     * Create and store a simple route for testing.
+     */
+    private static RouteDTO createSimpleTestRoute(String routeId, String agencyId, String shortName, String longName, int routeType) throws InvalidNamespaceException, IOException, SQLException {
+        RouteDTO input = new RouteDTO();
+        input.route_id = routeId;
+        input.agency_id = agencyId;
+        // Empty value should be permitted for transfers and transfer_duration
+        input.route_short_name = shortName;
+        input.route_long_name = longName;
+        input.route_type = routeType;
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.ROUTES);
+        String output = createTableWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.ROUTES.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, RouteDTO.class);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createSimpleRouteAndPattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
+        // Create new route
+        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
+        // Create new pattern for route
+        PatternDTO input = new PatternDTO();
+        input.pattern_id = patternId;
+        input.route_id = routeId;
+        input.name = name;
+        input.use_frequency = 0;
+        input.shapes = new ShapePointDTO[]{};
+        input.pattern_stops = new PatternStopDTO[]{};
+        // Write the pattern to the database
+        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
+        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.PATTERNS.name);
+        LOG.info(output);
+        // Parse output
+        return mapper.readValue(output, PatternDTO.class);
+    }
+
+    /**
+     * Test that a frequency trip entry CANNOT be added for a timetable-based pattern. Expects an exception to be thrown.
+     */
+    @Test(expected = IllegalStateException.class)
+    public void cannotCreateFrequencyForTimetablePattern() throws InvalidNamespaceException, IOException, SQLException {
+        PatternDTO simplePattern = createSimpleRouteAndPattern("900", "8", "The Loop");
+        TripDTO tripInput = constructFrequencyTrip(simplePattern.pattern_id, simplePattern.route_id, 6 * 60 * 60);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+    }
+
+    /**
+     * Checks that creating a frequency trip functions properly. This also updates the pattern to include pattern stops,
+     * which is a prerequisite for creating a frequency trip with stop times.
+     */
+    @Test
+    public void canCreateUpdateAndDeleteFrequencyTripForFrequencyPattern() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table tripsTable = Table.TRIPS;
+        int startTime = 6 * 60 * 60;
+        PatternDTO simplePattern = createSimpleRouteAndPattern("1000", "9", "The Line");
+        TripDTO tripInput = constructFrequencyTrip(simplePattern.pattern_id, simplePattern.route_id, startTime);
+        JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
+        // Update pattern with pattern stops, set to use frequencies, and TODO shape points
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        simplePattern.use_frequency = 1;
+        simplePattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(simplePattern.pattern_id, firstStopId, 0),
+            new PatternStopDTO(simplePattern.pattern_id, lastStopId, 1)
+        };
+        String updatedPatternOutput = patternUpdater.update(simplePattern.id, mapper.writeValueAsString(simplePattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+        // Create new trip for the pattern
+        String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
+        // Update trip
+        // TODO: Add update and delete tests for updating pattern stops, stop_times, and frequencies.
+        String updatedTripId = "100A";
+        createdTrip.trip_id = updatedTripId;
+        JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
+        String updateTripOutput = updateTripWriter.update(tripInput.id, mapper.writeValueAsString(createdTrip), true);
+        TripDTO updatedTrip = mapper.readValue(updateTripOutput, TripDTO.class);
+        // Check that saved data matches expected data
+        assertThat(updatedTrip.frequencies[0].start_time, equalTo(startTime));
+        assertThat(updatedTrip.trip_id, equalTo(updatedTripId));
+        // Delete trip record
+        JdbcTableWriter deleteTripWriter = createTestTableWriter(tripsTable);
+        int deleteOutput = deleteTripWriter.delete(
+            createdTrip.id,
+            true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, tripsTable.name);
+        // Check that record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where id=%d",
+                testNamespace,
+                tripsTable.name,
+                createdTrip.id
+            ));
+    }
+
+    /**
+     * Construct (without writing to the database) a trip with a frequency entry.
+     */
+    private TripDTO constructFrequencyTrip(String patternId, String routeId, int startTime) {
+        TripDTO tripInput = new TripDTO();
+        tripInput.pattern_id = patternId;
+        tripInput.route_id = routeId;
+        tripInput.service_id = simpleServiceId;
+        tripInput.stop_times = new StopTimeDTO[]{
+            new StopTimeDTO(firstStopId, 0, 0, 0),
+            new StopTimeDTO(lastStopId, 60, 60, 1)
+        };
+        FrequencyDTO frequency = new FrequencyDTO();
+        frequency.start_time = startTime;
+        frequency.end_time = 9 * 60 * 60;
+        frequency.headway_secs = 15 * 60;
+        tripInput.frequencies = new FrequencyDTO[]{frequency};
+        return tripInput;
+    }
+
+    /**
+     * Create and store a simple stop entity.
+     */
+    private static StopDTO createSimpleStop(String stopId, String stopName, double latitude, double longitude) throws InvalidNamespaceException, IOException, SQLException {
+        JdbcTableWriter createStopWriter = new JdbcTableWriter(Table.STOPS, testDataSource, testNamespace);
+        StopDTO input = new StopDTO();
+        input.stop_id = stopId;
+        input.stop_name = stopName;
+        input.stop_lat = latitude;
+        input.stop_lon = longitude;
+        String output = createStopWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.STOPS.name);
+        LOG.info(output);
+        return mapper.readValue(output, StopDTO.class);
+    }
+
+    /**
+     * Create and store a simple calendar that runs on each weekday.
+     */
+    private static CalendarDTO createWeekdayCalendar(String serviceId, String startDate, String endDate) throws IOException, SQLException, InvalidNamespaceException {
+        JdbcTableWriter createCalendarWriter = new JdbcTableWriter(Table.CALENDAR, testDataSource, testNamespace);
+        CalendarDTO calendarInput = new CalendarDTO();
+        calendarInput.service_id = serviceId;
+        calendarInput.monday = 1;
+        calendarInput.tuesday = 1;
+        calendarInput.wednesday = 1;
+        calendarInput.thursday = 1;
+        calendarInput.friday = 1;
+        calendarInput.saturday = 0;
+        calendarInput.sunday = 0;
+        calendarInput.start_date = startDate;
+        calendarInput.end_date = endDate;
+        String output = createCalendarWriter.create(mapper.writeValueAsString(calendarInput), true);
+        LOG.info("create {} output:", Table.CALENDAR.name);
+        LOG.info(output);
+        return mapper.readValue(output, CalendarDTO.class);
     }
 
     @AfterClass

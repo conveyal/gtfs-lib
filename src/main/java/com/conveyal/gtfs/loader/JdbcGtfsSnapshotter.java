@@ -56,9 +56,9 @@ public class JdbcGtfsSnapshotter {
     /**
      * Copy primary entity tables as well as Pattern and PatternStops tables.
      */
-    public FeedLoadResult copyTables() {
+    public SnapshotResult copyTables() {
         // This result object will be returned to the caller to summarize the feed and report any critical errors.
-        FeedLoadResult result = new FeedLoadResult();
+        SnapshotResult result = new SnapshotResult();
 
         try {
             long startTime = System.currentTimeMillis();
@@ -89,7 +89,7 @@ public class JdbcGtfsSnapshotter {
             copy(Table.PATTERNS, true);
             copy(Table.PATTERN_STOP, true);
             // see method comments fo why different logic is needed for this table
-            createScheduleExceptionsTable();
+            result.scheduleExceptions = createScheduleExceptionsTable();
             result.shapes = copy(Table.SHAPES, true);
             result.stops = copy(Table.STOPS, true);
             // TODO: Should we defer index creation on stop times?
@@ -106,7 +106,7 @@ public class JdbcGtfsSnapshotter {
             // TableLoadResult.
             LOG.error("Exception while creating snapshot: {}", ex.toString());
             ex.printStackTrace();
-            result.fatalException = ex.getMessage();
+            result.fatalException = ex.toString();
         }
         return result;
     }
@@ -145,7 +145,7 @@ public class JdbcGtfsSnapshotter {
             connection.commit();
             LOG.info("Done.");
         } catch (Exception ex) {
-            tableLoadResult.fatalException = ex.getMessage();
+            tableLoadResult.fatalException = ex.toString();
             LOG.error("Error: ", ex);
             try {
                 connection.rollback();
@@ -217,6 +217,11 @@ public class JdbcGtfsSnapshotter {
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
                 Multimap<String, String> addedServiceForDate = HashMultimap.create();
                 for (CalendarDate calendarDate : calendarDates) {
+                    // Skip any null dates
+                    if (calendarDate.date == null) {
+                        LOG.warn("Encountered calendar date record with null value for date field. Skipping.");
+                        continue;
+                    }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
                     if (calendarDate.exception_type == 1) {
                         addedServiceForDate.put(date, calendarDate.service_id);
@@ -293,8 +298,8 @@ public class JdbcGtfsSnapshotter {
                 }
 
                 connection.commit();
-            } catch (SQLException e) {
-                tableLoadResult.fatalException = e.getMessage();
+            } catch (Exception e) {
+                tableLoadResult.fatalException = e.toString();
                 LOG.error("Error creating schedule Exceptions: ", e);
                 e.printStackTrace();
                 try {
@@ -427,7 +432,7 @@ public class JdbcGtfsSnapshotter {
             connection.commit();
             LOG.info("Created new snapshot namespace: {}", insertStatement);
         } catch (Exception ex) {
-            LOG.error("Exception while registering snapshot namespace in feeds table: {}", ex.getMessage());
+            LOG.error("Exception while registering snapshot namespace in feeds table", ex);
             DbUtils.closeQuietly(connection);
         }
     }

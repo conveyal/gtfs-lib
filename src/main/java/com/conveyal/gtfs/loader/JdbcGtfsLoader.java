@@ -169,7 +169,7 @@ public class JdbcGtfsLoader {
             // TODO catch exceptions separately while loading each table so load can continue, store in TableLoadResult
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
             ex.printStackTrace();
-            result.fatalException = ex.getMessage();
+            result.fatalException = ex.toString();
         }
         return result;
     }
@@ -251,7 +251,7 @@ public class JdbcGtfsLoader {
             connection.commit();
             LOG.info("Created new feed namespace: {}", insertStatement);
         } catch (Exception ex) {
-            LOG.error("Exception while registering new feed namespace in feeds table: {}", ex.getMessage());
+            LOG.error("Exception while registering new feed namespace in feeds table", ex);
             DbUtils.closeQuietly(connection);
         }
     }

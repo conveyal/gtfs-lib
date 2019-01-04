@@ -163,6 +163,7 @@ public class Table {
         new ColorField("route_text_color",  OPTIONAL),
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
+        // wheelchair_accessible is an exemplar field applied to all trips on a route.
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
@@ -196,7 +197,8 @@ public class Table {
             new StringField("pattern_id", REQUIRED),
             new StringField("route_id", REQUIRED).isReferenceTo(ROUTES),
             new StringField("name", OPTIONAL),
-            // Editor-specific fields
+            // Editor-specific fields.
+            // direction_id and shape_id are exemplar fields applied to all trips for a pattern.
             new ShortField("direction_id", EDITOR, 1),
             new ShortField("use_frequency", EDITOR, 1),
             new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
@@ -281,7 +283,10 @@ public class Table {
             new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new TimeField("start_time", REQUIRED),
             new TimeField("end_time", REQUIRED),
-            new IntegerField("headway_secs", REQUIRED, 20, 60*60*2),
+            // Set max headway seconds to the equivalent of 6 hours. This should leave space for any very long headways
+            // (e.g., a ferry running exact times at a 4 hour headway), but will catch cases where milliseconds were
+            // exported accidentally.
+            new IntegerField("headway_secs", REQUIRED, 20, 60*60*6),
             new IntegerField("exact_times", OPTIONAL, 1))
             .withParentTable(TRIPS)
             .keyFieldIsNotUnique();

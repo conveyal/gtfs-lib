@@ -3,6 +3,7 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -49,6 +50,8 @@ public class SpeedTripValidator extends TripValidator {
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
+            // Check that shape_dist_traveled is increasing.
+            checkShapeDistTraveled(prevStopTime, currStopTime);
             if (missingBothTimes(currStopTime)) {
                 // FixMissingTimes has already been called, so both arrival and departure time are missing.
                 // The spec allows this. Other than accumulating distance, skip this StopTime.
@@ -79,6 +82,20 @@ public class SpeedTripValidator extends TripValidator {
             // Record current stop and stopTime for the next iteration.
             prevStopTime = currStopTime;
             prevStop = currStop;
+        }
+    }
+
+    /**
+     * Register shape dist traveled error if previous stop time's value was missing and the current value is
+     * not (if at least one stop time has a value, all stop times for the trip should) OR if current value
+     * is not greater than previous value.
+     */
+    private void checkShapeDistTraveled(StopTime previous, StopTime current) {
+        if (
+            (previous.shape_dist_traveled == Entity.DOUBLE_MISSING && current.shape_dist_traveled != Entity.DOUBLE_MISSING) ||
+            current.shape_dist_traveled <= previous.shape_dist_traveled
+        ) {
+            registerError(current, SHAPE_DIST_TRAVELED_NOT_INCREASING, current.shape_dist_traveled);
         }
     }
 
