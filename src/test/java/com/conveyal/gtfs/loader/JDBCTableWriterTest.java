@@ -375,7 +375,7 @@ public class JDBCTableWriterTest {
      * which is a prerequisite for creating a frequency trip with stop times.
      */
     @Test
-    public void canCreateFrequencyForFrequencyPattern() throws IOException, SQLException, InvalidNamespaceException {
+    public void canCreateUpdateAndDeleteFrequencyTripForFrequencyPattern() throws IOException, SQLException, InvalidNamespaceException {
         // Store Table and Class values for use in test.
         final Table tripsTable = Table.TRIPS;
         int startTime = 6 * 60 * 60;
