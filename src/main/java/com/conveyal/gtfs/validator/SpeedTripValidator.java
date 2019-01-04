@@ -86,14 +86,17 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * Register shape dist traveled error if previous stop time's value was missing and the current value is
-     * not (if at least one stop time has a value, all stop times for the trip should) OR if current value
-     * is not greater than previous value.
+     * Register shape dist traveled error if current stop time has a value AND either and the previous value is
+     * missing (if at least one stop time has a value, all stop times for the trip should) OR if current value
+     * is less than or equal to the previous value.
      */
     private void checkShapeDistTraveled(StopTime previous, StopTime current) {
         if (
-            (previous.shape_dist_traveled == Entity.DOUBLE_MISSING && current.shape_dist_traveled != Entity.DOUBLE_MISSING) ||
-            current.shape_dist_traveled <= previous.shape_dist_traveled
+            current.shape_dist_traveled != Entity.DOUBLE_MISSING &&
+            (
+                previous.shape_dist_traveled == Entity.DOUBLE_MISSING ||
+                current.shape_dist_traveled <= previous.shape_dist_traveled
+            )
         ) {
             registerError(current, SHAPE_DIST_TRAVELED_NOT_INCREASING, current.shape_dist_traveled);
         }
