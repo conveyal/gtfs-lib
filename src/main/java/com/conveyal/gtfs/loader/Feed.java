@@ -81,9 +81,7 @@ public class Feed {
         SQLErrorStorage errorStorage = null;
         try {
             errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
-        } catch (SQLException ex) {
-            throw new StorageException(ex);
-        } catch (InvalidNamespaceException ex) {
+        } catch (SQLException | InvalidNamespaceException ex) {
             throw new StorageException(ex);
         }
         int errorCountBeforeValidation = errorStorage.getErrorCount();

@@ -131,6 +131,7 @@ public class SQLErrorStorage {
      */
     public void commitAndClose() {
         try {
+            LOG.info("Committing errors and closing SQL connection.");
             this.commit();
             // Close the connection permanently (should be called only after errorStorage instance no longer needed).
             connection.close();

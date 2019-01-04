@@ -229,14 +229,16 @@ public class JDBCTableWriterTest {
         ));
     }
 
-    private void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
+    void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
         assertThatSqlQueryYieldsRowCount(sql, 0);
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
         LOG.info(sql);
-        ResultSet resultSet = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        assertThat(resultSet.getFetchSize(), equalTo(expectedRowCount));
+        int recordCount = 0;
+        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
+        while (rs.next()) recordCount++;
+        assertThat("Records matching query should equal expected count.", recordCount, equalTo(expectedRowCount));
     }
 
     @Test

@@ -1,9 +1,16 @@
 package com.conveyal.gtfs;
 
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.SnapshotResult;
+import com.conveyal.gtfs.storage.ExpectedFieldType;
+import com.conveyal.gtfs.storage.PersistenceExpectation;
+import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
+import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
@@ -22,9 +29,9 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -99,6 +106,26 @@ public class GTFSTest {
     }
 
     /**
+     * Tests that a GTFS feed with bad date values in calendars.txt and calendar_dates.txt can pass the integration test.
+     */
+    @Test
+    public void canLoadFeedWithBadDates () {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list(
+            new PersistenceExpectation(
+                "calendar",
+                new RecordExpectation[]{
+                    new RecordExpectation("start_date", null)
+                }
+            )
+        );
+        assertThat(
+            "Integration test passes",
+            runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations),
+            equalTo(true)
+        );
+    }
+
+    /**
      * Tests whether or not "fake-agency" GTFS can be placed in a zipped subdirectory and loaded/exported successfully.
      */
     @Test
@@ -119,11 +146,7 @@ public class GTFSTest {
         }
         // TODO Add error expectations argument that expects NewGTFSErrorType.TABLE_IN_SUBDIRECTORY error type.
         assertThat(
-            runIntegrationTestOnZipFile(
-                zipFileName,
-                nullValue(),
-                fakeAgencyPersistenceExpectations
-            ),
+            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations),
             equalTo(true)
         );
     }
@@ -220,7 +243,7 @@ public class GTFSTest {
     }
 
     /**
-     * A helper method that will run GTFS.main with a certain zip file.
+     * A helper method that will run GTFS#main with a certain zip file.
      * This tests whether a GTFS zip file can be loaded without any errors.
      *
      * After the GTFS is loaded, this will also initiate an export of a GTFS from the database and check
@@ -251,7 +274,7 @@ public class GTFSTest {
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
 
-            assertThatImportedGtfsMeetsExpectations(dbConnectionUrl, namespace, persistenceExpectations);
+            assertThatImportedGtfsMeetsExpectations(dataSource.getConnection(), namespace, persistenceExpectations);
         } catch (SQLException e) {
             TestUtils.dropDB(newDBName);
             e.printStackTrace();
@@ -261,9 +284,9 @@ public class GTFSTest {
             throw e;
         }
 
-        // Verify that exporting the feed (in non-editor mode) completes and data is outputed properly
+        // Verify that exporting the feed (in non-editor mode) completes and data is outputted properly
         try {
-            LOG.info("export GTFS from created namespase");
+            LOG.info("export GTFS from created namespace");
             File tempFile = exportGtfs(namespace, dataSource, false);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, false);
         } catch (IOException e) {
@@ -278,9 +301,10 @@ public class GTFSTest {
         // Verify that making a snapshot from an existing feed database, then exporting that snapshot to a GTFS zip file
         // works as expected
         try {
-            LOG.info("copy GTFS from created namespase");
-            FeedLoadResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
-            LOG.info("export GTFS from copied namespase");
+            LOG.info("copy GTFS from created namespace");
+            SnapshotResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
+            assertThatSnapshotIsErrorFree(copyResult);
+            LOG.info("export GTFS from copied namespace");
             File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
         } catch (IOException e) {
@@ -293,6 +317,60 @@ public class GTFSTest {
         return true;
     }
 
+    private void assertThatLoadIsErrorFree(FeedLoadResult loadResult) {
+        assertThat(loadResult.fatalException, is(nullValue()));
+        assertThat(loadResult.agency.fatalException, is(nullValue()));
+        assertThat(loadResult.calendar.fatalException, is(nullValue()));
+        assertThat(loadResult.calendarDates.fatalException, is(nullValue()));
+        assertThat(loadResult.fareAttributes.fatalException, is(nullValue()));
+        assertThat(loadResult.fareRules.fatalException, is(nullValue()));
+        assertThat(loadResult.feedInfo.fatalException, is(nullValue()));
+        assertThat(loadResult.frequencies.fatalException, is(nullValue()));
+        assertThat(loadResult.routes.fatalException, is(nullValue()));
+        assertThat(loadResult.shapes.fatalException, is(nullValue()));
+        assertThat(loadResult.stops.fatalException, is(nullValue()));
+        assertThat(loadResult.stopTimes.fatalException, is(nullValue()));
+        assertThat(loadResult.transfers.fatalException, is(nullValue()));
+        assertThat(loadResult.trips.fatalException, is(nullValue()));
+    }
+
+    private void assertThatSnapshotIsErrorFree(SnapshotResult snapshotResult) {
+        assertThatLoadIsErrorFree(snapshotResult);
+        assertThat(snapshotResult.scheduleExceptions.fatalException, is(nullValue()));
+    }
+
+    private String zipFolderAndLoadGTFS(String folderName, DataSource dataSource, PersistenceExpectation[] persistenceExpectations) {
+        // zip up test folder into temp zip file
+        String zipFileName;
+        try {
+            zipFileName = TestUtils.zipFolderFiles(folderName, true);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        }
+        String namespace;
+        // Verify that loading the feed completes and data is stored properly
+        try {
+            // load and validate feed
+            LOG.info("load and validate feed");
+            FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource);
+            DataSource ds = GTFS.createDataSource(
+                    dataSource.getConnection().getMetaData().getURL(),
+                    null,
+                    null
+            );
+            assertThatLoadIsErrorFree(loadResult);
+            assertThat(validationResult.fatalException, is(nullValue()));
+            namespace = loadResult.uniqueIdentifier;
+            assertThatImportedGtfsMeetsExpectations(ds.getConnection(), namespace, persistenceExpectations);
+        } catch (SQLException | AssertionError e) {
+            e.printStackTrace();
+            return null;
+        }
+        return namespace;
+    }
+
     /**
      * Helper function to export a GTFS from the database to a temporary zip file.
      */
@@ -302,18 +380,34 @@ public class GTFSTest {
         return tempFile;
     }
 
+    private class ValuePair {
+        private final Object expected;
+        private final Object found;
+        private ValuePair (Object expected, Object found) {
+            this.expected = expected;
+            this.found = found;
+        }
+    }
+
     /**
      * Run through the list of persistence expectations to make sure that the feed was imported properly into the
      * database.
      */
     private void assertThatImportedGtfsMeetsExpectations(
-        String dbConnectionUrl,
+        Connection connection,
         String namespace,
         PersistenceExpectation[] persistenceExpectations
     ) throws SQLException {
+        // Store field mismatches here (to provide assertion statements with more details).
+        Multimap<String, ValuePair> fieldsWithMismatches = ArrayListMultimap.create();
+        // Check that no validators failed during validation.
+        assertThat(
+            "One or more validators failed during GTFS import.",
+            countValidationErrorsOfType(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED),
+            equalTo(0)
+        );
         // run through testing expectations
-        LOG.info("testing expecations of record storage in the database");
-        Connection conn = DriverManager.getConnection(dbConnectionUrl);
+        LOG.info("testing expectations of record storage in the database");
         for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
             // select all entries from a table
             String sql = String.format(
@@ -322,7 +416,7 @@ public class GTFSTest {
                 persistenceExpectation.tableName
             );
             LOG.info(sql);
-            ResultSet rs = conn.prepareStatement(sql).executeQuery();
+            ResultSet rs = connection.prepareStatement(sql).executeQuery();
             boolean foundRecord = false;
             int numRecordsSearched = 0;
             while (rs.next()) {
@@ -332,32 +426,48 @@ public class GTFSTest {
                 for (RecordExpectation recordExpectation: persistenceExpectation.recordExpectations) {
                     switch (recordExpectation.expectedFieldType) {
                         case DOUBLE:
+                            double doubleVal = rs.getDouble(recordExpectation.fieldName);
                             LOG.info(String.format(
                                 "%s: %f",
                                 recordExpectation.fieldName,
-                                rs.getDouble(recordExpectation.fieldName)
+                                doubleVal
                             ));
-                            if (rs.getDouble(recordExpectation.fieldName) != recordExpectation.doubleExpectation) {
+                            if (doubleVal != recordExpectation.doubleExpectation) {
                                 allFieldsMatch = false;
                             }
                             break;
                         case INT:
+                            int intVal = rs.getInt(recordExpectation.fieldName);
                             LOG.info(String.format(
                                 "%s: %d",
                                 recordExpectation.fieldName,
-                                rs.getInt(recordExpectation.fieldName)
+                                intVal
                             ));
-                            if (rs.getInt(recordExpectation.fieldName) != recordExpectation.intExpectation) {
+                            if (intVal != recordExpectation.intExpectation) {
+                                fieldsWithMismatches.put(
+                                        recordExpectation.fieldName,
+                                        new ValuePair(recordExpectation.stringExpectation, intVal)
+                                );
                                 allFieldsMatch = false;
                             }
                             break;
                         case STRING:
+                            String strVal = rs.getString(recordExpectation.fieldName);
                             LOG.info(String.format(
                                 "%s: %s",
                                 recordExpectation.fieldName,
-                                rs.getString(recordExpectation.fieldName)
+                                strVal
                             ));
-                            if (!rs.getString(recordExpectation.fieldName).equals(recordExpectation.stringExpectation)) {
+                            if (strVal == null && recordExpectation.stringExpectation == null) {
+                                break;
+                            } else if (
+                                (strVal == null && recordExpectation.stringExpectation != null) ||
+                                !strVal.equals(recordExpectation.stringExpectation)
+                            ) {
+                                fieldsWithMismatches.put(
+                                    recordExpectation.fieldName,
+                                    new ValuePair(recordExpectation.stringExpectation, strVal)
+                                );
                                 allFieldsMatch = false;
                             }
                             break;
@@ -374,8 +484,26 @@ public class GTFSTest {
                     break;
                 }
             }
-            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord);
+            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord, fieldsWithMismatches);
         }
+    }
+
+    private static int countValidationErrorsOfType(
+            Connection connection,
+            String namespace,
+            NewGTFSErrorType errorType
+    ) throws SQLException {
+        String errorCheckSql = String.format(
+                "select * from %s.errors where error_type = '%s'",
+                namespace,
+                errorType);
+        LOG.info(errorCheckSql);
+        ResultSet errorResults = connection.prepareStatement(errorCheckSql).executeQuery();
+        int errorCount = 0;
+        while (errorResults.next()) {
+            errorCount++;
+        }
+        return errorCount;
     }
 
     /**
@@ -387,7 +515,7 @@ public class GTFSTest {
         PersistenceExpectation[] persistenceExpectations,
         boolean fromEditor
     ) throws IOException {
-        LOG.info("testing expecations of csv outputs in an exported gtfs");
+        LOG.info("testing expectations of csv outputs in an exported gtfs");
 
         ZipFile gtfsZipfile = new ZipFile(tempFile.getAbsolutePath());
 
@@ -432,7 +560,12 @@ public class GTFSTest {
                         val,
                         expectation
                     ));
-                    if (!val.equals(expectation)) {
+                    if (val.isEmpty() && expectation == null) {
+                        // First check that the csv value is an empty string and that the expectation is null. Null
+                        // exported from the database to a csv should round trip into an empty string, so this meets the
+                        // expectation.
+                        break;
+                    } else if (!val.equals(expectation)) {
                         // sometimes there are slight differences in decimal precision in various fields
                         // check if the decimal delta is acceptable
                         if (equalsWithNumericDelta(val, recordExpectation)) continue;
@@ -446,7 +579,7 @@ public class GTFSTest {
                     foundRecord = true;
                 }
             }
-            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord);
+            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord, null);
         }
     }
 
@@ -469,17 +602,34 @@ public class GTFSTest {
     /**
      * Helper method to make sure a persistence expectation was actually found after searching through records
      */
-    private void assertThatPersistenceExpectationRecordWasFound(int numRecordsSearched, boolean foundRecord) {
+    private void assertThatPersistenceExpectationRecordWasFound(
+        int numRecordsSearched,
+        boolean foundRecord,
+        Multimap<String, ValuePair> mismatches
+    ) {
         assertThat(
             "No records found in the ResultSet/CSV file",
             numRecordsSearched,
             ComparatorMatcherBuilder.<Integer>usingNaturalOrdering().greaterThan(0)
         );
-        assertThat(
-            "The record as defined in the PersistenceExpectation was not found.",
-            foundRecord,
-            equalTo(true)
-        );
+        if (mismatches != null) {
+            for (String field : mismatches.keySet()) {
+                Collection<ValuePair> valuePairs = mismatches.get(field);
+                for (ValuePair valuePair : valuePairs) {
+                    assertThat(
+                        String.format("The value expected for %s was not found", field),
+                        valuePair.expected,
+                        equalTo(valuePair.found)
+                    );
+                }
+            }
+        } else {
+            assertThat(
+                "The record as defined in the PersistenceExpectation was not found.",
+                foundRecord,
+                equalTo(true)
+            );
+        }
     }
 
     /**
@@ -617,102 +767,4 @@ public class GTFSTest {
                 }
             )
     };
-
-    /**
-     * A helper class to verify that data got stored in a particular table.
-     */
-    private class PersistenceExpectation {
-        public String tableName;
-        // each persistence expectation has an array of record expectations which all must reference a single row
-        // if looking for multiple records in the same table,
-        // create numerous PersistenceExpectations with the same tableName
-        public RecordExpectation[] recordExpectations;
-
-
-        public PersistenceExpectation(String tableName, RecordExpectation[] recordExpectations) {
-            this.tableName = tableName;
-            this.recordExpectations = recordExpectations;
-        }
-    }
-
-    private enum ExpectedFieldType {
-        INT,
-        DOUBLE, STRING
-    }
-
-    /**
-     * A helper class to verify that data got stored in a particular record.
-     */
-    private class RecordExpectation {
-        public double acceptedDelta;
-        public double doubleExpectation;
-        public String editorExpectation;
-        public ExpectedFieldType expectedFieldType;
-        public String fieldName;
-        public int intExpectation;
-        public String stringExpectation;
-        public boolean stringExpectationInCSV = false;
-        public boolean editorStringExpectation = false;
-
-        public RecordExpectation(String fieldName, int intExpectation) {
-            this.fieldName = fieldName;
-            this.expectedFieldType = ExpectedFieldType.INT;
-            this.intExpectation = intExpectation;
-        }
-
-        /**
-         * This extra constructor is a bit hacky in that it is only used for certain records that have
-         * an int type when stored in the database, but a string type when exported to GTFS
-         */
-        public RecordExpectation(String fieldName, int intExpectation, String stringExpectation) {
-            this.fieldName = fieldName;
-            this.expectedFieldType = ExpectedFieldType.INT;
-            this.intExpectation = intExpectation;
-            this.stringExpectation = stringExpectation;
-            this.stringExpectationInCSV = true;
-        }
-
-        /**
-         * This extra constructor is a also hacky in that it is only used for records that have
-         * an int type when stored in the database, and different values in the CSV export depending on
-         * whether or not it is a snapshot from the editor.  Currently this only applies to stop_times.stop_sequence
-         */
-        public RecordExpectation(String fieldName, int intExpectation, String stringExpectation, String editorExpectation) {
-            this.fieldName = fieldName;
-            this.expectedFieldType = ExpectedFieldType.INT;
-            this.intExpectation = intExpectation;
-            this.stringExpectation = stringExpectation;
-            this.stringExpectationInCSV = true;
-            this.editorStringExpectation = true;
-            this.editorExpectation = editorExpectation;
-        }
-
-        public RecordExpectation(String fieldName, String stringExpectation) {
-            this.fieldName = fieldName;
-            this.expectedFieldType = ExpectedFieldType.STRING;
-            this.stringExpectation = stringExpectation;
-        }
-
-        public RecordExpectation(String fieldName, double doubleExpectation, double acceptedDelta) {
-            this.fieldName = fieldName;
-            this.expectedFieldType = ExpectedFieldType.DOUBLE;
-            this.doubleExpectation = doubleExpectation;
-            this.acceptedDelta = acceptedDelta;
-        }
-
-        public String getStringifiedExpectation(boolean fromEditor) {
-            if (fromEditor && editorStringExpectation) return editorExpectation;
-            if (stringExpectationInCSV) return stringExpectation;
-            switch (expectedFieldType) {
-                case DOUBLE:
-                    return String.valueOf(doubleExpectation);
-                case INT:
-                    return String.valueOf(intExpectation);
-                case STRING:
-                    return stringExpectation;
-                default:
-                    return null;
-            }
-        }
-    }
 }
