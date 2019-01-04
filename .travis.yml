@@ -64,5 +64,7 @@ notifications:
 
 # Push results to codecov.io and run semantic-release (releases only created on pushes to the master branch).
 after_success:
-  - bash <(curl -s https://codecov.io/bash)
   - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev
+  # run codecov after semantic-release because maven-semantic-release creates extra commits that
+  # codecov will need a report on to reference in future PRs to the release branch
+  - bash <(curl -s https://codecov.io/bash)
