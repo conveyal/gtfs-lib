@@ -88,7 +88,9 @@ public class SpeedTripValidator extends TripValidator {
     /**
      * Register shape dist traveled error if current stop time has a value AND either and the previous value is
      * missing (if at least one stop time has a value, all stop times for the trip should) OR if current value
-     * is less than or equal to the previous value.
+     * is less than or equal to the previous value. Note: if the previous shape_dist_traveled value is present and the
+     * current value is missing, the previous value will be greater than the current stop time's value because
+     * {@link Entity#DOUBLE_MISSING} is the lowest possible double value. This in turn will register an error.
      */
     private void checkShapeDistTraveled(StopTime previous, StopTime current) {
         if (
