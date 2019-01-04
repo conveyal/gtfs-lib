@@ -402,7 +402,7 @@ public class GTFSTest {
         Multimap<String, ValuePair> fieldsWithMismatches = ArrayListMultimap.create();
         // Check that no validators failed during validation.
         assertThat(
-            "No validators failed during GTFS import.",
+            "One or more validators failed during GTFS import.",
             countValidationErrorsOfType(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED),
             equalTo(0)
         );
