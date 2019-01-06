@@ -262,7 +262,7 @@ public interface EntityPopulator<T> {
         double doubleValue = resultSet.getDouble(columnIndex);
         // If SQL value for column was null, resultSet.getDouble will return 0.0. If this is the case, override value with
         // DOUBLE_MISSING.
-        if (resultSet.wasNull()) return Entity.INT_MISSING;
+        if (resultSet.wasNull()) return Entity.DOUBLE_MISSING;
         else return doubleValue;
     }
 
