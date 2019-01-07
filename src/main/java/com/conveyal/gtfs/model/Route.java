@@ -30,6 +30,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public int    route_type;
     public URL    route_url;
     public String route_color;
+    public int route_sort_order;
     public String route_text_color;
     public URL route_branding_url;
     public String feed_id;
@@ -60,7 +61,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         // Editor-specific fields publicly_visible, wheelchair_accessible, route_sort_order, and status.
         setIntParameter(statement, oneBasedIndex++, 0);
         setIntParameter(statement, oneBasedIndex++, 0);
-        setIntParameter(statement, oneBasedIndex++, INT_MISSING);
+        // route_sort_order
+        setIntParameter(statement, oneBasedIndex++, route_sort_order);
         setIntParameter(statement, oneBasedIndex++, 0);
     }
 
@@ -97,6 +99,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_long_name = getStringField("route_long_name", false);
             r.route_desc = getStringField("route_desc", false);
             r.route_type = getIntField("route_type", true, 0, 7);
+            r.route_sort_order = getIntField("route_type", false, 0, Integer.MAX_VALUE);
             r.route_url = getUrlField("route_url", false);
             r.route_color = getStringField("route_color", false);
             r.route_text_color = getStringField("route_text_color", false);
@@ -125,6 +128,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             writeStringField("route_color");
             writeStringField("route_text_color");
             writeStringField("route_branding_url");
+            writeStringField("route_sort_order");
             endRecord();
         }
 
@@ -140,6 +144,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             writeStringField(r.route_color);
             writeStringField(r.route_text_color);
             writeUrlField(r.route_branding_url);
+            writeIntField(r.route_sort_order);
             endRecord();
         }
 
