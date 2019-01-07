@@ -258,9 +258,12 @@ public interface EntityPopulator<T> {
     static double getDoubleIfPresent (ResultSet resultSet, String columnName,
                                              TObjectIntMap<String> columnForName) throws SQLException {
         int columnIndex = columnForName.get(columnName);
-        // FIXME: if SQL value is null, resultSet.getInt will return 0. Should return value equal 0 if column is missing?
         if (columnIndex == 0) return Entity.DOUBLE_MISSING;
-        else return resultSet.getDouble(columnIndex);
+        double doubleValue = resultSet.getDouble(columnIndex);
+        // If SQL value for column was null, resultSet.getDouble will return 0.0. If this is the case, override value with
+        // DOUBLE_MISSING.
+        if (resultSet.wasNull()) return Entity.DOUBLE_MISSING;
+        else return doubleValue;
     }
 
     static int getIntIfPresent (ResultSet resultSet, String columnName,
