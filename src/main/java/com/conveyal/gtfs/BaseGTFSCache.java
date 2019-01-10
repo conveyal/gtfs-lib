@@ -76,6 +76,8 @@ public abstract class BaseGTFSCache<T> {
             // delete local .zip file ONLY if using s3
             if (bucket != null) {
                 String id = removalNotification.getKey();
+                // close db to avoid memory leak and mapdb corruption
+                removalNotification.getValue().close();
                 String[] extensions = {".zip"}; // used to include ".db", ".db.p" as well.  See #119
                 // delete local cache files (including zip) when feed removed from cache
                 for (String type : extensions) {

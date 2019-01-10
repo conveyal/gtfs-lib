@@ -842,7 +842,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     protected void finalize() throws IOException {
-        close();
+        if (!db.isClosed()) LOG.error("MapDB database was not closed before it was garbage collected. This is a bug!");
     }
 
     public void close () {
@@ -873,14 +873,14 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .transactionDisable()
                 .mmapFileEnable()
                 .asyncWriteEnable()
-                .deleteFilesAfterClose()
                 .compressionEnable()
-                .make()); // TODO db.close();
+                .closeOnJvmShutdown()
+                .make());
     }
 
     /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
     public GTFSFeed (String dbFile) throws IOException, ExecutionException {
-        this(constructDB(dbFile)); // TODO db.close();
+        this(constructDB(dbFile));
     }
 
     // One critical point when constructing the MapDB is the instance cache type and size.
@@ -902,6 +902,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                     .mmapFileEnable()
                     .asyncWriteEnable()
                     .compressionEnable()
+                    .closeOnJvmShutdown()
                     .make();
             return db;
         } catch (ExecutionError | IOError | Exception e) {
