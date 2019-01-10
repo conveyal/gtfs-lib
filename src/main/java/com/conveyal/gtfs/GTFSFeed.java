@@ -873,6 +873,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .transactionDisable()
                 .mmapFileEnable()
                 .asyncWriteEnable()
+                .deleteFilesAfterClose()
                 .compressionEnable()
                 .closeOnJvmShutdown()
                 .make());
