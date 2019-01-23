@@ -3,7 +3,7 @@
     "feed" : {
       "feed_version" : "1.0",
       "patterns" : [ {
-        "direction_id" : null,
+        "direction_id" : 0,
         "id" : 1,
         "name" : "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (2 trips)",
         "pattern_id" : "1",
@@ -102,7 +102,7 @@
         }, {
           "trip_id" : "frequency-trip"
         } ],
-        "use_frequency" : null
+        "use_frequency" : 0
       } ]
     }
   }

@@ -43,6 +43,7 @@ public class Pattern extends Entity {
     public LineString geometry;
     public String name;
     public String route_id;
+    public int direction_id = INT_MISSING;
     public static Joiner joiner = Joiner.on("-").skipNulls();
     public String feed_id;
 
@@ -78,6 +79,7 @@ public class Pattern extends Entity {
         // Patterns have one and only one route.
         // FIXME are we certain we're only passing in trips on one route? or are we losing information here?
         this.route_id = exemplarTrip.route_id;
+        this.direction_id = exemplarTrip.direction_id;
 
         // A name is assigned to this pattern based on the headsign, short name, direction ID or stop IDs.
         // This is not at all guaranteed to be unique, it's just to help identify the pattern.
@@ -112,9 +114,10 @@ public class Pattern extends Entity {
         statement.setString(oneBasedIndex++, route_id);
         statement.setString(oneBasedIndex++, name);
         // Editor-specific fields
-        setIntParameter(statement, oneBasedIndex++, 0);
-        setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, direction_id);
+        // FIXME: use_frequency should be based on whether the trip is associated with frequency entries.
+        setIntParameter(statement, oneBasedIndex++, 0); // use_frequency
         // FIXME: Shape set might be null?
-        statement.setString(7, associatedShapes.iterator().next());
+        statement.setString(oneBasedIndex++, associatedShapes.iterator().next());
     }
 }

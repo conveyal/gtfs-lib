@@ -77,7 +77,8 @@ public class PatternFinderValidator extends TripValidator {
         Connection connection = null;
         try {
             // TODO this assumes gtfs-lib is using an SQL database and not a MapDB.
-            // Maybe we should just create patterns in a separate step, but that would mean iterating over the stop_times twice.
+            //   Maybe we should just create patterns in a separate step, but that would mean iterating over the
+            //   stop_times twice.
             LOG.info("Creating pattern and pattern stops tables.");
             connection = feed.getConnection();
             Statement statement = connection.createStatement();
@@ -86,20 +87,18 @@ public class PatternFinderValidator extends TripValidator {
             String patternStopsTableName = feed.tablePrefix + "pattern_stops";
             statement.execute(String.format("alter table %s add column pattern_id varchar", tripsTableName));
             // FIXME: Here we're creating a pattern table that has an integer ID field (similar to the other GTFS tables)
-            // AND a varchar pattern_id with essentially the same value cast to a string. Perhaps the pattern ID should
-            // be a UUID or something, just to better distinguish it from the int ID?
-            statement.execute(String.format("create table %s (id serial, pattern_id varchar, " +
-                    "route_id varchar, name varchar, shape_id varchar)", patternsTableName));
-            // FIXME: Use patterns table?
-//            Table patternsTable = new Table(patternsTableName, Pattern.class, Requirement.EDITOR, Table.PATTERNS.fields);
+            //   AND a varchar pattern_id with essentially the same value cast to a string. Perhaps the pattern ID should
+            //   be a UUID or something, just to better distinguish it from the int ID?
+            Table patternsTable = new Table(patternsTableName, Pattern.class, Requirement.EDITOR, Table.PATTERNS.fields);
             Table patternStopsTable = new Table(patternStopsTableName, PatternStop.class, Requirement.EDITOR,
                     Table.PATTERN_STOP.fields);
-            String insertPatternStopSql = patternStopsTable.generateInsertSql(true);
-            // Create pattern stops table with serial ID
+            // Create pattern and pattern stops table, each with serial ID fields.
+            patternsTable.createSqlTable(connection, null, true);
             patternStopsTable.createSqlTable(connection, null, true);
-            PreparedStatement insertPatternStatement = connection.prepareStatement(
-                    String.format("insert into %s values (DEFAULT, ?, ?, ?, ?)", patternsTableName)
-            );
+            // Generate prepared statements for inserts.
+            String insertPatternSql = patternsTable.generateInsertSql(true);
+            String insertPatternStopSql = patternStopsTable.generateInsertSql(true);
+            PreparedStatement insertPatternStatement = connection.prepareStatement(insertPatternSql);
             BatchTracker patternTracker = new BatchTracker("pattern", insertPatternStatement);
             PreparedStatement insertPatternStopStatement = connection.prepareStatement(insertPatternStopSql);
             BatchTracker patternStopTracker = new BatchTracker("pattern stop", insertPatternStopStatement);
@@ -119,18 +118,11 @@ public class PatternFinderValidator extends TripValidator {
                 statement.execute(createTempSql);
                 patternForTripsFileStream = new PrintStream(new BufferedOutputStream(new FileOutputStream(tempPatternForTripsTextFile)));
             }
-            // TODO update to use batch trackers
             for (Map.Entry<TripPatternKey, Pattern> entry : patterns.entrySet()) {
                 Pattern pattern = entry.getValue();
-//                LOG.info("Batching pattern {}", pattern.pattern_id);
+                LOG.debug("Batching pattern {}", pattern.pattern_id);
                 TripPatternKey key = entry.getKey();
-                // First, create a pattern relation.
-                insertPatternStatement.setString(1, pattern.pattern_id);
-                insertPatternStatement.setString(2, pattern.route_id);
-                insertPatternStatement.setString(3, pattern.name);
-                // FIXME: This could be null...
-                String shapeId = pattern.associatedShapes.iterator().next();
-                insertPatternStatement.setString(4, shapeId);
+                pattern.setStatementParameters(insertPatternStatement, true);
                 patternTracker.addBatch();
                 // Construct pattern stops based on values in trip pattern key.
                 // FIXME: Use pattern stops table here?
