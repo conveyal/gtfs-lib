@@ -115,8 +115,9 @@ public class Pattern extends Entity {
         statement.setString(oneBasedIndex++, name);
         // Editor-specific fields
         setIntParameter(statement, oneBasedIndex++, direction_id);
-        // FIXME: use_frequency should be based on whether the trip is associated with frequency entries.
-        setIntParameter(statement, oneBasedIndex++, 0); // use_frequency
+        // Note: pattern#use_frequency is set in JdbcGtfsSnapshotter here:
+        // https://github.com/conveyal/gtfs-lib/blob/0c6aca98a83d534853b74011e6cc7bf376592581/src/main/java/com/conveyal/gtfs/loader/JdbcGtfsSnapshotter.java#L196-L211
+        setIntParameter(statement, oneBasedIndex++, INT_MISSING); // use_frequency
         // FIXME: Shape set might be null?
         statement.setString(oneBasedIndex++, associatedShapes.iterator().next());
     }
