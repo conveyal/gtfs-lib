@@ -102,7 +102,7 @@
         }, {
           "trip_id" : "frequency-trip"
         } ],
-        "use_frequency" : 0
+        "use_frequency" : null
       } ]
     }
   }
