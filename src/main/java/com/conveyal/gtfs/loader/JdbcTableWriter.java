@@ -186,7 +186,7 @@ public class JdbcTableWriter implements TableWriter {
                             referencedPatternUsesFrequencies = selectResults.getBoolean(1);
                         }
                     }
-                    updateChildTable(
+                    String keyValue = updateChildTable(
                         childEntitiesArray,
                         entityId,
                         referencedPatternUsesFrequencies,
@@ -194,6 +194,10 @@ public class JdbcTableWriter implements TableWriter {
                         referencingTable,
                         connection
                     );
+                    // Ensure JSON return object is updated with referencing table's (potentially) new key value.
+                    // Currently, the only case where an update occurs is when a referenced shape is referenced by other
+                    // patterns.
+                    jsonObject.put(referencingTable.getKeyFieldName(), keyValue);
                 }
             }
             // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
@@ -441,7 +445,7 @@ public class JdbcTableWriter implements TableWriter {
      * have a hierarchical relationship.
      * FIXME develop a better way to update tables with foreign keys to the table being updated.
      */
-    private void updateChildTable(
+    private String updateChildTable(
         ArrayNode subEntities,
         int id,
         boolean referencedPatternUsesFrequencies,
@@ -612,6 +616,9 @@ public class JdbcTableWriter implements TableWriter {
         } else {
             LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
         }
+        // Return key value in the case that it was updated (the only case for this would be if the shape was referenced
+        // by multiple patterns).
+        return keyValue;
     }
 
     /**

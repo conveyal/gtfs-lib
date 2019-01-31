@@ -12,6 +12,9 @@ public class PatternStopDTO {
     public Integer stop_sequence;
     public Integer timepoint;
 
+    /** Empty constructor for deserialization */
+    public PatternStopDTO() {}
+
     public PatternStopDTO (String patternId, String stopId, int stopSequence) {
         pattern_id = patternId;
         stop_id = stopId;

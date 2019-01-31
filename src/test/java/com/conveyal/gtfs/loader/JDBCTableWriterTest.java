@@ -30,7 +30,10 @@ import java.sql.SQLException;
 import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
@@ -48,6 +51,11 @@ public class JDBCTableWriterTest {
     private static String simpleServiceId = "1";
     private static String firstStopId = "1";
     private static String lastStopId = "2";
+    private static double firstStopLat = 34.2222;
+    private static double firstStopLon = -87.333;
+    private static double lastStopLat = 34.2233;
+    private static double lastStopLon = -87.334;
+    private static String sharedShapeId = "shared_shape_id";
     private static final ObjectMapper mapper = new ObjectMapper();
 
     private static JdbcTableWriter createTestTableWriter (Table table) throws InvalidNamespaceException {
@@ -73,8 +81,8 @@ public class JDBCTableWriterTest {
         testNamespace = result.uniqueIdentifier;
         // Create a service calendar and two stops, both of which are necessary to perform pattern and trip tests.
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
-        createSimpleStop(firstStopId, "First Stop", 34.2222, -87.333);
-        createSimpleStop(lastStopId, "Last Stop", 34.2233, -87.334);
+        createSimpleStop(firstStopId, "First Stop", firstStopLat, firstStopLon);
+        createSimpleStop(lastStopId, "Last Stop", lastStopLat, lastStopLon);
     }
 
     @Test
@@ -341,7 +349,14 @@ public class JDBCTableWriterTest {
     /**
      * Creates a pattern by first creating a route and then a pattern for that route.
      */
-    private static PatternDTO createSimpleRouteAndPattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
+    private static PatternDTO createRouteAndSimplePattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
+        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[]{}, new PatternStopDTO[]{}, 0);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndPattern(String routeId, String patternId, String name, String shapeId, ShapePointDTO[] shapes, PatternStopDTO[] patternStops, int useFrequency) throws InvalidNamespaceException, SQLException, IOException {
         // Create new route
         createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
         // Create new pattern for route
@@ -349,9 +364,10 @@ public class JDBCTableWriterTest {
         input.pattern_id = patternId;
         input.route_id = routeId;
         input.name = name;
-        input.use_frequency = 0;
-        input.shapes = new ShapePointDTO[]{};
-        input.pattern_stops = new PatternStopDTO[]{};
+        input.use_frequency = useFrequency;
+        input.shape_id = shapeId;
+        input.shapes = shapes;
+        input.pattern_stops = patternStops;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
@@ -366,10 +382,46 @@ public class JDBCTableWriterTest {
      */
     @Test(expected = IllegalStateException.class)
     public void cannotCreateFrequencyForTimetablePattern() throws InvalidNamespaceException, IOException, SQLException {
-        PatternDTO simplePattern = createSimpleRouteAndPattern("900", "8", "The Loop");
+        PatternDTO simplePattern = createRouteAndSimplePattern("900", "8", "The Loop");
         TripDTO tripInput = constructFrequencyTrip(simplePattern.pattern_id, simplePattern.route_id, 6 * 60 * 60);
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+    }
+
+    /**
+     * When multiple patterns reference a single shape_id, the returned JSON from an update to any of these patterns
+     * (whether the shape points were updated or not) should have a new shape_id because of the "copy on update" logic
+     * that ensures the shared shape is not modified.
+     */
+    @Test
+    public void shouldChangeShapeIdOnPatternUpdate() throws IOException, SQLException, InvalidNamespaceException {
+        String patternId = "10";
+        ShapePointDTO[] shapes = new ShapePointDTO[]{
+            new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
+            new ShapePointDTO(2, 150.0, sharedShapeId, lastStopLat, lastStopLon, 1)
+        };
+        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, firstStopId, 0),
+            new PatternStopDTO(patternId, lastStopId, 1)
+        };
+        PatternDTO simplePattern = createRouteAndPattern("1001", patternId, "The Line", sharedShapeId, shapes, patternStops, 0);
+        assertThat(simplePattern.shape_id, equalTo(sharedShapeId));
+        // Create pattern with shared shape. Note: typically we would encounter shared shapes on imported feeds (e.g.,
+        // BART), but this should simulate the situation well enough.
+        String secondPatternId = "11";
+        patternStops[0].pattern_id = secondPatternId;
+        patternStops[1].pattern_id = secondPatternId;
+        PatternDTO patternWithSharedShape = createRouteAndPattern("1002", secondPatternId, "The Line 2", sharedShapeId, shapes, patternStops, 0);
+        // Verify that shape_id is shared.
+        assertThat(patternWithSharedShape.shape_id, equalTo(sharedShapeId));
+        // Update any field on one of the patterns.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        patternWithSharedShape.name = "The shape_id should update";
+        String sharedPatternOutput = patternUpdater.update(patternWithSharedShape.id, mapper.writeValueAsString(patternWithSharedShape), true);
+        // The output should contain a new backend-generated shape_id.
+        PatternDTO updatedSharedPattern = mapper.readValue(sharedPatternOutput, PatternDTO.class);
+        LOG.info("Updated pattern output: {}", sharedPatternOutput);
+        assertThat(updatedSharedPattern.shape_id, not(equalTo(sharedShapeId)));
     }
 
     /**
@@ -381,7 +433,7 @@ public class JDBCTableWriterTest {
         // Store Table and Class values for use in test.
         final Table tripsTable = Table.TRIPS;
         int startTime = 6 * 60 * 60;
-        PatternDTO simplePattern = createSimpleRouteAndPattern("1000", "9", "The Line");
+        PatternDTO simplePattern = createRouteAndSimplePattern("1000", "9", "The Line");
         TripDTO tripInput = constructFrequencyTrip(simplePattern.pattern_id, simplePattern.route_id, startTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
         // Update pattern with pattern stops, set to use frequencies, and TODO shape points
