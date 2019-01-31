@@ -34,7 +34,7 @@ public class FeedFetcher implements DataFetcher {
         try {
             connection = GTFSGraphQL.getConnection();
             Statement statement = connection.createStatement();
-            LOG.info("SQL: {}", sqlBuilder.toString());
+            LOG.debug("SQL: {}", sqlBuilder.toString());
             if (statement.execute(sqlBuilder.toString())) {
                 ResultSet resultSet = statement.getResultSet();
                 ResultSetMetaData meta = resultSet.getMetaData();
