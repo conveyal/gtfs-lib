@@ -421,7 +421,15 @@ public class JDBCTableWriterTest {
         // The output should contain a new backend-generated shape_id.
         PatternDTO updatedSharedPattern = mapper.readValue(sharedPatternOutput, PatternDTO.class);
         LOG.info("Updated pattern output: {}", sharedPatternOutput);
-        assertThat(updatedSharedPattern.shape_id, not(equalTo(sharedShapeId)));
+        String newShapeId = updatedSharedPattern.shape_id;
+        assertThat(newShapeId, not(equalTo(sharedShapeId)));
+        // Ensure that pattern record in database reflects updated shape ID.
+        assertThatSqlQueryYieldsRowCount(String.format(
+            "select * from %s.%s where shape_id='%s'",
+            testNamespace,
+            Table.PATTERNS.name,
+            newShapeId
+        ), 1);
     }
 
     /**
