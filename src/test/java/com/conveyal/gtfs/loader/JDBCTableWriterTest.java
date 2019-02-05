@@ -425,10 +425,11 @@ public class JDBCTableWriterTest {
         assertThat(newShapeId, not(equalTo(sharedShapeId)));
         // Ensure that pattern record in database reflects updated shape ID.
         assertThatSqlQueryYieldsRowCount(String.format(
-            "select * from %s.%s where shape_id='%s'",
+            "select * from %s.%s where shape_id='%s' and pattern_id='%s'",
             testNamespace,
             Table.PATTERNS.name,
-            newShapeId
+            newShapeId,
+            secondPatternId
         ), 1);
     }
 
