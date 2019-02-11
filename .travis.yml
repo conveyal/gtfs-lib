@@ -68,3 +68,9 @@ after_success:
   # run codecov after semantic-release because maven-semantic-release creates extra commits that
   # codecov will need a report on to reference in future PRs to the release branch
   - bash <(curl -s https://codecov.io/bash)
+  # run codecov two more times if on master to upload coverage reports for the commits made by maven-semantic-release
+  - |
+    if [[ "$TRAVIS_BRANCH" = "master" ]]; then
+      bash <(curl -s https://codecov.io/bash) -C "$(git rev-parse @)"
+      bash <(curl -s https://codecov.io/bash) -C "$(git rev-parse @~)"
+    fi
