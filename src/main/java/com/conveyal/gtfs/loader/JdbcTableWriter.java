@@ -186,7 +186,7 @@ public class JdbcTableWriter implements TableWriter {
                             referencedPatternUsesFrequencies = selectResults.getBoolean(1);
                         }
                     }
-                    updateChildTable(
+                    String keyValue = updateChildTable(
                         childEntitiesArray,
                         entityId,
                         referencedPatternUsesFrequencies,
@@ -194,6 +194,10 @@ public class JdbcTableWriter implements TableWriter {
                         referencingTable,
                         connection
                     );
+                    // Ensure JSON return object is updated with referencing table's (potentially) new key value.
+                    // Currently, the only case where an update occurs is when a referenced shape is referenced by other
+                    // patterns.
+                    jsonObject.put(referencingTable.getKeyFieldName(), keyValue);
                 }
             }
             // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
@@ -441,7 +445,7 @@ public class JdbcTableWriter implements TableWriter {
      * have a hierarchical relationship.
      * FIXME develop a better way to update tables with foreign keys to the table being updated.
      */
-    private void updateChildTable(
+    private String updateChildTable(
         ArrayNode subEntities,
         int id,
         boolean referencedPatternUsesFrequencies,
@@ -449,13 +453,11 @@ public class JdbcTableWriter implements TableWriter {
         Table subTable,
         Connection connection
     ) throws SQLException, IOException {
-        // Get parent table's key field
-        Field keyField;
-        String keyValue;
-        // Primary key fields are always referenced by foreign key fields with the same name.
-        keyField = specTable.getFieldForName(subTable.getKeyFieldName());
+        // Get parent table's key field. Primary key fields are always referenced by foreign key fields with the same
+        // name.
+        Field keyField = specTable.getFieldForName(subTable.getKeyFieldName());
         // Get parent entity's key value
-        keyValue = getValueForId(id, keyField.name, tablePrefix, specTable, connection);
+        String keyValue = getValueForId(id, keyField.name, tablePrefix, specTable, connection);
         String childTableName = String.join(".", tablePrefix, subTable.name);
         if (!referencedPatternUsesFrequencies && subTable.name.equals(Table.FREQUENCIES.name) && subEntities.size() > 0) {
             // Do not permit the illegal state where frequency entries are being added/modified for a timetable pattern.
@@ -479,17 +481,44 @@ public class JdbcTableWriter implements TableWriter {
             reconcilePatternStops(keyValue, newPatternStops, connection);
         }
         if (!isCreatingNewEntity) {
-            // Delete existing sub-entities for given entity ID if the parent entity is not being newly created.
-            String deleteSql = getUpdateReferencesSql(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
-            LOG.info(deleteSql);
-            Statement statement = connection.createStatement();
-            // FIXME: Use copy on update for a pattern's shape instead of deleting the previous shape and replacing it.
-            //   This would better account for GTFS data loaded from a file where multiple patterns reference a single
-            //   shape.
-            int result = statement.executeUpdate(deleteSql);
-            LOG.info("Deleted {} {}", result, subTable.name);
-            // FIXME: are there cases when an update should not return zero?
-//            if (result == 0) throw new SQLException("No stop times found for trip ID");
+            // If not creating a new entity, we will delete the child entities (e.g., shape points or pattern stops) and
+            // regenerate them anew to avoid any messiness that we may encounter with update statements.
+            if (Table.SHAPES.name.equals(subTable.name)) {
+                // Check how many patterns are referencing the same shape_id to determine if we should copy on update.
+                String patternsForShapeIdSql = String.format("select id from %s.patterns where shape_id = ?", tablePrefix);
+                PreparedStatement statement = connection.prepareStatement(patternsForShapeIdSql);
+                statement.setString(1, keyValue);
+                LOG.info(statement.toString());
+                ResultSet resultSet = statement.executeQuery();
+                int patternsForShapeId = 0;
+                while (resultSet.next()) {
+                    patternsForShapeId++;
+                }
+                if (patternsForShapeId > 1) {
+                    // Use copy on update for pattern shape if a single shape is being used for multiple patterns because
+                    // we do not want edits for a given pattern (for example, a short run) to impact the shape for another
+                    // pattern (perhaps a long run that extends farther). Note: this behavior will have the side effect of
+                    // creating potentially redundant shape information, but this is better than accidentally butchering the
+                    // shapes for other patterns.
+                    LOG.info("More than one pattern references shape_id: {}", keyValue);
+                    keyValue = UUID.randomUUID().toString();
+                    LOG.info("Creating new shape_id ({}) for pattern id={}.", keyValue, id);
+                    // Update pattern#shape_id with new value. Note: shape_point#shape_id values are coerced to new
+                    // value further down in this function.
+                    String updatePatternShapeIdSql = String.format("update %s.patterns set shape_id = ? where id = ?", tablePrefix);
+                    PreparedStatement updateStatement = connection.prepareStatement(updatePatternShapeIdSql);
+                    updateStatement.setString(1, keyValue);
+                    updateStatement.setInt(2, id);
+                    LOG.info(updateStatement.toString());
+                    updateStatement.executeUpdate();
+                } else {
+                    // If only one pattern references this shape, delete the existing shape points to start anew.
+                    deleteChildEntities(subTable, keyField, keyValue);
+                }
+            } else {
+                // If not handling shape points, delete the child entities and create them anew.
+                deleteChildEntities(subTable, keyField, keyValue);
+            }
         }
         int entityCount = 0;
         PreparedStatement insertStatement = null;
@@ -587,6 +616,25 @@ public class JdbcTableWriter implements TableWriter {
         } else {
             LOG.info("No inserts to execute. Empty array found in JSON for child table {}", childTableName);
         }
+        // Return key value in the case that it was updated (the only case for this would be if the shape was referenced
+        // by multiple patterns).
+        return keyValue;
+    }
+
+    /**
+     * Delete existing sub-entities for given key value for when an update to the parent entity is made (i.e., the parent
+     * entity is not being newly created). Examples of sub-entities include stop times for trips, pattern stops for a
+     * pattern, or shape points (for a pattern in our model).
+     */
+    private void deleteChildEntities(Table childTable, Field keyField, String keyValue) throws SQLException {
+        String childTableName = String.join(".", tablePrefix, childTable.name);
+        String deleteSql = getUpdateReferencesSql(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
+        LOG.info(deleteSql);
+        Statement deleteStatement = connection.createStatement();
+        int result = deleteStatement.executeUpdate(deleteSql);
+        LOG.info("Deleted {} {}", result, childTable.name);
+        // FIXME: are there cases when an update should not return zero?
+        //   if (result == 0) throw new SQLException("No stop times found for trip ID");
     }
 
     /**

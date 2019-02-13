@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.util;
+package com.conveyal.gtfs.dto;
 
 public class StopTimeDTO {
     public String trip_id;

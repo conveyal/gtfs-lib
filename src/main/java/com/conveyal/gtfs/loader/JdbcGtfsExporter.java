@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
@@ -325,7 +326,8 @@ public class JdbcGtfsExporter {
         zip_properties.put("create", "false");
 
         // Specify the path to the ZIP File that you want to read as a File System
-        URI zip_disk = URI.create("jar:file://" + outFile);
+        // (File#toURI allows this to work across different operating systems, including Windows)
+        URI zip_disk = URI.create("jar:" + new File(outFile).toURI());
 
         // Create ZIP file System
         try (FileSystem fileSystem = FileSystems.newFileSystem(zip_disk, zip_properties)) {

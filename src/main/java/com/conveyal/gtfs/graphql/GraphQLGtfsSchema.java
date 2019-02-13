@@ -263,7 +263,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("route_url"))
             .field(MapFetcher.field("route_branding_url"))
             // TODO route_type as enum or int
-            .field(MapFetcher.field("route_type"))
+            .field(MapFetcher.field("route_type", GraphQLInt))
             .field(MapFetcher.field("route_color"))
             .field(MapFetcher.field("route_text_color"))
             // FIXME ˇˇ Editor fields that should perhaps be moved elsewhere.

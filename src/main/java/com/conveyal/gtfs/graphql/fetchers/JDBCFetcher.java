@@ -341,7 +341,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             }
             // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
 //            LOG.info("table name={}", tableName);
-            LOG.info("SQL: {}", preparedStatement.toString());
+            LOG.debug("SQL: {}", preparedStatement.toString());
             if (preparedStatement.execute()) {
                 ResultSet resultSet = preparedStatement.getResultSet();
                 ResultSetMetaData meta = resultSet.getMetaData();
@@ -363,7 +363,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         } finally {
             DbUtils.closeQuietly(connection);
         }
-        LOG.info("Result size: {}", results.size());
+        LOG.debug("Result size: {}", results.size());
         // Return a List of Maps, one Map for each row in the result.
         return results;
     }
