@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.util;
+package com.conveyal.gtfs.dto;
 
 public class PatternStopDTO {
     public Integer id;
@@ -11,6 +11,9 @@ public class PatternStopDTO {
     public Integer pickup_type;
     public Integer stop_sequence;
     public Integer timepoint;
+
+    /** Empty constructor for deserialization */
+    public PatternStopDTO() {}
 
     public PatternStopDTO (String patternId, String stopId, int stopSequence) {
         pattern_id = patternId;
