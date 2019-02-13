@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.util;
+package com.conveyal.gtfs.dto;
 
 // TODO add fields
 public class ShapePointDTO {

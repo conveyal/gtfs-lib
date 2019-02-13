@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.util;
+package com.conveyal.gtfs.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
