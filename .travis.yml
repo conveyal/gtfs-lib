@@ -21,7 +21,7 @@ before_install: |
 
 # Install semantic-release
 before_script:
-  - yarn global add @conveyal/maven-semantic-release semantic-release
+  - yarn global add @conveyal/maven-semantic-release semantic-release@15
 
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
@@ -55,8 +55,8 @@ sudo: false
 # The Conveyal subdirectory is deleted in the script above to prevent retaining Conveyal snapshot artifacts across builds.
 cache:
   directories:
-    - "$HOME/.m2/repository"
-    - "$HOME/.yarn-cache"
+    - "$HOME/.m2"
+    - "$HOME/.cache/yarn"
 
 # Notify us of the build status on the Slack channel     
 notifications:
