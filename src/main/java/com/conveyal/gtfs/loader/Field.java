@@ -22,12 +22,12 @@ import java.sql.SQLType;
 public abstract class Field {
 
     public final String name;
-    final Requirement requirement;
+    public final Requirement requirement;
     /**
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
      * integrity when loading a feed.
      * */
-    Table referenceTable = null;
+    public Table referenceTable = null;
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
 
