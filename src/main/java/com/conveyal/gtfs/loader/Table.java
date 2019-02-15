@@ -71,6 +71,7 @@ public class Table {
     private boolean usePrimaryKey = false;
     /** Indicates whether the table has unique key field. */
     private boolean hasUniqueKeyField = true;
+    private boolean compoundKey;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -242,7 +243,8 @@ public class Table {
             new StringField("transfer_type", REQUIRED),
             new StringField("min_transfer_time", OPTIONAL))
             .addPrimaryKey()
-            .keyFieldIsNotUnique();
+            .keyFieldIsNotUnique()
+            .hasCompoundKey();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
@@ -322,10 +324,16 @@ public class Table {
     }
 
     /**
-     * Fluent method to de-set the
+     * Fluent method to de-set the hasUniqueKeyField flag for tables which the first field should not be considered a
+     * primary key.
      */
     public Table keyFieldIsNotUnique() {
         this.hasUniqueKeyField = false;
+        return this;
+    }
+
+    private Table hasCompoundKey() {
+        this.compoundKey = true;
         return this;
     }
 
@@ -647,13 +655,14 @@ public class Table {
     }
 
     /**
-     * Returns field name that defines order for grouped entities. WARNING: this MUST be called on a spec table (i.e.,
-     * one of the constant tables defined in this class). Otherwise, it could return null even if the table has an order
-     * field defined.
+     * Returns field name that defines order for grouped entities or that defines the compound key field (e.g.,
+     * transfers#to_stop_id). WARNING: this field must be in the 1st position (base zero) of the fields array; hence,
+     * this MUST be called on a spec table (i.e., one of the constant tables defined in this class). Otherwise, it could
+     * return null even if the table has an order field defined.
      */
     public String getOrderFieldName () {
         String name = fields[1].name;
-        if (name.contains("_sequence")) return name;
+        if (name.contains("_sequence") || compoundKey) return name;
         else return null;
     }
 
@@ -692,6 +701,14 @@ public class Table {
 
     public boolean isRequired () {
         return required == REQUIRED;
+    }
+
+    /**
+     * Checks whether the table is part of the GTFS specification, i.e., it is not an internal table used for the editor
+     * (e.g., Patterns or PatternStops).
+     */
+    public boolean isSpecTable() {
+        return required == REQUIRED || required == OPTIONAL;
     }
 
     /**
@@ -884,9 +901,15 @@ public class Table {
         // Store field-scoped transit ID for referential integrity check. (Note, entity scoping doesn't work here because
         // we need to cross-check multiple entity types for valid references, e.g., stop times and trips both share trip
         // id.)
-        // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
-        // duplicates. If it has an order field, that order field should supersede the key field as the "unique" field.
-        String uniqueKeyField = !hasUniqueKeyField ? null : orderField != null ? orderField : keyField;
+        // If table has an order field, that order field should supersede the key field as the "unique" field. In other
+        // words, if it has an order field, the unique key is actually compound -- made up of the keyField + orderField.
+        String uniqueKeyField = orderField != null
+            ? orderField
+            // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
+            // duplicates.
+            : !hasUniqueKeyField
+                ? null
+                : keyField;
         String transitId = String.join(":", keyField, keyValue);
 
         // If the field is optional and there is no value present, skip check.
@@ -909,40 +932,41 @@ public class Table {
                 if (isOrderField) referentialIntegrityError.setSequence(value);
                 errors.add(referentialIntegrityError);
             }
-        } else {
-            // Handle duplicate ID check.
-            // Note: There is no need to check for duplicate IDs if the field is a foreign reference.
-            // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
-            // whether an order field is part of the "unique ID."
-            Set<String> listOfUniqueIds = referenceTracker.transitIds;
-            String uniqueId = transitId;
+        }
+        // Next, handle duplicate ID check.
+        // In most cases there is no need to check for duplicate IDs if the field is a foreign reference. However,
+        // transfers#to_stop_id is defined as an order field, so we need to check that this field (which is both a
+        // foreign ref and order field) is dataset unique in conjunction with the key field.
+        // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
+        // whether an order field is part of the "unique ID."
+        Set<String> listOfUniqueIds = referenceTracker.transitIds;
+        String uniqueId = transitId;
 
-            // Next, check that the ID is table-unique. For example, the trip_id field is table unique in trips.txt and
-            // the the stop_sequence field (joined with trip_id) is table unique in stop_times.txt.
-            if (field.name.equals(uniqueKeyField)) {
-                // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
-                if (isOrderField) {
-                    // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
-                    // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
-                    listOfUniqueIds = referenceTracker.transitIdsWithSequence;
-                    uniqueId = String.join(":", field.name, keyValue, value);
-                }
-                // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
-                boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
-                if (valueAlreadyExists) {
-                    // If the value is a duplicate, add an error.
-                    NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
-                                                                .setEntityId(keyValue);
-                    if (isOrderField) duplicateIdError.setSequence(value);
-                    errors.add(duplicateIdError);
-                }
-            } else if (field.name.equals(keyField)) {
-                // We arrive here if the field is not a foreign reference and not the unique key field on the table (e.g.,
-                // shape_pt_sequence), but is still a key on the table. For example, this is where we add shape_id from
-                // the shapes table, so that when we check the referential integrity of trips#shape_id, we know that the
-                // shape_id exists in the shapes table. It also handles tracking calendar_dates#service_id values.
-                referenceTracker.transitIds.add(uniqueId);
+        // Next, check that the ID is table-unique. For example, the trip_id field is table unique in trips.txt and
+        // the the stop_sequence field (joined with trip_id) is table unique in stop_times.txt.
+        if (field.name.equals(uniqueKeyField)) {
+            // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
+            if (isOrderField) {
+                // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
+                // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
+                listOfUniqueIds = referenceTracker.transitIdsWithSequence;
+                uniqueId = String.join(":", field.name, keyValue, value);
             }
+            // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
+            boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
+            if (valueAlreadyExists) {
+                // If the value is a duplicate, add an error.
+                NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
+                                                            .setEntityId(keyValue);
+                if (isOrderField) duplicateIdError.setSequence(value);
+                errors.add(duplicateIdError);
+            }
+        } else if (field.name.equals(keyField)) {
+            // We arrive here if the field is not a foreign reference and not the unique key field on the table (e.g.,
+            // shape_pt_sequence), but is still a key on the table. For example, this is where we add shape_id from
+            // the shapes table, so that when we check the referential integrity of trips#shape_id, we know that the
+            // shape_id exists in the shapes table. It also handles tracking calendar_dates#service_id values.
+            referenceTracker.transitIds.add(uniqueId);
         }
         return errors;
     }
