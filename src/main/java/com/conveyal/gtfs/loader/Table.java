@@ -71,6 +71,10 @@ public class Table {
     private boolean usePrimaryKey = false;
     /** Indicates whether the table has unique key field. */
     private boolean hasUniqueKeyField = true;
+    /**
+     * Indicates whether the table has a compound key that must be used in conjunction with the key field to determine
+     * table uniqueness(e.g., transfers#to_stop_id).
+     * */
     private boolean compoundKey;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
@@ -332,6 +336,7 @@ public class Table {
         return this;
     }
 
+    /** Fluent method to set whether the table has a compound key, e.g., transfers#to_stop_id. */
     private Table hasCompoundKey() {
         this.compoundKey = true;
         return this;
