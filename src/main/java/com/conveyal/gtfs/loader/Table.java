@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -36,8 +37,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
 import static com.conveyal.gtfs.loader.Requirement.OPTIONAL;
@@ -688,13 +691,11 @@ public class Table {
 
 
     /**
-     * Finds the index of the field given a string name.
+     * Finds the index of the field for this table given a string name.
      * @return the index of the field or -1 if no match is found
      */
     public int getFieldIndex (String name) {
-        // Linear search, assuming a small number of fields per table.
-        for (int i = 0; i < fields.length; i++) if (fields[i].name.equals(name)) return i;
-        return -1;
+        return Field.getFieldIndex(fields, name);
     }
 
     /**
@@ -893,13 +894,25 @@ public class Table {
         return parentTable;
     }
 
+    /**
+     * During table load, checks the uniqueness of the entity ID and that references are valid. NOTE: This method
+     * defaults the key field and order field names to this table's values.
+     * @param keyValue          key value for the record being checked
+     * @param lineNumber        line number of the record being checked
+     * @param field             field currently being checked
+     * @param value             value that corresponds to field
+     * @param referenceTracker  reference tracker in which to store references
+     * @return                  any duplicate or bad reference errors.
+     */
     public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, ReferenceTracker referenceTracker) {
         return checkReferencesAndUniqueness(keyValue, lineNumber, field, value, referenceTracker, getKeyFieldName(), getOrderFieldName());
     }
 
     /**
      * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
-     * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error.
+     * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error. NOTE:
+     * this instance of checkReferencesAndUniqueness allows for arbitrarily setting the keyField and orderField, which
+     * is helpful for checking uniqueness of fields that are not the standard primary key (e.g., route_short_name).
      */
     public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, ReferenceTracker referenceTracker, String keyField, String orderField) {
         Set<NewGTFSError> errors = new HashSet<>();
@@ -974,5 +987,35 @@ public class Table {
             referenceTracker.transitIds.add(uniqueId);
         }
         return errors;
+    }
+
+    /**
+     * For an array of field headers, returns the matching set of {@link Field}s for a {@link Table}. If errorStorage is
+     * not null, errors related to unexpected or duplicate header names will be stored.
+     */
+    public Field[] getFieldsFromFieldHeaders(String[] headers, SQLErrorStorage errorStorage) {
+        Field[] fields = new Field[headers.length];
+        Set<String> fieldsSeen = new HashSet<>();
+        for (int h = 0; h < headers.length; h++) {
+            String header = sanitize(headers[h], errorStorage);
+            if (fieldsSeen.contains(header) || "id".equals(header)) {
+                // FIXME: add separate error for tables containing ID field.
+                if (errorStorage != null) errorStorage.storeError(NewGTFSError.forTable(this, DUPLICATE_HEADER).setBadValue(header));
+                fields[h] = null;
+            } else {
+                fields[h] = getFieldForName(header);
+                fieldsSeen.add(header);
+            }
+        }
+        return fields;
+    }
+
+    /**
+     * Returns the index of the key field within the array of fields provided for a given table.
+     * @param fields array of fields (intended to be derived from the headers of a csv text file)
+     */
+    public int getKeyFieldIndex(Field[] fields) {
+        String keyField = getKeyFieldName();
+        return Field.getFieldIndex(fields, keyField);
     }
 }

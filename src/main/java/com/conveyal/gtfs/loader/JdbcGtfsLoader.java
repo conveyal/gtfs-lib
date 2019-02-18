@@ -360,8 +360,8 @@ public class JdbcGtfsLoader {
         // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
-        Field[] fields = getFieldsFromFieldHeaders(csvReader.getHeaders(), table, errorStorage);
-        int keyFieldIndex = getKeyFieldIndex(table, fields);
+        Field[] fields = table.getFieldsFromFieldHeaders(csvReader.getHeaders(), errorStorage);
+        int keyFieldIndex = table.getKeyFieldIndex(fields);
         // Create separate fields array with filtered list that does not include null values (for duplicate headers or
         // ID field). This is solely used to construct the table and array of values to load.
         Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
@@ -474,53 +474,6 @@ public class JdbcGtfsLoader {
         connection.commit();
         LOG.info("Done.");
         return numberOfRecordsLoaded;
-    }
-
-    /**
-     * Returns the index of the specified field name for the array of fields provided.
-     * @param fields array of fields (intended to be derived from the headers of a csv text file)
-     * @param fieldName string name of the field to find
-     */
-    public static int getFieldIndex(Field[] fields, String fieldName) {
-        int fieldIndex = -1;
-        if (fieldName == null) return fieldIndex;
-        for (int i = 0; i < fields.length; i++) {
-            if (fieldName.equals(fields[i].name)) {
-                fieldIndex = i;
-            }
-        }
-        return fieldIndex;
-    }
-
-    /**
-     * Returns the index of the key field within the array of fields provided for a given table.
-     * @param table table from which to derive the key field
-     * @param fields array of fields (intended to be derived from the headers of a csv text file)
-     */
-    public static int getKeyFieldIndex(Table table, Field[] fields) {
-        String keyField = table.getKeyFieldName();
-        return getFieldIndex(fields, keyField);
-    }
-
-    /**
-     * For an array of field headers, returns the matching set of {@link Field}s for a {@link Table}. If errorStorage is
-     * not null, errors related to unexpected or duplicate header names will be stored.
-     */
-    public static Field[] getFieldsFromFieldHeaders(String[] headers, Table table, SQLErrorStorage errorStorage) {
-        Field[] fields = new Field[headers.length];
-        Set<String> fieldsSeen = new HashSet<>();
-        for (int h = 0; h < headers.length; h++) {
-            String header = sanitize(headers[h], errorStorage);
-            if (fieldsSeen.contains(header) || "id".equals(header)) {
-                // FIXME: add separate error for tables containing ID field.
-                if (errorStorage != null) errorStorage.storeError(NewGTFSError.forTable(table, DUPLICATE_HEADER).setBadValue(header));
-                fields[h] = null;
-            } else {
-                fields[h] = table.getFieldForName(header);
-                fieldsSeen.add(header);
-            }
-        }
-        return fields;
     }
 
     /**

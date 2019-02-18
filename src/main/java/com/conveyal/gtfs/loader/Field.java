@@ -51,6 +51,16 @@ public abstract class Field {
         preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
     }
 
+    /**
+     * Finds the index of the field given a string name.
+     * @return the index of the field or -1 if no match is found
+     */
+    public static int getFieldIndex (Field[] fields, String name) {
+        // Linear search, assuming a small number of fields per table.
+        for (int i = 0; i < fields.length; i++) if (fields[i].name.equals(name)) return i;
+        return -1;
+    }
+
     public abstract SQLType getSqlType ();
 
     // Overridden to create exception for "double precision", since its enum value is just called DOUBLE, and ARRAY types,
