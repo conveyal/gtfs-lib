@@ -209,7 +209,7 @@ public class JdbcGtfsLoader {
         // FIXME is this extra CSV reader used anymore? Check comment below.
         // First, inspect feed_info.txt to extract the ID and version.
         // We could get this with SQL after loading, but feed_info, feed_id and feed_version are all optional.
-        CsvReader csvReader = getCsvReader(Table.FEED_INFO);
+        CsvReader csvReader = Table.FEED_INFO.getCsvReader(zip, errorStorage);
         String feedId = "", feedVersion = "";
         if (csvReader != null) {
             // feed_info.txt has been found and opened.
@@ -253,51 +253,6 @@ public class JdbcGtfsLoader {
             LOG.error("Exception while registering new feed namespace in feeds table", ex);
             DbUtils.closeQuietly(connection);
         }
-    }
-
-    /**
-     * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
-     * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
-     * It records an error if the entry is in a subdirectory (as long as errorStorage is not null).
-     * It then creates a CSV reader for that table if it's found.
-     *
-     * This method is static so that it can be reused outside of JdbcGtfsLoader for getting CSV readers for zip files
-     * outside of the load procedure.
-     */
-    public static CsvReader getCsvReader(ZipFile zipFile, Table table, SQLErrorStorage sqlErrorStorage) {
-        final String tableFileName = table.name + ".txt";
-        ZipEntry entry = zipFile.getEntry(tableFileName);
-        if (entry == null) {
-            // Table was not found, check if it is in a subdirectory.
-            Enumeration<? extends ZipEntry> entries = zipFile.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry e = entries.nextElement();
-                if (e.getName().endsWith(tableFileName)) {
-                    entry = e;
-                    if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(table, TABLE_IN_SUBDIRECTORY));
-                    break;
-                }
-            }
-        }
-        if (entry == null) return null;
-        try {
-            InputStream zipInputStream = zipFile.getInputStream(entry);
-            // Skip any byte order mark that may be present. Files must be UTF-8,
-            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
-            InputStream bomInputStream = new BOMInputStream(zipInputStream);
-            CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
-            csvReader.readHeaders();
-            return csvReader;
-        } catch (IOException e) {
-            LOG.error("Exception while opening zip entry: {}", e);
-            e.printStackTrace();
-            return null;
-        }
-    }
-
-    /** Wrapper method that passes in this loader instance's zip file and error storage. */
-    private CsvReader getCsvReader (Table table) {
-        return getCsvReader(zip, table, errorStorage);
     }
 
     /**
@@ -346,7 +301,7 @@ public class JdbcGtfsLoader {
      * @return number of rows that were loaded.
      */
     private int loadInternal (Table table) throws Exception {
-        CsvReader csvReader = getCsvReader(table);
+        CsvReader csvReader = table.getCsvReader(zip, errorStorage);
         if (csvReader == null) {
             LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
             // This GTFS table could not be opened in the zip, even in a subdirectory.
