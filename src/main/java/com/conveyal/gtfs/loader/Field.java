@@ -22,12 +22,12 @@ import java.sql.SQLType;
 public abstract class Field {
 
     public final String name;
-    final Requirement requirement;
+    public final Requirement requirement;
     /**
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
      * integrity when loading a feed.
      * */
-    Table referenceTable = null;
+    public Table referenceTable = null;
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
 
@@ -49,6 +49,16 @@ public abstract class Field {
 
     public void setNull(PreparedStatement preparedStatement, int oneBasedIndex) throws SQLException {
         preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
+    }
+
+    /**
+     * Finds the index of the field given a string name.
+     * @return the index of the field or -1 if no match is found
+     */
+    public static int getFieldIndex (Field[] fields, String name) {
+        // Linear search, assuming a small number of fields per table.
+        for (int i = 0; i < fields.length; i++) if (fields[i].name.equals(name)) return i;
+        return -1;
     }
 
     public abstract SQLType getSqlType ();
