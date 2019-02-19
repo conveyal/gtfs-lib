@@ -10,6 +10,7 @@ public enum NewGTFSErrorType {
     TIME_FORMAT(Priority.MEDIUM, "Time format should be HH:MM:SS."),
     URL_FORMAT(Priority.MEDIUM, "URL format should be <scheme>://<authority><path>?<query>#<fragment>"),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),
+    ILLEGAL_FIELD_VALUE(Priority.MEDIUM, "Fields may not contain tabs, carriage returns or new lines."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     FLOATING_FORMAT(Priority.MEDIUM, "Incorrect floating point number format."),
     COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),

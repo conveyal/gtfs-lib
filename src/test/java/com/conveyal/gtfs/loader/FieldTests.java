@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.storage.StorageException;
@@ -30,23 +31,21 @@ public class FieldTests {
                 "23000527", // Very distant future year
                 "790722" // Two digit year
         };
-
+        DateField dateField = new DateField("date", Requirement.REQUIRED);
         for (String badDate : badDates) {
-            try {
-                new DateField("date", Requirement.REQUIRED).validateAndConvert(badDate);
-                assertThat("Parsing bad dates should throw an exception and never reach this point.", false);
-            } catch (StorageException ex) {
-                assertThat("Error type should be date-related.",
-                        ex.errorType == NewGTFSErrorType.DATE_FORMAT || ex.errorType == NewGTFSErrorType.DATE_RANGE);
-                assertThat("Error's bad value should be the input value (the bad date).", ex.badValue.equals(badDate));
-            }
+            ValidateFieldResult<String> result = dateField.validateAndConvert(badDate);
+            assertThat("Parsing bad dates should result in an error.", result.errors.size() > 0);
+            NewGTFSError error = result.errors.iterator().next();
+            assertThat("Error type should be date-related.",
+                       error.errorType == NewGTFSErrorType.DATE_FORMAT || error.errorType == NewGTFSErrorType.DATE_RANGE);
+            assertThat("Error's bad value should be the input value (the bad date).", error.badValue.equals(badDate));
         }
 
         String[] goodDates = { "20160522", "20180717", "20221212", "20190505" };
 
         for (String goodDate : goodDates) {
-            String convertedValue = new DateField("date", Requirement.REQUIRED).validateAndConvert(goodDate);
-            assertThat("Returned value matches the well-formed date.", convertedValue.equals(goodDate));
+            ValidateFieldResult<String> result = dateField.validateAndConvert(goodDate);
+            assertThat("Returned value matches the well-formed date.", result.clean.equals(goodDate));
         }
 
     }

@@ -618,8 +618,8 @@ public class GTFSTest {
                 for (ValuePair valuePair : valuePairs) {
                     assertThat(
                         String.format("The value expected for %s was not found", field),
-                        valuePair.expected,
-                        equalTo(valuePair.found)
+                        valuePair.found,
+                        equalTo(valuePair.expected)
                     );
                 }
             }

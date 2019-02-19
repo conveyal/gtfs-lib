@@ -525,8 +525,22 @@ public class JdbcGtfsLoader {
                 // or the errors should not be signaled with exceptions.
                 // Also, we should probably not be converting any GTFS field values.
                 // We should be saving it as-is in the database and converting upon load into our model objects.
-                if (postgresText) transformedStrings[fieldIndex + 1] = field.validateAndConvert(string);
-                else field.setParameter(insertStatement, fieldIndex + 2, string);
+                Set<NewGTFSError> errors;
+                if (postgresText) {
+                    ValidateFieldResult<String> result = field.validateAndConvert(string);
+                    if (result.clean == null) setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+                    else transformedStrings[fieldIndex + 1] = result.clean;
+                    errors = result.errors;
+                    if (result.errors.size() > 0) errorStorage.storeErrors(result.errors);
+                }
+                else {
+                    errors = field.setParameter(insertStatement, fieldIndex + 2, string);
+                }
+                for (NewGTFSError error : errors) {
+                    error.entityType = table.getEntityClass();
+                    error.lineNumber = lineNumber;
+                    if (errorStorage != null) errorStorage.storeError(error);
+                }
             } catch (StorageException ex) {
                 // FIXME many exceptions don't have an error type
                 if (errorStorage != null) {
