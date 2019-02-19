@@ -32,10 +32,10 @@ public abstract class Field {
      *
      * TODO: Add other illegal character sequences (e.g., HTML tags, comments or escape sequences).
      */
-    private static final Set<IllegalCharacter> ILLEGAL_CHARACTERS = ImmutableSet.of(
+    public static final Set<IllegalCharacter> ILLEGAL_CHARACTERS = ImmutableSet.of(
         // Backslashes, newlines, and tabs have special meaning to Postgres. Also, new lines, tabs, and carriage returns are
         // prohibited by GTFS.
-        new IllegalCharacter("\\", "\\\\", "Double slash"),
+        new IllegalCharacter("\\", "\\\\", "Unescaped backslash"),
         new IllegalCharacter("\t", " ", "Tab"),
         new IllegalCharacter("\n", " ", "New line"),
         new IllegalCharacter("\r", " ", "Carriage return")

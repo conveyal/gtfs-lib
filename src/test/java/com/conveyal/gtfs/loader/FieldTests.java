@@ -1,14 +1,10 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
-import com.conveyal.gtfs.stats.FeedStats;
-import com.conveyal.gtfs.storage.StorageException;
 import org.junit.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
 
 /**
  * Unit tests to verify functionality of classes that load fields from GTFS tables.
@@ -48,5 +44,37 @@ public class FieldTests {
             assertThat("Returned value matches the well-formed date.", result.clean.equals(goodDate));
         }
 
+    }
+
+    /**
+     * Make sure {@link Field#cleanString(ValidateFieldResult)} catches and removes illegal character sequences.
+     */
+    @Test
+    public void illegalCharacterParseTest() {
+        String[] badStrings = {
+            "\n", // simple new line
+            "\t", // simple tab
+            "\t\n\r", // new line, tab, carriage return
+            "Hello\\world",  // backslashes not permitted (replaced with escaped slash)
+            "Downtown via Peachtree\n\nSt" // new line and carriage within string
+        };
+        StringField stringField = new StringField("any", Requirement.REQUIRED);
+        for (String badString : badStrings) {
+            ValidateFieldResult<String> result = stringField.validateAndConvert(badString);
+            assertThat("Input with illegal characters should result in an error.", result.errors.size() > 0);
+            NewGTFSError error = result.errors.iterator().next();
+            assertThat("Error type should be illegal field value.",
+                       error.errorType == NewGTFSErrorType.ILLEGAL_FIELD_VALUE);
+            for (IllegalCharacter illegalCharacter : Field.ILLEGAL_CHARACTERS) {
+                // Check that string is clean. Note: for backslash, we check that the clean string contains an escaped
+                // backslash because checking for a single backslash will yield true even for after a successful
+                // substitution.
+                boolean stringIsClean = !result.clean.contains(illegalCharacter.illegalSequence);
+                if (illegalCharacter.illegalSequence.equals("\\") && !stringIsClean) {
+                    stringIsClean = result.clean.contains(illegalCharacter.replacement);
+                }
+                assertThat(String.format("The cleaned string '%s' should not contain illegal character (%s).", result.clean, illegalCharacter.illegalSequence), stringIsClean);
+            }
+        }
     }
 }

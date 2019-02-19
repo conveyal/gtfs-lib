@@ -18,7 +18,7 @@ public class StringField extends Field {
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public ValidateFieldResult validateAndConvert (String string) {
+    public ValidateFieldResult<String> validateAndConvert (String string) {
         return cleanString(string);
     }
 
