@@ -86,7 +86,7 @@ public class JdbcGtfsLoader {
     private SQLErrorStorage errorStorage;
 
     // Contains references to unique entity IDs during load stage used for referential integrity check.
-    private ReferenceTracker referenceTracker;
+    private ReferenceTracker referenceTracker = new ReferenceTracker();
 
     public JdbcGtfsLoader(String gtfsFilePath, DataSource dataSource) {
         this.gtfsFilePath = gtfsFilePath;
@@ -130,9 +130,9 @@ public class JdbcGtfsLoader {
             result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
             
-            //The order of the following four lines should not be changed because the schema needs to be in place
-            //before the error storage can be constructed, which in turn needs to exist in case any errors are
-            //encountered during the loading process.
+            // The order of the following four lines should not be changed because the schema needs to be in place
+            // before the error storage can be constructed, which in turn needs to exist in case any errors are
+            // encountered during the loading process.
             {
                 createSchema(connection, tablePrefix);
                 //the SQLErrorStorage constructor expects the tablePrefix to contain the dot separator.
@@ -143,7 +143,6 @@ public class JdbcGtfsLoader {
                 // This allows everything to work even when there's no prefix.
                 this.tablePrefix += ".";
             }
-            this.referenceTracker = new ReferenceTracker(errorStorage);
             // Load each table in turn, saving some summary information about what happened during each table load
             result.agency = load(Table.AGENCY);
             result.calendar = load(Table.CALENDAR);
@@ -210,7 +209,7 @@ public class JdbcGtfsLoader {
         // FIXME is this extra CSV reader used anymore? Check comment below.
         // First, inspect feed_info.txt to extract the ID and version.
         // We could get this with SQL after loading, but feed_info, feed_id and feed_version are all optional.
-        CsvReader csvReader = getCsvReader(Table.FEED_INFO);
+        CsvReader csvReader = Table.FEED_INFO.getCsvReader(zip, errorStorage);
         String feedId = "", feedVersion = "";
         if (csvReader != null) {
             // feed_info.txt has been found and opened.
@@ -253,43 +252,6 @@ public class JdbcGtfsLoader {
         } catch (Exception ex) {
             LOG.error("Exception while registering new feed namespace in feeds table", ex);
             DbUtils.closeQuietly(connection);
-        }
-    }
-
-    /**
-     * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
-     * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
-     * It records an error if the entry is in a subdirectory.
-     * It then creates a CSV reader for that table if it's found.
-     */
-    private CsvReader getCsvReader (Table table) {
-        final String tableFileName = table.name + ".txt";
-        ZipEntry entry = zip.getEntry(tableFileName);
-        if (entry == null) {
-            // Table was not found, check if it is in a subdirectory.
-            Enumeration<? extends ZipEntry> entries = zip.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry e = entries.nextElement();
-                if (e.getName().endsWith(tableFileName)) {
-                    entry = e;
-                    errorStorage.storeError(NewGTFSError.forTable(table, TABLE_IN_SUBDIRECTORY));
-                    break;
-                }
-            }
-        }
-        if (entry == null) return null;
-        try {
-            InputStream zipInputStream = zip.getInputStream(entry);
-            // Skip any byte order mark that may be present. Files must be UTF-8,
-            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
-            InputStream bomInputStream = new BOMInputStream(zipInputStream);
-            CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
-            csvReader.readHeaders();
-            return csvReader;
-        } catch (IOException e) {
-            LOG.error("Exception while opening zip entry: {}", e);
-            e.printStackTrace();
-            return null;
         }
     }
 
@@ -339,7 +301,7 @@ public class JdbcGtfsLoader {
      * @return number of rows that were loaded.
      */
     private int loadInternal (Table table) throws Exception {
-        CsvReader csvReader = getCsvReader(table);
+        CsvReader csvReader = table.getCsvReader(zip, errorStorage);
         if (csvReader == null) {
             LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
             // This GTFS table could not be opened in the zip, even in a subdirectory.
@@ -353,25 +315,8 @@ public class JdbcGtfsLoader {
         // TODO Strip out line returns, tabs in field contents.
         // By default the CSV reader trims leading and trailing whitespace in fields.
         // Build up a list of fields in the same order they appear in this GTFS CSV file.
-        int headerCount = csvReader.getHeaderCount();
-        Field[] fields = new Field[headerCount];
-        Set<String> fieldsSeen = new HashSet<>();
-        String keyField = table.getKeyFieldName();
-        int keyFieldIndex = -1;
-        for (int h = 0; h < headerCount; h++) {
-            String header = sanitize(csvReader.getHeader(h));
-            if (fieldsSeen.contains(header) || "id".equals(header)) {
-                // FIXME: add separate error for tables containing ID field.
-                errorStorage.storeError(NewGTFSError.forTable(table, DUPLICATE_HEADER).setBadValue(header));
-                fields[h] = null;
-            } else {
-                fields[h] = table.getFieldForName(header);
-                fieldsSeen.add(header);
-                if (keyField.equals(header)) {
-                    keyFieldIndex = h;
-                }
-            }
-        }
+        Field[] fields = table.getFieldsFromFieldHeaders(csvReader.getHeaders(), errorStorage);
+        int keyFieldIndex = table.getKeyFieldIndex(fields);
         // Create separate fields array with filtered list that does not include null values (for duplicate headers or
         // ID field). This is solely used to construct the table and array of values to load.
         Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
@@ -439,7 +384,8 @@ public class JdbcGtfsLoader {
                 // CSV reader get on an empty field will be an empty string literal.
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
-                table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
+                Set<NewGTFSError> errors = table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
+                errorStorage.storeErrors(errors);
                 // Add value for entry into table
                 setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
                 // Increment column index.
@@ -576,24 +522,12 @@ public class JdbcGtfsLoader {
      *
      * TODO add a test including SQL injection text (quote and semicolon)
      */
-    public String sanitize (String string) throws SQLException {
+    public static String sanitize (String string, SQLErrorStorage errorStorage) {
         String clean = string.replaceAll("[^\\p{Alnum}_]", "");
         if (!clean.equals(string)) {
             LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);
-            if (errorStorage != null) {
-                errorStorage.storeError(NewGTFSError.forFeed(COLUMN_NAME_UNSAFE, string));
-            }
+            if (errorStorage != null) errorStorage.storeError(NewGTFSError.forFeed(COLUMN_NAME_UNSAFE, string));
         }
         return clean;
-    }
-
-    public class ReferenceTracker {
-        public final Set<String> transitIds = new HashSet<>();
-        public final Set<String> transitIdsWithSequence = new HashSet<>();
-        public final SQLErrorStorage errorStorage;
-
-        public ReferenceTracker(SQLErrorStorage errorStorage) {
-            this.errorStorage = errorStorage;
-        }
     }
 }
