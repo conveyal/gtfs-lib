@@ -520,22 +520,22 @@ public class JdbcGtfsLoader {
             // rather than setObject with a type code. I think some databases don't have setObject though.
             // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
             try {
-                // FIXME we need to set the transformed string element even when an error occurs.
-                // This means the validation and insertion step need to happen separately.
-                // or the errors should not be signaled with exceptions.
-                // Also, we should probably not be converting any GTFS field values.
-                // We should be saving it as-is in the database and converting upon load into our model objects.
+                // Here, we set the transformed string element even when an error occurs.
+                // Ideally, no errors should be signaled with exceptions, but this happens in a try/catch in case
+                // something goes wrong (we don't necessarily want to abort loading the feed altogether).
+                // FIXME Also, we should probably not be converting any GTFS field values, but some of them are coerced
+                //  to null if they are unparseable (e.g., DateField).
+                //  We should be saving it as-is in the database and converting upon load into our model objects.
                 Set<NewGTFSError> errors;
                 if (postgresText) {
                     ValidateFieldResult<String> result = field.validateAndConvert(string);
+                    // If the result is null, use the null-setting method.
                     if (result.clean == null) setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+                    // Otherwise, set the cleaned field according to its index.
                     else transformedStrings[fieldIndex + 1] = result.clean;
                     errors = result.errors;
-                    if (result.errors.size() > 0) errorStorage.storeErrors(result.errors);
-                }
-                else {
-                    errors = field.setParameter(insertStatement, fieldIndex + 2, string);
-                }
+                } else errors = field.setParameter(insertStatement, fieldIndex + 2, string);
+                // Store any errors encountered after field value has been set.
                 for (NewGTFSError error : errors) {
                     error.entityType = table.getEntityClass();
                     error.lineNumber = lineNumber;

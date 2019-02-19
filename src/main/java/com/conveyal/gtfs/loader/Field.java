@@ -2,12 +2,11 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
-import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLType;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -33,13 +32,13 @@ public abstract class Field {
      *
      * TODO: Add other illegal character sequences (e.g., HTML tags, comments or escape sequences).
      */
-    private static final Map<String, String> ILLEGAL_CHAR_REPLACEMENTS = ImmutableMap.of(
+    private static final Set<IllegalCharacter> ILLEGAL_CHARACTERS = ImmutableSet.of(
         // Backslashes, newlines, and tabs have special meaning to Postgres. Also, new lines, tabs, and carriage returns are
         // prohibited by GTFS.
-        "\\", "\\\\",
-        "\t", " ",
-        "\n", " ",
-        "\r", " "
+        new IllegalCharacter("\\", "\\\\", "Double slash"),
+        new IllegalCharacter("\t", " ", "Tab"),
+        new IllegalCharacter("\n", " ", "New line"),
+        new IllegalCharacter("\r", " ", "Carriage return")
     );
 
     final Requirement requirement;
@@ -85,30 +84,20 @@ public abstract class Field {
 
     // TODO test for input with tabs, newlines, carriage returns, and slashes in it.
     protected static ValidateFieldResult<String> cleanString (String string) {
-        // Initially set string result.
-        ValidateFieldResult<String> result = new ValidateFieldResult<>(string);
-        // Check for illegal character sequences and replace them as needed.
-        for (String illegalChar: ILLEGAL_CHAR_REPLACEMENTS.keySet()) {
-            // String.contains is significantly faster than using a regex or replace, and has barely any speed impact.
-            if (string.contains(illegalChar)) {
-                result.clean = string.replace(illegalChar, ILLEGAL_CHAR_REPLACEMENTS.get(illegalChar));
-                // We don't know the Table or line number here, but when the errors bubble up, these values should be
-                // assigned to the errors.
-                result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.ILLEGAL_FIELD_VALUE, illegalChar));
-            }
-        }
-        return result;
+        return cleanString(new ValidateFieldResult<>(string));
     }
 
     protected static ValidateFieldResult<String> cleanString (ValidateFieldResult<String> previousResult) {
         ValidateFieldResult<String> result = ValidateFieldResult.from(previousResult);
-        for (String illegalChar: ILLEGAL_CHAR_REPLACEMENTS.keySet()) {
+        // Check for illegal character sequences and replace them as needed.
+        for (IllegalCharacter illegalChar: ILLEGAL_CHARACTERS) {
             // String.contains is significantly faster than using a regex or replace, and has barely any speed impact.
-            if (previousResult.clean.contains(illegalChar)) {
-                result.clean = previousResult.clean.replace(illegalChar, ILLEGAL_CHAR_REPLACEMENTS.get(illegalChar));
+            if (previousResult.clean.contains(illegalChar.illegalSequence)) {
+                // Use the result string value to ensure that each iteration is cleaned up properly.
+                result.clean = result.clean.replace(illegalChar.illegalSequence, illegalChar.replacement);
                 // We don't know the Table or line number here, but when the errors bubble up, these values should be
                 // assigned to the errors.
-                result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.ILLEGAL_FIELD_VALUE, illegalChar));
+                result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.ILLEGAL_FIELD_VALUE, illegalChar.description));
             }
         }
         return result;
