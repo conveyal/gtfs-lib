@@ -385,7 +385,17 @@ public class JdbcGtfsLoader {
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
                 Set<NewGTFSError> errors = table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
-                errorStorage.storeErrors(errors);
+                if (
+                    table.name.equals("calendar_dates") &&
+                    "1".equals(csvReader.get(Field.getFieldIndex(fields, "exception_type")))
+                ){
+                    // Do not record bad reference errors for calendar date entries that add service
+                    // (exception type=1) because a corresponding service_id in calendars.txt is not required in
+                    // this case.
+                    LOG.info("Skipping bad reference for calendar_date adding service (service_id={}).", keyValue);
+                }
+                // In all other cases (outside of the calendar_dates special case), store the reference errors found.
+                else errorStorage.storeErrors(errors);
                 // Add value for entry into table
                 setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
                 // Increment column index.
