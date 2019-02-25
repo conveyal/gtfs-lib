@@ -2,6 +2,8 @@
 
 A library for loading and saving GTFS feeds of arbitrary size with disk-backed storage.
 
+analysis-backend uses this maintenance branch as a dependency, via R5. We may eventually merge this branch into dev, and update the dependencies of analysis-backend. We have avoided this update so far because of the estimated upgrade/migration effort related to different mapDB versions.
+
 Based on observations over several years of experience using the OneBusAway GTFS library (which is used by OpenTripPlanner), Conveyal created this new GTFS library to meet our current needs.
 
 The main design goals are:
