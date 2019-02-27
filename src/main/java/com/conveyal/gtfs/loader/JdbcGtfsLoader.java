@@ -175,19 +175,18 @@ public class JdbcGtfsLoader {
     }
     
     /**
-     * Creates a schema/namespace in the database.
+     * Creates a schema/namespace in the database WITHOUT committing the changes.
      * This does *not* setup any other tables or enter the schema name in a registry (@see #registerFeed).
      * 
      * @param connection Connection to the database to create the schema on.
      * @param schemaName Name of the schema (i.e. table prefix). Should not include the dot suffix.
      */
-    private static void createSchema (Connection connection, String schemaName) {    
+    static void createSchema (Connection connection, String schemaName) {
         try {
             Statement statement = connection.createStatement();
             // FIXME do the following only on databases that support schemas.
             // SQLite does not support them. Is there any advantage of schemas over flat tables?
             statement.execute("create schema " + schemaName);
-            connection.commit();
             LOG.info("Created new feed schema: {}", statement);
         } catch (Exception ex) {
             LOG.error("Exception while registering new feed namespace in feeds table: {}", ex.getMessage());
@@ -230,15 +229,12 @@ public class JdbcGtfsLoader {
             String md5Hex = md5.toString();
             HashCode sha1 = Files.hash(gtfsFile, Hashing.sha1());
             String shaHex = sha1.toString();
-            Statement statement = connection.createStatement();
+            createFeedRegistryIfNotExists(connection);
             // TODO try to get the feed_id and feed_version out of the feed_info table
             // statement.execute("select * from feed_info");
 
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
-            statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                    "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                    "snapshot_of varchar)");
             PreparedStatement insertStatement = connection.prepareStatement(
                     "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null)");
             insertStatement.setString(1, tablePrefix);
@@ -254,6 +250,17 @@ public class JdbcGtfsLoader {
             LOG.error("Exception while registering new feed namespace in feeds table", ex);
             DbUtils.closeQuietly(connection);
         }
+    }
+
+    /**
+     * Creates the feed registry table if it does not already exist. This must occur before the first attempt to load a
+     * GTFS feed or create an empty snapshot. Note: the connection MUST be committed after this method call.
+     */
+    static void createFeedRegistryIfNotExists(Connection connection) throws SQLException {
+        Statement statement = connection.createStatement();
+        statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
+                              "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
+                              "snapshot_of varchar)");
     }
 
     /**
