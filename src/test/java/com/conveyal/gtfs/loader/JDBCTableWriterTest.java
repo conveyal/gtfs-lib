@@ -6,7 +6,6 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
-import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
 import com.conveyal.gtfs.dto.RouteDTO;
@@ -14,6 +13,7 @@ import com.conveyal.gtfs.dto.ShapePointDTO;
 import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -31,9 +31,7 @@ import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 /**
  * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
@@ -83,6 +81,11 @@ public class JDBCTableWriterTest {
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
         createSimpleStop(firstStopId, "First Stop", firstStopLat, firstStopLon);
         createSimpleStop(lastStopId, "Last Stop", lastStopLat, lastStopLon);
+    }
+
+    @AfterClass
+    public static void tearDownClass() {
+        TestUtils.dropDB(testDBName);
     }
 
     @Test
@@ -261,18 +264,6 @@ public class JDBCTableWriterTest {
         ));
     }
 
-    void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
-        assertThatSqlQueryYieldsRowCount(sql, 0);
-    }
-
-    private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
-        LOG.info(sql);
-        int recordCount = 0;
-        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        while (rs.next()) recordCount++;
-        assertThat("Records matching query should equal expected count.", recordCount, equalTo(expectedRowCount));
-    }
-
     @Test
     public void canCreateUpdateAndDeleteRoutes() throws IOException, SQLException, InvalidNamespaceException {
         // Store Table and Class values for use in test.
@@ -324,57 +315,6 @@ public class JDBCTableWriterTest {
                 routeTable.name,
                 createdRoute.id
         ));
-    }
-
-    /**
-     * Create and store a simple route for testing.
-     */
-    private static RouteDTO createSimpleTestRoute(String routeId, String agencyId, String shortName, String longName, int routeType) throws InvalidNamespaceException, IOException, SQLException {
-        RouteDTO input = new RouteDTO();
-        input.route_id = routeId;
-        input.agency_id = agencyId;
-        // Empty value should be permitted for transfers and transfer_duration
-        input.route_short_name = shortName;
-        input.route_long_name = longName;
-        input.route_type = routeType;
-        // convert object to json and save it
-        JdbcTableWriter createTableWriter = createTestTableWriter(Table.ROUTES);
-        String output = createTableWriter.create(mapper.writeValueAsString(input), true);
-        LOG.info("create {} output:", Table.ROUTES.name);
-        LOG.info(output);
-        // parse output
-        return mapper.readValue(output, RouteDTO.class);
-    }
-
-    /**
-     * Creates a pattern by first creating a route and then a pattern for that route.
-     */
-    private static PatternDTO createRouteAndSimplePattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
-        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[]{}, new PatternStopDTO[]{}, 0);
-    }
-
-    /**
-     * Creates a pattern by first creating a route and then a pattern for that route.
-     */
-    private static PatternDTO createRouteAndPattern(String routeId, String patternId, String name, String shapeId, ShapePointDTO[] shapes, PatternStopDTO[] patternStops, int useFrequency) throws InvalidNamespaceException, SQLException, IOException {
-        // Create new route
-        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
-        // Create new pattern for route
-        PatternDTO input = new PatternDTO();
-        input.pattern_id = patternId;
-        input.route_id = routeId;
-        input.name = name;
-        input.use_frequency = useFrequency;
-        input.shape_id = shapeId;
-        input.shapes = shapes;
-        input.pattern_stops = patternStops;
-        // Write the pattern to the database
-        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
-        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
-        LOG.info("create {} output:", Table.PATTERNS.name);
-        LOG.info(output);
-        // Parse output
-        return mapper.readValue(output, PatternDTO.class);
     }
 
     /**
@@ -485,6 +425,32 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * This test makes sure that updated the service_id will properly update affected referenced entities properly.
+     * This test case was initially developed to prove that https://github.com/conveyal/gtfs-lib/issues/203 is
+     * happening.
+     */
+    @Test
+    public void canUpdateServiceId() {
+        // load GTFS file into editor
+    }
+
+    /*****************************************************************************************************************
+     * End tests, begin helpers
+     ****************************************************************************************************************/
+
+    private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
+        LOG.info(sql);
+        int recordCount = 0;
+        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
+        while (rs.next()) recordCount++;
+        assertThat("Records matching query should equal expected count.", recordCount, equalTo(expectedRowCount));
+    }
+
+    void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
+        assertThatSqlQueryYieldsRowCount(sql, 0);
+    }
+
+    /**
      * Construct (without writing to the database) a trip with a frequency entry.
      */
     private TripDTO constructFrequencyTrip(String patternId, String routeId, int startTime) {
@@ -505,6 +471,37 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndPattern(String routeId, String patternId, String name, String shapeId, ShapePointDTO[] shapes, PatternStopDTO[] patternStops, int useFrequency) throws InvalidNamespaceException, SQLException, IOException {
+        // Create new route
+        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
+        // Create new pattern for route
+        PatternDTO input = new PatternDTO();
+        input.pattern_id = patternId;
+        input.route_id = routeId;
+        input.name = name;
+        input.use_frequency = useFrequency;
+        input.shape_id = shapeId;
+        input.shapes = shapes;
+        input.pattern_stops = patternStops;
+        // Write the pattern to the database
+        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
+        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.PATTERNS.name);
+        LOG.info(output);
+        // Parse output
+        return mapper.readValue(output, PatternDTO.class);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndSimplePattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
+        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[]{}, new PatternStopDTO[]{}, 0);
+    }
+
+    /**
      * Create and store a simple stop entity.
      */
     private static StopDTO createSimpleStop(String stopId, String stopName, double latitude, double longitude) throws InvalidNamespaceException, IOException, SQLException {
@@ -518,6 +515,26 @@ public class JDBCTableWriterTest {
         LOG.info("create {} output:", Table.STOPS.name);
         LOG.info(output);
         return mapper.readValue(output, StopDTO.class);
+    }
+
+    /**
+     * Create and store a simple route for testing.
+     */
+    private static RouteDTO createSimpleTestRoute(String routeId, String agencyId, String shortName, String longName, int routeType) throws InvalidNamespaceException, IOException, SQLException {
+        RouteDTO input = new RouteDTO();
+        input.route_id = routeId;
+        input.agency_id = agencyId;
+        // Empty value should be permitted for transfers and transfer_duration
+        input.route_short_name = shortName;
+        input.route_long_name = longName;
+        input.route_type = routeType;
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.ROUTES);
+        String output = createTableWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.ROUTES.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, RouteDTO.class);
     }
 
     /**
@@ -540,10 +557,5 @@ public class JDBCTableWriterTest {
         LOG.info("create {} output:", Table.CALENDAR.name);
         LOG.info(output);
         return mapper.readValue(output, CalendarDTO.class);
-    }
-
-    @AfterClass
-    public static void tearDownClass() {
-        TestUtils.dropDB(testDBName);
     }
 }
