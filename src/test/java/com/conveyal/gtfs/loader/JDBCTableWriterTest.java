@@ -28,7 +28,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
+import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
+import static com.conveyal.gtfs.GTFS.validate;
+import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
@@ -46,6 +49,7 @@ public class JDBCTableWriterTest {
     private static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
+    private static String testGtfsGLSnapshotNamespace;
     private static String simpleServiceId = "1";
     private static String firstStopId = "1";
     private static String lastStopId = "2";
@@ -81,6 +85,17 @@ public class JDBCTableWriterTest {
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
         createSimpleStop(firstStopId, "First Stop", firstStopLat, firstStopLon);
         createSimpleStop(lastStopId, "Last Stop", lastStopLat, lastStopLon);
+
+        /** Load the following real-life GTFS for use with {@link JDBCTableWriterTest#canUpdateServiceId()}  **/
+        // load feed into db
+        FeedLoadResult feedLoadResult = load(getResourceFileName("real-world-gtfs-feeds/gtfs_GL.zip"), testDataSource);
+        String testGtfsGLNamespace = feedLoadResult.uniqueIdentifier;
+        // validate feed to create additional tables
+        validate(testGtfsGLNamespace, testDataSource);
+        // load into editor via snapshot
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(testGtfsGLNamespace, testDataSource);
+        SnapshotResult snapshotResult = snapshotter.copyTables();
+        testGtfsGLSnapshotNamespace = snapshotResult.uniqueIdentifier;
     }
 
     @AfterClass
@@ -430,8 +445,24 @@ public class JDBCTableWriterTest {
      * happening.
      */
     @Test
-    public void canUpdateServiceId() {
-        // load GTFS file into editor
+    public void canUpdateServiceId() throws InvalidNamespaceException, IOException, SQLException {
+        // change the service id
+        JdbcTableWriter tableWriter = new JdbcTableWriter(Table.CALENDAR, testDataSource, testGtfsGLSnapshotNamespace);
+        tableWriter.update(
+            2,
+            "{\"id\":2,\"service_id\":\"test\",\"description\":\"MoTuWeThFrSaSu\",\"monday\":1,\"tuesday\":1,\"wednesday\":1,\"thursday\":1,\"friday\":1,\"saturday\":1,\"sunday\":1,\"start_date\":\"20180526\",\"end_date\":\"20201231\"}",
+            true
+        );
+
+        // assert that the amount of stop times equals the original amount of stop times in the feed
+        assertThatSqlQueryYieldsRowCount(
+            String.format(
+                "select * from %s.%s",
+                testGtfsGLSnapshotNamespace,
+                Table.STOP_TIMES.name
+            ),
+            53
+        );
     }
 
     /*****************************************************************************************************************
