@@ -1,3 +1,5 @@
 stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,wheelchair_boarding
 4u6g,,Butler Ln,,37.0612132,-122.0074332,,,0,,,
 johv,,Scotts Valley Dr & Victor Sq,,37.0590172,-122.0096058,,,0,,,
+123,,Parent Station,,37.0666,-122.0777,,,1,,,
+1234,,Child Stop,,37.06662,-122.07772,,,0,123,,
