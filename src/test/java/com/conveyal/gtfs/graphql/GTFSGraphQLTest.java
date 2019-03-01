@@ -191,7 +191,8 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("superNested.txt"), matchesSnapshot());
     }
 
-    /** Tests whether a graphQL query that has superflous and redundant nesting can find the right result.
+    /**
+     * Tests whether a graphQL query that has superflous and redundant nesting can find the right result.
      * If the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs.
      * Furthermore, some queries should have been combined together.
      */
