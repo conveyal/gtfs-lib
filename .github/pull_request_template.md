@@ -6,7 +6,7 @@
 - [ ] The description lists any configuration setting(s) that differ from the default settings
 - [ ] All tests and CI builds passing
 - [ ] The description lists all relevant PRs included in this release _(remove this if not merging to master)_
-- [ ] Code coverage improves or is at 100% _(remove this if not merging to master)_
+- [ ] Code coverage does not significantly worsen (ideally it improves) _(remove this if not merging to master)_
 
 ### Description
 

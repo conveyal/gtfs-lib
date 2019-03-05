@@ -14,4 +14,4 @@ Please be as specific as possible.
 
 ## Notes on configuration and files required to reproduce the issue
 
-Please describe any applicable config files that were used. Also, if this issue is reporting behavior that is related to the data format of a particular GTFS file, please upload that GTFS file and note the exact files and lines that are causing the issue.
+Please describe any applicable config files that were used. If this issue is reporting behavior that is related to the data format of a particular GTFS file, please upload that GTFS file and note the exact files and lines that are causing the issue. If this issue is reproducable in [datatools-server](https://github.com/conveyal/datatools-server) or [datatools-ui](https://github.com/conveyal/datatools-ui) please include the exact commits of those libraries and any configuration of those libraries that differs from the default configuration.
