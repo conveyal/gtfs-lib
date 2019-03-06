@@ -26,11 +26,27 @@
         "error_type" : "FEED_TRAVEL_TIMES_ROUNDED",
         "line_number" : null
       }, {
+        "bad_value" : "123",
+        "entity_id" : "123",
+        "entity_sequence" : null,
+        "entity_type" : "Stop",
+        "error_id" : 3,
+        "error_type" : "STOP_UNUSED",
+        "line_number" : 4
+      }, {
+        "bad_value" : "1234",
+        "entity_id" : "1234",
+        "entity_sequence" : null,
+        "entity_type" : "Stop",
+        "error_id" : 4,
+        "error_type" : "STOP_UNUSED",
+        "line_number" : 5
+      }, {
         "bad_value" : "20170916",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
-        "error_id" : 3,
+        "error_id" : 5,
         "error_type" : "DATE_NO_SERVICE",
         "line_number" : null
       } ],
