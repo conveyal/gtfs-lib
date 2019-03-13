@@ -95,7 +95,7 @@ public class ServiceValidator extends TripValidator {
      */
     @Override
     public void complete(ValidationResult validationResult) {
-
+        validationResult.serviceInfoForServiceId = serviceInfoForServiceId;
         LOG.info("Merging calendars and calendar_dates...");
 
         // First handle the calendar entries, which define repeating weekly schedules.
@@ -113,7 +113,7 @@ public class ServiceValidator extends TripValidator {
                             (dayOfWeek == DayOfWeek.SATURDAY && calendar.saturday > 0) ||
                             (dayOfWeek == DayOfWeek.SUNDAY && calendar.sunday > 0)) {
                         // Service is active on this date.
-                        serviceInfoForServiceId.computeIfAbsent(calendar.service_id, ServiceInfo::new).datesActive.add(date);
+                        validationResult.serviceInfoForServiceId.computeIfAbsent(calendar.service_id, ServiceInfo::new).datesActive.add(date);
                     }
                 }
             } catch (Exception ex) {
@@ -124,7 +124,7 @@ public class ServiceValidator extends TripValidator {
 
         // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules.
         for (CalendarDate calendarDate : feed.calendarDates) {
-            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
+            ServiceInfo serviceInfo = validationResult.serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
             if (calendarDate.exception_type == 1) {
                 // Service added, add to set for this date.
                 serviceInfo.datesActive.add(calendarDate.date);
@@ -149,7 +149,7 @@ public class ServiceValidator extends TripValidator {
 
 
         // Check for incoherent or erroneous services.
-        for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
+        for (ServiceInfo serviceInfo : validationResult.serviceInfoForServiceId.values()) {
             if (serviceInfo.datesActive.isEmpty()) {
                 // This service must have been referenced by trips but is never active on any day.
                 registerError(NewGTFSError.forFeed(NewGTFSErrorType.SERVICE_NEVER_ACTIVE, serviceInfo.serviceId));
@@ -166,7 +166,7 @@ public class ServiceValidator extends TripValidator {
         }
 
         // Accumulate info about services into each date that they are active.
-        for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
+        for (ServiceInfo serviceInfo : validationResult.serviceInfoForServiceId.values()) {
             for (LocalDate date : serviceInfo.datesActive) {
                 dateInfoForDate.computeIfAbsent(date, DateInfo::new).add(serviceInfo);
             }
@@ -248,7 +248,7 @@ public class ServiceValidator extends TripValidator {
             sql = String.format("insert into %s values (?, ?, ?, ?)", servicesTableName);
             PreparedStatement serviceStatement = connection.prepareStatement(sql);
             final BatchTracker serviceTracker = new BatchTracker("services", serviceStatement);
-            for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
+            for (ServiceInfo serviceInfo : validationResult.serviceInfoForServiceId.values()) {
                 serviceStatement.setString(1, serviceInfo.serviceId);
                 serviceStatement.setInt(2, serviceInfo.datesActive.size());
                 serviceStatement.setInt(3, serviceInfo.getTotalServiceDurationSeconds());
@@ -265,7 +265,7 @@ public class ServiceValidator extends TripValidator {
             sql = String.format("insert into %s values (?, ?)", serviceDatesTableName);
             PreparedStatement serviceDateStatement = connection.prepareStatement(sql);
             final BatchTracker serviceDateTracker = new BatchTracker("service_dates", serviceDateStatement);
-            for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
+            for (ServiceInfo serviceInfo : validationResult.serviceInfoForServiceId.values()) {
                 for (LocalDate date : serviceInfo.datesActive) {
                     if (date == null) continue; // TODO ERR? Can happen with bad data (unparseable dates).
                     try {
@@ -302,7 +302,7 @@ public class ServiceValidator extends TripValidator {
                 "service_durations",
                 serviceDurationStatement
             );
-            for (ServiceInfo serviceInfo : serviceInfoForServiceId.values()) {
+            for (ServiceInfo serviceInfo : validationResult.serviceInfoForServiceId.values()) {
                 serviceInfo.durationByRouteType.forEachEntry((routeType, serviceDurationSeconds) -> {
                     try {
                         serviceDurationStatement.setString(1, serviceInfo.serviceId);
@@ -328,7 +328,7 @@ public class ServiceValidator extends TripValidator {
         LOG.info("Done.");
     }
 
-    private static class ServiceInfo {
+    static class ServiceInfo {
 
         final String serviceId;
         TIntIntHashMap durationByRouteType = new TIntIntHashMap();
@@ -345,7 +345,7 @@ public class ServiceValidator extends TripValidator {
 
     }
 
-    private static class DateInfo {
+    static class DateInfo {
 
         final LocalDate date;
         TIntIntHashMap durationByRouteType = new TIntIntHashMap();

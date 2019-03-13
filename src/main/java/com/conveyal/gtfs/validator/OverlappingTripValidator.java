@@ -1,30 +1,31 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.NewGTFSError;
-import com.conveyal.gtfs.error.OverlappingTripsInBlockError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
-import com.conveyal.gtfs.model.*;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK;
 
 /**
- * REVIEW
- * whoa: feed.trips.values().stream().iterator().forEachRemaining(trip -> {})
- * should be for (Trip trip : feed.trips) {}
- * We're fetching all the stop times for every trip in at least three different validators.
- *
  * Created by landon on 5/2/16.
  */
 public class OverlappingTripValidator extends TripValidator {
-
+    private static final Logger LOG = LoggerFactory.getLogger(OverlappingTripValidator.class);
     // check for overlapping trips within block
-    HashMap<String, List<BlockInterval>> blockIntervals = new HashMap<>();
+    private HashMap<String, List<BlockInterval>> blockIntervals = new HashMap<>();
 
     public OverlappingTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
@@ -33,60 +34,50 @@ public class OverlappingTripValidator extends TripValidator {
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         if (trip.block_id != null) {
+            // If the trip has a block_id, add a new block interval to the
             BlockInterval blockInterval = new BlockInterval();
             blockInterval.trip = trip;
             StopTime firstStopTime = stopTimes.get(0);
             blockInterval.startTime = firstStopTime.departure_time;
             blockInterval.firstStop = firstStopTime;
             blockInterval.lastStop = stopTimes.get(stopTimes.size() - 1);
-            List<BlockInterval> intervals = blockIntervals.get(trip.block_id);
-            if (intervals == null) {
-                intervals = new ArrayList<>();
-                blockIntervals.put(trip.block_id, intervals);
-            }
-            intervals.add(blockInterval);
+            // Construct new list of intervals if none exists for encountered block_id.
+            blockIntervals
+                .computeIfAbsent(trip.block_id, k -> new ArrayList<>())
+                .add(blockInterval);
         }
     }
 
     @Override
     public void complete (ValidationResult validationResult) {
+        // Iterate over each block and determine if there are any trips that overlap one another.
         for (String blockId : blockIntervals.keySet()) {
             List<BlockInterval> intervals = blockIntervals.get(blockId);
-            Collections.sort(intervals, Comparator.comparingInt(i -> i.startTime));
-            int i2offset = 0;
+            intervals.sort(Comparator.comparingInt(i -> i.startTime));
+            // Iterate over each interval (except for the last) comparing it to every other interval (so the last interval
+            // is handled through the course of iteration).
             // FIXME this has complexity of n^2, there has to be a better way.
-            for (BlockInterval i1 : intervals) {
+            for (int n = 0; n < intervals.size() - 1; n++) {
+                BlockInterval interval1 = intervals.get(n);
                 // Compare the interval at position N with all other intervals at position N+1 to the end of the list.
-                i2offset += 1; // Fixme replace with integer iteration and get(n)
-                for(BlockInterval i2 : intervals.subList(i2offset, intervals.size() - 1)) {
-                    String tripId1 = i1.trip.trip_id;
-                    String tripId2 = i2.trip.trip_id;
-                    if (tripId1.equals(tripId2)) {
-                        // Why would this happen? Just duplicating a case covered by the original implementation.
-                        // TODO can this happen at all?
+                for (BlockInterval interval2 : intervals.subList(n + 1, intervals.size())) {
+                    if (interval1.lastStop.departure_time <= interval2.firstStop.arrival_time || interval2.lastStop.departure_time <= interval1.firstStop.arrival_time) {
                         continue;
                     }
-                    // if trips don't overlap, skip FIXME can't this be simplified?
-                    if (i1.lastStop.departure_time <= i2.firstStop.arrival_time || i2.lastStop.departure_time <= i1.firstStop.arrival_time) {
-                        continue;
-                    }
-                    if (i1.trip.service_id.equals(i2.trip.service_id)) {
-                        // Trips overlap. If they have the same service_id they overlap.
-                        registerError(i1.trip, TRIP_OVERLAP_IN_BLOCK, i2.trip.trip_id);
+                    // If either trip's last departure occurs after the other's first arrival, they overlap. We still
+                    // need to determine if they operate on the same day though.
+                    if (interval1.trip.service_id.equals(interval2.trip.service_id)) {
+                        // If the overlapping trips share a service_id, record an error.
+                        registerError(interval1.trip, TRIP_OVERLAP_IN_BLOCK, interval2.trip.trip_id);
                     } else {
                         // Trips overlap but don't have the same service_id.
                         // Check to see if service days fall on the same days of the week.
-                        // FIXME requires more complex Service implementation
-                        Service s1 = null; //feed.services.get(i1.trip.service_id);
-                        Service s2 = null; //feed.services.get(i2.trip.service_id);
-                        boolean overlap = Service.checkOverlap(s1, s2);
-                        for (Map.Entry<LocalDate, CalendarDate> d1 : s1.calendar_dates.entrySet()) {
-                            LocalDate date = d1.getKey();
-                            boolean activeOnDate = s1.activeOn(date) && s2.activeOn(date);
-                            if (activeOnDate || overlap) { // FIXME this will always be true if overlap is true.
-                                registerError(i1.trip, TRIP_OVERLAP_IN_BLOCK, i2.trip.trip_id);
-                                break;
-                            }
+                        ServiceValidator.ServiceInfo info1 = validationResult.serviceInfoForServiceId.get(interval1.trip.service_id);
+                        ServiceValidator.ServiceInfo info2 = validationResult.serviceInfoForServiceId.get(interval2.trip.service_id);
+                        Set<LocalDate> overlappingDates = new HashSet<>(info1.datesActive); // use the copy constructor
+                        overlappingDates.retainAll(info2.datesActive);
+                        if (overlappingDates.size() > 0) {
+                            registerError(interval1.trip, TRIP_OVERLAP_IN_BLOCK, interval2.trip.trip_id);
                         }
                     }
                 }
