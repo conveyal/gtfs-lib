@@ -478,10 +478,15 @@ public class Table {
         String tableName = namespace == null
                 ? name
                 : String.join(".", namespace, name);
-        String questionMarks = String.join(", ", Collections.nCopies(editorFields().size(), "?"));
         String joinedFieldNames = commaSeparatedNames(editorFields());
         String idValue = setDefaultId ? "DEFAULT" : "?";
-        return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
+        return String.format(
+            "insert into %s (id, %s) values (%s, %s)",
+            tableName,
+            joinedFieldNames,
+            idValue,
+            String.join(", ", Collections.nCopies(editorFields().size(), "?"))
+        );
     }
 
     /**
