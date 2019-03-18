@@ -1025,7 +1025,7 @@ public class Table {
                 if (isOrderField) duplicateIdError.setSequence(value);
                 errors.add(duplicateIdError);
             }
-        } else if (field.name.equals(keyField)) {
+        } else if (field.name.equals(keyField) && !field.isForeignReference()) {
             // We arrive here if the field is not a foreign reference and not the unique key field on the table (e.g.,
             // shape_pt_sequence), but is still a key on the table. For example, this is where we add shape_id from
             // the shapes table, so that when we check the referential integrity of trips#shape_id, we know that the
