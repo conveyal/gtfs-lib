@@ -752,11 +752,14 @@ public class JdbcTableWriter implements TableWriter {
             // Initialize travel time with previous stop time value.
             int cumulativeTravelTime = timesForTripIds.get(tripId);
             for (PatternStop patternStop : patternStops) {
+                // Gather travel/dwell time for pattern stop (being sure to check for missing values).
+                int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+                int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
                 int oneBasedIndex = 1;
                 // Increase travel time by current pattern stop's travel and dwell times (and set values for update).
-                cumulativeTravelTime += patternStop.default_travel_time;
+                cumulativeTravelTime += travelTime;
                 updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
-                cumulativeTravelTime += patternStop.default_dwell_time;
+                cumulativeTravelTime += dwellTime;
                 updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
                 updateStopTimeStatement.setString(oneBasedIndex++, tripId);
                 updateStopTimeStatement.setInt(oneBasedIndex++, patternStop.stop_sequence);

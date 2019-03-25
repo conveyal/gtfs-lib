@@ -6,6 +6,7 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
@@ -485,6 +486,49 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int)} can normalize stop times to a pattern's
+     * default travel times.
+     */
+    @Test
+    public void canNormalizePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table tripsTable = Table.TRIPS;
+        int initialTravelTime = 60; // one minute
+        int startTime = 6 * 60 * 60; // 6AM
+        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+            new PatternStopDTO("900", firstStopId, 0),
+            new PatternStopDTO("900", lastStopId, 1)
+        };
+        patternStops[1].default_travel_time = initialTravelTime;
+        PatternDTO pattern = createRouteAndPattern("1000", "900", "Pattern A", null, new ShapePointDTO[]{}, patternStops, 0);
+        // Create trip with travel times that match pattern stops.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
+        JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
+        String createdTrip = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createdTrip);
+        // Update pattern stop with new travel time.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        int updatedTravelTime = 3600; // one hour
+        pattern.pattern_stops[1].default_travel_time = updatedTravelTime;
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+        // Normalize stop times.
+        JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
+        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
+        // Read pattern stops from database and check that the arrivals/departures have been updated.
+        JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES, testDataSource, testNamespace + ".", EntityPopulator.STOP_TIME);
+        Iterable<StopTime> stopTimes = stopTimesTable.getOrdered(tripInput.trip_id);
+        int index = 0;
+        for (StopTime stopTime : stopTimes) {
+            LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
+            assertThat(stopTime.arrival_time, equalTo(startTime + index * updatedTravelTime));
+            index++;
+        }
+        // Ensure that updated stop times equals pattern stops length
+        assertThat(index, equalTo(patternStops.length));
+    }
+
+    /**
      * Construct (without writing to the database) a trip with a frequency entry.
      */
     private TripDTO constructFrequencyTrip(String patternId, String routeId, int startTime) {
@@ -501,6 +545,22 @@ public class JDBCTableWriterTest {
         frequency.end_time = 9 * 60 * 60;
         frequency.headway_secs = 15 * 60;
         tripInput.frequencies = new FrequencyDTO[]{frequency};
+        return tripInput;
+    }
+
+    /**
+     * Construct (without writing to the database) a timetable trip.
+     */
+    private TripDTO constructTimetableTrip(String patternId, String routeId, int startTime, int travelTime) {
+        TripDTO tripInput = new TripDTO();
+        tripInput.pattern_id = patternId;
+        tripInput.route_id = routeId;
+        tripInput.service_id = simpleServiceId;
+        tripInput.stop_times = new StopTimeDTO[]{
+            new StopTimeDTO(firstStopId, startTime, startTime, 0),
+            new StopTimeDTO(lastStopId, startTime + travelTime, startTime + travelTime, 1)
+        };
+        tripInput.frequencies = new FrequencyDTO[]{};
         return tripInput;
     }
 
