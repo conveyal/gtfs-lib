@@ -134,7 +134,7 @@ public class GTFSTest {
         PersistenceExpectation[] expectations = PersistenceExpectation.list(
             new PersistenceExpectation(
                 new ErrorExpectation[]{
-                    new ErrorExpectation("error_type", "TRIP_OVERLAP_IN_BLOCK")
+                    new ErrorExpectation("error_type", NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK.toString())
                 }
             )
         );

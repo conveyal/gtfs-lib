@@ -6,8 +6,6 @@ import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -20,10 +18,13 @@ import java.util.Set;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK;
 
 /**
+ * This validator checks that trips which run on the same block (i.e., share a block_id) do not overlap. The block_id
+ * represents a vehicle in service, so there must not be any trips on the same block interval that start while another
+ * block trip is running.
+ *
  * Created by landon on 5/2/16.
  */
 public class OverlappingTripValidator extends TripValidator {
-    private static final Logger LOG = LoggerFactory.getLogger(OverlappingTripValidator.class);
     // check for overlapping trips within block
     private HashMap<String, List<BlockInterval>> blockIntervals = new HashMap<>();
 
@@ -34,7 +35,7 @@ public class OverlappingTripValidator extends TripValidator {
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         if (trip.block_id != null) {
-            // If the trip has a block_id, add a new block interval to the
+            // If the trip has a block_id, add a new block interval to the map.
             BlockInterval blockInterval = new BlockInterval();
             blockInterval.trip = trip;
             StopTime firstStopTime = stopTimes.get(0);
@@ -85,33 +86,15 @@ public class OverlappingTripValidator extends TripValidator {
         }
     }
 
+    /**
+     * A simple class used during validation to store details the run interval for a block trip.
+     */
     private class BlockInterval {
         Trip trip;
         Integer startTime;
         StopTime firstStop;
         StopTime lastStop;
     }
-
-    // FIXME what is this patternId? This seems like a subset of block overlap errors (within a service day).
-//            String patternId = feed.tripPatternMap.get(tripId);
-//            String patternName = feed.patterns.get(patternId).name;
-//            int firstDeparture = Iterables.get(stopTimes, 0).departure_time;
-//            int lastArrival = Iterables.getLast(stopTimes).arrival_time;
-//
-//            String tripKey = trip.service_id + "_"+ blockId + "_" + firstDeparture +"_" + lastArrival + "_" + patternId;
-//
-//            if (duplicateTripHash.containsKey(tripKey)) {
-//                String firstDepartureString = LocalTime.ofSecondOfDay(Iterables.get(stopTimes, 0).departure_time % 86399).toString();
-//                String lastArrivalString = LocalTime.ofSecondOfDay(Iterables.getLast(stopTimes).arrival_time % 86399).toString();
-//                String duplicateTripId = duplicateTripHash.get(tripKey);
-//                Trip duplicateTrip = feed.trips.get(duplicateTripId);
-//                long line = trip.id > duplicateTrip.id ? trip.id : duplicateTrip.id;
-//                feed.errors.add(new DuplicateTripError(trip, line, duplicateTripId, patternName, firstDepartureString, lastArrivalString));
-//                isValid = false;
-//            } else {
-//                duplicateTripHash.put(tripKey, tripId);
-//            }
-
 
 }
 
