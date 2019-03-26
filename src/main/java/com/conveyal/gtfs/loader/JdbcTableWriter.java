@@ -1311,7 +1311,12 @@ public class JdbcTableWriter implements TableWriter {
                 // There was one match found.
                 if (isCreating) {
                     // Under no circumstance should a new entity have a conflict with existing key field.
-                    throw new SQLException("New entity's key field must not match existing value.");
+                    throw new SQLException(
+                        String.format("New %s's %s value (%s) conflicts with an existing record in table.",
+                                      table.entityClass.getSimpleName(),
+                                      keyField,
+                                      keyValue)
+                    );
                 }
                 if (!uniqueIds.contains(id)) {
                     // There are two circumstances we could encounter here.

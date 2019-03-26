@@ -495,12 +495,13 @@ public class JDBCTableWriterTest {
         final Table tripsTable = Table.TRIPS;
         int initialTravelTime = 60; // one minute
         int startTime = 6 * 60 * 60; // 6AM
+        String patternId = "123456";
         PatternStopDTO[] patternStops = new PatternStopDTO[]{
-            new PatternStopDTO("900", firstStopId, 0),
-            new PatternStopDTO("900", lastStopId, 1)
+            new PatternStopDTO(patternId, firstStopId, 0),
+            new PatternStopDTO(patternId, lastStopId, 1)
         };
         patternStops[1].default_travel_time = initialTravelTime;
-        PatternDTO pattern = createRouteAndPattern("1000", "900", "Pattern A", null, new ShapePointDTO[]{}, patternStops, 0);
+        PatternDTO pattern = createRouteAndPattern("1000", patternId, "Pattern A", null, new ShapePointDTO[]{}, patternStops, 0);
         // Create trip with travel times that match pattern stops.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
