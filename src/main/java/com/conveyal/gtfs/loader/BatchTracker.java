@@ -45,7 +45,7 @@ public class BatchTracker {
         }
         // Avoid reuse, signal that this was cleanly closed.
         preparedStatement = null;
-        LOG.info(String.format("Inserted %d %s records", totalRecordsProcessed, recordType));
+        LOG.info(String.format("Processed %d %s records", totalRecordsProcessed, recordType));
         return totalRecordsProcessed;
     }
 

@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.UUID;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
@@ -501,12 +502,13 @@ public class JDBCTableWriterTest {
             new PatternStopDTO(patternId, lastStopId, 1)
         };
         patternStops[1].default_travel_time = initialTravelTime;
-        PatternDTO pattern = createRouteAndPattern("1000", patternId, "Pattern A", null, new ShapePointDTO[]{}, patternStops, 0);
+        PatternDTO pattern = createRouteAndPattern(UUID.randomUUID().toString(), patternId, "Pattern A", null, new ShapePointDTO[]{}, patternStops, 0);
         // Create trip with travel times that match pattern stops.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
-        String createdTrip = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
-        LOG.info(createdTrip);
+        String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createTripOutput);
+        TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
         // Update pattern stop with new travel time.
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
         int updatedTravelTime = 3600; // one hour
@@ -518,9 +520,8 @@ public class JDBCTableWriterTest {
         updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
         // Read pattern stops from database and check that the arrivals/departures have been updated.
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES, testDataSource, testNamespace + ".", EntityPopulator.STOP_TIME);
-        Iterable<StopTime> stopTimes = stopTimesTable.getOrdered(tripInput.trip_id);
         int index = 0;
-        for (StopTime stopTime : stopTimes) {
+        for (StopTime stopTime : stopTimesTable.getOrdered(createdTrip.trip_id)) {
             LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
             assertThat(stopTime.arrival_time, equalTo(startTime + index * updatedTravelTime));
             index++;
