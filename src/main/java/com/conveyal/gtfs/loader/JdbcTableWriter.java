@@ -1218,6 +1218,9 @@ public class JdbcTableWriter implements TableWriter {
         connection.close();
     }
 
+    /**
+     * Ensure that database connection closes. This should be called once the table writer is no longer needed.
+     */
     @Override
     public void close() {
         DbUtils.closeQuietly(connection);
