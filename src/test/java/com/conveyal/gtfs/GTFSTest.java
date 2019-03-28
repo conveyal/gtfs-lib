@@ -127,7 +127,7 @@ public class GTFSTest {
     }
 
     /**
-     * Tests that a GTFS feed with bad date values in calendars.txt and calendar_dates.txt can pass the integration test.
+     * Tests that a GTFS feed with overlapping block trips will record the appropriate error.
      */
     @Test
     public void canLoadFeedWithOverlappingTrips () {
