@@ -48,9 +48,6 @@ public class NewTripTimesValidator extends FeedValidator {
             new ReferencesTripValidator(feed, errorStorage),
             new ReversedTripValidator(feed, errorStorage),
             new ServiceValidator(feed, errorStorage),
-            // Overlapping trips validator requires use of service info computed by ServiceValidator, so it must run
-            // after the ServiceValidator.
-            new OverlappingTripValidator(feed, errorStorage),
             new PatternFinderValidator(feed, errorStorage)
         };
     }
