@@ -1,7 +1,5 @@
 package com.conveyal.gtfs.storage;
 
-import com.conveyal.gtfs.GTFSTest;
-
 /**
  * A helper class to verify that data got stored in a particular table.
  */
@@ -18,6 +16,11 @@ public class PersistenceExpectation {
     public PersistenceExpectation(String tableName, RecordExpectation[] recordExpectations) {
         this.tableName = tableName;
         this.recordExpectations = recordExpectations;
+    }
+
+    public PersistenceExpectation(ErrorExpectation[] errorExpectations) {
+        this.tableName = "errors";
+        this.recordExpectations = errorExpectations;
     }
 
     public static PersistenceExpectation[] list (PersistenceExpectation... expectations) {
