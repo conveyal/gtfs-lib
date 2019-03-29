@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
@@ -390,7 +391,32 @@ public class JdbcGtfsLoader {
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
                 Set<NewGTFSError> errors = table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
-                errorStorage.storeErrors(errors);
+                // Check for special case with calendar_dates where added service should not trigger ref. integrity
+                // error.
+                if (
+                    table.name.equals("calendar_dates") &&
+                    "service_id".equals(field.name) &&
+                    "1".equals(csvReader.get(Field.getFieldIndex(fields, "exception_type")))
+
+                ){
+                    for (NewGTFSError error : errors) {
+                        if (NewGTFSErrorType.REFERENTIAL_INTEGRITY.equals(error.errorType)) {
+                            // Do not record bad service_id reference errors for calendar date entries that add service
+                            // (exception type=1) because a corresponding service_id in calendars.txt is not required in
+                            // this case.
+                            LOG.info(
+                                "A calendar_dates.txt entry added service (exception_type=1) for service_id={}, which does not have (or necessarily need) a corresponding entry in calendars.txt.",
+                                keyValue
+                            );
+                        } else {
+                            errorStorage.storeError(error);
+                        }
+                    }
+                }
+                // In all other cases (i.e., outside of the calendar_dates special case), store the reference errors found.
+                else {
+                    errorStorage.storeErrors(errors);
+                }
                 // Add value for entry into table
                 setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
                 // Increment column index.
@@ -471,13 +497,29 @@ public class JdbcGtfsLoader {
             // rather than setObject with a type code. I think some databases don't have setObject though.
             // The Field objects throw exceptions to avoid passing the line number, table name etc. into them.
             try {
-                // FIXME we need to set the transformed string element even when an error occurs.
-                //  This means the validation and insertion step need to happen separately.
-                //  or the errors should not be signaled with exceptions.
-                //  Also, we should probably not be converting any GTFS field values.
+                // Here, we set the transformed string element even when an error occurs.
+                // Ideally, no errors should be signaled with exceptions, but this happens in a try/catch in case
+                // something goes wrong (we don't necessarily want to abort loading the feed altogether).
+                // FIXME Also, we should probably not be converting any GTFS field values, but some of them are coerced
+                //  to null if they are unparseable (e.g., DateField).
                 //  We should be saving it as-is in the database and converting upon load into our model objects.
-                if (postgresText) transformedStrings[fieldIndex + 1] = field.validateAndConvert(string);
-                else field.setParameter(insertStatement, fieldIndex + 2, string);
+                Set<NewGTFSError> errors;
+                if (postgresText) {
+                    ValidateFieldResult<String> result = field.validateAndConvert(string);
+                    // If the result is null, use the null-setting method.
+                    if (result.clean == null) setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+                    // Otherwise, set the cleaned field according to its index.
+                    else transformedStrings[fieldIndex + 1] = result.clean;
+                    errors = result.errors;
+                } else {
+                    errors = field.setParameter(insertStatement, fieldIndex + 2, string);
+                }
+                // Store any errors encountered after field value has been set.
+                for (NewGTFSError error : errors) {
+                    error.entityType = table.getEntityClass();
+                    error.lineNumber = lineNumber;
+                    if (errorStorage != null) errorStorage.storeError(error);
+                }
             } catch (StorageException ex) {
                 // FIXME many exceptions don't have an error type
                 if (errorStorage != null) {
