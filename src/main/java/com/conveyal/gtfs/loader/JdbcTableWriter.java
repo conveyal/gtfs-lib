@@ -271,7 +271,7 @@ public class JdbcTableWriter implements TableWriter {
                     patternStopsToNormalize.add(patternStop);
                 }
             }
-            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize, null);
+            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize);
             connection.commit();
             return stopTimesUpdated;
         } catch (Exception e) {
@@ -707,10 +707,11 @@ public class JdbcTableWriter implements TableWriter {
      * departure times for existing trips after a pattern stop has been added or inserted into a pattern or if a
      * pattern stop's default travel or dwell time were updated and the stop times need to reflect this update.
      * @param patternStops list of pattern stops for which to update stop times (ordered by increasing stop_sequence)
-     * @param serviceIdFilters service_id values to filter trips on
      * @throws SQLException
+     *
+     * TODO? add param Set<String> serviceIdFilters service_id values to filter trips on
      */
-    private int updateStopTimesForPatternStops(List<PatternStop> patternStops, Set<String> serviceIdFilters) throws SQLException {
+    private int updateStopTimesForPatternStops(List<PatternStop> patternStops) throws SQLException {
         PatternStop firstPatternStop = patternStops.iterator().next();
         int firstStopSequence = firstPatternStop.stop_sequence;
         // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
@@ -724,12 +725,6 @@ public class JdbcTableWriter implements TableWriter {
             tablePrefix,
             tablePrefix
         );
-        if (serviceIdFilters != null && serviceIdFilters.size() > 0) {
-            getFirstTravelTimeSql += String.format(
-                " and t.service_id in (%s)",
-                Collections.nCopies(serviceIdFilters.size(), "?")
-            );
-        }
         PreparedStatement statement = connection.prepareStatement(getFirstTravelTimeSql);
         statement.setInt(1, previousStopSequence);
         statement.setString(2, firstPatternStop.pattern_id);
