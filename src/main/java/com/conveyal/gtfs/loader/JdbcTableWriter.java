@@ -464,7 +464,7 @@ public class JdbcTableWriter implements TableWriter {
             throw new IllegalStateException("Cannot create or update frequency entries for a timetable-based pattern.");
         }
         // Reconciling pattern stops MUST happen before original pattern stops are deleted in below block (with
-        // getUpdateReferencesSql)
+        // #deleteChildEntities)
         if (Table.PATTERN_STOP.name.equals(subTable.name)) {
             List<PatternStop> newPatternStops = new ArrayList<>();
             // Clean up pattern stop ID fields (passed in as string ID from datatools-ui to avoid id collision)
@@ -630,7 +630,6 @@ public class JdbcTableWriter implements TableWriter {
         String childTableName = String.join(".", tablePrefix, childTable.name);
         PreparedStatement deleteStatement = getUpdateReferencesStatement(SqlMethod.DELETE, childTableName, keyField, keyValue, null);
         LOG.info(deleteStatement.toString());
-        deleteStatement.setString(1, keyValue);
         int result = deleteStatement.executeUpdate();
         LOG.info("Deleted {} {}", result, childTable.name);
         // FIXME: are there cases when an update should not return zero?
@@ -1087,6 +1086,7 @@ public class JdbcTableWriter implements TableWriter {
             // (e.g., keep a calendar from being deleted if trips reference it).
             // FIXME: actually add "cascading"? Currently, it just deletes one level down.
             deleteFromReferencingTables(tablePrefix, specTable, id);
+            // Next, delete the actual record specified by id.
             PreparedStatement statement = connection.prepareStatement(specTable.generateDeleteSql(tablePrefix));
             statement.setInt(1, id);
             LOG.info(statement.toString());
@@ -1102,13 +1102,12 @@ public class JdbcTableWriter implements TableWriter {
         } catch (Exception e) {
             LOG.error("Could not delete {} entity with id: {}", specTable.name, id);
             e.printStackTrace();
+            // Rollback changes if errors encountered.
+            connection.rollback();
             throw e;
         } finally {
-            if (autoCommit) {
-                // Always rollback and close if auto-committing.
-                connection.rollback();
-                connection.close();
-            }
+            // Always close connection if auto-committing. Otherwise, leave open (for potential further updates).
+            if (autoCommit) connection.close();
         }
     }
 
@@ -1368,6 +1367,7 @@ public class JdbcTableWriter implements TableWriter {
                         int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
                         LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
                     }
+                    // Get statement to update or delete entities that reference the key value.
                     PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
                     LOG.info(updateStatement.toString());
                     int result = updateStatement.executeUpdate();

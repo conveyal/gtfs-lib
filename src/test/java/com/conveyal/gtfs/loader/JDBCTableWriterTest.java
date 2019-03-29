@@ -332,6 +332,56 @@ public class JDBCTableWriterTest {
         ));
     }
 
+    @Test
+    public void deletePatternShouldDeleteReferencingTripsAndStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = "9834914";
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndSimplePattern(routeId, "9", "The Line");
+        // make sure saved data matches expected data
+        assertThat(pattern.route_id, equalTo(routeId));
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        assertThatSqlQueryYieldsRowCount(
+            String.format(
+                "select * from %s.%s where id=%d",
+                testNamespace,
+                Table.TRIPS.name,
+                createdTrip.id
+            ),
+            1
+        );
+        // Delete pattern record
+        JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
+        int deleteOutput = deletePatternWriter.delete(pattern.id, true);
+        LOG.info("deleted {} records from {}", deleteOutput, Table.PATTERNS.name);
+        // Check that pattern record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where id=%d",
+                testNamespace,
+                Table.PATTERNS.name,
+                pattern.id
+            ));
+        // Check that trip records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.TRIPS.name,
+                pattern.pattern_id
+            ));
+        // Check that stop_times records for trip do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.STOP_TIMES.name,
+                createdTrip.trip_id
+            ));
+    }
+
     /**
      * Test that a frequency trip entry CANNOT be added for a timetable-based pattern. Expects an exception to be thrown.
      */
@@ -411,31 +461,38 @@ public class JDBCTableWriterTest {
         LOG.info("Updated pattern output: {}", updatedPatternOutput);
         // Create new trip for the pattern
         String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createTripOutput);
         TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
         // Update trip
         // TODO: Add update and delete tests for updating pattern stops, stop_times, and frequencies.
         String updatedTripId = "100A";
         createdTrip.trip_id = updatedTripId;
         JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
-        String updateTripOutput = updateTripWriter.update(tripInput.id, mapper.writeValueAsString(createdTrip), true);
+        String updateTripOutput = updateTripWriter.update(createdTrip.id, mapper.writeValueAsString(createdTrip), true);
+        LOG.info(updateTripOutput);
         TripDTO updatedTrip = mapper.readValue(updateTripOutput, TripDTO.class);
         // Check that saved data matches expected data
         assertThat(updatedTrip.frequencies[0].start_time, equalTo(startTime));
         assertThat(updatedTrip.trip_id, equalTo(updatedTripId));
         // Delete trip record
         JdbcTableWriter deleteTripWriter = createTestTableWriter(tripsTable);
-        int deleteOutput = deleteTripWriter.delete(
-            createdTrip.id,
-            true
-        );
+        int deleteOutput = deleteTripWriter.delete(createdTrip.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, tripsTable.name);
-        // Check that record does not exist in DB
+        // Check that trip record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where id=%d",
                 testNamespace,
                 tripsTable.name,
-                createdTrip.id
+                updatedTrip.id
+            ));
+        // Check that stop_times records do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.STOP_TIMES.name,
+                updatedTrip.trip_id
             ));
     }
 
@@ -498,6 +555,22 @@ public class JDBCTableWriterTest {
         frequency.end_time = 9 * 60 * 60;
         frequency.headway_secs = 15 * 60;
         tripInput.frequencies = new FrequencyDTO[]{frequency};
+        return tripInput;
+    }
+
+    /**
+     * Construct (without writing to the database) a timetable trip.
+     */
+    private TripDTO constructTimetableTrip(String patternId, String routeId, int startTime, int travelTime) {
+        TripDTO tripInput = new TripDTO();
+        tripInput.pattern_id = patternId;
+        tripInput.route_id = routeId;
+        tripInput.service_id = simpleServiceId;
+        tripInput.stop_times = new StopTimeDTO[]{
+            new StopTimeDTO(firstStopId, startTime, startTime, 0),
+            new StopTimeDTO(lastStopId, startTime + travelTime, startTime + travelTime, 1)
+        };
+        tripInput.frequencies = new FrequencyDTO[]{};
         return tripInput;
     }
 
