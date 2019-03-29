@@ -386,7 +386,7 @@ public class JdbcGtfsLoader {
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
                 Set<NewGTFSError> errors = table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
-                // Check for special case with calendar_dates where addedd service should not trigger ref. integrity
+                // Check for special case with calendar_dates where added service should not trigger ref. integrity
                 // error.
                 if (
                     table.name.equals("calendar_dates") &&
