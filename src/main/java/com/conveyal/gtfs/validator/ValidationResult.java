@@ -5,8 +5,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.awt.geom.Rectangle2D;
 import java.io.Serializable;
 import java.time.LocalDate;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * An instance of this class is returned by the validator.
@@ -40,7 +38,6 @@ public class ValidationResult implements Serializable {
     public int[] dailyRailSeconds;
     public int[] dailyTotalSeconds;
     public int[] dailyTripCounts;
-    public Map<String, ServiceValidator.ServiceInfo> serviceInfoForServiceId = new HashMap<>();
     public GeographicBounds fullBounds = new GeographicBounds();
     public GeographicBounds boundsWithoutOutliers = new GeographicBounds();
     public long validationTime;
