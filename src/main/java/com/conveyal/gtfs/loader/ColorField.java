@@ -1,11 +1,13 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+import java.util.Set;
 
 import static com.conveyal.gtfs.loader.Field.cleanString;
 
@@ -21,21 +23,24 @@ public class ColorField extends Field {
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public String validateAndConvert (String string) {
+    public ValidateFieldResult<String> validateAndConvert (String string) {
+        ValidateFieldResult<String> result = new ValidateFieldResult<>(string);
         try {
             if (string.length() != 6) {
-                throw new StorageException(NewGTFSErrorType.COLOR_FORMAT, string);
+                result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.COLOR_FORMAT, string));
             }
             int integer = Integer.parseInt(string, 16);
-            return string; // Could also store the integer.
+            return result; // Could also store the integer.
         } catch (Exception ex) {
             throw new StorageException(NewGTFSErrorType.COLOR_FORMAT, string);
         }
     }
 
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
+            ValidateFieldResult<String> result = validateAndConvert(string);
+            preparedStatement.setString(oneBasedIndex, result.clean);
+            return result.errors;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }

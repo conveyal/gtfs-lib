@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
@@ -9,6 +10,8 @@ import java.sql.SQLType;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Collections;
+import java.util.Set;
 
 /**
  * A GTFS date in the format YYYYMMDD.
@@ -26,26 +29,33 @@ public class DateField extends Field {
         super(name, requirement);
     }
 
-    public static String validate (String string) {
+    public static ValidateFieldResult<String> validate (String string) {
+        // Initialize default value as null (i.e., don't use the input value).
+        ValidateFieldResult<String> result = new ValidateFieldResult<>();
         // Parse the date out of the supplied string.
         LocalDate date;
         try {
             date = LocalDate.parse(string, GTFS_DATE_FORMATTER);
+            // Only set the clean result after the date parse is successful.
+            result.clean = string;
         } catch (DateTimeParseException ex) {
-            throw new StorageException(NewGTFSErrorType.DATE_FORMAT, string);
+            result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.DATE_FORMAT, string));
+            return result;
         }
         // Range check on year. Parsing operation above should already have checked month and day ranges.
         int year = date.getYear();
         if (year < 2000 || year > 2100) {
-            throw new StorageException(NewGTFSErrorType.DATE_RANGE, string);
+            result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.DATE_RANGE, string));
         }
-        return string;
+        return result;
     }
 
     @Override
-    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public Set<NewGTFSError> setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setString(oneBasedIndex, validate(string));
+            ValidateFieldResult<String> result = validate(string);
+            preparedStatement.setString(oneBasedIndex, result.clean);
+            return result.errors;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
@@ -54,17 +64,18 @@ public class DateField extends Field {
     /**
      * DateField specific method to set a statement parameter from a {@link LocalDate}.
      */
-    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, LocalDate localDate) {
+    public Set<NewGTFSError> setParameter (PreparedStatement preparedStatement, int oneBasedIndex, LocalDate localDate) {
         try {
             if (localDate == null) setNull(preparedStatement, oneBasedIndex);
             else preparedStatement.setString(oneBasedIndex, localDate.format(GTFS_DATE_FORMATTER));
+            return Collections.EMPTY_SET;
         } catch (Exception e) {
             throw new StorageException(e);
         }
     }
 
     @Override
-    public String validateAndConvert (String string) {
+    public ValidateFieldResult<String> validateAndConvert (String string) {
         return validate(string);
     }
 

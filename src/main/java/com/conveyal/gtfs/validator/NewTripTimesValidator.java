@@ -46,7 +46,6 @@ public class NewTripTimesValidator extends FeedValidator {
         tripValidators = new TripValidator[] {
             new SpeedTripValidator(feed, errorStorage),
             new ReferencesTripValidator(feed, errorStorage),
-            //new OverlappingTripValidator(feed, errorStorage),
             new ReversedTripValidator(feed, errorStorage),
             new ServiceValidator(feed, errorStorage),
             new PatternFinderValidator(feed, errorStorage)
@@ -164,11 +163,10 @@ public class NewTripTimesValidator extends FeedValidator {
         // Repair the case where an arrival or departure time is provided, but not both.
         for (StopTime stopTime : stopTimes) fixMissingTimes(stopTime);
         // TODO check characteristics of timepoints
-        // All bad references should have been recorded at import, we can just ignore nulls.
-        Route route = null;
-        if (trip != null) route = routeById.get(trip.route_id);
+        // All bad references should have been recorded at import and null trip check is handled above, we can just
+        // ignore nulls.
+        Route route = routeById.get(trip.route_id);
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
-
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
     }
 
@@ -177,7 +175,9 @@ public class NewTripTimesValidator extends FeedValidator {
      */
     public void complete (ValidationResult validationResult) {
         for (TripValidator tripValidator : tripValidators) {
+            LOG.info("Running complete stage for {}", tripValidator.getClass().getSimpleName());
             tripValidator.complete(validationResult);
+            LOG.info("{} finished", tripValidator.getClass().getSimpleName());
         }
     }
 

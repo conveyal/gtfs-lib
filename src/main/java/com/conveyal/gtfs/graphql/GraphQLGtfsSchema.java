@@ -333,6 +333,18 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("parent_station"))
             .field(MapFetcher.field("location_type", GraphQLInt))
             .field(MapFetcher.field("wheelchair_boarding", GraphQLInt))
+            // Returns all stops that reference parent stop's stop_id
+            .field(newFieldDefinition()
+                    .name("child_stops")
+                    .type(new GraphQLList(new GraphQLTypeReference("stop")))
+                    .dataFetcher(new JDBCFetcher(
+                        "stops",
+                        "stop_id",
+                        null,
+                        false,
+                        "parent_station"
+                    ))
+                    .build())
             .field(RowCountFetcher.field("stop_time_count", "stop_times", "stop_id"))
             .field(newFieldDefinition()
                     .name("patterns")

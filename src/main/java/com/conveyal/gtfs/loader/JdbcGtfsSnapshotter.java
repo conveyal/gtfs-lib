@@ -20,6 +20,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.createFeedRegistryIfNotExists;
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.createSchema;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
 /**
@@ -415,15 +417,12 @@ public class JdbcGtfsSnapshotter {
      */
     private void registerSnapshot () {
         try {
-            Statement statement = connection.createStatement();
+            // We cannot simply insert into the feeds table because if we are creating an empty snapshot (to create/edit
+            // a GTFS feed from scratch), the feed registry table will not exist.
             // TODO copy over feed_id and feed_version from source namespace?
-
-            // FIXME do the following only on databases that support schemas.
-            // SQLite does not support them. Is there any advantage of schemas over flat tables?
-            statement.execute("create schema " + tablePrefix);
             // TODO: Record total snapshot processing time?
-            // Simply insert into feeds table (no need for table creation) because making a snapshot presumes that the
-            // feeds table already exists.
+            createFeedRegistryIfNotExists(connection);
+            createSchema(connection, tablePrefix);
             PreparedStatement insertStatement = connection.prepareStatement(
                     "insert into feeds values (?, null, null, null, null, null, current_timestamp, ?)");
             insertStatement.setString(1, tablePrefix);

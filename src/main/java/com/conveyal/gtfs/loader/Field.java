@@ -1,8 +1,13 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.google.common.collect.ImmutableSet;
+
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLType;
+import java.util.Set;
 
 /**
  * Field subclasses process an incoming String that represents a single GTFS CSV field value.
@@ -22,6 +27,19 @@ import java.sql.SQLType;
 public abstract class Field {
 
     public final String name;
+    /**
+     * Keep any illegal character sequences and their respective replacements here.
+     *
+     * TODO: Add other illegal character sequences (e.g., HTML tags, comments or escape sequences).
+     */
+    public static final Set<IllegalCharacter> ILLEGAL_CHARACTERS = ImmutableSet.of(
+        // Backslashes, newlines, and tabs have special meaning to Postgres. Also, new lines, tabs, and carriage returns are
+        // prohibited by GTFS.
+        new IllegalCharacter("\\", "\\\\", "Unescaped backslash"),
+        new IllegalCharacter("\t", " ", "Tab"),
+        new IllegalCharacter("\n", " ", "New line"),
+        new IllegalCharacter("\r", " ", "Carriage return")
+    );
     public final Requirement requirement;
     /**
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
@@ -43,9 +61,9 @@ public abstract class Field {
      * @param original a non-null String
      * @return a string that is parseable as this field's type, or null if it is not parseable
      */
-    public abstract String validateAndConvert(String original);
+    public abstract ValidateFieldResult<String> validateAndConvert(String original);
 
-    public abstract void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string);
+    public abstract Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string);
 
     public void setNull(PreparedStatement preparedStatement, int oneBasedIndex) throws SQLException {
         preparedStatement.setNull(oneBasedIndex, getSqlType().getVendorTypeNumber());
@@ -74,19 +92,24 @@ public abstract class Field {
     }
 
     // TODO test for input with tabs, newlines, carriage returns, and slashes in it.
-    protected static String cleanString (String string) {
-        // Backslashes, newlines, and tabs have special meaning to Postgres.
-        // String.contains is significantly faster than using a regex or replace, and has barely any speed impact.
-        if (string.contains("\\")) {
-            string = string.replace("\\", "\\\\");
+    protected static ValidateFieldResult<String> cleanString (String string) {
+        return cleanString(new ValidateFieldResult<>(string));
+    }
+
+    protected static ValidateFieldResult<String> cleanString (ValidateFieldResult<String> previousResult) {
+        ValidateFieldResult<String> result = ValidateFieldResult.from(previousResult);
+        // Check for illegal character sequences and replace them as needed.
+        for (IllegalCharacter illegalChar: ILLEGAL_CHARACTERS) {
+            // String.contains is significantly faster than using a regex or replace, and has barely any speed impact.
+            if (previousResult.clean.contains(illegalChar.illegalSequence)) {
+                // Use the result string value to ensure that each iteration is cleaned up properly.
+                result.clean = result.clean.replace(illegalChar.illegalSequence, illegalChar.replacement);
+                // We don't know the Table or line number here, but when the errors bubble up, these values should be
+                // assigned to the errors.
+                result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.ILLEGAL_FIELD_VALUE, illegalChar.description));
+            }
         }
-        if (string.contains("\t") || string.contains("\n") || string.contains("\r")) {
-            // TODO record error and recover, and use a single regex
-            string = string.replace("\t", " ");
-            string = string.replace("\n", " ");
-            string = string.replace("\r", " ");
-        }
-        return string;
+        return result;
     }
 
     /**

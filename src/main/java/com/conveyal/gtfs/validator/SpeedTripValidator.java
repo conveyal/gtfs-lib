@@ -61,7 +61,7 @@ public class SpeedTripValidator extends TripValidator {
                 registerError(currStopTime, DEPARTURE_BEFORE_ARRIVAL);
             }
             // Detect if travel times are rounded off to minutes.
-            boolean bothTravelTimesRounded = areTravelTimesRounded(prevStopTime);
+            boolean bothTravelTimesRounded = areTravelTimesRounded(prevStopTime) && areTravelTimesRounded(currStopTime);
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
             // If travel times are rounded and travel time is zero, determine the maximum and minimum possible speed
             // by adding/removing one minute of slack.

@@ -17,7 +17,7 @@ import java.util.Map;
 public class NewGTFSError {
 
     /** The class of the table in which the error was encountered. */
-    public final Class<? extends Entity> entityType;
+    public Class<? extends Entity> entityType;
 
     /** The kind of error encountered. */
     public final NewGTFSErrorType errorType;

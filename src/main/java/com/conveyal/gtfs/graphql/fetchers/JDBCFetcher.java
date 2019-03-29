@@ -69,6 +69,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     final String parentJoinField;
     private final String sortField;
     private final boolean autoLimit;
+    private final String childJoinField;
 
     /**
      * Constructor for tables that need neither restriction by a where clause nor sorting based on the enclosing entity.
@@ -96,10 +97,22 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      *                  tables that it is unnatural to expect a limit (e.g., shape points or pattern stops).
      */
     public JDBCFetcher (String tableName, String parentJoinField, String sortField, boolean autoLimit) {
+        this(tableName, parentJoinField, sortField, autoLimit, null);
+    }
+
+    /**
+     *
+     * @param childJoinField The child table field that should be joined to the parent join field. This enables joining
+     *                       where references from the child table to the parent table do not share the same field name,
+     *                       e.g., stops#stop_id -> transfers#from_stop_id. This value defaults to parentJoinField if
+     *                       argument is null.
+     */
+    public JDBCFetcher (String tableName, String parentJoinField, String sortField, boolean autoLimit, String childJoinField) {
         this.tableName = tableName;
         this.parentJoinField = parentJoinField;
         this.sortField = sortField;
         this.autoLimit = autoLimit;
+        this.childJoinField = childJoinField != null ? childJoinField : parentJoinField;
     }
 
     // We can't automatically generate JDBCFetcher based field definitions for inclusion in a GraphQL schema (as we
@@ -198,8 +211,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         // If we are fetching an item nested within a GTFS entity in the GraphQL query, we want to add an SQL "where"
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
         // Note, this is assuming the type of the field in the parent is a string.
-        if (parentJoinField != null && parentJoinValues != null && !parentJoinValues.isEmpty()) {
-            whereConditions.add(makeInClause(parentJoinField, parentJoinValues, preparedStatementParameters));
+        if (childJoinField != null && parentJoinValues != null && !parentJoinValues.isEmpty()) {
+            whereConditions.add(makeInClause(childJoinField, parentJoinValues, preparedStatementParameters));
         }
         if (sortField != null) {
             // Sort field is not provided by user input, so it's ok to add here (i.e., it's not prone to SQL injection).
@@ -341,7 +354,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
             }
             // This logging produces a lot of noise during testing due to large numbers of joined sub-queries
 //            LOG.info("table name={}", tableName);
-            LOG.debug("SQL: {}", preparedStatement.toString());
+            LOG.info("SQL: {}", preparedStatement.toString());
             if (preparedStatement.execute()) {
                 ResultSet resultSet = preparedStatement.getResultSet();
                 ResultSetMetaData meta = resultSet.getMetaData();
