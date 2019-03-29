@@ -333,10 +333,10 @@ public class JDBCTableWriterTest {
     }
 
     @Test
-    public void deletePatternShouldDeleteReferencingTripsAndStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+    public void shouldDeleteReferencingTripsAndStopTimesOnPatternDelete() throws IOException, SQLException, InvalidNamespaceException {
         String routeId = "9834914";
         int startTime = 6 * 60 * 60; // 6 AM
-        PatternDTO pattern = createRouteAndSimplePattern(routeId, "9", "The Line");
+        PatternDTO pattern = createRouteAndSimplePattern(routeId, "9901900", "The Line");
         // make sure saved data matches expected data
         assertThat(pattern.route_id, equalTo(routeId));
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
