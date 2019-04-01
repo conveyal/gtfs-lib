@@ -31,8 +31,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -249,6 +251,39 @@ public class JdbcTableWriter implements TableWriter {
                 connection.rollback();
                 connection.close();
             }
+        }
+    }
+
+    /**
+     * For a given pattern id and starting stop sequence (inclusive), normalize all stop times to match the pattern
+     * stops' travel times.
+     * @return number of stop times updated
+     */
+    public int normalizeStopTimesForPattern (int id, int beginWithSequence) throws SQLException {
+        try {
+            JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
+                Table.PATTERN_STOP,
+                dataSource,
+                tablePrefix + ".",
+                EntityPopulator.PATTERN_STOP
+            );
+            String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
+            List<PatternStop> patternStopsToNormalize = new ArrayList<>();
+            for (PatternStop patternStop : patternStops.getOrdered(patternId)) {
+                // Update stop times for any pattern stop with matching stop sequence (or for all pattern stops if the list
+                // is null).
+                if (patternStop.stop_sequence >= beginWithSequence) {
+                    patternStopsToNormalize.add(patternStop);
+                }
+            }
+            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize);
+            connection.commit();
+            return stopTimesUpdated;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            DbUtils.closeQuietly(connection);
         }
     }
 
@@ -661,12 +696,76 @@ public class JdbcTableWriter implements TableWriter {
         statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
         // Set "where clause" with value for pattern_id and stop_sequence
         statement.setString(oneBasedIndex++, patternStop.get("pattern_id").asText());
+        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
+        // normalize stop sequence values for stop times during snapshotting for the editor.
         statement.setInt(oneBasedIndex++, patternStop.get("stop_sequence").asInt());
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
         LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
+    }
+
+    /**
+     * Normalizes all stop times' arrivals and departures for an ordered set of pattern stops. This set can be the full
+     * set of stops for a pattern or just a subset. Typical usage for this method would be to overwrite the arrival and
+     * departure times for existing trips after a pattern stop has been added or inserted into a pattern or if a
+     * pattern stop's default travel or dwell time were updated and the stop times need to reflect this update.
+     * @param patternStops list of pattern stops for which to update stop times (ordered by increasing stop_sequence)
+     * @throws SQLException
+     *
+     * TODO? add param Set<String> serviceIdFilters service_id values to filter trips on
+     */
+    private int updateStopTimesForPatternStops(List<PatternStop> patternStops) throws SQLException {
+        PatternStop firstPatternStop = patternStops.iterator().next();
+        int firstStopSequence = firstPatternStop.stop_sequence;
+        // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
+        int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
+        String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
+        String getFirstTravelTimeSql = String.format(
+            "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
+                "and t.pattern_id = ? " +
+                "and t.trip_id = st.trip_id",
+            timeField,
+            tablePrefix,
+            tablePrefix
+        );
+        PreparedStatement statement = connection.prepareStatement(getFirstTravelTimeSql);
+        statement.setInt(1, previousStopSequence);
+        statement.setString(2, firstPatternStop.pattern_id);
+        LOG.info(statement.toString());
+        ResultSet resultSet = statement.executeQuery();
+        Map<String, Integer> timesForTripIds = new HashMap<>();
+        while (resultSet.next()) {
+            timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
+        }
+        // Update stop times for individual trips with normalized travel times.
+        String updateTravelTimeSql = String.format(
+            "update %s.stop_times set arrival_time = ?, departure_time = ? where trip_id = ? and stop_sequence = ?",
+            tablePrefix
+        );
+        PreparedStatement updateStopTimeStatement = connection.prepareStatement(updateTravelTimeSql);
+        LOG.info(updateStopTimeStatement.toString());
+        final BatchTracker stopTimesTracker = new BatchTracker("stop_times", updateStopTimeStatement);
+        for (String tripId : timesForTripIds.keySet()) {
+            // Initialize travel time with previous stop time value.
+            int cumulativeTravelTime = timesForTripIds.get(tripId);
+            for (PatternStop patternStop : patternStops) {
+                // Gather travel/dwell time for pattern stop (being sure to check for missing values).
+                int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+                int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
+                int oneBasedIndex = 1;
+                // Increase travel time by current pattern stop's travel and dwell times (and set values for update).
+                cumulativeTravelTime += travelTime;
+                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
+                cumulativeTravelTime += dwellTime;
+                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
+                updateStopTimeStatement.setString(oneBasedIndex++, tripId);
+                updateStopTimeStatement.setInt(oneBasedIndex++, patternStop.stop_sequence);
+                stopTimesTracker.addBatch();
+            }
+        }
+        return stopTimesTracker.executeRemaining();
     }
 
     /**
@@ -1037,8 +1136,8 @@ public class JdbcTableWriter implements TableWriter {
 
     /**
      * For a given condition (fieldName = 'value'), delete all entities that match the condition. Because this uses the
-     * primary delete method, it also will delete any "child" entities that reference any entities matching the original
-     * query.
+     * {@link #delete(Integer, boolean)} method, it also will delete any "child" entities that reference any entities
+     * matching the original query.
      */
     @Override
     public int deleteWhere(String fieldName, String value, boolean autoCommit) throws SQLException {
@@ -1063,14 +1162,14 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info("Deleted {} {} entities", results.size(), specTable.name);
             return results.size();
         } catch (Exception e) {
+            // Rollback changes on failure.
             connection.rollback();
             LOG.error("Could not delete {} entity where {}={}", specTable.name, fieldName, value);
             e.printStackTrace();
             throw e;
         } finally {
             if (autoCommit) {
-                // Always rollback and close if auto-committing.
-                connection.rollback();
+                // Always close connection if auto-committing.
                 connection.close();
             }
         }
@@ -1116,6 +1215,14 @@ public class JdbcTableWriter implements TableWriter {
         // FIXME: should this take a connection and commit it?
         connection.commit();
         connection.close();
+    }
+
+    /**
+     * Ensure that database connection closes. This should be called once the table writer is no longer needed.
+     */
+    @Override
+    public void close() {
+        DbUtils.closeQuietly(connection);
     }
 
     /**
@@ -1202,7 +1309,12 @@ public class JdbcTableWriter implements TableWriter {
                 // There was one match found.
                 if (isCreating) {
                     // Under no circumstance should a new entity have a conflict with existing key field.
-                    throw new SQLException("New entity's key field must not match existing value.");
+                    throw new SQLException(
+                        String.format("New %s's %s value (%s) conflicts with an existing record in table.",
+                                      table.entityClass.getSimpleName(),
+                                      keyField,
+                                      keyValue)
+                    );
                 }
                 if (!uniqueIds.contains(id)) {
                     // There are two circumstances we could encounter here.

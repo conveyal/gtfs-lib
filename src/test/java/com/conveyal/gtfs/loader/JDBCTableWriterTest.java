@@ -6,6 +6,8 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
 import com.conveyal.gtfs.dto.RouteDTO;
@@ -13,7 +15,6 @@ import com.conveyal.gtfs.dto.ShapePointDTO;
 import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
-import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -24,8 +25,10 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.UUID;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.load;
@@ -332,6 +335,60 @@ public class JDBCTableWriterTest {
         ));
     }
 
+    /**
+     * This test verifies that stop_times#shape_dist_traveled (and other "linked fields") are updated when a pattern
+     * is updated.
+     */
+    @Test
+    public void shouldUpdateStopTimeShapeDistTraveledOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = newUUID();
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndPattern(
+            routeId,
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternStopDTO[]{
+                new PatternStopDTO(patternId, firstStopId, 0),
+                new PatternStopDTO(patternId, lastStopId, 1)
+            },
+            0
+        );
+        // Make sure saved data matches expected data.
+        assertThat(pattern.route_id, equalTo(routeId));
+        // Create trip so we can check that the stop_time values are updated after the patter update.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
+        PreparedStatement statement = testDataSource.getConnection().prepareStatement(
+            String.format(
+                "select shape_dist_traveled from %s.stop_times where stop_sequence=1 and trip_id='%s'",
+                testNamespace,
+                createdTrip.trip_id
+            )
+        );
+        ResultSet resultSet = statement.executeQuery();
+        while (resultSet.next()) {
+            // First stop_time shape_dist_traveled should be zero.
+            assertThat(resultSet.getInt(1), equalTo(0));
+        }
+        // Update pattern_stop#shape_dist_traveled and check that the stop_time's shape_dist value is updated.
+        final double updatedShapeDistTraveled = 45.5;
+        pattern.pattern_stops[1].shape_dist_traveled = updatedShapeDistTraveled;
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern: {}", updatedPatternOutput);
+        ResultSet resultSet2 = statement.executeQuery();
+        while (resultSet2.next()) {
+            // First stop_time shape_dist_traveled should be updated.
+            assertThat(resultSet2.getDouble(1), equalTo(updatedShapeDistTraveled));
+        }
+    }
+
     @Test
     public void shouldDeleteReferencingTripsAndStopTimesOnPatternDelete() throws IOException, SQLException, InvalidNamespaceException {
         String routeId = "9834914";
@@ -497,6 +554,59 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int)} can normalize stop times to a pattern's
+     * default travel times.
+     */
+    @Test
+    public void canNormalizePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table tripsTable = Table.TRIPS;
+        int initialTravelTime = 60; // one minute
+        int startTime = 6 * 60 * 60; // 6AM
+        String patternId = "123456";
+        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, firstStopId, 0),
+            new PatternStopDTO(patternId, lastStopId, 1)
+        };
+        patternStops[1].default_travel_time = initialTravelTime;
+        PatternDTO pattern = createRouteAndPattern(newUUID(),
+                                                   patternId,
+                                                   "Pattern A",
+                                                   null,
+                                                   new ShapePointDTO[]{},
+                                                   patternStops,
+                                                   0);
+        // Create trip with travel times that match pattern stops.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
+        JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
+        String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createTripOutput);
+        TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
+        // Update pattern stop with new travel time.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        int updatedTravelTime = 3600; // one hour
+        pattern.pattern_stops[1].default_travel_time = updatedTravelTime;
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+        // Normalize stop times.
+        JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
+        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
+        // Read pattern stops from database and check that the arrivals/departures have been updated.
+        JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
+                                                                       testDataSource,
+                                                                       testNamespace + ".",
+                                                                       EntityPopulator.STOP_TIME);
+        int index = 0;
+        for (StopTime stopTime : stopTimesTable.getOrdered(createdTrip.trip_id)) {
+            LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
+            assertThat(stopTime.arrival_time, equalTo(startTime + index * updatedTravelTime));
+            index++;
+        }
+        // Ensure that updated stop times equals pattern stops length
+        assertThat(index, equalTo(patternStops.length));
+    }
+
+    /**
      * This test makes sure that updated the service_id will properly update affected referenced entities properly.
      * This test case was initially developed to prove that https://github.com/conveyal/gtfs-lib/issues/203 is
      * happening.
@@ -525,6 +635,10 @@ public class JDBCTableWriterTest {
     /*****************************************************************************************************************
      * End tests, begin helpers
      ****************************************************************************************************************/
+
+    private static String newUUID() {
+        return UUID.randomUUID().toString();
+    }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
         LOG.info(sql);
