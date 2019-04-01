@@ -1,10 +1,12 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+import java.util.Set;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -16,13 +18,15 @@ public class StringField extends Field {
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public String validateAndConvert (String string) {
+    public ValidateFieldResult<String> validateAndConvert (String string) {
         return cleanString(string);
     }
 
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
+            ValidateFieldResult<String> result = validateAndConvert(string);
+            preparedStatement.setString(oneBasedIndex, result.clean);
+            return result.errors;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }

@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 import com.google.common.collect.Sets;
@@ -198,21 +199,24 @@ public class CurrencyField extends Field {
         super(name, requirement);
     }
 
-    private String validate (String string) {
+    private ValidateFieldResult<String> validate (String string) {
+        ValidateFieldResult<String> result = new ValidateFieldResult<>(string);
         if (!CURRENCY_CODES.contains(string)) {
-            throw new StorageException(NewGTFSErrorType.CURRENCY_UNKNOWN, string);
+            result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.CURRENCY_UNKNOWN, string));
         }
-        return string;
+        return result;
     }
 
     /** Check that a string can be properly parsed and is in range. */
-    public String validateAndConvert (String string) {
+    public ValidateFieldResult<String> validateAndConvert (String string) {
         return validate(string);
     }
 
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setString(oneBasedIndex, validateAndConvert(string));
+            ValidateFieldResult<String> result = validateAndConvert(string);
+            preparedStatement.setString(oneBasedIndex, result.clean);
+            return result.errors;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }

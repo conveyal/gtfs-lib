@@ -34,7 +34,10 @@ public class BatchTracker {
         }
     }
 
-    public void executeRemaining() throws SQLException {
+    /**
+     * Execute any remaining statements and return the total records processed.
+     */
+    public int executeRemaining() throws SQLException {
         if (currentBatchSize > 0) {
             totalRecordsProcessed += currentBatchSize;
             preparedStatement.executeBatch();
@@ -42,7 +45,8 @@ public class BatchTracker {
         }
         // Avoid reuse, signal that this was cleanly closed.
         preparedStatement = null;
-        LOG.info(String.format("Inserted %d %s records", totalRecordsProcessed, recordType));
+        LOG.info(String.format("Processed %d %s records", totalRecordsProcessed, recordType));
+        return totalRecordsProcessed;
     }
 
     public void finalize () {

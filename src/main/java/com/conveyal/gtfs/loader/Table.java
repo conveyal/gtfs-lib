@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -19,9 +20,14 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
+import com.csvreader.CsvReader;
+import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -31,12 +37,19 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
 import static com.conveyal.gtfs.loader.Requirement.OPTIONAL;
@@ -70,6 +83,11 @@ public class Table {
     private boolean usePrimaryKey = false;
     /** Indicates whether the table has unique key field. */
     private boolean hasUniqueKeyField = true;
+    /**
+     * Indicates whether the table has a compound key that must be used in conjunction with the key field to determine
+     * table uniqueness(e.g., transfers#to_stop_id).
+     * */
+    private boolean compoundKey;
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -118,7 +136,7 @@ public class Table {
     );
 
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
-        new StringField("service_id", REQUIRED),
+        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR),
         new DateField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
     ).keyFieldIsNotUnique();
@@ -241,7 +259,8 @@ public class Table {
             new StringField("transfer_type", REQUIRED),
             new StringField("min_transfer_time", OPTIONAL))
             .addPrimaryKey()
-            .keyFieldIsNotUnique();
+            .keyFieldIsNotUnique()
+            .hasCompoundKey();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id",  REQUIRED),
@@ -321,10 +340,17 @@ public class Table {
     }
 
     /**
-     * Fluent method to de-set the
+     * Fluent method to de-set the hasUniqueKeyField flag for tables which the first field should not be considered a
+     * primary key.
      */
-    private Table keyFieldIsNotUnique() {
+    public Table keyFieldIsNotUnique() {
         this.hasUniqueKeyField = false;
+        return this;
+    }
+
+    /** Fluent method to set whether the table has a compound key, e.g., transfers#to_stop_id. */
+    private Table hasCompoundKey() {
+        this.compoundKey = true;
         return this;
     }
 
@@ -452,10 +478,52 @@ public class Table {
         String tableName = namespace == null
                 ? name
                 : String.join(".", namespace, name);
-        String questionMarks = String.join(", ", Collections.nCopies(editorFields().size(), "?"));
         String joinedFieldNames = commaSeparatedNames(editorFields());
         String idValue = setDefaultId ? "DEFAULT" : "?";
-        return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
+        return String.format(
+            "insert into %s (id, %s) values (%s, %s)",
+            tableName,
+            joinedFieldNames,
+            idValue,
+            String.join(", ", Collections.nCopies(editorFields().size(), "?"))
+        );
+    }
+
+    /**
+     * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
+     * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
+     * It records an error if the entry is in a subdirectory (as long as errorStorage is not null).
+     * It then creates a CSV reader for that table if it's found.
+     */
+    public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
+        final String tableFileName = this.name + ".txt";
+        ZipEntry entry = zipFile.getEntry(tableFileName);
+        if (entry == null) {
+            // Table was not found, check if it is in a subdirectory.
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry e = entries.nextElement();
+                if (e.getName().endsWith(tableFileName)) {
+                    entry = e;
+                    if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, TABLE_IN_SUBDIRECTORY));
+                    break;
+                }
+            }
+        }
+        if (entry == null) return null;
+        try {
+            InputStream zipInputStream = zipFile.getInputStream(entry);
+            // Skip any byte order mark that may be present. Files must be UTF-8,
+            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
+            InputStream bomInputStream = new BOMInputStream(zipInputStream);
+            CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
+            csvReader.readHeaders();
+            return csvReader;
+        } catch (IOException e) {
+            LOG.error("Exception while opening zip entry: {}", e);
+            e.printStackTrace();
+            return null;
+        }
     }
 
     /**
@@ -646,13 +714,14 @@ public class Table {
     }
 
     /**
-     * Returns field name that defines order for grouped entities. WARNING: this MUST be called on a spec table (i.e.,
-     * one of the constant tables defined in this class). Otherwise, it could return null even if the table has an order
-     * field defined.
+     * Returns field name that defines order for grouped entities or that defines the compound key field (e.g.,
+     * transfers#to_stop_id). WARNING: this field must be in the 1st position (base zero) of the fields array; hence,
+     * this MUST be called on a spec table (i.e., one of the constant tables defined in this class). Otherwise, it could
+     * return null even if the table has an order field defined.
      */
     public String getOrderFieldName () {
         String name = fields[1].name;
-        if (name.contains("_sequence")) return name;
+        if (name.contains("_sequence") || compoundKey) return name;
         else return null;
     }
 
@@ -673,13 +742,11 @@ public class Table {
 
 
     /**
-     * Finds the index of the field given a string name.
+     * Finds the index of the field for this table given a string name.
      * @return the index of the field or -1 if no match is found
      */
     public int getFieldIndex (String name) {
-        // Linear search, assuming a small number of fields per table.
-        for (int i = 0; i < fields.length; i++) if (fields[i].name.equals(name)) return i;
-        return -1;
+        return Field.getFieldIndex(fields, name);
     }
 
     /**
@@ -691,6 +758,14 @@ public class Table {
 
     public boolean isRequired () {
         return required == REQUIRED;
+    }
+
+    /**
+     * Checks whether the table is part of the GTFS specification, i.e., it is not an internal table used for the editor
+     * (e.g., Patterns or PatternStops).
+     */
+    public boolean isSpecTable() {
+        return required == REQUIRED || required == OPTIONAL;
     }
 
     /**
@@ -871,74 +946,127 @@ public class Table {
     }
 
     /**
-     * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
-     * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error.
+     * During table load, checks the uniqueness of the entity ID and that references are valid. NOTE: This method
+     * defaults the key field and order field names to this table's values.
+     * @param keyValue          key value for the record being checked
+     * @param lineNumber        line number of the record being checked
+     * @param field             field currently being checked
+     * @param value             value that corresponds to field
+     * @param referenceTracker  reference tracker in which to store references
+     * @return                  any duplicate or bad reference errors.
      */
-    public void checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String string, JdbcGtfsLoader.ReferenceTracker referenceTracker) {
+    public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, ReferenceTracker referenceTracker) {
+        return checkReferencesAndUniqueness(keyValue, lineNumber, field, value, referenceTracker, getKeyFieldName(), getOrderFieldName());
+    }
+
+    /**
+     * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
+     * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error. NOTE:
+     * this instance of checkReferencesAndUniqueness allows for arbitrarily setting the keyField and orderField, which
+     * is helpful for checking uniqueness of fields that are not the standard primary key (e.g., route_short_name).
+     */
+    public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, ReferenceTracker referenceTracker, String keyField, String orderField) {
+        Set<NewGTFSError> errors = new HashSet<>();
         // Store field-scoped transit ID for referential integrity check. (Note, entity scoping doesn't work here because
         // we need to cross-check multiple entity types for valid references, e.g., stop times and trips both share trip
         // id.)
-        String keyField = getKeyFieldName();
-        String orderField = getOrderFieldName();
-        // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
-        // duplicates. If it has an order field, that order field should supersede the key field as the "unique" field.
-        String uniqueKeyField = !hasUniqueKeyField ? null : orderField != null ? orderField : keyField;
+        // If table has an order field, that order field should supersede the key field as the "unique" field. In other
+        // words, if it has an order field, the unique key is actually compound -- made up of the keyField + orderField.
+        String uniqueKeyField = orderField != null
+            ? orderField
+            // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
+            // duplicates.
+            : !hasUniqueKeyField
+                ? null
+                : keyField;
         String transitId = String.join(":", keyField, keyValue);
 
         // If the field is optional and there is no value present, skip check.
-        if (!field.isRequired() && "".equals(string)) return;
+        if (!field.isRequired() && "".equals(value)) return Collections.EMPTY_SET;
 
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
         if (field.isForeignReference()) {
-            // Check referential integrity if applicable
+            // Check referential integrity if the field is a foreign reference. Note: the reference table must be loaded
+            // before the table/value being currently checked.
             String referenceField = field.referenceTable.getKeyFieldName();
-            String referenceTransitId = String.join(":", referenceField, string);
+            String referenceTransitId = String.join(":", referenceField, value);
 
             if (!referenceTracker.transitIds.contains(referenceTransitId)) {
                 // If the reference tracker does not contain
                 NewGTFSError referentialIntegrityError = NewGTFSError.forLine(
                         this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
                         .setEntityId(keyValue);
-                if (isOrderField) {
-                    // If the field is an order field, set the sequence for the new error.
-                    referentialIntegrityError.setSequence(string);
-                }
-                referenceTracker.errorStorage.storeError(referentialIntegrityError);
+                // If the field is an order field, set the sequence for the new error.
+                if (isOrderField) referentialIntegrityError.setSequence(value);
+                errors.add(referentialIntegrityError);
             }
         }
-
+        // Next, handle duplicate ID check.
+        // In most cases there is no need to check for duplicate IDs if the field is a foreign reference. However,
+        // transfers#to_stop_id is defined as an order field, so we need to check that this field (which is both a
+        // foreign ref and order field) is dataset unique in conjunction with the key field.
         // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
         // whether an order field is part of the "unique ID."
         Set<String> listOfUniqueIds = referenceTracker.transitIds;
         String uniqueId = transitId;
 
-        // There is no need to check for duplicate IDs if the field is a foreign reference.
-        if (field.isForeignReference()) return;
-        // Next, check that the ID is table-unique.
+        // Next, check that the ID is table-unique. For example, the trip_id field is table unique in trips.txt and
+        // the the stop_sequence field (joined with trip_id) is table unique in stop_times.txt.
         if (field.name.equals(uniqueKeyField)) {
             // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
             if (isOrderField) {
                 // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
                 // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
                 listOfUniqueIds = referenceTracker.transitIdsWithSequence;
-                uniqueId = String.join(":", field.name, keyValue, string);
+                uniqueId = String.join(":", field.name, keyValue, value);
             }
             // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
             boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
             if (valueAlreadyExists) {
                 // If the value is a duplicate, add an error.
                 NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
-                        .setEntityId(keyValue);
-                if (isOrderField) {
-                    duplicateIdError.setSequence(string);
-                }
-                referenceTracker.errorStorage.storeError(duplicateIdError);
+                                                            .setEntityId(keyValue);
+                if (isOrderField) duplicateIdError.setSequence(value);
+                errors.add(duplicateIdError);
             }
-        } else {
-            // If the field is not the table unique key field, skip the duplicate ID check and simply add the ID to the
-            // list of unique IDs.
-            listOfUniqueIds.add(uniqueId);
+        } else if (field.name.equals(keyField) && !field.isForeignReference()) {
+            // We arrive here if the field is not a foreign reference and not the unique key field on the table (e.g.,
+            // shape_pt_sequence), but is still a key on the table. For example, this is where we add shape_id from
+            // the shapes table, so that when we check the referential integrity of trips#shape_id, we know that the
+            // shape_id exists in the shapes table. It also handles tracking calendar_dates#service_id values.
+            referenceTracker.transitIds.add(uniqueId);
         }
+        return errors;
+    }
+
+    /**
+     * For an array of field headers, returns the matching set of {@link Field}s for a {@link Table}. If errorStorage is
+     * not null, errors related to unexpected or duplicate header names will be stored.
+     */
+    public Field[] getFieldsFromFieldHeaders(String[] headers, SQLErrorStorage errorStorage) {
+        Field[] fields = new Field[headers.length];
+        Set<String> fieldsSeen = new HashSet<>();
+        for (int h = 0; h < headers.length; h++) {
+            String header = sanitize(headers[h], errorStorage);
+            if (fieldsSeen.contains(header) || "id".equals(header)) {
+                // FIXME: add separate error for tables containing ID field.
+                if (errorStorage != null) errorStorage.storeError(NewGTFSError.forTable(this, DUPLICATE_HEADER).setBadValue(header));
+                fields[h] = null;
+            } else {
+                fields[h] = getFieldForName(header);
+                fieldsSeen.add(header);
+            }
+        }
+        return fields;
+    }
+
+    /**
+     * Returns the index of the key field within the array of fields provided for a given table.
+     * @param fields array of fields (intended to be derived from the headers of a csv text file)
+     */
+    public int getKeyFieldIndex(Field[] fields) {
+        String keyField = getKeyFieldName();
+        return Field.getFieldIndex(fields, keyField);
     }
 }

@@ -21,4 +21,6 @@ public interface TableWriter <T extends Entity> {
     int deleteWhere (String fieldName, String value, boolean autoCommit) throws SQLException;
 
     void commit () throws SQLException;
+
+    void close ();
 }
