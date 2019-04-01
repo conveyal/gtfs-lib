@@ -261,7 +261,12 @@ public class JdbcTableWriter implements TableWriter {
      */
     public int normalizeStopTimesForPattern (int id, int beginWithSequence) throws SQLException {
         try {
-            JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(Table.PATTERN_STOP, dataSource, tablePrefix + ".", EntityPopulator.PATTERN_STOP);
+            JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
+                Table.PATTERN_STOP,
+                dataSource,
+                tablePrefix + ".",
+                EntityPopulator.PATTERN_STOP
+            );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
             List<PatternStop> patternStopsToNormalize = new ArrayList<>();
             for (PatternStop patternStop : patternStops.getOrdered(patternId)) {

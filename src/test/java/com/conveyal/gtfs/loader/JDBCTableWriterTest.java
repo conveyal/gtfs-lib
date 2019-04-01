@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
@@ -334,6 +335,60 @@ public class JDBCTableWriterTest {
         ));
     }
 
+    /**
+     * This test verifies that stop_times#shape_dist_traveled (and other "linked fields") are updated when a pattern
+     * is updated.
+     */
+    @Test
+    public void shouldUpdateStopTimeShapeDistTraveledOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = newUUID();
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndPattern(
+            routeId,
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternStopDTO[]{
+                new PatternStopDTO(patternId, firstStopId, 0),
+                new PatternStopDTO(patternId, lastStopId, 1)
+            },
+            0
+        );
+        // Make sure saved data matches expected data.
+        assertThat(pattern.route_id, equalTo(routeId));
+        // Create trip so we can check that the stop_time values are updated after the patter update.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
+        PreparedStatement statement = testDataSource.getConnection().prepareStatement(
+            String.format(
+                "select shape_dist_traveled from %s.stop_times where stop_sequence=1 and trip_id='%s'",
+                testNamespace,
+                createdTrip.trip_id
+            )
+        );
+        ResultSet resultSet = statement.executeQuery();
+        while (resultSet.next()) {
+            // First stop_time shape_dist_traveled should be zero.
+            assertThat(resultSet.getInt(1), equalTo(0));
+        }
+        // Update pattern_stop#shape_dist_traveled and check that the stop_time's shape_dist value is updated.
+        final double updatedShapeDistTraveled = 45.5;
+        pattern.pattern_stops[1].shape_dist_traveled = updatedShapeDistTraveled;
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern: {}", updatedPatternOutput);
+        ResultSet resultSet2 = statement.executeQuery();
+        while (resultSet2.next()) {
+            // First stop_time shape_dist_traveled should be updated.
+            assertThat(resultSet2.getDouble(1), equalTo(updatedShapeDistTraveled));
+        }
+    }
+
     @Test
     public void shouldDeleteReferencingTripsAndStopTimesOnPatternDelete() throws IOException, SQLException, InvalidNamespaceException {
         String routeId = "9834914";
@@ -514,7 +569,7 @@ public class JDBCTableWriterTest {
             new PatternStopDTO(patternId, lastStopId, 1)
         };
         patternStops[1].default_travel_time = initialTravelTime;
-        PatternDTO pattern = createRouteAndPattern(UUID.randomUUID().toString(),
+        PatternDTO pattern = createRouteAndPattern(newUUID(),
                                                    patternId,
                                                    "Pattern A",
                                                    null,
@@ -580,6 +635,10 @@ public class JDBCTableWriterTest {
     /*****************************************************************************************************************
      * End tests, begin helpers
      ****************************************************************************************************************/
+
+    private static String newUUID() {
+        return UUID.randomUUID().toString();
+    }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
         LOG.info(sql);
