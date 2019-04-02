@@ -30,7 +30,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
 import java.util.UUID;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
@@ -165,12 +164,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, feedInfoTable.name);
 
         // make sure record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-            "select * from %s.%s where id=%d",
-            testNamespace,
-            feedInfoTable.name,
-            createdFeedInfo.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFeedInfo.id, feedInfoTable));
     }
 
     /**
@@ -270,20 +264,10 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                fareTable.name,
-                createdFare.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.id, fareTable);
 
         // make sure fare_rules record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.FARE_RULES.name,
-                createdFare.fare_rules[0].id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
     }
 
     @Test
@@ -331,12 +315,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
         // make sure route record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                routeTable.name,
-                createdRoute.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdRoute.id, routeTable));
     }
 
     /**
@@ -405,12 +384,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
 
         // make sure route record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-            "select * from %s.%s where id=%d",
-            testNamespace,
-            scheduleExceptionTable.name,
-            scheduleException.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(scheduleException.id, scheduleExceptionTable));
     }
 
     /**
@@ -478,27 +452,13 @@ public class JDBCTableWriterTest {
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
-        assertThatSqlQueryYieldsRowCount(
-            String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.TRIPS.name,
-                createdTrip.id
-            ),
-            1
-        );
+        assertThatSqlQueryYieldsRowCount(getAllColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Delete pattern record
         JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
         int deleteOutput = deletePatternWriter.delete(pattern.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, Table.PATTERNS.name);
         // Check that pattern record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(
-            String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.PATTERNS.name,
-                pattern.id
-            ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(pattern.id, Table.PATTERNS));
         // Check that trip records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
@@ -719,9 +679,9 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Executes SQL query for the specified ID and columns and returns the resulting result set.
+     * Constructs SQL query for the specified ID and columns and returns the resulting result set.
      */
-    private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
+    private String getColumnsForId(int id, Table table, String... columns) throws SQLException {
         String sql = String.format(
             "select %s from %s.%s where id=%d",
             String.join(", ", columns),
@@ -729,9 +689,23 @@ public class JDBCTableWriterTest {
             table.name,
             id
         );
-        return testDataSource.getConnection()
-                                     .prepareStatement(sql)
-                                     .executeQuery();
+        LOG.info(sql);
+        return sql;
+    }
+
+    /**
+     * Constructs SQL query for the specified ID for all table columns and returns the resulting result set.
+     */
+    private String getAllColumnsForId(int id, Table table) throws SQLException {
+        return getColumnsForId(id, table, "*");
+    }
+
+    /**
+     * Executes SQL query for the specified ID and columns and returns the resulting result set.
+     */
+    private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
+        String sql = getColumnsForId(id, table, columns);
+        return testDataSource.getConnection().prepareStatement(sql).executeQuery();
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
