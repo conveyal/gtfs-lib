@@ -34,7 +34,8 @@ public class DateListField extends Field {
     public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
             String[] dateStrings = Arrays.stream(string.split(","))
-                    .map(DateField::validate)
+                    // Validate date strings and get the clean value.
+                    .map(s -> DateField.validate(s).clean)
                     .toArray(String[]::new);
             Array array = preparedStatement.getConnection().createArrayOf("text", dateStrings);
             preparedStatement.setArray(oneBasedIndex, array);

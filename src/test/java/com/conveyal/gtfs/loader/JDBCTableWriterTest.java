@@ -6,6 +6,8 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
+import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
@@ -28,6 +30,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.UUID;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
@@ -37,6 +40,7 @@ import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /**
@@ -332,6 +336,80 @@ public class JDBCTableWriterTest {
                 testNamespace,
                 routeTable.name,
                 createdRoute.id
+        ));
+    }
+
+    /**
+     * Ensure that a simple {@link ScheduleException} can be created, updated, and deleted.
+     */
+    @Test
+    public void canCreateUpdateAndDeleteScheduleExceptions() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
+        final Class<ScheduleExceptionDTO> scheduleExceptionDTOClass = ScheduleExceptionDTO.class;
+
+        // create new object to be saved
+        ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
+        exceptionInput.name = "Halloween";
+        exceptionInput.exemplar = 9; // Add, swap, or remove type
+        exceptionInput.removed_service = new String[]{simpleServiceId};
+        String[] halloweenDate = new String[]{"20191031"};
+        exceptionInput.dates = halloweenDate;
+        TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
+        ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput,
+                                                                         scheduleExceptionDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(scheduleException.removed_service[0], equalTo(simpleServiceId));
+        ResultSet resultSet = getResultSetForId(scheduleException.id, scheduleExceptionTable, "removed_service");
+        while (resultSet.next()) {
+            String[] array = (String[]) resultSet.getArray(1).getArray();
+            for (int i = 0; i < array.length; i++) {
+                assertEquals(exceptionInput.removed_service[i], array[i]);
+
+            }
+        }
+        // try to update record
+        String[] updatedDates = new String[]{"20191031", "20201031"};
+        scheduleException.dates = updatedDates;
+
+        // covert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String updateOutput = updateTableWriter.update(
+            scheduleException.id,
+            mapper.writeValueAsString(scheduleException),
+            true
+        );
+        LOG.info("update {} output:", scheduleExceptionTable.name);
+        LOG.info(updateOutput);
+
+        ScheduleExceptionDTO updatedDTO = mapper.readValue(updateOutput, scheduleExceptionDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedDTO.dates, equalTo(updatedDates));
+        ResultSet rs2 = getResultSetForId(scheduleException.id, scheduleExceptionTable, "dates");
+        while (rs2.next()) {
+            String[] array = (String[]) rs2.getArray(1).getArray();
+            for (int i = 0; i < array.length; i++) {
+                assertEquals(updatedDates[i], array[i]);
+
+            }
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(scheduleExceptionTable);
+        int deleteOutput = deleteTableWriter.delete(
+            scheduleException.id,
+            true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
+
+        // make sure route record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(String.format(
+            "select * from %s.%s where id=%d",
+            testNamespace,
+            scheduleExceptionTable.name,
+            scheduleException.id
         ));
     }
 
@@ -638,6 +716,22 @@ public class JDBCTableWriterTest {
 
     private static String newUUID() {
         return UUID.randomUUID().toString();
+    }
+
+    /**
+     * Executes SQL query for the specified ID and columns and returns the resulting result set.
+     */
+    private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
+        String sql = String.format(
+            "select %s from %s.%s where id=%d",
+            String.join(", ", columns),
+            testNamespace,
+            table.name,
+            id
+        );
+        return testDataSource.getConnection()
+                                     .prepareStatement(sql)
+                                     .executeQuery();
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
