@@ -264,7 +264,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.id, fareTable);
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.id, fareTable));
 
         // make sure fare_rules record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
