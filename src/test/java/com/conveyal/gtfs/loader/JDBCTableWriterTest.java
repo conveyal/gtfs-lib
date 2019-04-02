@@ -6,6 +6,7 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
@@ -630,6 +631,106 @@ public class JDBCTableWriterTest {
             ),
             53
         );
+    }
+
+    /**
+     * Tests whether schedule exceptions can be created, updated and deleted. This particular test creates a schedule
+     * exception with a custom schedule, so more tests may be needed to verify the functionality with the other types of
+     * schedule exceptions.
+     */
+    @Test
+    public void canCreateUpdateAndDeleteScheduleExceptions () throws IOException, SQLException, InvalidNamespaceException {
+        // create an associated calendar record
+        String weekdayCalendarServiceId = "weekday-exception-test";
+        createWeekdayCalendar(weekdayCalendarServiceId, "20190103", "20190104");
+
+        // Store Table and Class values for use in test.
+        final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
+        final Class<ScheduleExceptionDTO> scheduleExceptionDTOClass = ScheduleExceptionDTO.class;
+
+        // create new object to be saved
+        ScheduleExceptionDTO scheduleExceptionInput = new ScheduleExceptionDTO();
+        String exceptionName = "test-exception";
+        scheduleExceptionInput.name = exceptionName;
+        scheduleExceptionInput.id = -2;
+        scheduleExceptionInput.exemplar = 8;
+        scheduleExceptionInput.custom_schedule = new String[]{weekdayCalendarServiceId};
+        scheduleExceptionInput.dates = new String[]{"20190105"};
+
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String createOutput = createTableWriter.create(mapper.writeValueAsString(scheduleExceptionInput), true);
+        LOG.info("create {} output:", scheduleExceptionTable.name);
+        LOG.info(createOutput);
+
+        // parse output
+        ScheduleExceptionDTO createdScheduleException = mapper.readValue(createOutput, scheduleExceptionDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(createdScheduleException.name, equalTo(exceptionName));
+
+        // make sure record exists in database
+        assertThatSqlQueryYieldsRowCount(
+            String.format(
+                "select * from %s.%s where name='%s'",
+                testNamespace,
+                scheduleExceptionTable.name,
+                exceptionName
+            ),
+            1
+        );
+
+        // try to update record
+        String updatedExceptionName = "test-exception-updated";
+        createdScheduleException.name = updatedExceptionName;
+
+        // covert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String updateOutput = updateTableWriter.update(
+            createdScheduleException.id,
+            mapper.writeValueAsString(createdScheduleException),
+            true
+        );
+        LOG.info("update {} output:", scheduleExceptionTable.name);
+        LOG.info(updateOutput);
+
+        ScheduleExceptionDTO updatedScheduleExceptionDTO = mapper.readValue(updateOutput, scheduleExceptionDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedScheduleExceptionDTO.name, equalTo(updatedExceptionName));
+
+        // verify that record was updated in database
+        assertThatSqlQueryYieldsZeroRows(String.format(
+            "select * from %s.%s where name='%s'",
+            testNamespace,
+            scheduleExceptionTable.name,
+            exceptionName
+        ));
+        assertThatSqlQueryYieldsRowCount(
+            String.format(
+                "select * from %s.%s where name='%s'",
+                testNamespace,
+                scheduleExceptionTable.name,
+                updatedExceptionName
+            ),
+            1
+        );
+
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(scheduleExceptionTable);
+        int deleteOutput = deleteTableWriter.delete(
+            createdScheduleException.id,
+            true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
+
+        // make sure record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(String.format(
+            "select * from %s.%s where id=%d",
+            testNamespace,
+            scheduleExceptionTable.name,
+            createdScheduleException.id
+        ));
     }
 
     /*****************************************************************************************************************
