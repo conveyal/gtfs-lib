@@ -6,6 +6,8 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
+import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
@@ -37,6 +39,7 @@ import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 
 /**
@@ -161,12 +164,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, feedInfoTable.name);
 
         // make sure record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-            "select * from %s.%s where id=%d",
-            testNamespace,
-            feedInfoTable.name,
-            createdFeedInfo.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFeedInfo.id, feedInfoTable));
     }
 
     /**
@@ -266,20 +264,10 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                fareTable.name,
-                createdFare.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.id, fareTable));
 
         // make sure fare_rules record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.FARE_RULES.name,
-                createdFare.fare_rules[0].id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
     }
 
     @Test
@@ -327,12 +315,68 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
         // make sure route record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                routeTable.name,
-                createdRoute.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdRoute.id, routeTable));
+    }
+
+    /**
+     * Ensure that a simple {@link ScheduleException} can be created, updated, and deleted.
+     */
+    @Test
+    public void canCreateUpdateAndDeleteScheduleExceptions() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
+        final Class<ScheduleExceptionDTO> scheduleExceptionDTOClass = ScheduleExceptionDTO.class;
+        // Create new object to be saved.
+        ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
+        exceptionInput.name = "Halloween";
+        exceptionInput.exemplar = 9; // Add, swap, or remove type
+        exceptionInput.removed_service = new String[]{simpleServiceId};
+        String[] halloweenDate = new String[]{"20191031"};
+        exceptionInput.dates = halloweenDate;
+        TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
+        ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput,
+                                                                         scheduleExceptionDTOClass);
+        // Make sure saved data matches expected data.
+        assertThat(scheduleException.removed_service[0], equalTo(simpleServiceId));
+        ResultSet resultSet = getResultSetForId(scheduleException.id, scheduleExceptionTable, "removed_service");
+        while (resultSet.next()) {
+            String[] array = (String[]) resultSet.getArray(1).getArray();
+            for (int i = 0; i < array.length; i++) {
+                assertEquals(exceptionInput.removed_service[i], array[i]);
+            }
+        }
+        // try to update record
+        String[] updatedDates = new String[]{"20191031", "20201031"};
+        scheduleException.dates = updatedDates;
+        // covert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String updateOutput = updateTableWriter.update(
+            scheduleException.id,
+            mapper.writeValueAsString(scheduleException),
+            true
+        );
+        LOG.info("update {} output:", scheduleExceptionTable.name);
+        LOG.info(updateOutput);
+        ScheduleExceptionDTO updatedDTO = mapper.readValue(updateOutput, scheduleExceptionDTOClass);
+        // Make sure saved data matches expected data.
+        assertThat(updatedDTO.dates, equalTo(updatedDates));
+        ResultSet rs2 = getResultSetForId(scheduleException.id, scheduleExceptionTable, "dates");
+        while (rs2.next()) {
+            String[] array = (String[]) rs2.getArray(1).getArray();
+            for (int i = 0; i < array.length; i++) {
+                assertEquals(updatedDates[i], array[i]);
+            }
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(scheduleExceptionTable);
+        int deleteOutput = deleteTableWriter.delete(
+            scheduleException.id,
+            true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
+        // Make sure route record does not exist in DB.
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(scheduleException.id, scheduleExceptionTable));
     }
 
     /**
@@ -400,27 +444,13 @@ public class JDBCTableWriterTest {
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
-        assertThatSqlQueryYieldsRowCount(
-            String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.TRIPS.name,
-                createdTrip.id
-            ),
-            1
-        );
+        assertThatSqlQueryYieldsRowCount(getAllColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Delete pattern record
         JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
         int deleteOutput = deletePatternWriter.delete(pattern.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, Table.PATTERNS.name);
         // Check that pattern record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(
-            String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.PATTERNS.name,
-                pattern.id
-            ));
+        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(pattern.id, Table.PATTERNS));
         // Check that trip records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
@@ -638,6 +668,36 @@ public class JDBCTableWriterTest {
 
     private static String newUUID() {
         return UUID.randomUUID().toString();
+    }
+
+    /**
+     * Constructs SQL query for the specified ID and columns and returns the resulting result set.
+     */
+    private String getColumnsForId(int id, Table table, String... columns) throws SQLException {
+        String sql = String.format(
+            "select %s from %s.%s where id=%d",
+            String.join(", ", columns),
+            testNamespace,
+            table.name,
+            id
+        );
+        LOG.info(sql);
+        return sql;
+    }
+
+    /**
+     * Constructs SQL query for the specified ID for all table columns and returns the resulting result set.
+     */
+    private String getAllColumnsForId(int id, Table table) throws SQLException {
+        return getColumnsForId(id, table, "*");
+    }
+
+    /**
+     * Executes SQL query for the specified ID and columns and returns the resulting result set.
+     */
+    private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
+        String sql = getColumnsForId(id, table, columns);
+        return testDataSource.getConnection().prepareStatement(sql).executeQuery();
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
