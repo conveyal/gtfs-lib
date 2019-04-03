@@ -326,8 +326,7 @@ public class JDBCTableWriterTest {
         // Store Table and Class values for use in test.
         final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
         final Class<ScheduleExceptionDTO> scheduleExceptionDTOClass = ScheduleExceptionDTO.class;
-
-        // create new object to be saved
+        // Create new object to be saved.
         ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
         exceptionInput.name = "Halloween";
         exceptionInput.exemplar = 9; // Add, swap, or remove type
@@ -338,21 +337,18 @@ public class JDBCTableWriterTest {
         String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
         ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput,
                                                                          scheduleExceptionDTOClass);
-
-        // make sure saved data matches expected data
+        // Make sure saved data matches expected data.
         assertThat(scheduleException.removed_service[0], equalTo(simpleServiceId));
         ResultSet resultSet = getResultSetForId(scheduleException.id, scheduleExceptionTable, "removed_service");
         while (resultSet.next()) {
             String[] array = (String[]) resultSet.getArray(1).getArray();
             for (int i = 0; i < array.length; i++) {
                 assertEquals(exceptionInput.removed_service[i], array[i]);
-
             }
         }
         // try to update record
         String[] updatedDates = new String[]{"20191031", "20201031"};
         scheduleException.dates = updatedDates;
-
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(scheduleExceptionTable);
         String updateOutput = updateTableWriter.update(
@@ -362,17 +358,14 @@ public class JDBCTableWriterTest {
         );
         LOG.info("update {} output:", scheduleExceptionTable.name);
         LOG.info(updateOutput);
-
         ScheduleExceptionDTO updatedDTO = mapper.readValue(updateOutput, scheduleExceptionDTOClass);
-
-        // make sure saved data matches expected data
+        // Make sure saved data matches expected data.
         assertThat(updatedDTO.dates, equalTo(updatedDates));
         ResultSet rs2 = getResultSetForId(scheduleException.id, scheduleExceptionTable, "dates");
         while (rs2.next()) {
             String[] array = (String[]) rs2.getArray(1).getArray();
             for (int i = 0; i < array.length; i++) {
                 assertEquals(updatedDates[i], array[i]);
-
             }
         }
         // try to delete record
@@ -382,8 +375,7 @@ public class JDBCTableWriterTest {
             true
         );
         LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
-
-        // make sure route record does not exist in DB
+        // Make sure route record does not exist in DB.
         assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(scheduleException.id, scheduleExceptionTable));
     }
 
