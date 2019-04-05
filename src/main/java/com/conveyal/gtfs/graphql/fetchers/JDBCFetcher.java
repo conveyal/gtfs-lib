@@ -54,8 +54,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     public static final String MAX_LAT = "maxLat";
     public static final String MAX_LON = "maxLon";
     // Lists of column names to be used when searching for string matches in the respective tables.
-    private static final List<String> stopSearchColumns = Arrays.asList("stop_id", "stop_code", "stop_name");
-    private static final List<String> routeSearchColumns = Arrays.asList("route_id", "route_short_name", "route_long_name");
+    private static final String[] stopSearchColumns = new String[]{"stop_id", "stop_code", "stop_name"};
+    private static final String[] routeSearchColumns = new String[]{"route_id", "route_short_name", "route_long_name"};
     // The following lists of arguments are considered non-standard, i.e., they are not handled by filtering entities
     // with a simple WHERE clause. They are all bundled together in argsToSkip as a convenient way to pass over them
     // when constructing said WHERE clause.
@@ -212,10 +212,26 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         // clause. This could conceivably be done automatically, but it's clearer to just express the intent.
         // Note, this is assuming the type of the field in the parent is a string.
         if (childJoinField != null && parentJoinValues != null && !parentJoinValues.isEmpty()) {
-            whereConditions.add(makeInClause(childJoinField, parentJoinValues, preparedStatementParameters));
+            // Ensure that child join field exists in join table.
+            if (filterByExistingColumns(namespace, childJoinField).contains(childJoinField)) {
+                whereConditions.add(
+                    makeInClause(childJoinField, parentJoinValues, preparedStatementParameters)
+                );
+            } else {
+                // If the child join field does not exist, a query with the where clause would
+                // result in a SQL exception. If we omitted the where clause, we would query for
+                // the entire table, so the only thing to do is log a warning and prematurely
+                // return the results (which will be an empty map). In most cases this is unlikely
+                // to occur (e.g., if we're joining trips to a route based on their route_id), but
+                // there are cases (joining child stops to a parent stop based on the parent_station
+                // field) where this would result in errors.
+                LOG.warn("{} does not exist in {}.{} table", childJoinField, namespace, tableName);
+                return results;
+            }
         }
         if (sortField != null) {
-            // Sort field is not provided by user input, so it's ok to add here (i.e., it's not prone to SQL injection).
+            // Sort field is not provided by user input, so it's ok to add here (i.e., it's not
+            // prone to SQL injection).
             sortBy = String.format(" order by %s", sortField);
         }
         Set<String> argumentKeys = graphQLQueryArguments.keySet();
@@ -301,9 +317,25 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         if (argumentKeys.contains(SEARCH_ARG)) {
             // Handle string search argument
             String value = (String) graphQLQueryArguments.get(SEARCH_ARG);
+            // Only apply string search if string is not empty.
             if (!value.isEmpty()) {
-                // Only apply string search if string is not empty.
-                Set<String> searchFields = getSearchFields(namespace);
+                // Determine which search columns exist in database table (to avoid "column does not
+                // exist" postgres exception).
+                String[] searchColumns = new String[]{};
+                switch (tableName) {
+                    case "stops":
+                        searchColumns = stopSearchColumns;
+                        break;
+                    case "routes":
+                        searchColumns = routeSearchColumns;
+                        break;
+                    // TODO: add string search on other tables? For example, trips: id, headway;
+                    //  agency: name; patterns: name.
+                    default:
+                        // Search columns will be an empty set, which will ultimately return an empty set.
+                        break;
+                }
+                Set<String> searchFields = filterByExistingColumns(namespace, searchColumns);
                 List<String> searchClauses = new ArrayList<>();
                 for (String field : searchFields) {
                     // Double percent signs format as single percents, which are used for the string matching.
@@ -411,19 +443,25 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     }
 
     /**
-     * Get the list of fields to perform a string search on for the provided table. Each table included here must have
-     * the {@link #SEARCH_ARG} argument applied in the query definition.
+     * Check for the existence of the specified columns in the table. Note: this query seems to take
+     * between 10 and 30 milliseconds to get column names. This seems acceptable to avoid errors on,
+     * e.g., where conditions that include columns which don't exist.
+     * @param namespace         table namespace/feed ID
+     * @param columnsToCheck    columns to verify existence in table
+     * @return                  filtered set of columns verified to exist in table
      */
-    private Set<String> getSearchFields(String namespace) {
-        // Check table metadata for presence of columns.
-//        long startTime = System.currentTimeMillis();
+    private Set<String> filterByExistingColumns(String namespace, String... columnsToCheck) {
+        // Collect existing columns here.
         Set<String> columnsForTable = new HashSet<>();
-        List<String> searchColumns = new ArrayList<>();
+        // Check table metadata for presence of columns.
         Connection connection = null;
         try {
             connection = GTFSGraphQL.getConnection();
-            ResultSet columns = connection.getMetaData().getColumns(null, namespace, tableName, null);
+            ResultSet columns = connection
+                .getMetaData()
+                .getColumns(null, namespace, tableName, null);
             while (columns.next()) {
+                // Column name is in the 4th index
                 String column = columns.getString(4);
                 columnsForTable.add(column);
             }
@@ -432,23 +470,8 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
         } finally {
             DbUtils.closeQuietly(connection);
         }
-        // Each query seems to take between 10 and 30 milliseconds to get column names. This seems acceptable to avoid
-        // errors for conditions that include columns that don't exist.
-//        LOG.info("Took {} ms to get column name metadata.", System.currentTimeMillis() - startTime);
-        switch (tableName) {
-            case "stops":
-                searchColumns = stopSearchColumns;
-                break;
-            case "routes":
-                searchColumns = routeSearchColumns;
-                break;
-            // TODO: add string search on other tables? For example, trips: id, headway; agency: name; patterns: name.
-            default:
-                // Search columns will be an empty set, which will ultimately return an empty set.
-                break;
-        }
         // Filter available columns in table by search columns.
-        columnsForTable.retainAll(searchColumns);
+        columnsForTable.retainAll(Arrays.asList(columnsToCheck));
         return columnsForTable;
     }
 
@@ -462,8 +485,9 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
     }
 
     /**
-     * Construct filter clause with '=' (single string) or 'in' (multiple strings) and add values to list of parameters.
-     * */
+     * Construct filter clause with '=' (single string) or 'in' (multiple strings) and add values to
+     * list of parameters.
+     */
     static String makeInClause(String filterField, List<String> strings, List<String> parameters) {
         if (strings.size() == 1) {
             return filterEquals(filterField, strings.get(0), parameters);
