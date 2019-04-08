@@ -190,11 +190,13 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pattern_id"))
             .field(newFieldDefinition()
                     .name("stop_times")
-                    // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
+                    // forward reference to the as yet undefined stopTimeType (must be defined
+                    // after tripType)
                     .type(new GraphQLList(new GraphQLTypeReference("stopTime")))
-                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
-                    // (i.e., nested types that typically would only be nested under another entity and only make sense
-                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally"
+                    //  nested types (i.e., nested types that typically would only be nested under
+                    //  another entity and only make sense with the entire set -- fares -> fare
+                    //  rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher(
                             "stop_times",

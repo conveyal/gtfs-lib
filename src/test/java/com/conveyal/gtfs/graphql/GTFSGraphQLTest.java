@@ -2,7 +2,7 @@ package com.conveyal.gtfs.graphql;
 
 import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.loader.FeedLoadResult;
-import graphql.GraphQL;
+import graphql.ExecutionInput;
 import org.apache.commons.io.IOUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -38,6 +38,7 @@ public class GTFSGraphQLTest {
     private static String testInjectionDBName;
     private static DataSource testInjectionDataSource;
     private static String testInjectionNamespace;
+    private static String badCalendarDateNamespace;
 
     @BeforeClass
     public static void setUpClass() throws IOException {
@@ -52,6 +53,15 @@ public class GTFSGraphQLTest {
         testNamespace = feedLoadResult.uniqueIdentifier;
         // validate feed to create additional tables
         validate(testNamespace, testDataSource);
+
+        // Zip up test folder into temp zip file for loading into database.
+        FeedLoadResult feed2LoadResult = load(
+            TestUtils.zipFolderFiles("fake-agency-bad-calendar-date", true),
+            testDataSource
+        );
+        badCalendarDateNamespace = feed2LoadResult.uniqueIdentifier;
+        // validate feed to create additional tables
+        validate(badCalendarDateNamespace, testDataSource);
 
         // create a separate injection database to use in injection tests
         // create a new database
@@ -75,7 +85,7 @@ public class GTFSGraphQLTest {
     @Test(timeout=5000)
     public void canInitialize() {
         GTFSGraphQL.initialize(testDataSource);
-        GraphQL graphQL = GTFSGraphQL.getGraphQl();
+        GTFSGraphQL.getGraphQl();
     }
 
     /** Tests that the root element of a feed can be fetched. */
@@ -167,7 +177,7 @@ public class GTFSGraphQLTest {
     /** Tests that the stop times of a feed can be fetched. */
     @Test(timeout=5000)
     public void canFetchRoutesAndFilterTripsByDateAndTime() throws IOException {
-        Map<String, Object> variables = new HashMap<String, Object>();
+        Map<String, Object> variables = new HashMap<>();
         variables.put("namespace", testNamespace);
         variables.put("date", "20170915");
         variables.put("from", 24000);
@@ -201,13 +211,30 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("superNestedNoLimits.txt"), matchesSnapshot());
     }
 
+    /** Tests that a query for child stops does not throw an exception for a feed with no
+     * parent_station column in the imported stops table.
+     */
+    @Test(timeout=5000)
+    public void canFetchStopsWithoutParentStationColumn() throws IOException {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("namespace", badCalendarDateNamespace);
+        assertThat(
+            queryGraphQL(
+                "feedStopWithChildren.txt",
+                variables,
+                testDataSource
+            ),
+            matchesSnapshot()
+        );
+    }
+
     /**
      * Attempt to fetch more than one record with SQL injection as inputs.
      * The graphql library should properly escape the string and return 0 results for stops.
      */
     @Test(timeout=5000)
     public void canSanitizeSQLInjectionSentAsInput() throws IOException {
-        Map<String, Object> variables = new HashMap<String, Object>();
+        Map<String, Object> variables = new HashMap<>();
         variables.put("namespace", testInjectionNamespace);
         variables.put("stop_id", Arrays.asList("' OR 1=1;"));
         assertThat(
@@ -237,7 +264,7 @@ public class GTFSGraphQLTest {
         connection.commit();
 
         // make graphql query
-        Map<String, Object> variables = new HashMap<String, Object>();
+        Map<String, Object> variables = new HashMap<>();
         variables.put("namespace", testInjectionNamespace);
         assertThat(queryGraphQL("feedRoutes.txt", variables, testInjectionDataSource), matchesSnapshot());
     }
@@ -250,7 +277,7 @@ public class GTFSGraphQLTest {
      *                      in the `src/test/resources/graphql` folder
      */
     private Map<String, Object> queryGraphQL(String queryFilename) throws IOException {
-        Map<String, Object> variables = new HashMap<String, Object>();
+        Map<String, Object> variables = new HashMap<>();
         variables.put("namespace", testNamespace);
         return queryGraphQL(queryFilename, variables, testDataSource);
     }
@@ -272,11 +299,10 @@ public class GTFSGraphQLTest {
         FileInputStream inputStream = new FileInputStream(
             getResourceFileName(String.format("graphql/%s", queryFilename))
         );
-        return GTFSGraphQL.getGraphQl().execute(
-            IOUtils.toString(inputStream),
-            null,
-            null,
-            variables
-        ).toSpecification();
+        ExecutionInput executionInput = ExecutionInput.newExecutionInput()
+            .query(IOUtils.toString(inputStream))
+            .variables(variables)
+            .build();
+        return GTFSGraphQL.getGraphQl().execute(executionInput).toSpecification();
     }
 }
