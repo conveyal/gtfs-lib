@@ -1,0 +1,16 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "stops" : [ {
+        "child_stops" : [ ],
+        "stop_id" : "4u6g",
+        "stop_name" : "Butler Ln"
+      }, {
+        "child_stops" : [ ],
+        "stop_id" : "johv",
+        "stop_name" : "Scotts Valley Dr & Victor Sq"
+      } ]
+    }
+  }
+}

@@ -225,7 +225,12 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
                 // to occur (e.g., if we're joining trips to a route based on their route_id), but
                 // there are cases (joining child stops to a parent stop based on the parent_station
                 // field) where this would result in errors.
-                LOG.warn("{} does not exist in {}.{} table", childJoinField, namespace, tableName);
+                LOG.warn(
+                    "{} does not exist in {}.{} table. Cannot create where clause for join.",
+                    childJoinField,
+                    namespace,
+                    tableName
+                );
                 return results;
             }
         }
