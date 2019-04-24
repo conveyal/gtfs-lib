@@ -25,6 +25,7 @@ public class ReferenceTracker {
      * @param lineNumber        line number of the record being checked
      * @param field             field currently being checked
      * @param value             value that corresponds to field
+     * @param table             table currently being checked
      * @return                  any duplicate or bad reference errors.
      */
     public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, Table table) {
