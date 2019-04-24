@@ -10,7 +10,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 /**
- * This class is used during feed loads to track the unique keys that are encountered in a GTFS
+ * This class is used while loading GTFS to track the unique keys that are encountered in a GTFS
  * feed. It has two sets of strings that it tracks, one for single field keys (e.g., route_id or
  * stop_id) and one for keys that are compound, usually made up of a string ID with a sequence field
  * (e.g., trip_id + stop_sequence for tracking unique stop times).
