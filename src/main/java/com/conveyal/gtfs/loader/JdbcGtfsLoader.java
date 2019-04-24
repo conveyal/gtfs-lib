@@ -390,7 +390,8 @@ public class JdbcGtfsLoader {
                 // CSV reader get on an empty field will be an empty string literal.
                 String string = csvReader.get(f);
                 // Use spec table to check that references are valid and IDs are unique.
-                Set<NewGTFSError> errors = table.checkReferencesAndUniqueness(keyValue, lineNumber, field, string, referenceTracker);
+                Set<NewGTFSError> errors = referenceTracker
+                    .checkReferencesAndUniqueness(keyValue, lineNumber, field, string, table);
                 // Check for special case with calendar_dates where added service should not trigger ref. integrity
                 // error.
                 if (
