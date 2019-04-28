@@ -261,12 +261,14 @@
       <groupId>org.hamcrest</groupId>
       <artifactId>java-hamcrest</artifactId>
       <version>2.0.0.0</version>
+      <scope>test</scope>
     </dependency>
     <!-- Snapshotting library for testing -->
     <dependency>
-      <groupId>com.github.Zenika</groupId>
+      <groupId>com.github.conveyal</groupId>
       <artifactId>java-snapshot-matcher</artifactId>
-      <version>7e6ed4049eb637334e56f84bdd23ea74da05f141</version>
+      <version>3495b32f7b4d3f82590e0a2284029214070b6984</version>
+      <scope>test</scope>
     </dependency>
     <!-- Disk-backed storage that looks like a Java map. -->
     <dependency>
