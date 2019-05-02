@@ -21,7 +21,7 @@ before_install: |
 
 # Install semantic-release
 before_script:
-  - yarn global add @conveyal/maven-semantic-release semantic-release
+  - yarn global add @conveyal/maven-semantic-release semantic-release@15
 
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.

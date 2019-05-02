@@ -91,7 +91,6 @@ public abstract class Field {
         return String.join(" ", name, getSqlTypeName());
     }
 
-    // TODO test for input with tabs, newlines, carriage returns, and slashes in it.
     protected static ValidateFieldResult<String> cleanString (String string) {
         return cleanString(new ValidateFieldResult<>(string));
     }
@@ -106,7 +105,12 @@ public abstract class Field {
                 result.clean = result.clean.replace(illegalChar.illegalSequence, illegalChar.replacement);
                 // We don't know the Table or line number here, but when the errors bubble up, these values should be
                 // assigned to the errors.
-                result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.ILLEGAL_FIELD_VALUE, illegalChar.description));
+                if (!illegalChar.illegalSequence.equals("\\")) {
+                    // Do not include error entry for unescaped backslash. While this character
+                    // sequence is problematic for Postgres, it is not technically an illegal
+                    // value according to the GTFS specification.
+                    result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.ILLEGAL_FIELD_VALUE, illegalChar.description));
+                }
             }
         }
         return result;
