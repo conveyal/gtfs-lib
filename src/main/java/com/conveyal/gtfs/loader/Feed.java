@@ -32,15 +32,15 @@ public class Feed {
     // This may be the empty string if the feed is stored in the root ("public") schema.
     public final String tablePrefix;
 
-    public final TableReader<Agency> agencies;
-    public final TableReader<Calendar> calendars;
-    public final TableReader<CalendarDate> calendarDates;
+    public final JDBCTableReader<Agency> agencies;
+    public final JDBCTableReader<Calendar> calendars;
+    public final JDBCTableReader<CalendarDate> calendarDates;
 //    public final TableReader<Fare> fares;
-    public final TableReader<Route> routes;
-    public final TableReader<Stop>  stops;
-    public final TableReader<Trip>  trips;
-//    public final TableReader<ShapePoint> shapePoints;
-    public final TableReader<StopTime>   stopTimes;
+    public final JDBCTableReader<Route> routes;
+    public final JDBCTableReader<Stop>  stops;
+    public final JDBCTableReader<Trip>  trips;
+    public final JDBCTableReader<ShapePoint> shapePoints;
+    public final JDBCTableReader<StopTime>   stopTimes;
 
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     // TODO remove this and use only NewGTFSErrors in Validators, loaded into a JDBC table
@@ -63,7 +63,7 @@ public class Feed {
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
-//        shapePoints = new JDBCTableReader(Table.SHAPES, dataSource, tablePrefix, EntityPopulator.SHAPE_POINT);
+        shapePoints = new JDBCTableReader(Table.SHAPES, dataSource, tablePrefix, EntityPopulator.SHAPE_POINT);
         stopTimes = new JDBCTableReader(Table.STOP_TIMES, dataSource, tablePrefix, EntityPopulator.STOP_TIME);
     }
 
@@ -91,7 +91,9 @@ public class Feed {
                 new DuplicateStopsValidator(this, errorStorage),
                 new TimeZoneValidator(this, errorStorage),
                 new NewTripTimesValidator(this, errorStorage),
-                new NamesValidator(this, errorStorage));
+                new NamesValidator(this, errorStorage),
+                new ShapeValidator(this, errorStorage)
+        );
 
         for (FeedValidator feedValidator : feedValidators) {
             String validatorName = feedValidator.getClass().getSimpleName();

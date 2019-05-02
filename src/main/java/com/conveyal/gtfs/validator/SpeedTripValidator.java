@@ -100,7 +100,7 @@ public class SpeedTripValidator extends TripValidator {
                 current.shape_dist_traveled <= previous.shape_dist_traveled
             )
         ) {
-            registerError(current, SHAPE_DIST_TRAVELED_NOT_INCREASING, current.shape_dist_traveled);
+            registerError(current, STOP_TIME_SHAPE_DIST_TRAVELED_NOT_INCREASING, current.shape_dist_traveled);
         }
     }
 
