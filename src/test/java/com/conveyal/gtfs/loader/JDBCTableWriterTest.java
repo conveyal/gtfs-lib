@@ -18,6 +18,8 @@ import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hamcrest.Matcher;
+import org.hamcrest.Matchers;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -164,7 +166,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, feedInfoTable.name);
 
         // make sure record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFeedInfo.id, feedInfoTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFeedInfo.id, feedInfoTable));
     }
 
     /**
@@ -209,8 +211,8 @@ public class JDBCTableWriterTest {
         fareInput.price = 2.50;
         fareInput.agency_id = "RTA";
         fareInput.payment_method = 0;
-        // Empty value should be permitted for transfers and transfer_duration
-        fareInput.transfers = null;
+        // Empty string value or null should be permitted for transfers and transfer_duration
+        fareInput.transfers = "";
         fareInput.transfer_duration = null;
         FareRuleDTO fareRuleInput = new FareRuleDTO();
         // Fare ID should be assigned to "child entity" by editor automatically.
@@ -235,9 +237,24 @@ public class JDBCTableWriterTest {
         assertThat(createdFare.fare_id, equalTo(fareId));
         assertThat(createdFare.fare_rules[0].fare_id, equalTo(fareId));
 
+        // Ensure transfers value is null to check database integrity.
+        ResultSet resultSet = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES);
+        while (resultSet.next()) {
+            // We must match against null value for transfers because the database stored value will
+            // not be an empty string, but null.
+            assertResultValue(resultSet, "transfers", Matchers.nullValue());
+            assertResultValue(resultSet, "fare_id", equalTo(fareInput.fare_id));
+            assertResultValue(resultSet, "currency_type", equalTo(fareInput.currency_type));
+            assertResultValue(resultSet, "price", equalTo(fareInput.price));
+            assertResultValue(resultSet, "agency_id", equalTo(fareInput.agency_id));
+            assertResultValue(resultSet, "payment_method", equalTo(fareInput.payment_method));
+            assertResultValue(resultSet, "transfer_duration", equalTo(fareInput.transfer_duration));
+        }
+
         // try to update record
         String updatedFareId = "3B";
         createdFare.fare_id = updatedFareId;
+        createdFare.transfers = "0";
 
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(fareTable);
@@ -255,6 +272,13 @@ public class JDBCTableWriterTest {
         assertThat(updatedFareDTO.fare_id, equalTo(updatedFareId));
         assertThat(updatedFareDTO.fare_rules[0].fare_id, equalTo(updatedFareId));
 
+        // Ensure transfers value is updated correctly to check database integrity.
+        ResultSet updatedResult = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES);
+        while (updatedResult.next()) {
+            assertResultValue(updatedResult, "transfers", equalTo(0));
+            assertResultValue(updatedResult, "fare_id", equalTo(createdFare.fare_id));
+        }
+
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(fareTable);
         int deleteOutput = deleteTableWriter.delete(
@@ -264,10 +288,10 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.id, fareTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFare.id, fareTable));
 
         // make sure fare_rules record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
     }
 
     @Test
@@ -315,7 +339,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
         // make sure route record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdRoute.id, routeTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdRoute.id, routeTable));
     }
 
     /**
@@ -376,7 +400,7 @@ public class JDBCTableWriterTest {
         );
         LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
         // Make sure route record does not exist in DB.
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(scheduleException.id, scheduleExceptionTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(scheduleException.id, scheduleExceptionTable));
     }
 
     /**
@@ -444,13 +468,13 @@ public class JDBCTableWriterTest {
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
-        assertThatSqlQueryYieldsRowCount(getAllColumnsForId(createdTrip.id, Table.TRIPS), 1);
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Delete pattern record
         JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
         int deleteOutput = deletePatternWriter.delete(pattern.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, Table.PATTERNS.name);
         // Check that pattern record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(pattern.id, Table.PATTERNS));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(pattern.id, Table.PATTERNS));
         // Check that trip records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
@@ -676,7 +700,7 @@ public class JDBCTableWriterTest {
     private String getColumnsForId(int id, Table table, String... columns) throws SQLException {
         String sql = String.format(
             "select %s from %s.%s where id=%d",
-            String.join(", ", columns),
+            columns.length > 0 ? String.join(", ", columns) : "*",
             testNamespace,
             table.name,
             id
@@ -686,18 +710,18 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Constructs SQL query for the specified ID for all table columns and returns the resulting result set.
-     */
-    private String getAllColumnsForId(int id, Table table) throws SQLException {
-        return getColumnsForId(id, table, "*");
-    }
-
-    /**
      * Executes SQL query for the specified ID and columns and returns the resulting result set.
      */
     private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
         String sql = getColumnsForId(id, table, columns);
         return testDataSource.getConnection().prepareStatement(sql).executeQuery();
+    }
+
+    /**
+     * Asserts that a given value for the specified field in result set matches provided matcher.
+     */
+    private void assertResultValue(ResultSet resultSet, String field, Matcher matcher) throws SQLException {
+        assertThat(resultSet.getObject(field), matcher);
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
