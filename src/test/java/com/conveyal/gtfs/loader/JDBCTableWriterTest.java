@@ -18,6 +18,7 @@ import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -236,13 +237,18 @@ public class JDBCTableWriterTest {
         assertThat(createdFare.fare_id, equalTo(fareId));
         assertThat(createdFare.fare_rules[0].fare_id, equalTo(fareId));
 
-        // Ensure transfers value is null.
-        ResultSet resultSet = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES, "transfers");
+        // Ensure transfers value is null to check database integrity.
+        ResultSet resultSet = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES);
         while (resultSet.next()) {
-            // We must use getObject because getInt will always return 0 for a null value.
-            Object value = resultSet.getObject(1);
-            LOG.info("fare#transfers {}", value);
-            assertThat(value, Matchers.nullValue());
+            // We must match against null value for transfers because the database stored value will
+            // not be an empty string, but null.
+            assertResultValue(resultSet, "transfers", Matchers.nullValue());
+            assertResultValue(resultSet, "fare_id", equalTo(fareInput.fare_id));
+            assertResultValue(resultSet, "currency_type", equalTo(fareInput.currency_type));
+            assertResultValue(resultSet, "price", equalTo(fareInput.price));
+            assertResultValue(resultSet, "agency_id", equalTo(fareInput.agency_id));
+            assertResultValue(resultSet, "payment_method", equalTo(fareInput.payment_method));
+            assertResultValue(resultSet, "transfer_duration", equalTo(fareInput.transfer_duration));
         }
 
         // try to update record
@@ -266,12 +272,11 @@ public class JDBCTableWriterTest {
         assertThat(updatedFareDTO.fare_id, equalTo(updatedFareId));
         assertThat(updatedFareDTO.fare_rules[0].fare_id, equalTo(updatedFareId));
 
-        // Ensure transfers value is updated correctly.
+        // Ensure transfers value is updated correctly to check database integrity.
         ResultSet updatedResult = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES, "transfers");
         while (updatedResult.next()) {
-            Object value = updatedResult.getObject(1);
-            LOG.info("fare#transfers {}", value);
-            assertThat(value, equalTo(0));
+            assertResultValue(resultSet, "transfers", equalTo(0));
+            assertResultValue(resultSet, "fare_id", equalTo(createdFare.fare_id));
         }
 
         // try to delete record
@@ -717,6 +722,13 @@ public class JDBCTableWriterTest {
     private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
         String sql = getColumnsForId(id, table, columns);
         return testDataSource.getConnection().prepareStatement(sql).executeQuery();
+    }
+
+    /**
+     * Asserts that a given value for the specified field in result set matches provided matcher.
+     */
+    private void assertResultValue(ResultSet resultSet, String field, Matcher matcher) throws SQLException {
+        assertThat(resultSet.getObject(field), matcher);
     }
 
     private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
