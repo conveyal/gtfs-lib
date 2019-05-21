@@ -286,12 +286,12 @@ public class Table {
             // FIXME: Do we need an index on stop_id
             new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
 //                    .indexThisColumn(),
-            // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are reqiured
+            // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are required
             new TimeField("arrival_time", OPTIONAL),
             new TimeField("departure_time", OPTIONAL),
             new StringField("stop_headsign", OPTIONAL),
-            new ShortField("pickup_type", OPTIONAL, 2),
-            new ShortField("drop_off_type", OPTIONAL, 2),
+            new ShortField("pickup_type", OPTIONAL, 3),
+            new ShortField("drop_off_type", OPTIONAL, 3),
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
