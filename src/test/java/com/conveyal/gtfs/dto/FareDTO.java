@@ -13,7 +13,8 @@ public class FareDTO {
     public Double price;
     public String currency_type;
     public Integer payment_method;
-    public Integer transfers;
+    // transfers is a string because we need to be able to pass empty strings to the JdbcTableWriter
+    public String transfers;
     public String agency_id;
     public Integer transfer_duration;
     public FareRuleDTO[] fare_rules;

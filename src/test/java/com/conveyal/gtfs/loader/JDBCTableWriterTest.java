@@ -18,6 +18,7 @@ import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hamcrest.Matchers;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -209,8 +210,8 @@ public class JDBCTableWriterTest {
         fareInput.price = 2.50;
         fareInput.agency_id = "RTA";
         fareInput.payment_method = 0;
-        // Empty value should be permitted for transfers and transfer_duration
-        fareInput.transfers = null;
+        // Empty string value or null should be permitted for transfers and transfer_duration
+        fareInput.transfers = "";
         fareInput.transfer_duration = null;
         FareRuleDTO fareRuleInput = new FareRuleDTO();
         // Fare ID should be assigned to "child entity" by editor automatically.
@@ -235,9 +236,19 @@ public class JDBCTableWriterTest {
         assertThat(createdFare.fare_id, equalTo(fareId));
         assertThat(createdFare.fare_rules[0].fare_id, equalTo(fareId));
 
+        // Ensure transfers value is null.
+        ResultSet resultSet = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES, "transfers");
+        while (resultSet.next()) {
+            // We must use getObject because getInt will always return 0 for a null value.
+            Object value = resultSet.getObject(1);
+            LOG.info("fare#transfers {}", value);
+            assertThat(value, Matchers.nullValue());
+        }
+
         // try to update record
         String updatedFareId = "3B";
         createdFare.fare_id = updatedFareId;
+        createdFare.transfers = "0";
 
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(fareTable);
@@ -254,6 +265,14 @@ public class JDBCTableWriterTest {
         // make sure saved data matches expected data
         assertThat(updatedFareDTO.fare_id, equalTo(updatedFareId));
         assertThat(updatedFareDTO.fare_rules[0].fare_id, equalTo(updatedFareId));
+
+        // Ensure transfers value is updated correctly.
+        ResultSet updatedResult = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES, "transfers");
+        while (updatedResult.next()) {
+            Object value = updatedResult.getObject(1);
+            LOG.info("fare#transfers {}", value);
+            assertThat(value, equalTo(0));
+        }
 
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(fareTable);

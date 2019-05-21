@@ -424,7 +424,11 @@ public class JdbcTableWriter implements TableWriter {
                         }
                         field.setParameter(preparedStatement, index, String.join(",", values));
                     } else {
-                        field.setParameter(preparedStatement, index, value.asText());
+                        String text = value.asText();
+                        // If the field is a ShortField and the string is empty, set value to null. Otherwise, set
+                        // parameter with string.
+                        if (field instanceof ShortField && text.isEmpty()) field.setNull(preparedStatement, index);
+                        else field.setParameter(preparedStatement, index, text);
                     }
                 }
             } catch (StorageException e) {
