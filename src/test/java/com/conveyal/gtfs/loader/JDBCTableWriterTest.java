@@ -166,7 +166,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, feedInfoTable.name);
 
         // make sure record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFeedInfo.id, feedInfoTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFeedInfo.id, feedInfoTable));
     }
 
     /**
@@ -273,10 +273,10 @@ public class JDBCTableWriterTest {
         assertThat(updatedFareDTO.fare_rules[0].fare_id, equalTo(updatedFareId));
 
         // Ensure transfers value is updated correctly to check database integrity.
-        ResultSet updatedResult = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES, "transfers");
+        ResultSet updatedResult = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES);
         while (updatedResult.next()) {
-            assertResultValue(resultSet, "transfers", equalTo(0));
-            assertResultValue(resultSet, "fare_id", equalTo(createdFare.fare_id));
+            assertResultValue(updatedResult, "transfers", equalTo(0));
+            assertResultValue(updatedResult, "fare_id", equalTo(createdFare.fare_id));
         }
 
         // try to delete record
@@ -288,10 +288,10 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.id, fareTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFare.id, fareTable));
 
         // make sure fare_rules record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
     }
 
     @Test
@@ -339,7 +339,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
         // make sure route record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(createdRoute.id, routeTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdRoute.id, routeTable));
     }
 
     /**
@@ -400,7 +400,7 @@ public class JDBCTableWriterTest {
         );
         LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
         // Make sure route record does not exist in DB.
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(scheduleException.id, scheduleExceptionTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(scheduleException.id, scheduleExceptionTable));
     }
 
     /**
@@ -468,13 +468,13 @@ public class JDBCTableWriterTest {
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
-        assertThatSqlQueryYieldsRowCount(getAllColumnsForId(createdTrip.id, Table.TRIPS), 1);
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Delete pattern record
         JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
         int deleteOutput = deletePatternWriter.delete(pattern.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, Table.PATTERNS.name);
         // Check that pattern record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getAllColumnsForId(pattern.id, Table.PATTERNS));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(pattern.id, Table.PATTERNS));
         // Check that trip records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
@@ -700,20 +700,13 @@ public class JDBCTableWriterTest {
     private String getColumnsForId(int id, Table table, String... columns) throws SQLException {
         String sql = String.format(
             "select %s from %s.%s where id=%d",
-            String.join(", ", columns),
+            columns.length > 0 ? String.join(", ", columns) : "*",
             testNamespace,
             table.name,
             id
         );
         LOG.info(sql);
         return sql;
-    }
-
-    /**
-     * Constructs SQL query for the specified ID for all table columns and returns the resulting result set.
-     */
-    private String getAllColumnsForId(int id, Table table) throws SQLException {
-        return getColumnsForId(id, table, "*");
     }
 
     /**
