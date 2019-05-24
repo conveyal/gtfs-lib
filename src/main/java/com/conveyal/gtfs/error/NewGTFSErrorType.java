@@ -35,7 +35,7 @@ public enum NewGTFSErrorType {
     TABLE_IN_SUBDIRECTORY(Priority.HIGH, "Rather than being at the root of the zip file, a table was nested in a subdirectory."),
     TABLE_MISSING_COLUMN_HEADERS(Priority.HIGH, "Table is missing column headers."),
     TABLE_TOO_LONG(Priority.MEDIUM, "Table is too long to record line numbers with a 32-bit integer, overflow will occur."),
-    TIME_ZONE_FORMAT(Priority.MEDIUM, "Time zone format should be X."),
+    TIME_ZONE_FORMAT(Priority.MEDIUM, "Time zone format should match value from the Time Zone Database https://en.wikipedia.org/wiki/List_of_tz_database_time_zones."),
     REQUIRED_TABLE_EMPTY(Priority.MEDIUM, "This table is required by the GTFS specification but is empty."),
     FEED_TRAVEL_TIMES_ROUNDED(Priority.LOW, "All travel times in the feed are rounded to the minute, which may cause unexpected results in routing applications where travel times are zero."),
     ROUTE_DESCRIPTION_SAME_AS_NAME(Priority.LOW, "The description of a route is identical to its name, so does not add any information."),
