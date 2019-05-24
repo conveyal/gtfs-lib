@@ -13,6 +13,7 @@ public enum NewGTFSErrorType {
     ILLEGAL_FIELD_VALUE(Priority.MEDIUM, "Fields may not contain tabs, carriage returns or new lines."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     FARE_TRANSFER_MISMATCH(Priority.MEDIUM, "A fare that does not permit transfers has a non-zero transfer duration."),
+    FREQUENCY_PERIOD_OVERLAP(Priority.MEDIUM, "A frequency for a trip overlaps with another frequency defined for the same trip."),
     FLOATING_FORMAT(Priority.MEDIUM, "Incorrect floating point number format."),
     COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),
     NUMBER_PARSING(Priority.MEDIUM, "Unable to parse number from value."),

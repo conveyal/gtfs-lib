@@ -697,7 +697,7 @@ public class JDBCTableWriterTest {
     /**
      * Constructs SQL query for the specified ID and columns and returns the resulting result set.
      */
-    private String getColumnsForId(int id, Table table, String... columns) throws SQLException {
+    private String getColumnsForId(int id, Table table, String... columns) {
         String sql = String.format(
             "select %s from %s.%s where id=%d",
             columns.length > 0 ? String.join(", ", columns) : "*",
