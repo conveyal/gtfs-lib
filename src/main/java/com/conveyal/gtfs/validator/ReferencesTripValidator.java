@@ -15,6 +15,12 @@ import java.util.Set;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 
 /**
+ * This validator checks for unused entities in the dataset.
+ *
+ * It iterates over each trip and collects all of the route, trip, and stop IDs referenced by all of the trips found
+ * within the feed. In the completion stage of the validator it verifies that there are no stops, trips, or routes in
+ * the feed that do not actually get used by at least one trip.
+ *
  * Created by abyrd on 2017-04-18
  */
 public class ReferencesTripValidator extends TripValidator {
@@ -31,7 +37,13 @@ public class ReferencesTripValidator extends TripValidator {
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
         if (trip != null) referencedTrips.add(trip.trip_id);
         if (route != null) referencedRoutes.add(route.route_id);
-        for (Stop stop : stops) referencedStops.add(stop.stop_id);
+        for (Stop stop : stops) {
+            referencedStops.add(stop.stop_id);
+            // If a stop used by the trip has a parent station, count this among the referenced stops, too. While the
+            // parent station may not be referenced directly, the relationship is functioning correctly and there is
+            // not an issue with this stop being unreferenced.
+            if (stop.parent_station != null) referencedStops.add(stop.parent_station);
+        }
     }
 
     @Override
