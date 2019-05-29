@@ -349,7 +349,7 @@ public class Table {
     }
 
     /** Fluent method to set whether the table has a compound key, e.g., transfers#to_stop_id. */
-    private Table hasCompoundKey() {
+    public Table hasCompoundKey() {
         this.compoundKey = true;
         return this;
     }
