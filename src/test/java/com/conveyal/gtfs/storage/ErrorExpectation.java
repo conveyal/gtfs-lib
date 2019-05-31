@@ -1,6 +1,9 @@
 package com.conveyal.gtfs.storage;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import org.hamcrest.Matcher;
+
+import static org.hamcrest.Matchers.equalTo;
 
 /**
  * Defines the expected values for an error stored in the errors table for a feed in the GTFS database.
@@ -11,25 +14,30 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
  * order can be found in {@link com.conveyal.gtfs.validator.NewTripTimesValidator}).
  */
 public class ErrorExpectation {
-    public NewGTFSErrorType errorType;
-    public String badValue;
-    public String entityType;
-    public String entityId;
+    public Matcher<String> errorTypeMatcher;
+    public Matcher<String> badValueMatcher;
+    public Matcher<String> entityTypeMatcher;
+    public Matcher<String> entityIdMatcher;
 
     public ErrorExpectation(NewGTFSErrorType errorType) {
-        this.errorType = errorType;
+        this(errorType, null, null, null);
     }
 
-    public ErrorExpectation(NewGTFSErrorType errorType, String entityId) {
-        this.errorType = errorType;
-        this.entityId = entityId;
+    public ErrorExpectation(NewGTFSErrorType errorType, Matcher<String> entityIdMatcher) {
+        this(errorType, null, null, entityIdMatcher);
     }
 
-    public ErrorExpectation(NewGTFSErrorType errorType, String badValue, String entityType, String entityId) {
-        this.errorType = errorType;
-        this.badValue = badValue;
-        this.entityType = entityType;
-        this.entityId = entityId;
+    /**
+     * Note: we accept Matchers as constructor args rather than the actual string values because this gives us the
+     * ability to specify null values in the case that we don't care about matching a specific value for an error
+     * (e.g., we only want to check for a matching error type but are not concerned with a specific error's entity ID
+     * value).
+     */
+    public ErrorExpectation(NewGTFSErrorType errorType, Matcher<String> badValueMatcher, Matcher<String> entityTypeMatcher, Matcher<String> entityIdMatcher) {
+        this.errorTypeMatcher = equalTo(errorType.toString());
+        this.badValueMatcher = badValueMatcher;
+        this.entityTypeMatcher = entityTypeMatcher;
+        this.entityIdMatcher = entityIdMatcher;
     }
 
     /**
