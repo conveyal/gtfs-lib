@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
@@ -47,6 +48,10 @@ public class SpeedTripValidator extends TripValidator {
         double distanceMeters = 0;
         for (int i = beginIndex + 1; i < stopTimes.size(); i++) {
             StopTime currStopTime = stopTimes.get(i);
+            if (currStopTime.pickup_type == 1 && currStopTime.drop_off_type == 1 && currStopTime.timepoint == 0) {
+                // stop_time allows neither pickup or drop off and is not a timepoint, so it serves no purpose.
+                registerError(currStopTime, NewGTFSErrorType.STOP_TIME_UNUSED);
+            }
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
@@ -54,7 +59,9 @@ public class SpeedTripValidator extends TripValidator {
             checkShapeDistTraveled(prevStopTime, currStopTime);
             if (missingBothTimes(currStopTime)) {
                 // FixMissingTimes has already been called, so both arrival and departure time are missing.
-                // The spec allows this. Other than accumulating distance, skip this StopTime.
+                // The spec allows this. Other than accumulating distance, skip this StopTime. If this stop_time serves
+                // as a timepoint; however, this is considered an error.
+                if (currStopTime.timepoint == 1) registerError(currStopTime, NewGTFSErrorType.TIMEPOINT_MISSING_TIMES);
                 continue;
             }
             if (currStopTime.departure_time < currStopTime.arrival_time) {

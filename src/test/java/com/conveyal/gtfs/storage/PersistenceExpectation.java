@@ -18,11 +18,6 @@ public class PersistenceExpectation {
         this.recordExpectations = recordExpectations;
     }
 
-    public PersistenceExpectation(ErrorExpectation[] errorExpectations) {
-        this.tableName = "errors";
-        this.recordExpectations = errorExpectations;
-    }
-
     public static PersistenceExpectation[] list (PersistenceExpectation... expectations) {
         return expectations;
     }

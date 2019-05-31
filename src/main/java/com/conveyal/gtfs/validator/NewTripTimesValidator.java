@@ -67,7 +67,7 @@ public class NewTripTimesValidator extends FeedValidator {
         String previousTripId = null;
         // Order stop times by trip ID and sequence number (i.e. scan through the stops in each trip in order)
         for (StopTime stopTime : feed.stopTimes.getAllOrdered()) {
-            // FIXME all bad references should already be caught elsewhere, this should just be a continue
+            // All bad references should already be caught elsewhere, this should just be a continue
             if (stopTime.trip_id == null) continue;
             if (!stopTime.trip_id.equals(previousTripId) && !stopTimesForTrip.isEmpty()) {
                 processTrip(stopTimesForTrip);

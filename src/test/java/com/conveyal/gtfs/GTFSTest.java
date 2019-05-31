@@ -32,7 +32,9 @@ import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -96,11 +98,20 @@ public class GTFSTest {
      */
     @Test
     public void canLoadAndExportSimpleAgency() {
+        ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+        );
         assertThat(
             runIntegrationTestOnFolder(
                 "fake-agency",
                 nullValue(),
-                fakeAgencyPersistenceExpectations
+                fakeAgencyPersistenceExpectations,
+                fakeAgencyErrorExpectations
             ),
             equalTo(true)
         );
@@ -119,28 +130,49 @@ public class GTFSTest {
                 }
             )
         );
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
+            new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+        );
         assertThat(
             "Integration test passes",
-            runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations),
+            runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations, errorExpectations),
             equalTo(true)
         );
     }
 
     /**
-     * Tests that a GTFS feed with overlapping block trips will record the appropriate error.
+     * Tests that a GTFS feed with errors is loaded properly and that the various errors were detected and stored in the
+     * database.
      */
     @Test
-    public void canLoadFeedWithOverlappingTrips () {
-        PersistenceExpectation[] expectations = PersistenceExpectation.list(
-            new PersistenceExpectation(
-                new ErrorExpectation[]{
-                    new ErrorExpectation("error_type", NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK.toString())
-                }
-            )
+    public void canLoadFeedWithErrors () {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list();
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.FARE_TRANSFER_MISMATCH, equalTo("fare-02")),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP, equalTo("freq-01_08:30:00_to_10:15:00_every_15m00s")),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP, equalTo("freq-01_08:30:00_to_10:15:00_every_15m00s")),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK, equalTo("1A00000"))
         );
         assertThat(
             "Integration test passes",
-            runIntegrationTestOnFolder("fake-agency-overlapping-trips", nullValue(), expectations),
+            runIntegrationTestOnFolder("fake-agency-overlapping-trips", nullValue(), expectations, errorExpectations),
             equalTo(true)
         );
     }
@@ -164,9 +196,30 @@ public class GTFSTest {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        // TODO Add error expectations argument that expects NewGTFSErrorType.TABLE_IN_SUBDIRECTORY error type.
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+        );
         assertThat(
-            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations),
+            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, errorExpectations),
             equalTo(true)
         );
     }
@@ -231,11 +284,17 @@ public class GTFSTest {
                 }
             )
         };
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
+        );
         assertThat(
             runIntegrationTestOnFolder(
                 "fake-agency-only-calendar-dates",
                 nullValue(),
-                persistenceExpectations
+                persistenceExpectations,
+                errorExpectations
             ),
             equalTo(true)
         );
@@ -244,12 +303,13 @@ public class GTFSTest {
 
     /**
      * A helper method that will zip a specified folder in test/main/resources and call
-     * {@link #runIntegrationTestOnZipFile(String, Matcher, PersistenceExpectation[])} on that file.
+     * {@link #runIntegrationTestOnZipFile} on that file.
      */
     private boolean runIntegrationTestOnFolder(
         String folderName,
         Matcher<Object> fatalExceptionExpectation,
-        PersistenceExpectation[] persistenceExpectations
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -260,7 +320,7 @@ public class GTFSTest {
             e.printStackTrace();
             return false;
         }
-        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations);
+        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations);
     }
 
     /**
@@ -273,7 +333,8 @@ public class GTFSTest {
     private boolean runIntegrationTestOnZipFile(
         String zipFileName,
         Matcher<Object> fatalExceptionExpectation,
-        PersistenceExpectation[] persistenceExpectations
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations
     ) {
         String newDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
@@ -295,7 +356,7 @@ public class GTFSTest {
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
 
-            assertThatImportedGtfsMeetsExpectations(dataSource.getConnection(), namespace, persistenceExpectations);
+            assertThatImportedGtfsMeetsExpectations(dataSource.getConnection(), namespace, persistenceExpectations, errorExpectations);
         } catch (SQLException e) {
             TestUtils.dropDB(newDBName);
             e.printStackTrace();
@@ -385,7 +446,8 @@ public class GTFSTest {
     private void assertThatImportedGtfsMeetsExpectations(
         Connection connection,
         String namespace,
-        PersistenceExpectation[] persistenceExpectations
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations
     ) throws SQLException {
         // Store field mismatches here (to provide assertion statements with more details).
         Multimap<String, ValuePair> fieldsWithMismatches = ArrayListMultimap.create();
@@ -442,6 +504,7 @@ public class GTFSTest {
                                     recordExpectation.fieldName,
                                     new ValuePair(recordExpectation.stringExpectation, strVal)
                                 );
+                                LOG.error("Expected {}, found {}", recordExpectation.stringExpectation, strVal);
                                 allFieldsMatch = false;
                             }
                             break;
@@ -456,10 +519,43 @@ public class GTFSTest {
                     LOG.info("Database record satisfies expectations.");
                     foundRecord = true;
                     break;
+                } else {
+                    LOG.error("Persistence mismatch on record {}", numRecordsSearched);
                 }
             }
             assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord, fieldsWithMismatches);
         }
+        // Expect zero errors if errorExpectations is null.
+        if (errorExpectations == null) errorExpectations = new ErrorExpectation[]{};
+        // Check that error expectations match errors stored in database.
+        LOG.info("Checking {} error expectations", errorExpectations.length);
+        // select all entries from error table
+        String sql = String.format("select * from %s.errors", namespace);
+        LOG.info(sql);
+        ResultSet rs = connection.prepareStatement(sql).executeQuery();
+        int errorCount = 0;
+        Iterator<ErrorExpectation> errorExpectationIterator = Arrays.stream(errorExpectations).iterator();
+        while (rs.next()) {
+            errorCount++;
+            String errorType = rs.getString("error_type");
+            String entityType = rs.getString("entity_type");
+            String entityId = rs.getString("entity_id");
+            String badValue = rs.getString("bad_value");
+            LOG.info("Found error {}: {} {} {} {}", errorCount, errorType, entityId, entityType, badValue);
+            // Skip error expectation if not exists. But continue iteration to count all errors.
+            if (!errorExpectationIterator.hasNext()) continue;
+            ErrorExpectation errorExpectation = errorExpectationIterator.next();
+            LOG.info("Expecting error {}: {}", errorCount, errorExpectation.errorTypeMatcher);
+            // Error expectation must contain error type matcher. The others are optional.
+            assertThat(errorType, errorExpectation.errorTypeMatcher);
+            if (errorExpectation.entityTypeMatcher != null) assertThat(entityType, errorExpectation.entityTypeMatcher);
+            if (errorExpectation.entityIdMatcher != null) assertThat(entityId, errorExpectation.entityIdMatcher);
+            if (errorExpectation.badValueMatcher != null) assertThat(badValue, errorExpectation.badValueMatcher);
+        }
+        assertThat(
+            "Error count is equal to number of error expectations.",
+            errorCount,
+            equalTo(errorExpectations.length));
     }
 
     private static int countValidationErrorsOfType(
