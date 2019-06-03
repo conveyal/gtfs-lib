@@ -2,7 +2,10 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import org.apache.commons.text.StringEscapeUtils;
 import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 
@@ -10,6 +13,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
  * Unit tests to verify functionality of classes that load fields from GTFS tables.
  */
 public class FieldTests {
+    private static final Logger LOG = LoggerFactory.getLogger(FieldTests.class);
 
     /**
      * Make sure our date field reader catches bad dates and accepts correct ones.
@@ -55,12 +59,14 @@ public class FieldTests {
             "\n", // simple new line
             "\t", // simple tab
             "\t\n\r", // new line, tab, carriage return
-            "Hello\\world",  // backslashes not permitted (replaced with escaped slash)
+            // Unescaped backslashes no longer log an error; however, the character is still replaced with escaped slash.
+            // "Hello\\world",
             "Downtown via Peachtree\n\nSt" // new line and carriage within string
         };
         StringField stringField = new StringField("any", Requirement.REQUIRED);
         for (String badString : badStrings) {
             ValidateFieldResult<String> result = stringField.validateAndConvert(badString);
+            LOG.info("{} error(s) found for input string {}", result.errors.size(), StringEscapeUtils.escapeJava(badString));
             assertThat("Input with illegal characters should result in an error.", result.errors.size() > 0);
             NewGTFSError error = result.errors.iterator().next();
             assertThat("Error type should be illegal field value.",

@@ -357,5 +357,11 @@
       <artifactId>graphql-java</artifactId>
       <version>11.0</version>
     </dependency>
+    <!--  Contains special utils for things like converting escaped strings to unescaped strings for logging.  -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>1.6</version>
+    </dependency>
   </dependencies>
 </project>
