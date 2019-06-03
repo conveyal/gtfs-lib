@@ -253,7 +253,7 @@ public class GTFSFeedTest {
         assertThat(
             feed.getSpatialIndex().size(),
             // This should reflect the number of stops in src/test/resources/fake-agency/stops.txt
-            equalTo(4)
+            equalTo(5)
         );
     }
 

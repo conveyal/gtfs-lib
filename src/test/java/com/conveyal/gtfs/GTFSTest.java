@@ -102,8 +102,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
             new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
         );
         assertThat(
@@ -214,7 +213,6 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
             new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
         );

@@ -14,6 +14,9 @@
         "child_stops" : [ {
           "stop_id" : "1234",
           "stop_name" : "Child Stop"
+        }, {
+          "stop_id" : "1234567",
+          "stop_name" : "Unused stop"
         } ],
         "stop_id" : "123",
         "stop_name" : "Parent Station"
@@ -21,6 +24,10 @@
         "child_stops" : [ ],
         "stop_id" : "1234",
         "stop_name" : "Child Stop"
+      }, {
+        "child_stops" : [ ],
+        "stop_id" : "1234567",
+        "stop_name" : "Unused stop"
       } ]
     }
   }
