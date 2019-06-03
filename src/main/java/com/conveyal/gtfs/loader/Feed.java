@@ -35,7 +35,8 @@ public class Feed {
     public final TableReader<Agency> agencies;
     public final TableReader<Calendar> calendars;
     public final TableReader<CalendarDate> calendarDates;
-//    public final TableReader<Fare> fares;
+    public final TableReader<FareAttribute> fareAttributes;
+    public final TableReader<Frequency> frequencies;
     public final TableReader<Route> routes;
     public final TableReader<Stop>  stops;
     public final TableReader<Trip>  trips;
@@ -57,7 +58,8 @@ public class Feed {
         if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
-//        fares = new JDBCTableReader(Table.FARES, dataSource, tablePrefix, EntityPopulator.FARE);
+        fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, tablePrefix, EntityPopulator.FARE_ATTRIBUTE);
+        frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, tablePrefix, EntityPopulator.FREQUENCY);
         calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
         calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
@@ -89,6 +91,8 @@ public class Feed {
         List<FeedValidator> feedValidators = Arrays.asList(
                 new MisplacedStopValidator(this, errorStorage, validationResult),
                 new DuplicateStopsValidator(this, errorStorage),
+                new FaresValidator(this, errorStorage),
+                new FrequencyValidator(this, errorStorage),
                 new TimeZoneValidator(this, errorStorage),
                 new NewTripTimesValidator(this, errorStorage),
                 new NamesValidator(this, errorStorage));

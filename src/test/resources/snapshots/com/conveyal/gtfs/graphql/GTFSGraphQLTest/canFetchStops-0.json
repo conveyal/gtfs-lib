@@ -8,6 +8,8 @@
         "parent_station" : null,
         "patterns" : [ {
           "pattern_id" : "1"
+        }, {
+          "pattern_id" : "2"
         } ],
         "routes" : [ {
           "route_id" : "1"
@@ -48,15 +50,11 @@
         "stop_lat" : 37.0590172,
         "stop_lon" : -122.0096058,
         "stop_name" : "Scotts Valley Dr & Victor Sq",
-        "stop_time_count" : 2,
+        "stop_time_count" : 1,
         "stop_times" : [ {
           "stop_id" : "johv",
           "stop_sequence" : 2,
           "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-        }, {
-          "stop_id" : "johv",
-          "stop_sequence" : 2,
-          "trip_id" : "frequency-trip"
         } ],
         "stop_timezone" : null,
         "stop_url" : null,
@@ -84,14 +82,40 @@
         "id" : 5,
         "location_type" : 0,
         "parent_station" : "123",
-        "patterns" : [ ],
-        "routes" : [ ],
+        "patterns" : [ {
+          "pattern_id" : "2"
+        } ],
+        "routes" : [ {
+          "route_id" : "1"
+        } ],
         "stop_code" : null,
         "stop_desc" : null,
         "stop_id" : "1234",
         "stop_lat" : 37.06662,
         "stop_lon" : -122.07772,
         "stop_name" : "Child Stop",
+        "stop_time_count" : 1,
+        "stop_times" : [ {
+          "stop_id" : "1234",
+          "stop_sequence" : 2,
+          "trip_id" : "frequency-trip"
+        } ],
+        "stop_timezone" : null,
+        "stop_url" : null,
+        "wheelchair_boarding" : null,
+        "zone_id" : null
+      }, {
+        "id" : 6,
+        "location_type" : 0,
+        "parent_station" : "123",
+        "patterns" : [ ],
+        "routes" : [ ],
+        "stop_code" : null,
+        "stop_desc" : null,
+        "stop_id" : "1234567",
+        "stop_lat" : 37.06668,
+        "stop_lon" : -122.07781,
+        "stop_name" : "Unused stop",
         "stop_time_count" : 0,
         "stop_times" : [ ],
         "stop_timezone" : null,

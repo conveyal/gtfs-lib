@@ -4,6 +4,8 @@ import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -68,21 +70,21 @@ public interface EntityPopulator<T> {
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
 
     EntityPopulator<Agency> AGENCY = (result, columnForName) -> {
-        Agency agency = new Agency();
-        agency.agency_id       = getStringIfPresent(result, "agency_id", columnForName);
-        agency.agency_name     = getStringIfPresent(result, "agency_name", columnForName);
-        agency.agency_url      = getUrlIfPresent   (result, "agency_url", columnForName);
-        agency.agency_timezone = getStringIfPresent(result, "agency_timezone", columnForName);
-        agency.agency_lang     = getStringIfPresent(result, "agency_lang", columnForName);
-        agency.agency_phone    = getStringIfPresent(result, "agency_phone", columnForName);
-        agency.agency_fare_url = getUrlIfPresent   (result, "agency_fare_url", columnForName);
-        agency.agency_email    = getStringIfPresent(result, "agency_email", columnForName);
-        agency.agency_branding_url = getUrlIfPresent (result, "agency_branding_url", columnForName);
+        Agency agency              = new Agency();
+        agency.agency_id           = getStringIfPresent(result, "agency_id", columnForName);
+        agency.agency_name         = getStringIfPresent(result, "agency_name", columnForName);
+        agency.agency_url          = getUrlIfPresent   (result, "agency_url", columnForName);
+        agency.agency_timezone     = getStringIfPresent(result, "agency_timezone", columnForName);
+        agency.agency_lang         = getStringIfPresent(result, "agency_lang", columnForName);
+        agency.agency_phone        = getStringIfPresent(result, "agency_phone", columnForName);
+        agency.agency_fare_url     = getUrlIfPresent   (result, "agency_fare_url", columnForName);
+        agency.agency_email        = getStringIfPresent(result, "agency_email", columnForName);
+        agency.agency_branding_url = getUrlIfPresent   (result, "agency_branding_url", columnForName);
         return agency;
     };
 
     EntityPopulator<Calendar> CALENDAR = (result, columnForName) -> {
-        Calendar calendar = new Calendar();
+        Calendar calendar   = new Calendar();
         calendar.service_id = getStringIfPresent(result, "service_id", columnForName);
         calendar.start_date = getDateIfPresent  (result, "start_date", columnForName);
         calendar.end_date   = getDateIfPresent  (result, "end_date",   columnForName);
@@ -104,10 +106,31 @@ public interface EntityPopulator<T> {
         return calendarDate;
     };
 
+    EntityPopulator<FareAttribute> FARE_ATTRIBUTE = (result, columnForName) -> {
+        FareAttribute fareAttribute     = new FareAttribute();
+        fareAttribute.fare_id           = getStringIfPresent(result, "fare_id",     columnForName);
+        fareAttribute.agency_id         = getStringIfPresent(result, "agency_id",     columnForName);
+        fareAttribute.price             = getDoubleIfPresent(result, "price",           columnForName);
+        fareAttribute.payment_method    = getIntIfPresent   (result, "payment_method", columnForName);
+        fareAttribute.transfers         = getIntIfPresent   (result, "transfers", columnForName);
+        fareAttribute.transfer_duration = getIntIfPresent   (result, "transfer_duration", columnForName);
+        return fareAttribute;
+    };
+
+    EntityPopulator<Frequency> FREQUENCY = (result, columnForName) -> {
+        Frequency frequency    = new Frequency();
+        frequency.trip_id      = getStringIfPresent(result, "trip_id",     columnForName);
+        frequency.start_time   = getIntIfPresent   (result, "start_time", columnForName);
+        frequency.end_time     = getIntIfPresent   (result, "end_time", columnForName);
+        frequency.headway_secs = getIntIfPresent   (result, "headway_secs", columnForName);
+        frequency.exact_times  = getIntIfPresent   (result, "exact_times", columnForName);
+        return frequency;
+    };
+
     EntityPopulator<ScheduleException> SCHEDULE_EXCEPTION = (result, columnForName) -> {
         ScheduleException scheduleException = new ScheduleException();
-        scheduleException.name              = getStringIfPresent(result, "name", columnForName);
-        scheduleException.dates             = getDateListIfPresent(result, "dates", columnForName);
+        scheduleException.name              = getStringIfPresent    (result, "name", columnForName);
+        scheduleException.dates             = getDateListIfPresent  (result, "dates", columnForName);
         scheduleException.exemplar          = exemplarFromInt(getIntIfPresent(result, "exemplar", columnForName));
         scheduleException.customSchedule    = getStringListIfPresent(result, "custom_schedule", columnForName);
         scheduleException.addedService      = getStringListIfPresent(result, "added_service", columnForName);
@@ -116,22 +139,22 @@ public interface EntityPopulator<T> {
     };
 
     EntityPopulator<Route> ROUTE = (result, columnForName) -> {
-        Route route = new Route();
-        route.route_id         = getStringIfPresent(result, "route_id",           columnForName);
-        route.agency_id        = getStringIfPresent(result, "agency_id",          columnForName);
-        route.route_short_name = getStringIfPresent(result, "route_short_name",   columnForName);
-        route.route_long_name  = getStringIfPresent(result, "route_long_name",    columnForName);
-        route.route_desc       = getStringIfPresent(result, "route_desc",         columnForName);
-        route.route_type       = getIntIfPresent   (result, "route_type",         columnForName);
-        route.route_color      = getStringIfPresent(result, "route_color",        columnForName);
-        route.route_text_color = getStringIfPresent(result, "route_text_color",   columnForName);
-        route.route_url          = getUrlIfPresent (result, "route_url",          columnForName);
-        route.route_branding_url = getUrlIfPresent (result, "route_branding_url", columnForName);
+        Route route              = new Route();
+        route.route_id           = getStringIfPresent(result, "route_id",           columnForName);
+        route.agency_id          = getStringIfPresent(result, "agency_id",          columnForName);
+        route.route_short_name   = getStringIfPresent(result, "route_short_name",   columnForName);
+        route.route_long_name    = getStringIfPresent(result, "route_long_name",    columnForName);
+        route.route_desc         = getStringIfPresent(result, "route_desc",         columnForName);
+        route.route_type         = getIntIfPresent   (result, "route_type",         columnForName);
+        route.route_color        = getStringIfPresent(result, "route_color",        columnForName);
+        route.route_text_color   = getStringIfPresent(result, "route_text_color",   columnForName);
+        route.route_url          = getUrlIfPresent   (result, "route_url",          columnForName);
+        route.route_branding_url = getUrlIfPresent   (result, "route_branding_url", columnForName);
         return route;
     };
 
     EntityPopulator<Stop> STOP = (result, columnForName) -> {
-        Stop stop = new Stop();
+        Stop stop           = new Stop();
         stop.stop_id        = getStringIfPresent(result, "stop_id",        columnForName);
         stop.stop_code      = getStringIfPresent(result, "stop_code",      columnForName);
         stop.stop_name      = getStringIfPresent(result, "stop_name",      columnForName);
@@ -148,7 +171,7 @@ public interface EntityPopulator<T> {
     };
 
     EntityPopulator<Trip> TRIP = (result, columnForName) -> {
-        Trip trip = new Trip();
+        Trip trip            = new Trip();
         trip.trip_id         = getStringIfPresent(result, "trip_id", columnForName);
         trip.route_id        = getStringIfPresent(result, "route_id", columnForName);
         trip.service_id      = getStringIfPresent(result, "service_id", columnForName);
@@ -163,26 +186,26 @@ public interface EntityPopulator<T> {
     };
 
     EntityPopulator<ShapePoint> SHAPE_POINT = (result, columnForName) -> {
-        ShapePoint shapePoint = new ShapePoint();
-        shapePoint.shape_id     = getStringIfPresent(result, "shape_id", columnForName);
-        shapePoint.shape_pt_lat = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
-        shapePoint.shape_pt_lon = getDoubleIfPresent(result, "shape_pt_lon", columnForName);
-        shapePoint.shape_pt_sequence = getIntIfPresent(result, "shape_pt_sequence", columnForName);
+        ShapePoint shapePoint          = new ShapePoint();
+        shapePoint.shape_id            = getStringIfPresent(result, "shape_id", columnForName);
+        shapePoint.shape_pt_lat        = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
+        shapePoint.shape_pt_lon        = getDoubleIfPresent(result, "shape_pt_lon", columnForName);
+        shapePoint.shape_pt_sequence   = getIntIfPresent   (result, "shape_pt_sequence", columnForName);
         shapePoint.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
         return shapePoint;
     };
 
     EntityPopulator<StopTime> STOP_TIME = (result, columnForName) -> {
-        StopTime stopTime = new StopTime();
-        stopTime.trip_id        = getStringIfPresent(result, "trip_id", columnForName);
-        stopTime.arrival_time   = getIntIfPresent   (result, "arrival_time", columnForName);
-        stopTime.departure_time = getIntIfPresent   (result, "departure_time", columnForName);
-        stopTime.stop_id        = getStringIfPresent(result, "stop_id", columnForName);
-        stopTime.stop_sequence  = getIntIfPresent   (result, "stop_sequence", columnForName);
-        stopTime.stop_headsign  = getStringIfPresent(result, "stop_headsign", columnForName);
-        stopTime.pickup_type    = getIntIfPresent   (result, "pickup_type", columnForName);
-        stopTime.drop_off_type  = getIntIfPresent   (result, "drop_off_type", columnForName);
-        stopTime.timepoint      = getIntIfPresent   (result, "timepoint", columnForName);
+        StopTime stopTime            = new StopTime();
+        stopTime.trip_id             = getStringIfPresent(result, "trip_id", columnForName);
+        stopTime.arrival_time        = getIntIfPresent   (result, "arrival_time", columnForName);
+        stopTime.departure_time      = getIntIfPresent   (result, "departure_time", columnForName);
+        stopTime.stop_id             = getStringIfPresent(result, "stop_id", columnForName);
+        stopTime.stop_sequence       = getIntIfPresent   (result, "stop_sequence", columnForName);
+        stopTime.stop_headsign       = getStringIfPresent(result, "stop_headsign", columnForName);
+        stopTime.pickup_type         = getIntIfPresent   (result, "pickup_type", columnForName);
+        stopTime.drop_off_type       = getIntIfPresent   (result, "drop_off_type", columnForName);
+        stopTime.timepoint           = getIntIfPresent   (result, "timepoint", columnForName);
         stopTime.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
         return stopTime;
     };

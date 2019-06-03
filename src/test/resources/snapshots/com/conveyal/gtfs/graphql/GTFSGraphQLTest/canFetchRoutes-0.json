@@ -6,9 +6,11 @@
         "agency_id" : "1",
         "count" : 1,
         "id" : 2,
-        "pattern_count" : 1,
+        "pattern_count" : 2,
         "patterns" : [ {
           "pattern_id" : "1"
+        }, {
+          "pattern_id" : "2"
         } ],
         "publicly_visible" : null,
         "route_branding_url" : null,
@@ -25,6 +27,8 @@
           "stop_id" : "4u6g"
         }, {
           "stop_id" : "johv"
+        }, {
+          "stop_id" : "1234"
         } ],
         "trip_count" : 2,
         "trips" : [ {

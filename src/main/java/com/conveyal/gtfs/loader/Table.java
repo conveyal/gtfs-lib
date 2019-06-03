@@ -349,7 +349,7 @@ public class Table {
     }
 
     /** Fluent method to set whether the table has a compound key, e.g., transfers#to_stop_id. */
-    private Table hasCompoundKey() {
+    public Table hasCompoundKey() {
         this.compoundKey = true;
         return this;
     }
@@ -587,6 +587,14 @@ public class Table {
             fieldsString = commaSeparatedNames(requiredFields(), fieldPrefix, true);
         } else fieldsString = "*";
         return String.format("select %s from %s", fieldsString, tableName);
+    }
+
+    /**
+     * Shorthand wrapper for calling {@link #generateSelectSql(String, Requirement)}. Note: this does not prefix field
+     * names with the namespace, so cannot serve as a replacement for {@link #generateSelectAllExistingFieldsSql}.
+     */
+    public String generateSelectAllSql (String namespace) {
+        return generateSelectSql(namespace, Requirement.PROPRIETARY);
     }
 
     /**
