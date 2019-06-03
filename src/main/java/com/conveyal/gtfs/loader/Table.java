@@ -590,6 +590,14 @@ public class Table {
     }
 
     /**
+     * Shorthand wrapper for calling {@link #generateSelectSql(String, Requirement)}. Note: this does not prefix field
+     * names with the namespace, so cannot serve as a replacement for {@link #generateSelectAllExistingFieldsSql}.
+     */
+    public String generateSelectAllSql (String namespace) {
+        return generateSelectSql(namespace, Requirement.PROPRIETARY);
+    }
+
+    /**
      * Generate a select statement from the columns that actually exist in the database table.  This method is intended
      * to be used when exporting to a GTFS and eventually generates the select all with each individual field and
      * applicable transformations listed out.
