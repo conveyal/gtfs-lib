@@ -21,6 +21,13 @@
         "stop_times" : [ ]
       }, {
         "stop_id" : "1234",
+        "stop_times" : [ {
+          "stop_id" : "1234",
+          "stop_sequence" : 2,
+          "trip_id" : "frequency-trip"
+        } ]
+      }, {
+        "stop_id" : "1234567",
         "stop_times" : [ ]
       } ]
     }

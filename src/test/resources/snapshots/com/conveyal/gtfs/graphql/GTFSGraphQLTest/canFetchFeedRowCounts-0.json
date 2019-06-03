@@ -6,10 +6,10 @@
         "agency" : 1,
         "calendar" : 1,
         "calendar_dates" : 1,
-        "errors" : 6,
+        "errors" : 5,
         "routes" : 1,
         "stop_times" : 4,
-        "stops" : 4,
+        "stops" : 5,
         "trips" : 2
       },
       "snapshot_of" : null

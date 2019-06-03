@@ -36,13 +36,13 @@
         "timepoint" : null,
         "trip_id" : "frequency-trip"
       }, {
-        "arrival_time" : 28860,
-        "departure_time" : 28860,
+        "arrival_time" : 30540,
+        "departure_time" : 30540,
         "drop_off_type" : 0,
         "pickup_type" : 0,
         "shape_dist_traveled" : 341.4491961,
         "stop_headsign" : null,
-        "stop_id" : "johv",
+        "stop_id" : "1234",
         "stop_sequence" : 2,
         "timepoint" : null,
         "trip_id" : "frequency-trip"
