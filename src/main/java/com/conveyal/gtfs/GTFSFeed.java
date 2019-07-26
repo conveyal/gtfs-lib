@@ -196,29 +196,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
-        LOG.info("Building stop to stop times index");
-        Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
-        Bind.secondaryKeys(stop_times, stopStopTimeSet, (key, stopTime) -> new String[] {stopTime.stop_id});
-        LOG.info("Building trips per service index");
-        Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
-        LOG.info("Building services per date index");
-        Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
-
-            LocalDate startDate = service.calendar != null
-                    ? service.calendar.start_date
-                    : service.calendar_dates.keySet().stream().sorted().findFirst().get();
-            LocalDate endDate = service.calendar != null
-                    ? service.calendar.end_date
-                    : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
-            // end date for Period.between is not inclusive
-            int daysOfService = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
-            return IntStream.range(0, daysOfService)
-                    .mapToObj(offset -> startDate.plusDays(offset))
-                    .filter(service::activeOn)
-                    .map(date -> date.format(dateFormatter))
-                    .toArray(size -> new String[size]);
-        });
-
         loaded = true;
     }
 
