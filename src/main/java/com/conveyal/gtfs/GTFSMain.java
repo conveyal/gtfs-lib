@@ -1,6 +1,5 @@
 package com.conveyal.gtfs;
 
-import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.util.json.JsonManager;
 import com.conveyal.gtfs.validator.model.ValidationResult;
 import org.apache.commons.cli.CommandLine;
@@ -41,7 +40,7 @@ public class GTFSMain {
         if(cmd.hasOption("validate")) {
             feed.validate();
             JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class);
-            ValidationResult result = new ValidationResult(arguments[0], feed, new FeedStats(feed));
+            ValidationResult result = new ValidationResult(arguments[0], feed);
             String resultString = json.writePretty(result);
             File resultFile;
             if (arguments.length >= 2) {
