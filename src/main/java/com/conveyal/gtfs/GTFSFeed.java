@@ -234,15 +234,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             throw new RuntimeException(e);
         }
     }
-//    public void validate (EventBus eventBus, Validator... validators) {
-//        if (eventBus == null) {
-//
-//        }
-//        for (Validator validator : validators) {
-//            validator.getClass().getSimpleName();
-//            validator.validate(this, false);
-//        }
-//    }
+
     public void validate (boolean repair, Validator... validators) {
         long startValidation = System.currentTimeMillis();
         for (Validator validator : validators) {
