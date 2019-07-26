@@ -171,18 +171,6 @@ public class GTFSFeedTest {
     }
 
     /**
-     * Make sure the correct timezone of a stop is returned
-     */
-    @Test
-    public void canGetAgencyTimeZoneForStop() {
-        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
-        assertThat(
-            feed.getAgencyTimeZoneForStop("4u6g").getId(),
-            equalTo("America/Los_Angeles")
-        );
-    }
-
-    /**
      * Make sure that a GTFS feed with interpolated stop times have calculated times after feed processing
      * @throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes
      */
@@ -230,18 +218,6 @@ public class GTFSFeedTest {
 
             i++;
         }
-    }
-
-    /**
-     * Make sure a list of services for a date can be calculated
-     */
-    @Test
-    public void canGetServicesForDate() {
-        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
-        assertThat(
-            feed.getServicesForDate(LocalDate.of(2017,9,17)).get(0).service_id,
-            equalTo("04100312-8fe1-46a5-a9f2-556f39478f57")
-        );
     }
 
     /**
