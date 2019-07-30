@@ -90,8 +90,8 @@ public class Stop extends Entity {
             s.feed = feed;
             s.feed_id = feed.feedId;
             /* TODO check ref integrity later, this table self-references via parent_station */
-
-            feed.stops.put(s.stop_id, s);
+            // Attempting to put a null key or value will cause an NPE in BTreeMap
+            if (s.stop_id != null) feed.stops.put(s.stop_id, s);
         }
 
     }
