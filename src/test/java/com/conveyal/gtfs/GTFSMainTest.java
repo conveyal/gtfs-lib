@@ -18,6 +18,7 @@ import static org.hamcrest.Matchers.containsString;
  */
 public class GTFSMainTest {
     private static String simpleGtfsZipFileName;
+    private static String badGtfsZipFileName;
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
     // this is used so that it is possible to test code that calls System.exit()
@@ -30,6 +31,7 @@ public class GTFSMainTest {
         simpleGtfsZipFileName = null;
         try {
             simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency", true);
+            badGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-bad-calendar-date", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -74,6 +76,17 @@ public class GTFSMainTest {
     @Test
     public void canValidateSimpleAgency() throws Exception {
         String[] args = {simpleGtfsZipFileName, "-validate"};
+        GTFSMain.main(args);
+    }
+
+    /**
+     * Verify that a simple GTFS Zip file can be loaded with the GTFSMain class.
+     *
+     * @throws Exception
+     */
+    @Test
+    public void canValidateFeedWithErrors() throws Exception {
+        String[] args = {badGtfsZipFileName, "-validate"};
         GTFSMain.main(args);
     }
 }
