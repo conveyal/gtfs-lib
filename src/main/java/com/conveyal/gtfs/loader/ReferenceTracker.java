@@ -106,7 +106,14 @@ public class ReferenceTracker {
                 listOfUniqueIds = this.transitIdsWithSequence;
                 uniqueId = String.join(":", field.name, keyValue, value);
             }
-            // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
+            if (table.required.equals(Requirement.PROPRIETARY)) {
+                // Some proprietary tables in the GTFS+ spec do not conform to the general principle in GTFS where a key
+                // field (e.g., stop_id) only acts as the primary key field in the entity's table. For example, stop_id
+                // acts as a primary key on stop_attributes.txt, so we prepend the table name to the unique ID for these
+                // tables when checking for duplicate entries.
+                uniqueId = String.join(":", table.name, field.name, value);
+            }
+             // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
             boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
             if (valueAlreadyExists) {
                 // If the value is a duplicate, add an error.
