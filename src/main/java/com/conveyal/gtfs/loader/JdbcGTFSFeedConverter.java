@@ -182,7 +182,7 @@ public class JdbcGTFSFeedConverter {
                     "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
                     "snapshot_of varchar)");
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null)");
+                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, null); // md5Hex
             insertStatement.setString(3, null); // shaHex

@@ -234,7 +234,7 @@ public class JdbcGtfsLoader {
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null)");
+                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, md5Hex);
             insertStatement.setString(3, shaHex);
@@ -258,7 +258,7 @@ public class JdbcGtfsLoader {
         Statement statement = connection.createStatement();
         statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
                               "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                              "snapshot_of varchar)");
+                              "snapshot_of varchar, deleted boolean)");
     }
 
     /**
