@@ -109,6 +109,8 @@ public class JdbcGtfsSnapshotter {
             LOG.error("Exception while creating snapshot: {}", ex.toString());
             ex.printStackTrace();
             result.fatalException = ex.toString();
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
     }
@@ -424,7 +426,7 @@ public class JdbcGtfsSnapshotter {
             createFeedRegistryIfNotExists(connection);
             createSchema(connection, tablePrefix);
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, null, null, null, null, null, current_timestamp, ?)");
+                    "insert into feeds values (?, null, null, null, null, null, current_timestamp, ?, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, feedIdToSnapshot);
             insertStatement.execute();

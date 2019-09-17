@@ -80,10 +80,7 @@ public class JDBCTableWriterTest {
         testDataSource = createDataSource (dbConnectionUrl, null, null);
         LOG.info("creating feeds table because it isn't automatically generated unless you import a feed");
         Connection connection = testDataSource.getConnection();
-        connection.createStatement()
-            .execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                "snapshot_of varchar)");
+        connection.createStatement().execute(JdbcGtfsLoader.getCreateFeedRegistrySQL());
         connection.commit();
         LOG.info("feeds table created");
         // Create an empty snapshot to create a new namespace and all the tables
