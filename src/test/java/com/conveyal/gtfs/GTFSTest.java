@@ -338,8 +338,8 @@ public class GTFSTest {
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
         DataSource dataSource = GTFS.createDataSource(
             dbConnectionUrl,
-            null,
-            null
+            "postgres",
+            "postgres"
         );
 
         String namespace;
