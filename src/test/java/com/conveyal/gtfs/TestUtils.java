@@ -53,7 +53,9 @@ public class TestUtils {
     private static boolean executeAndClose(String statement) {
         Connection connection;
         try {
-            connection = createTestDataSource(PG_URL).getConnection();
+            // This connection must be established without GTFS#createDataSource because the "create database" command
+            // cannot run inside a transaction block.
+            connection = DriverManager.getConnection(PG_URL, PG_TEST_USER, PG_TEST_PASSWORD);
         } catch (SQLException e) {
             e.printStackTrace();
             LOG.error("Error connecting to database!");
@@ -81,7 +83,7 @@ public class TestUtils {
 
     public static DataSource createTestDataSource (String dbUrl) {
         return GTFS.createDataSource(dbUrl, PG_TEST_USER, PG_TEST_PASSWORD);
-    } 
+    }
 
     /**
      * Generate a new database for isolating a test.
