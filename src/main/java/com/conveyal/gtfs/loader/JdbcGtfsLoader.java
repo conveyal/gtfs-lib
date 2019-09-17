@@ -92,6 +92,13 @@ public class JdbcGtfsLoader {
         this.dataSource = dataSource;
     }
 
+    /** Get SQL string for creating the feed registry table (AKA, the "feeds" table). */
+    public static String getCreateFeedRegistrySQL() {
+        return "create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
+            "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
+            "snapshot_of varchar, deleted boolean)";
+    }
+
 
     // Hash to uniquely identify files.
     // We can't use CRC32, the probability of collision on 10k items is about 1%.
@@ -168,6 +175,8 @@ public class JdbcGtfsLoader {
             LOG.error("Exception while loading GTFS file: {}", ex.toString());
             ex.printStackTrace();
             result.fatalException = ex.toString();
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
     }
@@ -256,9 +265,7 @@ public class JdbcGtfsLoader {
      */
     static void createFeedRegistryIfNotExists(Connection connection) throws SQLException {
         Statement statement = connection.createStatement();
-        statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                              "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                              "snapshot_of varchar, deleted boolean)");
+        statement.execute(getCreateFeedRegistrySQL());
     }
 
     /**

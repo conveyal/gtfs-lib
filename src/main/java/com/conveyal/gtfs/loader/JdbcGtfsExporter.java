@@ -5,6 +5,7 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
+import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
@@ -311,6 +312,8 @@ public class JdbcGtfsExporter {
             LOG.error("Exception while creating snapshot: {}", ex.toString());
             ex.printStackTrace();
             result.fatalException = ex.toString();
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
     }

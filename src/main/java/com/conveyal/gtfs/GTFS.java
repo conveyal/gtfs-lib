@@ -26,6 +26,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
@@ -105,27 +106,35 @@ public abstract class GTFS {
      */
     public static void delete (String feedId, DataSource dataSource) throws SQLException, InvalidNamespaceException {
         LOG.info("Deleting all tables (dropping schema) for {} feed namespace.", feedId);
-        Connection connection = null;
-        try {
-            connection = dataSource.getConnection();
+        // Try-with-resources will automatically close the connection when the try block exits.
+        try (Connection connection = dataSource.getConnection()) {
             ensureValidNamespace(feedId);
             // Mark entry in feeds table as deleted.
             String deleteFeedEntrySql = "update feeds set deleted = true where namespace = ?";
             PreparedStatement deleteFeedStatement = connection.prepareStatement(deleteFeedEntrySql);
             deleteFeedStatement.setString(1, feedId);
             deleteFeedStatement.executeUpdate();
+            String schemaSql = String.format(
+                "SELECT schema_name FROM information_schema.schemata where schema_name = '%s'",
+                feedId
+            );
+            PreparedStatement preparedStatement = connection.prepareStatement(schemaSql);
+            ResultSet resultSet = preparedStatement.executeQuery();
+            while (resultSet.next()) {
+                LOG.info("schema + " + resultSet.getString("schema_name"));
+            }
             // Drop all tables bearing the feedId namespace.
             // Note: It does not appear to be possible to use prepared statements with "drop schema."
-            String dropSchemaSql = String.format("DROP SCHEMA %s CASCADE", feedId);
-            Statement statement = connection.createStatement();
-            statement.executeUpdate(dropSchemaSql);
+            String dropSchemaSql = String.format("drop schema %s cascade;", feedId);
+            PreparedStatement dropSchemaStatement = connection.prepareStatement(dropSchemaSql);
+            LOG.info(dropSchemaStatement.toString());
+            dropSchemaStatement.executeUpdate();
             // Commit the changes.
             connection.commit();
+            LOG.info("Drop schema successful!");
         } catch (InvalidNamespaceException | SQLException e) {
             LOG.error(String.format("Could not drop feed for namespace %s", feedId), e);
             throw e;
-        } finally {
-            if (connection != null) DbUtils.closeQuietly(connection);
         }
     }
 
