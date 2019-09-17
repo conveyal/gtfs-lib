@@ -1,6 +1,5 @@
 package com.conveyal.gtfs;
 
-import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +19,9 @@ import static com.conveyal.gtfs.util.Util.randomIdString;
 public class TestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-    private static String pgUrl = "jdbc:postgresql://localhost/postgres";
+    private static final String PG_URL = "jdbc:postgresql://localhost/postgres";
+    public static final String PG_TEST_USER = "postgres";
+    public static final String PG_TEST_PASSWORD = "postgres";
 
     /**
      * Forcefully drops a database even if other users are connected to it.
@@ -51,7 +52,7 @@ public class TestUtils {
     private static boolean executeAndClose(String statement) {
         Connection connection;
         try {
-            connection = DriverManager.getConnection(pgUrl);
+            connection = DriverManager.getConnection(PG_URL, PG_TEST_USER, PG_TEST_PASSWORD);
         } catch (SQLException e) {
             e.printStackTrace();
             LOG.error("Error connecting to database!");
