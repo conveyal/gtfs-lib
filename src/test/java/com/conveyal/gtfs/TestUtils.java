@@ -4,6 +4,7 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -52,7 +53,7 @@ public class TestUtils {
     private static boolean executeAndClose(String statement) {
         Connection connection;
         try {
-            connection = DriverManager.getConnection(PG_URL, PG_TEST_USER, PG_TEST_PASSWORD);
+            connection = createTestDataSource(PG_URL).getConnection();
         } catch (SQLException e) {
             e.printStackTrace();
             LOG.error("Error connecting to database!");
@@ -77,6 +78,10 @@ public class TestUtils {
             return false;
         }
     }
+
+    public static DataSource createTestDataSource (String dbUrl) {
+        return GTFS.createDataSource(dbUrl, PG_TEST_USER, PG_TEST_PASSWORD);
+    } 
 
     /**
      * Generate a new database for isolating a test.

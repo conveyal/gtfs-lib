@@ -38,8 +38,6 @@ import java.util.Iterator;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.gtfs.TestUtils.PG_TEST_PASSWORD;
-import static com.conveyal.gtfs.TestUtils.PG_TEST_USER;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.equalTo;
@@ -338,11 +336,7 @@ public class GTFSTest {
     ) {
         String newDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
-        DataSource dataSource = GTFS.createDataSource(
-            dbConnectionUrl,
-            PG_TEST_USER,
-            PG_TEST_PASSWORD
-        );
+        DataSource dataSource = TestUtils.createTestDataSource(dbConnectionUrl);
 
         String namespace;
 

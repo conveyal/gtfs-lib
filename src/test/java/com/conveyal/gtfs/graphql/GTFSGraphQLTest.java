@@ -21,8 +21,6 @@ import java.util.Map;
 import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
-import static com.conveyal.gtfs.TestUtils.PG_TEST_PASSWORD;
-import static com.conveyal.gtfs.TestUtils.PG_TEST_USER;
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static com.zenika.snapshotmatcher.SnapshotMatcher.matchesSnapshot;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -47,7 +45,7 @@ public class GTFSGraphQLTest {
         // create a new database
         testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
-        testDataSource = createDataSource(dbConnectionUrl, PG_TEST_USER, PG_TEST_PASSWORD);
+        testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         // zip up test folder into temp zip file
         String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
         // load feed into db
@@ -69,7 +67,7 @@ public class GTFSGraphQLTest {
         // create a new database
         testInjectionDBName = TestUtils.generateNewDB();
         String injectionDbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testInjectionDBName);
-        testInjectionDataSource = createDataSource(injectionDbConnectionUrl, PG_TEST_USER, PG_TEST_PASSWORD);
+        testInjectionDataSource = TestUtils.createTestDataSource(injectionDbConnectionUrl);
         // load feed into db
         FeedLoadResult injectionFeedLoadResult = load(zipFileName, testInjectionDataSource);
         testInjectionNamespace = injectionFeedLoadResult.uniqueIdentifier;
