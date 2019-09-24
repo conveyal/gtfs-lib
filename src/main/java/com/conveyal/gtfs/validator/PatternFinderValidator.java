@@ -226,7 +226,7 @@ public class PatternFinderValidator extends TripValidator {
             throw new RuntimeException(e);
         } finally {
             // Close transaction finally.
-            DbUtils.closeQuietly(connection);
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
 
     }

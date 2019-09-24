@@ -8,11 +8,13 @@ import com.conveyal.gtfs.storage.ErrorExpectation;
 import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
+import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.hamcrest.Matcher;
@@ -30,11 +32,16 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -49,6 +56,7 @@ import static org.junit.Assert.assertThat;
  */
 public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    private static final String JDBC_URL = "jdbc:postgresql://localhost";
     private static final Logger LOG = LoggerFactory.getLogger(GTFSTest.class);
 
     // setup a stream to capture the output from the program
@@ -323,10 +331,12 @@ public class GTFSTest {
 
     /**
      * A helper method that will run GTFS#main with a certain zip file.
-     * This tests whether a GTFS zip file can be loaded without any errors.
-     *
-     * After the GTFS is loaded, this will also initiate an export of a GTFS from the database and check
-     * the integrity of the exported GTFS.
+     * This tests whether a GTFS zip file can be loaded without any errors. The full list of steps includes:
+     * 1. GTFS#load
+     * 2. GTFS#validate
+     * 3. exportGtfs/check exported GTFS integrity
+     * 4. makeSnapshot
+     * 5. Delete feed/namespace
      */
     private boolean runIntegrationTestOnZipFile(
         String zipFileName,
@@ -334,8 +344,8 @@ public class GTFSTest {
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations
     ) {
-        String newDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
+        String testDBName = TestUtils.generateNewDB();
+        String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
         DataSource dataSource = GTFS.createDataSource(
             dbConnectionUrl,
             null,
@@ -345,7 +355,7 @@ public class GTFSTest {
         String namespace;
 
         // Verify that loading the feed completes and data is stored properly
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
@@ -353,14 +363,13 @@ public class GTFSTest {
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
-
-            assertThatImportedGtfsMeetsExpectations(dataSource.getConnection(), namespace, persistenceExpectations, errorExpectations);
+            assertThatImportedGtfsMeetsExpectations(connection, namespace, persistenceExpectations, errorExpectations);
         } catch (SQLException e) {
-            TestUtils.dropDB(newDBName);
+            TestUtils.dropDB(testDBName);
             e.printStackTrace();
             return false;
         } catch (AssertionError e) {
-            TestUtils.dropDB(newDBName);
+            TestUtils.dropDB(testDBName);
             throw e;
         }
 
@@ -370,11 +379,11 @@ public class GTFSTest {
             File tempFile = exportGtfs(namespace, dataSource, false);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, false);
         } catch (IOException e) {
-            TestUtils.dropDB(newDBName);
+            TestUtils.dropDB(testDBName);
             e.printStackTrace();
             return false;
         } catch (AssertionError e) {
-            TestUtils.dropDB(newDBName);
+            TestUtils.dropDB(testDBName);
             throw e;
         }
 
@@ -389,11 +398,47 @@ public class GTFSTest {
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
         } catch (IOException e) {
             e.printStackTrace();
+            TestUtils.dropDB(testDBName);
             return false;
-        } finally {
-            TestUtils.dropDB(newDBName);
+        } catch (AssertionError e) {
+            TestUtils.dropDB(testDBName);
+            throw e;
         }
 
+        // Verify that deleting a feed works as expected.
+        try (Connection connection = dataSource.getConnection()) {
+            LOG.info("Deleting GTFS feed from database.");
+            GTFS.delete(namespace, dataSource);
+
+            String sql = String.format("select * from feeds where namespace = '%s'", namespace);
+            LOG.info(sql);
+            ResultSet resultSet = connection.prepareStatement(sql).executeQuery();
+            while (resultSet.next()) {
+                // Assert that the feed registry shows feed as deleted.
+                assertThat(resultSet.getBoolean("deleted"), is(true));
+            }
+            // Ensure that schema no longer exists for namespace (note: this is Postgres specific).
+            String schemaSql = String.format(
+                "SELECT * FROM information_schema.schemata where schema_name = '%s'",
+                namespace
+            );
+            LOG.info(schemaSql);
+            ResultSet schemaResultSet = connection.prepareStatement(schemaSql).executeQuery();
+            int schemaCount = 0;
+            while (schemaResultSet.next()) schemaCount++;
+            // There should be no schema records matching the deleted namespace.
+            assertThat(schemaCount, is(0));
+        } catch (SQLException | InvalidNamespaceException e) {
+            e.printStackTrace();
+            TestUtils.dropDB(testDBName);
+            return false;
+        } catch (AssertionError e) {
+            TestUtils.dropDB(testDBName);
+            throw e;
+        }
+
+        // This should be run following all of the above tests (any new tests should go above these lines).
+        TestUtils.dropDB(testDBName);
         return true;
     }
 

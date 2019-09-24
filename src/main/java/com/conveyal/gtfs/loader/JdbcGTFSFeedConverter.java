@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
@@ -10,19 +9,15 @@ import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.gtfs.model.FareRule;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
-import com.conveyal.gtfs.storage.StorageException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.io.*;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
 /**
@@ -178,11 +173,9 @@ public class JdbcGTFSFeedConverter {
             statement.execute("create schema " + tablePrefix);
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
-            statement.execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                    "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                    "snapshot_of varchar)");
+            statement.execute(JdbcGtfsLoader.getCreateFeedRegistrySQL());
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null)");
+                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, null); // md5Hex
             insertStatement.setString(3, null); // shaHex

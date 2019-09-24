@@ -127,8 +127,8 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
      * @return the total number of rows in this table, or -1 if the table does not exist.
      */
     public int getRowCount() {
-        try {
-            Connection connection = dataSource.getConnection();
+        // Try-with-resources will automatically close the connection when the try block exits.
+        try (Connection connection = dataSource.getConnection()) {
             Statement statement = connection.createStatement();
             statement.execute("select count(*) from " + qualifiedTableName);
             ResultSet resultSet = statement.getResultSet();
