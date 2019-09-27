@@ -256,7 +256,7 @@ public class Table {
             // FIXME: Do we need an index on from_ and to_stop_id
             new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
-            new StringField("transfer_type", REQUIRED),
+            new ShortField("transfer_type", REQUIRED, 3),
             new StringField("min_transfer_time", OPTIONAL))
             .addPrimaryKey()
             .keyFieldIsNotUnique()
