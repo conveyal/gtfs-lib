@@ -804,8 +804,8 @@ public class GTFSTest {
             new PersistenceExpectation(
                 "feed_info",
                 new RecordExpectation[]{
-                    new RecordExpectation("feed_publisher_name", "Conveyal"
-                    ),
+                    new RecordExpectation("feed_id", "fake_transit"),
+                    new RecordExpectation("feed_publisher_name", "Conveyal"),
                     new RecordExpectation(
                         "feed_publisher_url", "http://www.conveyal.com"
                     ),

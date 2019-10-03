@@ -154,6 +154,7 @@ public class Table {
     // FIXME: Should we add some constraint on number of rows that this table has? Perhaps this is a GTFS editor specific
     // feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
+        new StringField("feed_id", OPTIONAL),
         new StringField("feed_publisher_name", REQUIRED),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),

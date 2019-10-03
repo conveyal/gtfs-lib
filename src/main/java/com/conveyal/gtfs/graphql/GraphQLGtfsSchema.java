@@ -142,6 +142,7 @@ public class GraphQLGtfsSchema {
     public static final GraphQLObjectType feedInfoType = newObject().name("feed_info")
             .description("A GTFS feed_info object")
             .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("feed_id"))
             .field(MapFetcher.field("feed_publisher_name"))
             .field(MapFetcher.field("feed_publisher_url"))
             .field(MapFetcher.field("feed_lang"))
