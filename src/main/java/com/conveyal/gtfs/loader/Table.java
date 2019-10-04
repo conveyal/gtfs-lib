@@ -152,9 +152,12 @@ public class Table {
     ).addPrimaryKey();
 
     // FIXME: Should we add some constraint on number of rows that this table has? Perhaps this is a GTFS editor specific
-    // feature.
+    //  feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
+        // feed_id is not the first field because that would label it as the key field, which we do not want because the
+        // key field cannot be optional.
+        new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
