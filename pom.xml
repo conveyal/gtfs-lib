@@ -98,7 +98,7 @@
         <version>3.1.1</version>
         <configuration>
           <!-- Turn off Java 8 strict Javadoc checking -->
-          <additionalparam>-Xdoclint:none</additionalparam>
+          <doclint>none</doclint>
         </configuration>
         <executions>
           <!-- Compress Javadoc into JAR and include that JAR when deploying. -->
