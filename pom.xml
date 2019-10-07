@@ -8,7 +8,7 @@
 
   <groupId>com.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
-  <version>5.0.3-SNAPSHOT</version>
+  <version>5.0.7-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <licenses>
@@ -69,7 +69,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.2</version>
+        <version>3.8.1</version>
         <configuration>
           <!-- Target Java versions -->
           <source>1.8</source>
@@ -80,23 +80,25 @@
         <!-- Recommended way to deploy to OSSRH -->
         <groupId>org.sonatype.plugins</groupId>
         <artifactId>nexus-staging-maven-plugin</artifactId>
-        <version>1.6.7</version>
+        <version>1.6.8</version>
         <extensions>true</extensions>
         <configuration>
           <serverId>ossrh</serverId>
           <nexusUrl>https://oss.sonatype.org/</nexusUrl>
           <!-- Release versions will be synced to Maven Central automatically. -->
           <autoReleaseAfterClose>true</autoReleaseAfterClose>
+          <!-- Sets timeout for 30 minutes instead of the default of 5 minutes  -->
+          <stagingProgressTimeoutMinutes>30</stagingProgressTimeoutMinutes>
         </configuration>
       </plugin>
       <plugin>
         <!-- Allow attaching Javadoc during releases -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>2.10.3</version>
+        <version>3.1.1</version>
         <configuration>
           <!-- Turn off Java 8 strict Javadoc checking -->
-          <additionalparam>-Xdoclint:none</additionalparam>
+          <doclint>none</doclint>
         </configuration>
         <executions>
           <!-- Compress Javadoc into JAR and include that JAR when deploying. -->
@@ -112,6 +114,7 @@
         <!-- Include zipped source code in releases -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
+        <version>3.1.0</version>
         <executions>
           <execution>
             <id>attach-sources</id>
@@ -124,7 +127,7 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.5</version>
+        <version>1.6</version>
         <executions>
           <execution>
             <id>sign-artifacts</id>
@@ -141,7 +144,7 @@
         <!-- Attach a version of the JAR that includes all dependencies -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>2.2</version>
+        <version>3.2.1</version>
         <executions>
           <execution>
             <phase>package</phase>
@@ -182,7 +185,7 @@
       <plugin>
         <groupId>org.jacoco</groupId>
         <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.7.9</version>
+        <version>0.8.4</version>
         <executions>
           <execution>
             <goals>
