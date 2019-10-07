@@ -67,6 +67,9 @@ notifications:
 after_success:
   # this first codecov run will upload a report associated with the commit set through Travis CI environment variables
   - bash <(curl -s https://codecov.io/bash)
+  # Clear contents of the target directory to avoid issues where maven-semantic-release attempts to upload
+  # multiple versions/builds (and fails due to the pre-existence of the version on maven central).
+  - rm -rf target/*
   # run maven-semantic-release to potentially create a new release of gtfs-lib.
   #
   # If maven-semantic-release finishes successfully and the current branch is master, upload coverage reports for the
