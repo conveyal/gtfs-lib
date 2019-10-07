@@ -117,6 +117,7 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         FeedInfoDTO feedInfoInput = new FeedInfoDTO();
         String publisherName = "test-publisher";
+        feedInfoInput.feed_id = null;
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
@@ -175,6 +176,7 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         FeedInfoDTO feedInfoInput = new FeedInfoDTO();
         String publisherName = "' OR 1 = 1; SELECT '1";
+        feedInfoInput.feed_id = "fake_id";
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class FeedInfoDTO {
     public int id;
+    public String feed_id;
     public String feed_publisher_name;
     public String feed_publisher_url;
     public String feed_lang;
