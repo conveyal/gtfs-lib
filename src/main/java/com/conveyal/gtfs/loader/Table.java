@@ -3,12 +3,10 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.storage.StorageException;
-import com.sun.org.apache.regexp.internal.RE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.util.*;
 import java.util.stream.Collectors;

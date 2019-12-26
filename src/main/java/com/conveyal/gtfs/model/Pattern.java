@@ -2,7 +2,7 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.google.common.base.Joiner;
-import com.vividsolutions.jts.geom.LineString;
+import org.locationtech.jts.geom.LineString;
 
 import java.io.Serializable;
 import java.util.*;

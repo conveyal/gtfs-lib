@@ -51,7 +51,7 @@
 
   <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
-    <geotools.version>14.0</geotools.version>
+    <geotools.version>21.2</geotools.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -70,11 +70,24 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <version>3.2</version>
+        <version>3.8.1</version>
         <configuration>
-          <!-- Target Java versions -->
-          <source>1.8</source>
-          <target>1.8</target>
+          <!-- Target Java version -->
+          <release>11</release>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.1.2</version>
+        <configuration>
+          <archive>
+            <manifestEntries>
+              <!-- For Java 11 Modules, specify a module name. Do not create module-info.java until all
+                   our dependencies specify a module name. -->
+              <Automatic-Module-Name>com.conveyal.gtfslib</Automatic-Module-Name>
+            </manifestEntries>
+          </archive>
         </configuration>
       </plugin>
       <plugin>
@@ -94,10 +107,10 @@
         <!-- Allow attaching Javadoc during releases -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
-        <version>2.10.3</version>
+        <version>3.1.1</version>
         <configuration>
-          <!-- Turn off Java 8 strict Javadoc checking -->
-          <additionalparam>-Xdoclint:none</additionalparam>
+          <!-- Turn off strict Javadoc checking -->
+          <doclint>none</doclint>
         </configuration>
         <executions>
           <!-- Compress Javadoc into JAR and include that JAR when deploying. -->
@@ -113,6 +126,7 @@
         <!-- Include zipped source code in releases -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-source-plugin</artifactId>
+        <version>3.1.0</version>
         <executions>
           <execution>
             <id>attach-sources</id>
@@ -179,26 +193,6 @@
           </execution>
         </executions>
       </plugin>
-      <!-- This plugin calculates code coverage and generates a report during the test phase in maven -->
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>0.7.9</version>
-        <executions>
-          <execution>
-            <goals>
-              <goal>prepare-agent</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>test</phase>
-            <goals>
-              <goal>report</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
     </plugins>
   </build>
 
@@ -247,11 +241,6 @@
     	<artifactId>guava</artifactId>
     	<version>18.0</version>
     </dependency>
-    <dependency>
-    	<groupId>com.vividsolutions</groupId>
-    	<artifactId>jts</artifactId>
-    	<version>1.13</version>
-    </dependency>
     <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
     <dependency>
       <groupId>org.hamcrest</groupId>
@@ -289,13 +278,13 @@
     </dependency>
     <dependency>
       <groupId>org.geotools</groupId>
-      <artifactId>gt-api</artifactId>
+      <artifactId>gt-main</artifactId>
       <version>${geotools.version}</version>
     </dependency>
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-epsg-hsql</artifactId>
-      <version>11-beta</version>
+      <version>11.1</version>
     </dependency>
     <!-- For uploading / downloading things from Amazon S3.
          We should really eliminate this functionality, it's out of scope for this gtfs-lib library. -->
@@ -315,12 +304,6 @@
       <groupId>commons-cli</groupId>
       <artifactId>commons-cli</artifactId>
       <version>1.4</version>
-    </dependency>
-    <!-- We should really find a way to do this without forking Jackson -->
-    <dependency>
-      <groupId>com.conveyal</groupId>
-      <artifactId>jackson2-geojson</artifactId>
-      <version>0.8</version>
     </dependency>
     <!-- JDBC support for Postgres databases. More modules would need to be added to access H2, SQLite etc. -->
     <dependency>

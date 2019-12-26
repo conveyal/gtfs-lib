@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.util.json;
 
-import com.conveyal.geojson.GeoJsonModule;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -36,7 +35,10 @@ public class JsonManager<T> {
         this.theClass = theClass;
         this.mapper = new ObjectMapper();
         mapper.addMixInAnnotations(Rectangle2D.class, Rectangle2DMixIn.class);
-        mapper.registerModule(new GeoJsonModule());
+        // FIXME GeoJSON serialization has been removed,
+        //       it was a fork of a library using an incompatible version of JTS
+        //       apparently this entire class is only used for writing validation results to JSON
+        // mapper.registerModule(new GeoJsonModule());
         SimpleModule deser = new SimpleModule();
 
         deser.addDeserializer(LocalDate.class, new JacksonSerializers.LocalDateStringDeserializer());

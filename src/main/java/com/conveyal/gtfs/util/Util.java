@@ -1,8 +1,8 @@
 package com.conveyal.gtfs.util;
 
 import com.conveyal.gtfs.model.Stop;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.GeometryFactory;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.apache.commons.math3.util.FastMath;
 

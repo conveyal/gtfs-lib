@@ -1,6 +1,6 @@
 package com.conveyal.gtfs.validator.service;
 
-import com.vividsolutions.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Coordinate;
 import org.opengis.referencing.operation.MathTransform;
 
 public class ProjectedCoordinate extends Coordinate {
