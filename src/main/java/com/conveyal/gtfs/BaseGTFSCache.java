@@ -124,7 +124,7 @@ public abstract class BaseGTFSCache<T> {
 
         // read the feed
         String cleanTempId = cleanId(tempId);
-        File dbFile = new File(cacheDir, cleanTempId + ".db");
+        File dbFile = new File(cacheDir, cleanTempId + ".v2.db");
         File movedFeedFile = new File(cacheDir, cleanTempId + ".zip");
 
         // don't copy if we're loading from a locally-cached feed
@@ -143,11 +143,11 @@ public abstract class BaseGTFSCache<T> {
         if (idGenerator != null) {
             // This mess seems to be necessary to get around Windows file locks.
             File originalZip = new File(cacheDir, cleanTempId + ".zip");
-            File originalDb = new File(cacheDir, cleanTempId + ".db");
-            File originalDbp = new File(cacheDir, cleanTempId + ".db.p");
+            File originalDb = new File(cacheDir, cleanTempId + ".v2.db");
+            File originalDbp = new File(cacheDir, cleanTempId + ".v2.db.p");
             Files.copy(originalZip,(new File(cacheDir, cleanId + ".zip")));
-            Files.copy(originalDb,(new File(cacheDir, cleanId + ".db")));
-            Files.copy(originalDbp,(new File(cacheDir, cleanId + ".db.p")));
+            Files.copy(originalDb,(new File(cacheDir, cleanId + ".v2.db")));
+            Files.copy(originalDbp,(new File(cacheDir, cleanId + ".v2.db.p")));
             originalZip.delete();
             originalDb.delete();
             originalDbp.delete();
@@ -167,13 +167,13 @@ public abstract class BaseGTFSCache<T> {
             else {
                 LOG.info("Zip file already exists on s3.");
             }
-            s3.putObject(bucket, key + ".db", new File(cacheDir, cleanId + ".db"));
-            s3.putObject(bucket, key + ".db.p", new File(cacheDir, cleanId + ".db.p"));
+            s3.putObject(bucket, key + ".v2.db", new File(cacheDir, cleanId + ".v2.db"));
+            s3.putObject(bucket, key + ".v2.db.p", new File(cacheDir, cleanId + ".v2.db.p"));
             LOG.info("db files written.");
         }
 
         // reconnect to feed database
-        feed = new GTFSFeed(new File(cacheDir, cleanId + ".db").getAbsolutePath());
+        feed = new GTFSFeed(new File(cacheDir, cleanId + ".v2.db").getAbsolutePath());
         T processed = processFeed(feed);
         cache.put(id, processed);
         return processed;
@@ -205,7 +205,7 @@ public abstract class BaseGTFSCache<T> {
         // see if we have it cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
-        File dbFile = new File(cacheDir, id + ".db");
+        File dbFile = new File(cacheDir, id + ".v2.db");
         GTFSFeed feed;
         if (dbFile.exists()) {
             LOG.info("Processed GTFS was found cached locally");
@@ -223,16 +223,16 @@ public abstract class BaseGTFSCache<T> {
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
-                S3Object db = s3.getObject(bucket, key + ".db");
+                S3Object db = s3.getObject(bucket, key + ".v2.db");
                 InputStream is = db.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(dbFile);
                 ByteStreams.copy(is, fos);
                 is.close();
                 fos.close();
 
-                S3Object dbp = s3.getObject(bucket, key + ".db.p");
+                S3Object dbp = s3.getObject(bucket, key + ".v2.db.p");
                 InputStream isp = dbp.getObjectContent();
-                FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".db.p"));
+                FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".v2.db.p"));
                 ByteStreams.copy(isp, fosp);
                 isp.close();
                 fosp.close();
@@ -289,7 +289,7 @@ public abstract class BaseGTFSCache<T> {
     public abstract GTFSFeed getFeed (String id);
 
     private void deleteLocalDBFiles(String id) {
-        String[] extensions = {".db", ".db.p"};
+        String[] extensions = {".v2.db", ".v2.db.p"};
         // delete ONLY local cache db files
         for (String type : extensions) {
             File file = new File(cacheDir, id + type);
