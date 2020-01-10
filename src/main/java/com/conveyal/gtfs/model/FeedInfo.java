@@ -77,7 +77,7 @@ public class FeedInfo extends Entity implements Cloneable {
             fi.feed = feed;
             if (feed.feedInfo.isEmpty()) {
                 feed.feedInfo.put("NONE", fi);
-                feed.feedId = fi.feed_id;
+                feed.feedId.set(fi.feed_id);
             } else {
                 feed.errors.add(new GeneralError(tableName, row, null, "FeedInfo contains more than one record."));
             }

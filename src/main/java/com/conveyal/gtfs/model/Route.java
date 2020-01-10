@@ -105,7 +105,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_text_color = getStringField("route_text_color", false);
             r.route_branding_url = getUrlField("route_branding_url", false);
             r.feed = feed;
-            r.feed_id = feed.feedId;
+            r.feed_id = feed.feedId.get();
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (r.route_id != null) feed.routes.put(r.route_id, r);
         }

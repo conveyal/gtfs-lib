@@ -14,12 +14,12 @@ import com.vividsolutions.jts.algorithm.ConvexHull;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.index.strtree.STRtree;
 import org.geotools.referencing.GeodeticCalculator;
+import org.mapdb.Atomic;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
-import org.mapdb.Fun;
-import org.mapdb.Fun.Tuple2;
 import org.mapdb.Serializer;
+import org.mapdb.serializer.SerializerArrayTuple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,9 +41,15 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import static org.mapdb.Serializer.JAVA;
+import static org.mapdb.Serializer.STRING;
+
 /**
- * All entities must be from a single feed namespace.
- * Composed of several GTFSTables.
+ * This is a random-access representation of the contents of a single GTFS feed, generally backed by
+ * filesystem-based storage. All entities are expected to be from a single feed namespace, i.e. you should not load
+ * multiple feeds into a single GTFSFeed because it is not intended deal with cross-feed ID collisions.
+ * This is the original, largely MapDB-backed storage mechanism, alongside which we have implemented RDBMS-backed
+ * storage in the new class GTFS.
  */
 public class GTFSFeed implements Cloneable, Closeable {
 
@@ -52,29 +58,40 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     private DB db;
 
-    public String feedId = null;
+    public final Atomic.String feedId;
 
     // TODO make all of these Maps MapDBs so the entire GTFSFeed is persistent and uses constant memory
 
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency> agency;
+
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
-    public final NavigableSet<Tuple2<String, Frequency>> frequencies;
+    // TODO ^ Update docs URL
+    // The Object[] contains <String, Frequency>
+    public final NavigableSet<Object[]> frequencies;
+
+    /** Map from GTFS route_id to Route object. */
     public final Map<String, Route> routes;
+
+    /** Map from GTFS stop_id to Stop object. */
     public final Map<String, Stop> stops;
+
     public final Map<String, Transfer> transfers;
+
+    /** Map from GTFS trip_id to Trip object. */
     public final BTreeMap<String, Trip> trips;
 
     public final Set<String> transitIds = new HashSet<>();
+
     /** CRC32 of the GTFS file this was loaded from */
-    public long checksum;
+    public final Atomic.Long checksum;
 
-    /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
-    public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
+    /* Map from 2-tuples of (String shape_id, Integer shape_pt_sequence) to shape points */
+    public final ConcurrentNavigableMap<Object[], ShapePoint> shape_points;
 
-    /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
-    public final BTreeMap<Tuple2, StopTime> stop_times;
+    /* Map from 2-tuples of (String trip_id, Integer stop_sequence) to stoptimes. */
+    public final BTreeMap<Object[], StopTime> stop_times;
 
 //    public final ConcurrentMap<String, Long> stopCountByStopTime;
 
@@ -140,25 +157,27 @@ public class GTFSFeed implements Cloneable, Closeable {
         // probability of any input, which means an equal probability of any output. At least I think that's all correct.
         // Repeated XOR is not commutative but zip.stream returns files in the order they are in the central directory
         // of the zip file, so that's not a problem.
-        checksum = zip.stream().mapToLong(ZipEntry::getCrc).reduce((l1, l2) -> l1 ^ l2).getAsLong();
+        // NOTE(abyrd): actually I don't think the concerns about adding apply because of overflow wrap-around effect.
+        // NOTE(abyrd): also, we're using CRC32 which is not a long, it's a 32-bit int.
+        long checksum = zip.stream().mapToLong(ZipEntry::getCrc).reduce((l1, l2) -> l1 ^ l2).getAsLong();
 
-        db.getAtomicLong("checksum").set(checksum);
+        this.checksum.set(checksum);
 
         new FeedInfo.Loader(this).loadTable(zip);
         // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
+        // TODO verify the atomic string logic below
         if (fid != null) {
-            feedId = fid;
+            this.feedId.set(fid);
             LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
         }
-        else if (feedId == null || feedId.isEmpty()) {
-            feedId = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
+        else if (feedId == null || feedId.get().isEmpty()) {
+            fid = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
+            this.feedId.set(fid);
             LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
         }
         else {
             LOG.info("Feed ID is '{}'.", feedId);
         }
-
-        db.getAtomicString("feed_id").set(feedId);
 
         new Agency.Loader(this).loadTable(zip);
 
@@ -305,11 +324,11 @@ public class GTFSFeed implements Cloneable, Closeable {
      * This is an efficient iteration over a tree map.
      */
     public Iterable<StopTime> getOrderedStopTimesForTrip (String trip_id) {
-        Map<Fun.Tuple2, StopTime> tripStopTimes =
-                stop_times.subMap(
-                        Fun.t2(trip_id, null),
-                        Fun.t2(trip_id, Fun.HI)
-                );
+        // TODO verify submap syntax
+        Map<Object[], StopTime> tripStopTimes = stop_times.subMap(
+            new Object[] {trip_id},
+            new Object[] {trip_id, null}
+        );
         return tripStopTimes.values();
     }
 
@@ -461,10 +480,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     public Collection<Frequency> getFrequencies (String trip_id) {
-        // IntelliJ tells me all these casts are unnecessary, and that's also my feeling, but the code won't compile
-        // without them
-        return (List<Frequency>) frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
-                .map(t2 -> ((Tuple2<String, Frequency>) t2).b)
+        // TODO check submap syntax
+        return frequencies.subSet(new Object[]{trip_id}, new Object[]{trip_id,null}).stream()
+                .map(f -> (Frequency) f[1])
                 .collect(Collectors.toList());
     }
 
@@ -545,8 +563,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Get trip speed in meters per second. */
     public double getTripSpeed (String trip_id, boolean straightLine) {
 
-        StopTime firstStopTime = this.stop_times.ceilingEntry(Fun.t2(trip_id, null)).getValue();
-        StopTime lastStopTime = this.stop_times.floorEntry(Fun.t2(trip_id, Fun.HI)).getValue();
+        // TODO verify ceiling and floor logic, are they reversed?
+        StopTime firstStopTime = this.stop_times.ceilingEntry(new Object[]{trip_id, null}).getValue();
+        StopTime lastStopTime = this.stop_times.floorEntry(new Object[]{trip_id}).getValue();
 
         // ensure that stopTime returned matches trip id (i.e., that the trip has stoptimes)
         if (!firstStopTime.trip_id.equals(trip_id) || !lastStopTime.trip_id.equals(trip_id)) {
@@ -605,34 +624,34 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Create a GTFS feed in a temp file */
     public GTFSFeed () {
         // calls to this must be first operation in constructor - why, Java?
-        this(DBMaker.newTempFileDB()
-                .transactionDisable()
-                .mmapFileEnable()
-                .asyncWriteEnable()
-                .deleteFilesAfterClose()
-                .compressionEnable()
+        this(DBMaker.tempFileDB()
+                // .transactionDisable()
+                .fileMmapEnable()
+                // .asyncWriteEnable()
+                .deleteFilesAfterClose()  // TODO db.close();?
+                // .compressionEnable()
                 // .cacheSize(1024 * 1024) this bloats memory consumption
-                .make()); // TODO db.close();
+                .make());
     }
 
     /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
     public GTFSFeed (String dbFile) throws IOException, ExecutionException {
-        this(constructDB(dbFile)); // TODO db.close();
+        this(constructDB(dbFile)); // TODO db.close();?
     }
 
     private static DB constructDB(String dbFile) {
         DB db;
         try{
-            DBMaker dbMaker = DBMaker.newFileDB(new File(dbFile));
-            db = dbMaker
-                    .transactionDisable()
-                    .mmapFileEnable()
-                    .asyncWriteEnable()
-                    .compressionEnable()
-//                     .cacheSize(1024 * 1024) this bloats memory consumption
-                    .make();
+            db = DBMaker.fileDB(new File(dbFile)).transactionEnable().fileMmapEnable().make();
+//                    .transactionDisable()
+//                    .mmapFileEnable()
+//                    .asyncWriteEnable()
+//                    .compressionEnable()
+////                     .cacheSize(1024 * 1024) this bloats memory consumption
+//                    .make();
             return db;
         } catch (ExecutionError | IOError | Exception e) {
+            // TODO clearer error message
             LOG.error("Could not construct db from file.", e);
             return null;
         }
@@ -641,29 +660,78 @@ public class GTFSFeed implements Cloneable, Closeable {
     private GTFSFeed (DB db) {
         this.db = db;
 
-        agency = db.getTreeMap("agency");
-        feedInfo = db.getTreeMap("feed_info");
-        routes = db.getTreeMap("routes");
-        trips = db.getTreeMap("trips");
-        stop_times = db.getTreeMap("stop_times");
-        frequencies = db.getTreeSet("frequencies");
-        transfers = db.getTreeMap("transfers");
-        stops = db.getTreeMap("stops");
-        fares = db.getTreeMap("fares");
-        services = db.getTreeMap("services");
-        shape_points = db.getTreeMap("shape_points");
+        agency = db.treeMap("agency")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
 
-        feedId = db.getAtomicString("feed_id").get();
-        checksum = db.getAtomicLong("checksum").get();
+        feedInfo = db.treeMap("feed_info")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        routes = db.treeMap("routes")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        trips = db.treeMap("trips")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        stop_times = db.treeMap("stop_times")
+                .keySerializer(new SerializerArrayTuple(Serializer.STRING, Serializer.INTEGER))
+                .valueSerializer(Serializer.JAVA)
+                .createOrOpen();
+
+        frequencies = db.treeSet("frequencies")
+                .serializer(new SerializerArrayTuple(STRING, JAVA)).createOrOpen();
+
+        transfers = db.treeMap("transfers")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        stops = db.treeMap("stops")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        fares = db.treeMap("fares")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        services = db.treeMap("services")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        shape_points = db.treeMap("shape_points")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
+
+        // TODO why were we saving these into primitive fields instead of using the MapDB objects directly?
+        feedId = db.atomicString("feed_id").createOrOpen(); //.get();
+        checksum = db.atomicLong("checksum").createOrOpen(); //.get();
 
         // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
         // nothing else contains JTS objects
-        patterns = db.createTreeMap("patterns")
-                .valueSerializer(Serializer.JAVA)
-                .makeOrGet();
+        patterns = db.treeMap("patterns")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
 
-        tripPatternMap = db.getTreeMap("patternForTrip");
+        tripPatternMap = db.treeMap("patternForTrip")
+                .keySerializer(STRING)
+                .valueSerializer(JAVA)
+                .createOrOpen();
 
-        errors = db.getTreeSet("errors");
+        errors = (NavigableSet<GTFSError>) db.treeSet("errors")
+                .serializer(JAVA)
+                .createOrOpen();
+
     }
 }

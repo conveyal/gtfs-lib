@@ -2,8 +2,6 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 
-import org.mapdb.Fun;
-
 import java.io.IOException;
 import java.io.Serializable;
 import java.sql.PreparedStatement;
@@ -87,7 +85,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
             st.feed           = null; // this could circular-serialize the whole feed
-            feed.stop_times.put(new Fun.Tuple2(st.trip_id, st.stop_sequence), st);
+            feed.stop_times.put(new Object[]{st.trip_id, st.stop_sequence}, st);
 
             /*
               Check referential integrity without storing references. StopTime cannot directly reference Trips or

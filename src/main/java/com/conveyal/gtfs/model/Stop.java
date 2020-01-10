@@ -88,7 +88,7 @@ public class Stop extends Entity {
             s.stop_timezone  = getStringField("stop_timezone", false);
             s.wheelchair_boarding = getStringField("wheelchair_boarding", false);
             s.feed = feed;
-            s.feed_id = feed.feedId;
+            s.feed_id = feed.feedId.get();
             /* TODO check ref integrity later, this table self-references via parent_station */
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (s.stop_id != null) feed.stops.put(s.stop_id, s);

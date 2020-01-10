@@ -7,8 +7,6 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
 
-import org.mapdb.Fun.Tuple2;
-
 public class ShapePoint extends Entity {
 
     private static final long serialVersionUID = 6751814959971086070L;
@@ -78,7 +76,7 @@ public class ShapePoint extends Entity {
             ShapePoint s = new ShapePoint(shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled);
             s.id = row + 1; // offset line number by 1 to account for 0-based row index
             s.feed = null; // since we're putting this into MapDB, we don't want circular serialization
-            feed.shape_points.put(new Tuple2<String, Integer>(s.shape_id, s.shape_pt_sequence), s);
+            feed.shape_points.put(new Object[]{s.shape_id, s.shape_pt_sequence}, s);
         }
     }
 

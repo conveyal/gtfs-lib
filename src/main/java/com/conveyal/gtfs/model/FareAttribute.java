@@ -77,7 +77,7 @@ public class FareAttribute extends Entity {
                 fa.agency_id = getStringField("agency_id", false);
                 fa.transfer_duration = getIntField("transfer_duration", false, 0, 24 * 60 * 60);
                 fa.feed = feed;
-                fa.feed_id = feed.feedId;
+                fa.feed_id = feed.feedId.get();
                 fare.fare_attribute = fa;
             }
 

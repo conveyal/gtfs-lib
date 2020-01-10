@@ -102,7 +102,7 @@ public class JdbcGTFSFeedConverter {
                     .flatMap(List::stream)
                     .collect(Collectors.toList());
             List<Frequency> frequencies = gtfsFeed.frequencies.stream()
-                    .map(stringFrequencyTuple2 -> stringFrequencyTuple2.b)
+                    .map(stringFrequencyTuple2 -> (Frequency) stringFrequencyTuple2[1])
                     .collect(Collectors.toList());
 
             // Copy all tables (except for PATTERN_STOPS, which does not exist in GTFSFeed).

@@ -76,7 +76,7 @@ public class Trip extends Entity {
             t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed = feed;
-            t.feed_id = feed.feedId;
+            t.feed_id = feed.feedId.get();
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (t.trip_id != null) feed.trips.put(t.trip_id, t);
 

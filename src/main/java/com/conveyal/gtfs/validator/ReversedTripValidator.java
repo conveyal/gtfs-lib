@@ -11,7 +11,6 @@ import com.google.common.collect.Iterables;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.GeometryFactory;
-import org.mapdb.Fun;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -62,7 +61,7 @@ public class ReversedTripValidator extends TripValidator {
             StopTime lastStop = Iterables.getLast(stopTimes);
 
             ShapePoint firstShape = null; // feed.shape_points.ceilingEntry(Fun.t2(shapeId, null)).getValue();
-            Map.Entry<Fun.Tuple2<String, Integer>, ShapePoint> entry = null; //feed.shape_points.floorEntry(new Fun.Tuple2(shapeId, Fun.HI));
+            Map.Entry<Object[], ShapePoint> entry = null; //feed.shape_points.floorEntry(new Fun.Tuple2(shapeId, Fun.HI));
             ShapePoint lastShape = entry.getValue();
 
             Coordinate firstStopCoord;

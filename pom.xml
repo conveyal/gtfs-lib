@@ -275,9 +275,9 @@
     </dependency>
     <!-- Disk-backed storage that looks like a Java map. -->
     <dependency>
-    	<groupId>org.mapdb</groupId>
-    	<artifactId>mapdb</artifactId>
-    	<version>1.0.8</version>
+      <groupId>org.mapdb</groupId>
+      <artifactId>mapdb</artifactId>
+      <version>3.0.8</version>
     </dependency>
     <!-- Our logging API, no implementation specified as gtfs-lib is a library. -->
     <dependency>

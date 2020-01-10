@@ -108,7 +108,7 @@ public class Calendar extends Entity implements Serializable {
                 c.start_date = getDateField("start_date", true);
                 c.end_date = getDateField("end_date", true);
                 c.feed = feed;
-                c.feed_id = feed.feedId;
+                c.feed_id = feed.feedId.get();
                 service.calendar = c;
             }
 
