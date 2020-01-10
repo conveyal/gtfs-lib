@@ -1,11 +1,16 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import org.jetbrains.annotations.NotNull;
+import org.mapdb.DataInput2;
+import org.mapdb.DataOutput2;
+import org.mapdb.Serializer;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Objects;
 
 public class ShapePoint extends Entity {
 
@@ -103,6 +108,45 @@ public class ShapePoint extends Entity {
         @Override
         protected Iterator<ShapePoint> iterator() {
             return feed.shape_points.values().iterator();
+        }
+    }
+
+    public static class MapDBSerializer implements Serializer<ShapePoint> {
+
+        @Override
+        public void serialize (
+            @NotNull DataOutput2 output,
+            @NotNull ShapePoint shapePoint
+        ) throws IOException {
+            output.writeUTF(shapePoint.shape_id);
+            output.writeDouble(shapePoint.shape_pt_lat);
+            output.writeDouble(shapePoint.shape_pt_lon);
+            output.writeInt(shapePoint.shape_pt_sequence);
+            output.writeDouble(shapePoint.shape_dist_traveled);
+        }
+
+        @Override
+        public ShapePoint deserialize (
+            @NotNull DataInput2 input,
+            int available
+        ) throws IOException {
+            ShapePoint shapePoint = new ShapePoint();
+            shapePoint.shape_id = input.readUTF();
+            shapePoint.shape_pt_lat = input.readDouble();
+            shapePoint.shape_pt_lon = input.readDouble();
+            shapePoint.shape_pt_sequence = input.readInt();
+            shapePoint.shape_dist_traveled = input.readDouble();
+            return shapePoint;
+        }
+
+        @Override
+        public boolean isTrusted () {
+            return true;
+        }
+
+        @Override
+        public boolean equals (Object obj) {
+            return Objects.equals(this, obj);
         }
     }
 }

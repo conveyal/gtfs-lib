@@ -1,11 +1,16 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import org.jetbrains.annotations.NotNull;
+import org.mapdb.DataInput2;
+import org.mapdb.DataOutput2;
+import org.mapdb.Serializer;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Objects;
 
 public class Trip extends Entity {
 
@@ -123,6 +128,64 @@ public class Trip extends Entity {
             return feed.trips.values().iterator();
         }
 
+    }
+
+    public static class MapDBSerializer implements Serializer<Trip> {
+
+        @Override
+        public void serialize (
+                @NotNull DataOutput2 output,
+                @NotNull Trip trip
+        ) throws IOException {
+            writeNullOrUTF(output, trip.trip_id);
+            writeNullOrUTF(output, trip.route_id);
+            writeNullOrUTF(output, trip.service_id);
+            writeNullOrUTF(output, trip.trip_headsign);
+            writeNullOrUTF(output, trip.trip_short_name);
+            writeNullOrUTF(output, trip.block_id);
+            writeNullOrUTF(output, trip.shape_id);
+            output.writeInt(trip.direction_id);
+            output.writeInt(trip.bikes_allowed);
+            output.writeInt(trip.wheelchair_accessible);
+        }
+
+        @Override
+        public Trip deserialize (
+                @NotNull DataInput2 input,
+                int available
+        ) throws IOException {
+            Trip trip = new Trip();
+            trip.trip_id = readNullOrUTF(input);
+            trip.route_id = readNullOrUTF(input);
+            trip.service_id = readNullOrUTF(input);
+            trip.trip_headsign = readNullOrUTF(input);
+            trip.trip_short_name = readNullOrUTF(input);
+            trip.block_id = readNullOrUTF(input);
+            trip.shape_id = readNullOrUTF(input);
+            trip.direction_id = input.readInt();
+            trip.bikes_allowed = input.readInt();
+            trip.wheelchair_accessible = input.readInt();
+            return trip;
+        }
+
+        @Override
+        public boolean isTrusted () {
+            return true;
+        }
+
+        @Override
+        public boolean equals (Object obj) {
+            return Objects.equals(this, obj);
+        }
+
+        private String readNullOrUTF (DataInput2 input) throws IOException {
+            String string = input.readUTF();
+            return (string.length() == 0) ? null : string;
+        }
+
+        private void writeNullOrUTF (DataOutput2 output, String string) throws IOException {
+            output.writeUTF(string == null ? "" : string);
+        }
 
     }
 
