@@ -32,9 +32,9 @@ public class GTFSMain {
             System.out.println("Please specify a GTFS feed to load.");
             System.exit(1);
         }
-        File tempFile = File.createTempFile("gtfs", ".db");
+        File databaseFile = new File(arguments[0] + ".db3");
 
-        GTFSFeed feed = new GTFSFeed(tempFile.getAbsolutePath());
+        GTFSFeed feed = new GTFSFeed(databaseFile.getAbsolutePath());
         feed.loadFromFile(new ZipFile(arguments[0]));
 
         if(cmd.hasOption("validate")) {
@@ -58,7 +58,7 @@ public class GTFSMain {
         LOG.info("reopening feed");
 
         // re-open
-        GTFSFeed reconnected = new GTFSFeed(tempFile.getAbsolutePath());
+        GTFSFeed reconnected = new GTFSFeed(databaseFile.getAbsolutePath());
 
         LOG.info("Connected to already loaded feed");
 
