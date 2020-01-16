@@ -1,7 +1,6 @@
 package com.conveyal.gtfs;
 
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.AmazonS3Exception;
 import com.amazonaws.services.s3.model.S3Object;
@@ -14,6 +13,7 @@ import com.google.common.io.Files;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -37,7 +37,7 @@ import java.util.zip.ZipFile;
  * we would connect another GTFSFeed to the same mapdb, which seems like an ideal way to corrupt mapdbs. SoftReferences
  * prevent this as it cannot be removed if it is referenced elsewhere.
  */
-public abstract class BaseGTFSCache<T> {
+public abstract class BaseGTFSCache<T extends Closeable> {
     private static final Logger LOG = LoggerFactory.getLogger(BaseGTFSCache.class);
 
     public final String bucket;
@@ -47,14 +47,6 @@ public abstract class BaseGTFSCache<T> {
 
     private static AmazonS3 s3 = null;
     private LoadingCache<String, T> cache;
-
-    public BaseGTFSCache(String bucket, File cacheDir) {
-        this(bucket, null, cacheDir);
-    }
-
-    public BaseGTFSCache(String bucket, String bucketFolder, File cacheDir) {
-        this(null, bucket, bucketFolder, cacheDir);
-    }
 
     /** If bucket is null, work offline and do not use S3 */
     public BaseGTFSCache(String awsRegion, String bucket, String bucketFolder, File cacheDir) {
@@ -69,28 +61,36 @@ public abstract class BaseGTFSCache<T> {
 
         this.cacheDir = cacheDir;
 
-        if (bucket != null) {
-            LOG.warn("Local cache files (including .zip) will be deleted when removed from cache.");
-        }
-        RemovalListener<String, GTFSFeed> removalListener = removalNotification -> {
-            // delete local .zip file ONLY if using s3
-            if (bucket != null) {
-                String id = removalNotification.getKey();
-                // close db to avoid memory leak and mapdb corruption
+        RemovalListener<String, T> removalListener = removalNotification -> {
+            try {
+                LOG.info("Evicting feed {} from gtfs-cache and closing MapDB file. Reason: {}",
+                        removalNotification.getKey(),
+                        removalNotification.getCause());
+                // Close DB to avoid leaking (off-heap allocated) memory for MapDB object cache, and MapDB corruption.
                 removalNotification.getValue().close();
-                String[] extensions = {".zip"}; // used to include ".db", ".db.p" as well.  See #119
-                // delete local cache files (including zip) when feed removed from cache
-                for (String type : extensions) {
-                    File file = new File(cacheDir, id + type);
-                    file.delete();
+                // Delete local .zip file ONLY if using s3 (i.e. when 'bucket' has been set to something).
+                // TODO elaborate on why we would want to do this.
+                if (bucket != null) {
+                    String id = removalNotification.getKey();
+                    String[] extensions = {".zip"}; // used to include ".db", ".db.p" as well.  See #119
+                    // delete local cache files (including zip) when feed removed from cache
+                    for (String type : extensions) {
+                        File file = new File(cacheDir, id + type);
+                        file.delete();
+                    }
                 }
+            } catch (Exception e) {
+                throw new RuntimeException("Exception while trying to evict GTFS MapDB from cache.", e);
             }
         };
         this.cache = (LoadingCache<String, T>) CacheBuilder.newBuilder()
                 // we use SoftReferenced values because we have the constraint that we don't want more than one
                 // copy of a particular GTFSFeed object around; that would mean multiple MapDBs are pointing at the same
                 // file, which is bad.
-                .softValues()
+                //.maximumSize(x) should be less sensitive to GC, though it interacts with instance cache size of MapDB
+                // itself. But is MapDB instance cache on or off heap?
+                .maximumSize(20)
+                // .softValues()
                 .removalListener(removalListener)
                 .build(new CacheLoader() {
                     public T load(Object s) throws Exception {
