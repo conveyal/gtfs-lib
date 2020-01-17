@@ -19,8 +19,6 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.Validator;
-import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
@@ -66,7 +64,6 @@ import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
@@ -278,25 +275,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
-    public void validate (boolean repair, Validator... validators) {
-        long startValidation = System.currentTimeMillis();
-        for (Validator validator : validators) {
-            try {
-                long startValidator = System.currentTimeMillis();
-//                validator.validate(this, repair);
-                long endValidator = System.currentTimeMillis();
-                long diff = endValidator - startValidator;
-                LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(diff));
-            } catch (Exception e) {
-                LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
-//                LOG.error(e.toString());
-                e.printStackTrace();
-            }
-        }
-        long endValidation = System.nanoTime();
-        long total = endValidation - startValidation;
-        LOG.info("{} validators completed in {} milliseconds.", validators.length, TimeUnit.NANOSECONDS.toMillis(total));
-    }
 
     // validate function call that should explicitly list each validator to run on GTFSFeed
     public void validate () {
@@ -676,37 +654,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
 
         return ls;
-    }
-
-    /** Get the length of a trip in meters. */
-    public double getTripDistance (String trip_id, boolean straightLine) {
-        return straightLine
-                ? GeoUtils.getDistance(this.getStraightLineForStops(trip_id))
-                : GeoUtils.getDistance(this.getTripGeometry(trip_id));
-    }
-
-    /** Get trip speed (using trip shape if available) in meters per second. */
-    public double getTripSpeed (String trip_id) {
-        return getTripSpeed(trip_id, false);
-    }
-
-    /** Get trip speed in meters per second. */
-    public double getTripSpeed (String trip_id, boolean straightLine) {
-
-        StopTime firstStopTime = this.stop_times.ceilingEntry(Fun.t2(trip_id, null)).getValue();
-        StopTime lastStopTime = this.stop_times.floorEntry(Fun.t2(trip_id, Fun.HI)).getValue();
-
-        // ensure that stopTime returned matches trip id (i.e., that the trip has stoptimes)
-        if (!firstStopTime.trip_id.equals(trip_id) || !lastStopTime.trip_id.equals(trip_id)) {
-            return Double.NaN;
-        }
-
-        double distance = getTripDistance(trip_id, straightLine);
-
-        // trip time (in seconds)
-        int time = lastStopTime.arrival_time - firstStopTime.departure_time;
-
-        return distance / time; // meters per second
     }
 
     // TODO: code review

@@ -304,22 +304,10 @@
       <artifactId>commons-cli</artifactId>
       <version>1.4</version>
     </dependency>
-    <!-- JDBC support for Postgres databases. More modules would need to be added to access H2, SQLite etc. -->
-    <dependency>
-      <groupId>org.postgresql</groupId>
-      <artifactId>postgresql</artifactId>
-      <version>42.0.0</version>
-    </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
       <version>3.0</version>
-    </dependency>
-    <!-- Database connection pooling, implements interfaces in JDBC -->
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-dbcp2</artifactId>
-      <version>2.1.1</version>
     </dependency>
   </dependencies>
 </project>
