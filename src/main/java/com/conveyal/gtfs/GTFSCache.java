@@ -13,7 +13,6 @@ import com.google.common.io.Files;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.Closeable;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -37,8 +36,8 @@ import java.util.zip.ZipFile;
  * we would connect another GTFSFeed to the same mapdb, which seems like an ideal way to corrupt mapdbs. SoftReferences
  * prevent this as it cannot be removed if it is referenced elsewhere.
  */
-public abstract class BaseGTFSCache<T extends Closeable> {
-    private static final Logger LOG = LoggerFactory.getLogger(BaseGTFSCache.class);
+public class GTFSCache {
+    private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
 
     public final String bucket;
     public final String bucketFolder;
@@ -46,10 +45,10 @@ public abstract class BaseGTFSCache<T extends Closeable> {
     public final File cacheDir;
 
     private static AmazonS3 s3 = null;
-    private LoadingCache<String, T> cache;
+    private LoadingCache<String, GTFSFeed> cache;
 
     /** If bucket is null, work offline and do not use S3 */
-    public BaseGTFSCache(String awsRegion, String bucket, String bucketFolder, File cacheDir) {
+    public GTFSCache (String awsRegion, String bucket, String bucketFolder, File cacheDir) {
         if (awsRegion == null || bucket == null) LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
         else {
             s3 = AmazonS3ClientBuilder.standard().withRegion(awsRegion).build();
@@ -61,7 +60,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
         this.cacheDir = cacheDir;
 
-        RemovalListener<String, T> removalListener = removalNotification -> {
+        RemovalListener<String, GTFSFeed> removalListener = removalNotification -> {
             try {
                 LOG.info("Evicting feed {} from gtfs-cache and closing MapDB file. Reason: {}",
                         removalNotification.getKey(),
@@ -83,7 +82,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
                 throw new RuntimeException("Exception while trying to evict GTFS MapDB from cache.", e);
             }
         };
-        this.cache = (LoadingCache<String, T>) CacheBuilder.newBuilder()
+        this.cache = (LoadingCache<String, GTFSFeed>) CacheBuilder.newBuilder()
                 // we use SoftReferenced values because we have the constraint that we don't want more than one
                 // copy of a particular GTFSFeed object around; that would mean multiple MapDBs are pointing at the same
                 // file, which is bad.
@@ -93,7 +92,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
                 // .softValues()
                 .removalListener(removalListener)
                 .build(new CacheLoader() {
-                    public T load(Object s) throws Exception {
+                    public GTFSFeed load(Object s) throws Exception {
                         // Thanks, java, for making me use a cast here. If I put generic arguments to new CacheLoader
                         // due to type erasure it can't be sure I'm using types correctly.
                         return retrieveAndProcessFeed((String) s);
@@ -109,16 +108,16 @@ public abstract class BaseGTFSCache<T extends Closeable> {
      * Add a GTFS feed to this cache with the given ID. NB this is not the feed ID, because feed IDs are not
      * unique when you load multiple versions of the same feed.
      */
-    public T put (String id, File feedFile) throws Exception {
+    public GTFSFeed put (String id, File feedFile) throws Exception {
         return put(id, feedFile, null);
     }
 
     /** Add a GTFS feed to this cache where the ID is calculated from the feed itself */
-    public T put (Function<GTFSFeed, String> idGenerator, File feedFile) throws Exception {
+    public GTFSFeed put (Function<GTFSFeed, String> idGenerator, File feedFile) throws Exception {
         return put(null, feedFile, idGenerator);
     }
 
-    private T put (String id, File feedFile, Function<GTFSFeed, String> idGenerator) throws Exception {
+    private GTFSFeed put (String id, File feedFile, Function<GTFSFeed, String> idGenerator) throws Exception {
         // generate temporary ID to name files
         String tempId = id != null ? id : UUID.randomUUID().toString();
 
@@ -174,12 +173,11 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
         // reconnect to feed database
         feed = new GTFSFeed(new File(cacheDir, cleanId + ".v2.db").getAbsolutePath());
-        T processed = processFeed(feed);
-        cache.put(id, processed);
-        return processed;
+        cache.put(id, feed);
+        return feed;
     }
 
-    public T get (String id) {
+    public GTFSFeed get (String id) {
         try {
             return cache.get(id);
         } catch (ExecutionException e) {
@@ -190,7 +188,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
     }
 
     public boolean containsId (String id) {
-        T feed;
+        GTFSFeed feed;
         try {
             feed = cache.get(id);
         } catch (Exception e) {
@@ -201,7 +199,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
 
     /** retrieve a feed from local cache or S3 */
-    private T retrieveAndProcessFeed (String originalId) {
+    private GTFSFeed retrieveAndProcessFeed (String originalId) {
         // see if we have it cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
@@ -212,7 +210,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
             try {
                 feed = new GTFSFeed(dbFile.getAbsolutePath());
                 if (feed != null) {
-                    return processFeed(feed);
+                    return feed;
                 }
             } catch (Exception e) {
                 LOG.warn("Error loading local MapDB.", e);
@@ -240,7 +238,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
                 LOG.info("Returning processed GTFS from S3");
                 feed = new GTFSFeed(dbFile.getAbsolutePath());
                 if (feed != null) {
-                    return processFeed(feed);
+                    return feed;
                 }
             } catch (AmazonS3Exception e) {
                 LOG.warn("DB file for key {} does not exist on S3.", key);
@@ -282,11 +280,6 @@ public abstract class BaseGTFSCache<T extends Closeable> {
             throw new NoSuchElementException(originalId);
         }
     }
-
-    /** Convert a GTFSFeed into whatever this cache holds */
-    protected abstract T processFeed (GTFSFeed feed);
-
-    public abstract GTFSFeed getFeed (String id);
 
     private void deleteLocalDBFiles(String id) {
         String[] extensions = {".v2.db", ".v2.db.p"};

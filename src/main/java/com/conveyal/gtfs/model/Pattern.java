@@ -5,10 +5,8 @@ import com.google.common.base.Joiner;
 import org.locationtech.jts.geom.LineString;
 
 import java.io.Serializable;
-import java.util.*;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.List;
+import java.util.UUID;
 
 /**
  * Created by landon on 2/5/16.
@@ -23,7 +21,7 @@ public class Pattern implements Serializable {
     // TODO: change list of trips to set
     public List<String> associatedTrips;
     // TODO: add set of shapes
-//    public Set<String> associatedShapes;
+    // public Set<String> associatedShapes;
     public LineString geometry;
     public String name;
     public String route_id;

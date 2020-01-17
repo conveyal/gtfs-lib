@@ -1,22 +1,41 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.validator.*;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Fare;
+import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.model.Shape;
+import com.conveyal.gtfs.model.ShapePoint;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.Validator;
-import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.google.common.collect.*;
-import com.google.common.eventbus.EventBus;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ExecutionError;
-import org.locationtech.jts.algorithm.ConvexHull;
-import org.locationtech.jts.geom.*;
-import org.locationtech.jts.index.strtree.STRtree;
-import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.geotools.referencing.GeodeticCalculator;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateList;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.mapdb.BTreeMap;
-import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
@@ -32,16 +51,23 @@ import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.concurrent.ConcurrentMap;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -50,81 +76,93 @@ import java.util.zip.ZipOutputStream;
 import static com.conveyal.gtfs.util.Util.human;
 
 /**
- * All entities must be from a single feed namespace.
- * Composed of several GTFSTables.
+ * This is a MapDB-backed representation of the data from a single GTFS feed.
+ * All entities are expected to be from a single namespace, do not load several feeds into a single GTFSFeed.
  */
 public class GTFSFeed implements Cloneable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
+
+    /** A JTS geometry factory to produce LineString geometries. */
+    private static final GeometryFactory gf = new GeometryFactory();
+
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     private DB db;
 
     public String feedId = null;
 
-    // TODO make all of these Maps MapDBs so the entire GTFSFeed is persistent and uses constant memory
+    // All tables below should be MapDB maps so the entire GTFSFeed is persistent and uses constant memory.
 
-    /* Some of these should be multimaps since they don't have an obvious unique key. */
+    // Some of these should be multimaps since they don't have an obvious unique key.
+
+    /** Map from agency_id to Agency entity. */
     public final Map<String, Agency> agency;
+
+    /** Map from empty string to FeedInfo entity, FIXME this should probably be a set. */
     public final Map<String, FeedInfo> feedInfo;
-    // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
+
+    /** Multimap from ??? to Frequency entities. */
+    // Sets of tuples are used to make multimaps in mapdb:
+    // https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
+
+    /** Map from route_id to Route entity. */
     public final Map<String, Route> routes;
+
+    /** Map from stop_id to Stop entity. */
     public final Map<String, Stop> stops;
+
+    /** Map from ? ? */
     public final Map<String, Transfer> transfers;
+
+    /** Map from trip_id to Trip entity. */
     public final BTreeMap<String, Trip> trips;
 
+    // THIS is this only thing that is not in the MapDB
     public final Set<String> transitIds = new HashSet<>();
-    /** CRC32 of the GTFS file this was loaded from */
+
+    /**
+     * CRC32 of the GTFS file this was loaded from.
+     * FIXME actually it's xored CRC32s, and why are we not just accessing the mapdb atomic long directly?
+     */
     public long checksum;
 
-    /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
+    /* Map from 2-tuples of (shape_id, shape_pt_sequence) to ShapePoint entities. */
     public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
 
-    /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
+    /**
+     * Map from 2-tuples of (trip_id, stop_sequence) to StopTime entities. Tuple2 types are not specified because
+     * a later function call requires passing Fun.HI (an Object) as a parameter.
+     */
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
-//    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
-    /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
-    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
-    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
-    public final NavigableSet<Tuple2<String, String>> tripsPerService;
-
-    public final NavigableSet<Tuple2<String, String>> servicesPerDate;
-
-    /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
+    /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. TODO what is the key? */
     public final Map<String, Fare> fares;
 
-    /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
+    /* A service is a calendar entry and all calendar_dates that modify that calendar entry. TODO what is the key? */
     public final BTreeMap<String, Service> services;
 
-    /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
+    /**
+     * A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading.
+     * TODO store these outside the mapdb for size?
+     */
     public final NavigableSet<GTFSError> errors;
 
-    /* Stops spatial index which gets built lazily by getSpatialIndex() */
-    private transient STRtree spatialIndex;
-
-    /* Convex hull of feed (based on stops) built lazily by getConvexHull() */
-    private transient Polygon convexHull;
-
-    /* Merged stop buffers polygon built lazily by getMergedBuffers() */
+    /**
+     * Merged stop buffers polygon built lazily by getMergedBuffers()
+     * TODO do we need or use this?
+     */
     private transient Geometry mergedBuffers;
 
-    /** A JTS geometry factory to produce LineString geometries. */
-    private static final GeometryFactory gf = new GeometryFactory();
-
-    /* Map routes to associated trip patterns. */
-    // TODO: Hash Multimapping in guava (might need dependency).
+    /** Map from pattern IDs to Pattern entities (which are generated by us, not found in GTFS). */
     public final Map<String, Pattern> patterns;
 
-    // TODO bind this to map above so that it is kept up to date automatically
-    public final Map<String, String> tripPatternMap;
-    private boolean loaded = false;
+    /** Map from each trip_id to ID of trip pattern containing that trip. */
+    public final Map<String, String> patternForTrip;
 
-    /* A place to store an event bus that is passed through constructor. */
-    public transient EventBus eventBus;
+    /** Once a GTFSFeed has one feed loaded into it, we block loading any additional feeds. */
+    private boolean loaded = false;
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -176,46 +214,29 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Calendar.Loader(this, serviceTable).loadTable(zip);
         new CalendarDate.Loader(this, serviceTable).loadTable(zip);
         this.services.putAll(serviceTable);
-        serviceTable = null; // free memory
+        // Joined Services have been persisted to MapDB. Release in-memory HashMap for garbage collection.
+        serviceTable = null;
 
-        // Same deal
+        // Joining is performed for Fares as for Services above.
         Map<String, Fare> fares = new HashMap<>();
         new FareAttribute.Loader(this, fares).loadTable(zip);
         new FareRule.Loader(this, fares).loadTable(zip);
         this.fares.putAll(fares);
-        fares = null; // free memory
+        // Joined Fares have been persisted to MapDB. Release in-memory HashMap for garbage collection.
+        fares = null;
 
+        // Comment out the StopTime and/or ShapePoint loaders for quick testing on large feeds.
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
         new Transfer.Loader(this).loadTable(zip);
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
-        new StopTime.Loader(this).loadTable(zip); // comment out this line for quick testing using NL feed
+        new StopTime.Loader(this).loadTable(zip);
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
-        LOG.info("Building trips per service index");
-        Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
-        LOG.info("Building services per date index");
-        Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
-
-            LocalDate startDate = service.calendar != null
-                    ? LocalDate.parse(String.valueOf(service.calendar.start_date), dateFormatter)
-                    : service.calendar_dates.keySet().stream().sorted().findFirst().get();
-            LocalDate endDate = service.calendar != null
-                    ? LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter)
-                    : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
-            // end date for Period.between is not inclusive
-            int daysOfService = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
-            return IntStream.range(0, daysOfService)
-                    .mapToObj(offset -> startDate.plusDays(offset))
-                    .filter(service::activeOn)
-                    .map(date -> date.format(dateFormatter))
-                    .toArray(size -> new String[size]);
-        });
-
         loaded = true;
     }
 
@@ -256,15 +277,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             throw new RuntimeException(e);
         }
     }
-//    public void validate (EventBus eventBus, Validator... validators) {
-//        if (eventBus == null) {
-//
-//        }
-//        for (Validator validator : validators) {
-//            validator.getClass().getSimpleName();
-//            validator.validate(this, false);
-//        }
-//    }
+
     public void validate (boolean repair, Validator... validators) {
         long startValidation = System.currentTimeMillis();
         for (Validator validator : validators) {
@@ -288,11 +301,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     // validate function call that should explicitly list each validator to run on GTFSFeed
     public void validate () {
 /////////////////
-    }
-
-    public FeedStats calculateStats() {
-        FeedStats feedStats = new FeedStats(this);
-        return feedStats;
     }
 
     /**
@@ -346,39 +354,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                         Fun.t2(trip_id, Fun.HI)
                 );
         return tripStopTimes.values();
-    }
-
-    /**
-     * TODO rename getStopSpatialIndex to make it clear what the index contains.
-     */
-    public STRtree getSpatialIndex () {
-        if (this.spatialIndex == null) {
-            synchronized (this) {
-                if (this.spatialIndex == null) {
-                    // build spatial index
-                    STRtree stopIndex = new STRtree();
-                    for(Stop stop : this.stops.values()) {
-                        try {
-                            if (Double.isNaN(stop.stop_lat) || Double.isNaN(stop.stop_lon)) {
-                                continue;
-                            }
-                            Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
-                            stopIndex.insert(new Envelope(stopCoord), stop);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-
-                    }
-                    try {
-                        stopIndex.build();
-                        this.spatialIndex = stopIndex;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-        return this.spatialIndex;
     }
 
     /** Get the shape for the given shape ID */
@@ -525,10 +500,12 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         namePatterns(patterns);
 
-        patterns.stream().forEach(p -> {
-            this.patterns.put(p.pattern_id, p);
-            p.associatedTrips.stream().forEach(t -> this.tripPatternMap.put(t, p.pattern_id));
-        });
+        for (Pattern pattern : patterns) {
+            this.patterns.put(pattern.pattern_id, pattern);
+            for (String tripid : pattern.associatedTrips) {
+                this.patternForTrip.put(tripid, pattern.pattern_id);
+            }
+        }
 
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
     }
@@ -732,70 +709,12 @@ public class GTFSFeed implements Cloneable, Closeable {
         return distance / time; // meters per second
     }
 
-    /** Get list of stop_times for a given stop_id. */
-    public List<StopTime> getStopTimesForStop (String stop_id) {
-        SortedSet<Tuple2<String, Tuple2>> index = this.stopStopTimeSet
-                .subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.stop_times.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    public List<Trip> getTripsForService (String service_id) {
-        SortedSet<Tuple2<String, String>> index = this.tripsPerService
-                .subSet(new Tuple2<>(service_id, null), new Tuple2(service_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.trips.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    /** Get list of services for each date of service. */
-    public List<Service> getServicesForDate (LocalDate date) {
-        String dateString = date.format(dateFormatter);
-        SortedSet<Tuple2<String, String>> index = this.servicesPerDate
-                .subSet(new Tuple2<>(dateString, null), new Tuple2(dateString, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.services.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    public List<LocalDate> getDatesOfService () {
-        return this.servicesPerDate.stream()
-                .map(tuple -> LocalDate.parse(tuple.a, dateFormatter))
-                .collect(Collectors.toList());
-    }
-
-    /** Get list of distinct trips (filters out multiple visits by a trip) a given stop_id. */
-    public List<Trip> getDistinctTripsForStop (String stop_id) {
-        return getStopTimesForStop(stop_id).stream()
-                .map(stopTime -> this.trips.get(stopTime.trip_id))
-                .distinct()
-                .collect(Collectors.toList());
-    }
-
-    /** Get the likely time zone for a stop using the agency of the first stop time encountered for the stop. */
-    public ZoneId getAgencyTimeZoneForStop (String stop_id) {
-        StopTime stopTime = getStopTimesForStop(stop_id).iterator().next();
-
-        Trip trip = this.trips.get(stopTime.trip_id);
-        Route route = this.routes.get(trip.route_id);
-        Agency agency = route.agency_id != null ? this.agency.get(route.agency_id) : this.agency.get(0);
-
-        return ZoneId.of(agency.agency_timezone);
-    }
-
     // TODO: code review
     public Geometry getMergedBuffers() {
         if (this.mergedBuffers == null) {
 //            synchronized (this) {
                 Collection<Geometry> polygons = new ArrayList<>();
                 for (Stop stop : this.stops.values()) {
-                    if (getStopTimesForStop(stop.stop_id).isEmpty()) {
-                        continue;
-                    }
                     if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
                         continue;
                     }
@@ -813,20 +732,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         return this.mergedBuffers;
     }
 
-    public Polygon getConvexHull() {
-        if (this.convexHull == null) {
-            synchronized (this) {
-                List<Coordinate> coordinates = this.stops.values().stream().map(
-                        stop -> new Coordinate(stop.stop_lon, stop.stop_lat)
-                ).collect(Collectors.toList());
-                Coordinate[] coords = coordinates.toArray(new Coordinate[coordinates.size()]);
-                ConvexHull convexHull = new ConvexHull(coords, gf);
-                this.convexHull = (Polygon) convexHull.getConvexHull();
-            }
-        }
-        return this.convexHull;
-    }
-
     /**
      * Cloning can be useful when you want to make only a few modifications to an existing feed.
      * Keep in mind that this is a shallow copy, so you'll have to create new maps in the clone for tables you want
@@ -842,7 +747,11 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     protected void finalize() throws IOException {
-        if (!db.isClosed()) LOG.error("MapDB database was not closed before it was garbage collected. This is a bug!");
+        // Although everyone recommends against using finalizers to take actions, as far as I know they are a good place
+        // to assert that cleanup actions were taken before an object went out of scope.
+        if (!db.isClosed()) {
+            LOG.error("MapDB database was not closed before it was garbage collected. This is a bug!");
+        }
     }
 
     public void close () {
@@ -852,6 +761,11 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Thrown when we cannot interpolate stop times because the first or last stops do not have times */
     public class FirstAndLastStopsDoNotHaveTimes extends Exception {
         /** do nothing */
+    }
+
+    public List<LocalDate> getDatesOfService () {
+        // TODO reimplement
+        throw new UnsupportedOperationException();
     }
 
     /**
@@ -926,23 +840,18 @@ public class GTFSFeed implements Cloneable, Closeable {
         fares = db.getTreeMap("fares");
         services = db.getTreeMap("services");
         shape_points = db.getTreeMap("shape_points");
+        patternForTrip = db.getTreeMap("patternForTrip");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();
 
-        // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
-        // nothing else contains JTS objects
+        // Use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
+        // None of the other maps contain JTS objects.
         patterns = db.createTreeMap("patterns")
                 .valueSerializer(Serializer.JAVA)
                 .makeOrGet();
 
-        tripPatternMap = db.getTreeMap("patternForTrip");
-
-        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
-        stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
-        tripsPerService = db.getTreeSet("tripsPerService");
-        servicesPerDate = db.getTreeSet("servicesPerDate");
-
         errors = db.getTreeSet("errors");
     }
+
 }
