@@ -40,11 +40,13 @@ public class GTFSCache {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
 
     public final String bucket;
+
     public final String bucketFolder;
 
     public final File cacheDir;
 
     private static AmazonS3 s3 = null;
+
     private LoadingCache<String, GTFSFeed> cache;
 
     /** If bucket is null, work offline and do not use S3 */
@@ -105,19 +107,26 @@ public class GTFSCache {
     }
 
     /**
-     * Add a GTFS feed to this cache with the given ID. NB this is not the feed ID, because feed IDs are not
-     * unique when you load multiple versions of the same feed.
+     * Build the MapDB files for the given GTFS feed ZIP, with the specified ID, and return the MapDB (without
+     * putting it in the cache). This ID is not the feed's self-declared feed ID, because we may load multiple
+     * versions of the same feed.
      */
-    public GTFSFeed put (String id, File feedFile) throws Exception {
-        return put(id, feedFile, null);
+    public GTFSFeed buildFeed (String id, File feedFile) throws Exception {
+        return buildFeed(id, feedFile, null);
     }
 
-    /** Add a GTFS feed to this cache where the ID is calculated from the feed itself */
-    public GTFSFeed put (Function<GTFSFeed, String> idGenerator, File feedFile) throws Exception {
-        return put(null, feedFile, idGenerator);
+    /**
+     * Build the MapDB files for the given GTFS feed ZIP, with the specified ID, and return the MapDB (without
+     * putting it in the cache). The supplied function will generate a unique name for the feed (in case multiple
+     * versions of the same feed are loaded), and is evaluated after the feed is already loaded so it can examine the
+     * contents of the feed when generating the ID.
+     */
+    public GTFSFeed buildFeed (Function<GTFSFeed, String> idGenerator, File feedFile) throws Exception {
+        return buildFeed(null, feedFile, idGenerator);
     }
 
-    private GTFSFeed put (String id, File feedFile, Function<GTFSFeed, String> idGenerator) throws Exception {
+    private GTFSFeed buildFeed (String id, File feedFile, Function<GTFSFeed, String> idGenerator) throws Exception {
+
         // generate temporary ID to name files
         String tempId = id != null ? id : UUID.randomUUID().toString();
 
@@ -152,28 +161,27 @@ public class GTFSCache {
             originalDbp.delete();
         }
 
-        // upload feed
-        // TODO best way to do this? Should we zip the files together?
+        // Upload feed and MapDB files to S3 for long-term retrieval by workers and future backends.
         if (bucket != null) {
-            LOG.info("Writing feed to s3 cache");
+            LOG.info("Writing feed to S3 for long-term storage.");
             String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
 
             // write zip to s3 if not already there
             if (!s3.doesObjectExist(bucket, key + ".zip")) {
                 s3.putObject(bucket, key + ".zip", feedFile);
-                LOG.info("Zip file written.");
+                LOG.info("GTFS ZIP file written.");
             }
             else {
-                LOG.info("Zip file already exists on s3.");
+                LOG.info("ZIP file already exists on s3.");
             }
             s3.putObject(bucket, key + ".v2.db", new File(cacheDir, cleanId + ".v2.db"));
             s3.putObject(bucket, key + ".v2.db.p", new File(cacheDir, cleanId + ".v2.db.p"));
-            LOG.info("db files written.");
+            LOG.info("MapDB files written to S3.");
         }
 
         // reconnect to feed database
         feed = new GTFSFeed(new File(cacheDir, cleanId + ".v2.db").getAbsolutePath());
-        cache.put(id, feed);
+        // cache.put(id, feed);
         return feed;
     }
 
@@ -200,7 +208,8 @@ public class GTFSCache {
 
     /** retrieve a feed from local cache or S3 */
     private GTFSFeed retrieveAndProcessFeed (String originalId) {
-        // see if we have it cached locally
+
+        // First try to load an already-existing GTFS MapDB cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
         File dbFile = new File(cacheDir, id + ".v2.db");
@@ -218,6 +227,7 @@ public class GTFSCache {
             }
         }
 
+        // Fallback - try to fetch an already-built GTFS MapDB from S3
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
@@ -246,13 +256,13 @@ public class GTFSCache {
                 LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
         }
-        // if we fell through to here, getting the mapdb was unsuccessful
-        // grab GTFS from S3 if it is not found locally
+
+        // Fetching an already built MapDB from S3 was unsuccessful.
+        // Instead, try to build a MapDB from the original GTFS ZIP in the local cache, and falling back to S3.
         File feedFile = new File(cacheDir, id + ".zip");
         if (feedFile.exists()) {
             LOG.info("Loading feed from local cache directory...");
         }
-
         if (!feedFile.exists() && bucket != null) {
             LOG.info("Feed not found locally, downloading from S3.");
             try {
@@ -271,7 +281,7 @@ public class GTFSCache {
         if (feedFile.exists()) {
             // TODO this will also re-upload the original feed ZIP to S3.
             try {
-                return put(originalId, feedFile);
+                return buildFeed(originalId, feedFile);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }

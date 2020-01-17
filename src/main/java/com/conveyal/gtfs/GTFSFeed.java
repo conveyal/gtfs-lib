@@ -76,7 +76,7 @@ import static com.conveyal.gtfs.util.Util.human;
  * This is a MapDB-backed representation of the data from a single GTFS feed.
  * All entities are expected to be from a single namespace, do not load several feeds into a single GTFSFeed.
  */
-public class GTFSFeed implements Cloneable, Closeable {
+public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
 
@@ -85,6 +85,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
+    /** The MapDB database handling persistence of Maps to a pair of disk files behind the scenes. */
     private DB db;
 
     public String feedId = null;
@@ -710,9 +711,18 @@ public class GTFSFeed implements Cloneable, Closeable {
         /** do nothing */
     }
 
+    // FIXME this is only adding the first and last dates of each calendar, but that's enough for finding the range.
+    // TODO reimplement to return service density by mode per day.
     public List<LocalDate> getDatesOfService () {
-        // TODO reimplement
-        throw new UnsupportedOperationException();
+        List<LocalDate> serviceDates = new ArrayList<>();
+        for (Service service : this.services.values()) {
+            if (service.calendar != null) {
+                serviceDates.add(LocalDate.from(dateFormatter.parse(Integer.toString(service.calendar.start_date))));
+                serviceDates.add(LocalDate.from(dateFormatter.parse(Integer.toString(service.calendar.end_date))));
+            }
+            serviceDates.addAll(service.calendar_dates.keySet());
+        }
+        return serviceDates;
     }
 
     /**
