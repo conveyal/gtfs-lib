@@ -3,9 +3,7 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 
 import java.io.IOException;
-import java.util.Collection;
 import java.util.Iterator;
-import java.util.Map;
 
 public class Trip extends Entity {
 
@@ -20,7 +18,6 @@ public class Trip extends Entity {
     public String shape_id;
     public int    bikes_allowed;
     public int    wheelchair_accessible;
-    public String feed_id;
 
     public static class Loader extends Entity.Loader<Trip> {
 
@@ -48,8 +45,6 @@ public class Trip extends Entity {
             t.shape_id        = getStringField("shape_id", false);
             t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
-            t.feed = feed;
-            t.feed_id = feed.feedId;
             feed.trips.put(t.trip_id, t);
 
             /*

@@ -4,7 +4,6 @@ import com.conveyal.gtfs.GTFSFeed;
 import org.mapdb.Fun;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Iterator;
 
 import static com.conveyal.gtfs.model.Entity.Writer.convertToGtfsTime;
@@ -64,7 +63,6 @@ public class Frequency extends Entity implements Comparable<Frequency> {
             f.end_time = getTimeField("end_time", true);
             f.headway_secs = getIntField("headway_secs", true, 1, 24 * 60 * 60);
             f.exact_times = getIntField("exact_times", false, 0, 1);
-            f.feed = feed;
             feed.frequencies.add(Fun.t2(f.trip_id, f));
         }
     }

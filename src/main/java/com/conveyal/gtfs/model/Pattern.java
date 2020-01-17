@@ -26,11 +26,9 @@ public class Pattern implements Serializable {
     public String name;
     public String route_id;
     public static Joiner joiner = Joiner.on("-").skipNulls();
-    public String feed_id;
 
     // TODO: Should a Pattern be generated for a single trip or a set of trips that share the same ordered stop list?
     public Pattern (GTFSFeed feed, List<String> orderedStops, List<String> trips){
-        this.feed_id = feed.feedId;
 
         this.pattern_id = UUID.randomUUID().toString();
 

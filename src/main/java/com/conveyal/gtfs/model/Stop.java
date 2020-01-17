@@ -22,7 +22,6 @@ public class Stop extends Entity {
     public String stop_timezone;
     // TODO should be int
     public String wheelchair_boarding;
-    public String feed_id;
 
     @Override
     public String getId () {
@@ -56,8 +55,6 @@ public class Stop extends Entity {
             s.parent_station = getStringField("parent_station", false);
             s.stop_timezone  = getStringField("stop_timezone", false);
             s.wheelchair_boarding = getStringField("wheelchair_boarding", false);
-            s.feed = feed;
-            s.feed_id = feed.feedId;
             /* TODO check ref integrity later, this table self-references via parent_station */
 
             feed.stops.put(s.stop_id, s);

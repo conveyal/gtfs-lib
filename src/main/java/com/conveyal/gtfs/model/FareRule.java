@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.DuplicateKeyError;
 import com.conveyal.gtfs.error.ReferentialIntegrityError;
 
 import java.io.IOException;
@@ -50,7 +49,6 @@ public class FareRule extends Entity {
             fr.origin_id = getStringField("origin_id", false);
             fr.destination_id = getStringField("destination_id", false);
             fr.contains_id = getStringField("contains_id", false);
-            fr.feed = feed;
             fare.fare_rules.add(fr);
 
         }

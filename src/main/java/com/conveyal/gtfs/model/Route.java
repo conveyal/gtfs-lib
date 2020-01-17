@@ -30,7 +30,6 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public String route_color;
     public String route_text_color;
     public URL route_branding_url;
-    public String feed_id;
 
     public static class Loader extends Entity.Loader<Route> {
 
@@ -69,8 +68,6 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_color = getStringField("route_color", false);
             r.route_text_color = getStringField("route_text_color", false);
             r.route_branding_url = getUrlField("route_branding_url", false);
-            r.feed = feed;
-            r.feed_id = feed.feedId;
             feed.routes.put(r.route_id, r);
         }
 

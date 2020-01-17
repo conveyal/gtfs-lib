@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-
 import org.mapdb.Fun;
 
 import java.io.IOException;
@@ -15,7 +14,7 @@ import java.util.Iterator;
 public class StopTime extends Entity implements Cloneable, Serializable {
 
     private static final long serialVersionUID = -8883780047901081832L;
-    /* StopTime cannot directly reference Trips or Stops because they would be serialized into the MapDB. */
+    /* StopTime cannot directly reference Trip or Stop instances because they would be serialized into the MapDB. */
     public String trip_id;
     public int    arrival_time = INT_MISSING;
     public int    departure_time = INT_MISSING;
@@ -64,7 +63,6 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.drop_off_type  = getIntField("drop_off_type", false, 0, 3);
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
-            st.feed           = null; // this could circular-serialize the whole feed
             feed.stop_times.put(new Fun.Tuple2(st.trip_id, st.stop_sequence), st);
 
             /*

@@ -17,7 +17,6 @@ public class FareAttribute extends Entity {
     public int payment_method;
     public int transfers;
     public int transfer_duration;
-    public String feed_id;
 
     public static class Loader extends Entity.Loader<FareAttribute> {
         private final Map<String, Fare> fares;
@@ -49,8 +48,6 @@ public class FareAttribute extends Entity {
                 fa.payment_method = getIntField("payment_method", true, 0, 1);
                 fa.transfers = getIntField("transfers", false, 0, 10, UNLIMITED_TRANSFERS); // in the GTFS spec, a missing value means "unlimited", so we default to UNLIMITED_TRANSFERS (or MAX_INT) when no value is found
                 fa.transfer_duration = getIntField("transfer_duration", false, 0, 24 * 60 * 60);
-                fa.feed = feed;
-                fa.feed_id = feed.feedId;
                 fare.fare_attribute = fa;
             }
 
