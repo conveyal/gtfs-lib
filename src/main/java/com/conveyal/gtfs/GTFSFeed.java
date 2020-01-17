@@ -112,8 +112,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Merged stop buffers polygon built lazily by getMergedBuffers() */
     private transient Geometry mergedBuffers;
 
-    /* Create geometry factory to produce LineString geometries. */
-    GeometryFactory gf = new GeometryFactory();
+    /** A JTS geometry factory to produce LineString geometries. */
+    private static final GeometryFactory gf = new GeometryFactory();
 
     /* Map routes to associated trip patterns. */
     // TODO: Hash Multimapping in guava (might need dependency).
