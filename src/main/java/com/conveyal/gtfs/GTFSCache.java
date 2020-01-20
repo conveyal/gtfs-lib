@@ -206,7 +206,7 @@ public class GTFSCache {
     }
 
 
-    /** retrieve a feed from local cache or S3 */
+    /** Retrieve a feed from local cache or S3. */
     private GTFSFeed retrieveAndProcessFeed (String originalId) {
 
         // First try to load an already-existing GTFS MapDB cached locally
@@ -300,8 +300,12 @@ public class GTFSCache {
         }
     }
 
+    /**
+     * Replace all characters in the feed ID that are not alphanumeric or underscore with a dash.
+     * This ensures that the ID is valid for use as a file name or object name on S3.
+     */
     public static String cleanId(String id) {
-        // replace all special characters with `-`, except for underscore `_`
         return id.replaceAll("[^A-Za-z0-9_]", "-");
     }
+
 }
