@@ -18,17 +18,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.NoSuchElementException;
-import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Function;
-import java.util.zip.ZipFile;
 
 /**
- * Fast cache for GTFS feeds stored on S3.
- *
- * Depending on the application, we often want to store additional data with a GTFS feed. Thus, you can subclass this
- * class and override the processFeed function with a function that transforms a GTFSFeed object into whatever objects
- * you need. If you just need to store GTFSFeeds without any additional data, see the GTFSCache class.
+ * Cache of disk-backed (MapDB) GTFS feeds, falling back on long-term storage on S3.
  *
  * This uses a soft-values cache because (it is assumed) you do not want to have multiple copies of the same GTFS feed
  * in memory. When you are storing a reference to the original GTFS feed, it may be retrieved from the cache and held
@@ -41,8 +34,6 @@ public class GTFSCache {
 
     public final String bucket;
 
-    public final String bucketFolder;
-
     public final File cacheDir;
 
     private static AmazonS3 s3 = null;
@@ -50,18 +41,23 @@ public class GTFSCache {
     private LoadingCache<String, GTFSFeed> cache;
 
     /** If bucket is null, work offline and do not use S3 */
+    // TODO remove bucketFolder
     public GTFSCache (String awsRegion, String bucket, String bucketFolder, File cacheDir) {
-        if (awsRegion == null || bucket == null) LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
-        else {
+        if (awsRegion == null || bucket == null) {
+            LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
+        } else {
             s3 = AmazonS3ClientBuilder.standard().withRegion(awsRegion).build();
             LOG.info("Using bucket {} for GTFS Cache", bucket);
         }
 
         this.bucket = bucket;
-        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
-
         this.cacheDir = cacheDir;
 
+        CacheLoader<String, GTFSFeed> cacheLoader = new CacheLoader<>() {
+            public GTFSFeed load (String s) {
+                return retrieveAndProcessFeed(s);
+            }
+        };
         RemovalListener<String, GTFSFeed> removalListener = removalNotification -> {
             try {
                 LOG.info("Evicting feed {} from gtfs-cache and closing MapDB file. Reason: {}",
@@ -70,7 +66,7 @@ public class GTFSCache {
                 // Close DB to avoid leaking (off-heap allocated) memory for MapDB object cache, and MapDB corruption.
                 removalNotification.getValue().close();
                 // Delete local .zip file ONLY if using s3 (i.e. when 'bucket' has been set to something).
-                // TODO elaborate on why we would want to do this.
+                // TODO elaborate on why we would want to do this. Maybe just remove this code and use large EBS volume.
                 if (bucket != null) {
                     String id = removalNotification.getKey();
                     String[] extensions = {".zip"}; // used to include ".db", ".db.p" as well.  See #119
@@ -84,8 +80,8 @@ public class GTFSCache {
                 throw new RuntimeException("Exception while trying to evict GTFS MapDB from cache.", e);
             }
         };
-        this.cache = (LoadingCache<String, GTFSFeed>) CacheBuilder.newBuilder()
-                // we use SoftReferenced values because we have the constraint that we don't want more than one
+        this.cache = CacheBuilder.newBuilder()
+                // We used SoftReferenced values because we have the constraint that we don't want more than one
                 // copy of a particular GTFSFeed object around; that would mean multiple MapDBs are pointing at the same
                 // file, which is bad.
                 //.maximumSize(x) should be less sensitive to GC, though it interacts with instance cache size of MapDB
@@ -93,95 +89,62 @@ public class GTFSCache {
                 .maximumSize(20)
                 // .softValues()
                 .removalListener(removalListener)
-                .build(new CacheLoader() {
-                    public GTFSFeed load(Object s) throws Exception {
-                        // Thanks, java, for making me use a cast here. If I put generic arguments to new CacheLoader
-                        // due to type erasure it can't be sure I'm using types correctly.
-                        return retrieveAndProcessFeed((String) s);
-                    }
-                });
-    }
-
-    public long getCurrentCacheSize() {
-        return this.cache.size();
+                .build(cacheLoader);
     }
 
     /**
      * Build the MapDB files for the given GTFS feed ZIP, with the specified ID, and return the MapDB (without
      * putting it in the cache). This ID is not the feed's self-declared feed ID, because we may load multiple
      * versions of the same feed.
+     *
+     * TODO explain overwriting behavior when files already exist
+     * @param sourceFile this file will be moved into the cache.
      */
-    public GTFSFeed buildFeed (String id, File feedFile) throws Exception {
-        return buildFeed(id, feedFile, null);
-    }
+    public GTFSFeed buildFeed (String id, File sourceFile) throws Exception {
 
-    /**
-     * Build the MapDB files for the given GTFS feed ZIP, with the specified ID, and return the MapDB (without
-     * putting it in the cache). The supplied function will generate a unique name for the feed (in case multiple
-     * versions of the same feed are loaded), and is evaluated after the feed is already loaded so it can examine the
-     * contents of the feed when generating the ID.
-     */
-    public GTFSFeed buildFeed (Function<GTFSFeed, String> idGenerator, File feedFile) throws Exception {
-        return buildFeed(null, feedFile, idGenerator);
-    }
+        // Throw an exception if the supplied ID is not a sequence of alphanumeric characters and underscores.
+        validateId(id);
 
-    private GTFSFeed buildFeed (String id, File feedFile, Function<GTFSFeed, String> idGenerator) throws Exception {
+        // Derive file names and File objects from the supplied ID.
+        // TODO check that the file doesn't already exist? Or at least warn when overwriting?
+        String zipName = id + ".zip";
+        String dbName = id + ".v2.db";
+        String dbpName = id + ".v2.db.p";
+        File zipFile = new File(cacheDir, zipName);
+        File dbFile = new File(cacheDir, dbName);
+        File dbpFile = new File(cacheDir, dbpName);
 
-        // generate temporary ID to name files
-        String tempId = id != null ? id : UUID.randomUUID().toString();
+        // Move the file into the local cache unless we're loading from a feed that is already in that local cache.
+        // We used to copy, should we maintain that behavior?
+        if (!sourceFile.equals(zipFile)) {
+            Files.move(sourceFile, zipFile);
+        }
 
-        // read the feed
-        String cleanTempId = cleanId(tempId);
-        File dbFile = new File(cacheDir, cleanTempId + ".v2.db");
-        File movedFeedFile = new File(cacheDir, cleanTempId + ".zip");
-
-        // don't copy if we're loading from a locally-cached feed
-        if (!feedFile.equals(movedFeedFile)) Files.copy(feedFile, movedFeedFile);
-
+        // Load the GTFS data into the GTFSFeed MapDB tables.
         GTFSFeed feed = new GTFSFeed(dbFile.getAbsolutePath());
-        feed.loadFromFile(new ZipFile(movedFeedFile));
+        feed.loadFromFile(zipFile, id);
         feed.findPatterns();
+        feed.close();
 
-        if (idGenerator != null) id = idGenerator.apply(feed);
-
-        String cleanId = cleanId(id);
-
-        feed.close(); // make sure everything is written to disk
-
-        if (idGenerator != null) {
-            // This mess seems to be necessary to get around Windows file locks.
-            File originalZip = new File(cacheDir, cleanTempId + ".zip");
-            File originalDb = new File(cacheDir, cleanTempId + ".v2.db");
-            File originalDbp = new File(cacheDir, cleanTempId + ".v2.db.p");
-            Files.copy(originalZip,(new File(cacheDir, cleanId + ".zip")));
-            Files.copy(originalDb,(new File(cacheDir, cleanId + ".v2.db")));
-            Files.copy(originalDbp,(new File(cacheDir, cleanId + ".v2.db.p")));
-            originalZip.delete();
-            originalDb.delete();
-            originalDbp.delete();
-        }
-
-        // Upload feed and MapDB files to S3 for long-term retrieval by workers and future backends.
+        // Upload original feed zip and MapDB files to S3 for long-term retrieval by workers and future deployments.
         if (bucket != null) {
-            LOG.info("Writing feed to S3 for long-term storage.");
-            String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
-
-            // write zip to s3 if not already there
-            if (!s3.doesObjectExist(bucket, key + ".zip")) {
-                s3.putObject(bucket, key + ".zip", feedFile);
-                LOG.info("GTFS ZIP file written.");
+            // Only upload the ZIP if it's not already on S3. We might be rebuilding MapDB files from an existing zip.
+            if (!s3.doesObjectExist(bucket, zipName)) {
+                LOG.info("Uploading GTFS feed and MapDB files to S3 for long-term storage...");
+                s3.putObject(bucket, zipName, zipFile);
+                LOG.info("GTFS ZIP file uploaded to S3.");
+            } else {
+                LOG.info("ZIP file already exists on S3, not uploading.");
             }
-            else {
-                LOG.info("ZIP file already exists on s3.");
-            }
-            s3.putObject(bucket, key + ".v2.db", new File(cacheDir, cleanId + ".v2.db"));
-            s3.putObject(bucket, key + ".v2.db.p", new File(cacheDir, cleanId + ".v2.db.p"));
-            LOG.info("MapDB files written to S3.");
+            // Always upload the MapDB files since calling this method is a request for them to be (re)built.
+            s3.putObject(bucket, dbName, dbFile);
+            s3.putObject(bucket, dbpName, dbpFile);
+            LOG.info("MapDB files uploaded to S3.");
         }
 
-        // reconnect to feed database
-        feed = new GTFSFeed(new File(cacheDir, cleanId + ".v2.db").getAbsolutePath());
-        // cache.put(id, feed);
+        // After uploading, reconnect to the feed database so we can return a useable object.
+        // Note that we do NOT put the feed into the cache here, the LoadingCache mechanism automatically handles that.
+        feed = new GTFSFeed(new File(cacheDir, dbName).getAbsolutePath());
         return feed;
     }
 
@@ -195,27 +158,25 @@ public class GTFSCache {
         }
     }
 
-    public boolean containsId (String id) {
-        GTFSFeed feed;
-        try {
-            feed = cache.get(id);
-        } catch (Exception e) {
-            return false;
-        }
-        return feed != null;
-    }
-
-
     /** Retrieve a feed from local cache or S3. */
-    private GTFSFeed retrieveAndProcessFeed (String originalId) {
+    private GTFSFeed retrieveAndProcessFeed (String id) {
 
-        // First try to load an already-existing GTFS MapDB cached locally
-        String id = cleanId(originalId);
-        String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
-        File dbFile = new File(cacheDir, id + ".v2.db");
+        // Throw an exception if the supplied ID is not a sequence of alphanumeric characters and underscores.
+        validateId(id);
+
+        // Derive file names and File objects from the supplied ID.
+        // TODO check that the file doesn't already exist? Or at least warn when overwriting?
+        String zipName = id + ".zip";
+        String dbName = id + ".v2.db";
+        String dbpName = id + ".v2.db.p";
+        File zipFile = new File(cacheDir, zipName);
+        File dbFile = new File(cacheDir, dbName);
+        File dbpFile = new File(cacheDir, dbpName);
+
+        // First try to load an already-existing GTFS MapDB cached locally.
         GTFSFeed feed;
         if (dbFile.exists()) {
-            LOG.info("Processed GTFS was found cached locally");
+            LOG.info("Processed GTFS was found cached locally.");
             try {
                 feed = new GTFSFeed(dbFile.getAbsolutePath());
                 if (feed != null) {
@@ -227,31 +188,19 @@ public class GTFSCache {
             }
         }
 
-        // Fallback - try to fetch an already-built GTFS MapDB from S3
+        // GTFS MapDB did not exist locally or was corrupted. Try to fetch an already-built GTFS MapDB from S3.
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
-                S3Object db = s3.getObject(bucket, key + ".v2.db");
-                InputStream is = db.getObjectContent();
-                FileOutputStream fos = new FileOutputStream(dbFile);
-                ByteStreams.copy(is, fos);
-                is.close();
-                fos.close();
-
-                S3Object dbp = s3.getObject(bucket, key + ".v2.db.p");
-                InputStream isp = dbp.getObjectContent();
-                FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".v2.db.p"));
-                ByteStreams.copy(isp, fosp);
-                isp.close();
-                fosp.close();
-
+                fetchFromS3(dbName, dbFile);
+                fetchFromS3(dbpName, dbpFile);
                 LOG.info("Returning processed GTFS from S3");
                 feed = new GTFSFeed(dbFile.getAbsolutePath());
                 if (feed != null) {
                     return feed;
                 }
             } catch (AmazonS3Exception e) {
-                LOG.warn("DB file for key {} does not exist on S3.", key);
+                LOG.warn("DB or DBP file {} does not exist on S3.", dbFile);
             } catch (ExecutionException | IOException e) {
                 LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
@@ -259,53 +208,76 @@ public class GTFSCache {
 
         // Fetching an already built MapDB from S3 was unsuccessful.
         // Instead, try to build a MapDB from the original GTFS ZIP in the local cache, and falling back to S3.
-        File feedFile = new File(cacheDir, id + ".zip");
-        if (feedFile.exists()) {
+        if (zipFile.exists()) {
             LOG.info("Loading feed from local cache directory...");
-        }
-        if (!feedFile.exists() && bucket != null) {
-            LOG.info("Feed not found locally, downloading from S3.");
-            try {
-                S3Object gtfs = s3.getObject(bucket, key + ".zip");
-                InputStream is = gtfs.getObjectContent();
-                FileOutputStream fos = new FileOutputStream(feedFile);
-                ByteStreams.copy(is, fos);
-                is.close();
-                fos.close();
-            } catch (Exception e) {
-                LOG.error("Could not download feed at s3://{}/{}.", bucket, key);
-                throw new RuntimeException(e);
+        } else {
+            if (bucket == null) {
+                LOG.warn("No S3 bucket specified, nowhere to look for the origial GTFS ZIP file.");
+            } else  {
+                LOG.info("Feed not found locally, downloading from S3.");
+                try {
+                    fetchFromS3(zipName, zipFile);
+                } catch (Exception e) {
+                    // TODO fold this error reporting and exception handling into fetchFromS3 method.
+                    LOG.error("Could not download feed at s3://{}/{}.", bucket, zipFile);
+                    throw new RuntimeException(e);
+                }
             }
         }
 
-        if (feedFile.exists()) {
-            // TODO this will also re-upload the original feed ZIP to S3.
+        if (zipFile.exists()) {
+            // This will also re-upload the original feed ZIP to S3. TODO is this a problem or intentional behavior?
             try {
-                return buildFeed(originalId, feedFile);
+                return buildFeed(id, zipFile);
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
         } else {
-            LOG.warn("Feed {} not found locally", originalId);
-            throw new NoSuchElementException(originalId);
+            LOG.warn("Feed {} not found locally", id);
+            throw new NoSuchElementException(id);
         }
     }
 
+    /**
+     * Factored out the repeated action of fetching a file from S3 and storing in the local cache.
+     * TODO fold error logging and exception handling into this method.
+     */
+    private void fetchFromS3 (String remoteName, File localFile) throws IOException, AmazonS3Exception {
+        S3Object db = s3.getObject(bucket, remoteName);
+        InputStream is = db.getObjectContent();
+        FileOutputStream fos = new FileOutputStream(localFile);
+        ByteStreams.copy(is, fos);
+        is.close();
+        fos.close();
+    }
+
+    /**
+     * TODO explain why we would want to delete the local files.
+     * Assumption is they are corrupted and should be rebuilt?
+     */
     private void deleteLocalDBFiles(String id) {
-        String[] extensions = {".v2.db", ".v2.db.p"};
-        // delete ONLY local cache db files
-        for (String type : extensions) {
-            File file = new File(cacheDir, id + type);
-            file.delete();
-        }
+        String dbName = id + ".v2.db";
+        String dbpName = id + ".v2.db.p";
+        File dbFile = new File(cacheDir, dbName);
+        File dbpFile = new File(cacheDir, dbpName);
+        dbFile.delete();
+        dbpFile.delete();
     }
 
     /**
      * Replace all characters in the feed ID that are not alphanumeric or underscore with a dash.
      * This ensures that the ID is valid for use as a file name or object name on S3.
+     * TODO maybe make a class for already cleaned IDs, with methods to get the DB, ZIP, JSON etc. filenames.
      */
     public static String cleanId(String id) {
         return id.replaceAll("[^A-Za-z0-9_]", "-");
+    }
+
+    /** Check that the supplied ID is "clean" for use as a filename and throw an exception if not. */
+    public static void validateId (String id) {
+        if (id == null || id.isBlank() || ! cleanId(id).equals(id)) {
+            throw new RuntimeException("Supplied ID must consist entirely of alphanumeric characters or underscores.");
+        }
     }
 
 }

@@ -33,6 +33,7 @@ import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
+import org.mapdb.Atomic;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -62,6 +63,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -83,16 +85,27 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
     /** A JTS geometry factory to produce LineString geometries. */
     private static final GeometryFactory gf = new GeometryFactory();
 
+    /** Used for encoding and decoding GTFS dates formatted as an 8-digit integer.  */
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
     /** The MapDB database handling persistence of Maps to a pair of disk files behind the scenes. */
-    private DB db;
+    private final DB db;
 
-    public String feedId = null;
+    /**
+     * A unique identifier for this feed, among all feeds loaded by the creator. For example, an object
+     * identifier from a database system. This will be a UUID if the creator did not supply an ID.
+     * TODO we may want to cache this, it's read zillions of times in the GraphQL API.
+     */
+    private final Atomic.String uniqueId;
 
-    // All tables below should be MapDB maps so the entire GTFSFeed is persistent and uses constant memory.
+    /** The name of the original file this feed was loaded from, just for reference. */
+    private final Atomic.String sourceFileName;
 
-    // Some of these should be multimaps since they don't have an obvious unique key.
+    /** The XORed CRC32s of all constituent files in the GTFS zip file this was loaded from. */
+    private final Atomic.Long checksum;
+
+    // All CSV tables in GTFS (and derived views) are represented as fields below. These Maps or Sets of Tuples are
+    // in fact MapDB trees, so the entire GTFSFeed is persistent and uses constant memory.
 
     /** Map from agency_id to Agency entity. */
     public final Map<String, Agency> agency;
@@ -120,12 +133,6 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
     // THIS is this only thing that is not in the MapDB
     public final Set<String> transitIds = new HashSet<>();
 
-    /**
-     * CRC32 of the GTFS file this was loaded from.
-     * FIXME actually it's xored CRC32s, and why are we not just accessing the mapdb atomic long directly?
-     */
-    public long checksum;
-
     /* Map from 2-tuples of (shape_id, shape_pt_sequence) to ShapePoint entities. */
     public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
 
@@ -143,7 +150,7 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
 
     /**
      * A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading.
-     * TODO store these outside the mapdb for size?
+     * TODO store these outside the mapdb for size? We don't necessarily want to download these every time.
      */
     public final NavigableSet<GTFSError> errors;
 
@@ -171,75 +178,74 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
      * us to associate a line number with errors in objects that don't have any other clear identifier.
      *
      * Interestingly, all references are resolvable when tables are loaded in alphabetical order.
+     *
+     * @param gtfsFile the source GTFS file, which is a ZIP archive of CSV files.
+     * @param uniqueId a unique identifier for this feed, among all feeds loaded by the caller. For example, an object
+     *                 identifier from a database system. If null, a random UUID will be generated.
      */
-    public void loadFromFile(ZipFile zip, String fid) throws Exception {
-        if (this.loaded) throw new UnsupportedOperationException("Attempt to load GTFS into existing database");
-
-        // NB we don't have a single CRC for the file, so we combine all the CRCs of the component files. NB we are not
-        // simply summing the CRCs because CRCs are (I assume) uniformly randomly distributed throughout the width of a
-        // long, so summing them is a convolution which moves towards a Gaussian with mean 0 (i.e. more concentrated
-        // probability in the center), degrading the quality of the hash. Instead we XOR. Assuming each bit is independent,
-        // this will yield a nice uniformly distributed result, because when combining two bits there is an equal
-        // probability of any input, which means an equal probability of any output. At least I think that's all correct.
-        // Repeated XOR is not commutative but zip.stream returns files in the order they are in the central directory
-        // of the zip file, so that's not a problem.
-        checksum = zip.stream().mapToLong(ZipEntry::getCrc).reduce((l1, l2) -> l1 ^ l2).getAsLong();
-
-        db.getAtomicLong("checksum").set(checksum);
-
-        new FeedInfo.Loader(this).loadTable(zip);
-        // maybe we should just point to the feed object itself instead of its ID, and null out its stoptimes map after loading
-        if (fid != null) {
-            feedId = fid;
-            LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
-        }
-        else if (feedId == null || feedId.isEmpty()) {
-            feedId = new File(zip.getName()).getName().replaceAll("\\.zip$", "");
-            LOG.info("Feed ID is undefined, pester maintainers to include a feed ID. Using file name {}.", feedId); // TODO log an error, ideally feeds should include a feedID
-        }
-        else {
-            LOG.info("Feed ID is '{}'.", feedId);
+    public void loadFromFile(File gtfsFile, String uniqueId) throws Exception {
+        if (this.loaded) {
+            throw new UnsupportedOperationException("Cannot load more GTFS feeds into an already loaded database.");
         }
 
-        db.getAtomicString("feed_id").set(feedId);
+        ZipFile gtfsZipFile = new ZipFile(gtfsFile);
 
-        new Agency.Loader(this).loadTable(zip);
+        // Zip files do not store a single CRC for the entire file, so we combine all the CRCs of the component files.
+        // We are not simply summing the CRCs because CRCs are (I assume) uniformly randomly distributed throughout
+        // the width of a long, so summing them is a convolution which moves towards a Gaussian with mean 0 (i.e.
+        // more concentrated probability in the center), degrading the quality of the hash. Instead we XOR. Assuming
+        // each bit is independent, this will yield a nice uniformly distributed result, because when combining two
+        // bits there is an equal probability of any input, which means an equal probability of any output. At least
+        // I think that's all correct. Repeated XOR is not commutative but zip.stream returns files in the order they
+        // are in the central directory of the zip file, so that's not a problem.
+        checksum.set(gtfsZipFile.stream().mapToLong(ZipEntry::getCrc).reduce((l1, l2) -> l1 ^ l2).getAsLong());
+
+        // We could calculate the MD5 and use that as default unique ID.
+        // But some use cases may want to allow multiple copies of the same feed.
+        if (uniqueId == null) {
+            uniqueId = UUID.randomUUID().toString();
+            LOG.info("No unique ID supplied, generated a UUID: {}", uniqueId);
+        }
+        this.uniqueId.set(uniqueId);
+        sourceFileName.set(gtfsZipFile.getName());
+
+        new FeedInfo.Loader(this).loadTable(gtfsZipFile);
+        new Agency.Loader(this).loadTable(gtfsZipFile);
 
         // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
         // we're done loading them
         Map<String, Service> serviceTable = new HashMap<>();
-        new Calendar.Loader(this, serviceTable).loadTable(zip);
-        new CalendarDate.Loader(this, serviceTable).loadTable(zip);
+        new Calendar.Loader(this, serviceTable).loadTable(gtfsZipFile);
+        new CalendarDate.Loader(this, serviceTable).loadTable(gtfsZipFile);
         this.services.putAll(serviceTable);
         // Joined Services have been persisted to MapDB. Release in-memory HashMap for garbage collection.
         serviceTable = null;
 
         // Joining is performed for Fares as for Services above.
         Map<String, Fare> fares = new HashMap<>();
-        new FareAttribute.Loader(this, fares).loadTable(zip);
-        new FareRule.Loader(this, fares).loadTable(zip);
+        new FareAttribute.Loader(this, fares).loadTable(gtfsZipFile);
+        new FareRule.Loader(this, fares).loadTable(gtfsZipFile);
         this.fares.putAll(fares);
         // Joined Fares have been persisted to MapDB. Release in-memory HashMap for garbage collection.
         fares = null;
 
         // Comment out the StopTime and/or ShapePoint loaders for quick testing on large feeds.
-        new Route.Loader(this).loadTable(zip);
-        new ShapePoint.Loader(this).loadTable(zip);
-        new Stop.Loader(this).loadTable(zip);
-        new Transfer.Loader(this).loadTable(zip);
-        new Trip.Loader(this).loadTable(zip);
-        new Frequency.Loader(this).loadTable(zip);
-        new StopTime.Loader(this).loadTable(zip);
+        new Route.Loader(this).loadTable(gtfsZipFile);
+        new ShapePoint.Loader(this).loadTable(gtfsZipFile);
+        new Stop.Loader(this).loadTable(gtfsZipFile);
+        new Transfer.Loader(this).loadTable(gtfsZipFile);
+        new Trip.Loader(this).loadTable(gtfsZipFile);
+        new Frequency.Loader(this).loadTable(gtfsZipFile);
+        new StopTime.Loader(this).loadTable(gtfsZipFile);
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
-        loaded = true;
-    }
 
-    public void loadFromFile(ZipFile zip) throws Exception {
-        loadFromFile(zip, null);
+        // Prevent loading additional feeds into this MapDB.
+        gtfsZipFile.close();
+        loaded = true;
     }
 
     public void toFile (String file) {
@@ -291,35 +297,19 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
     }
 
     /**
-     * Static factory method returning a new instance of GTFSFeed containing the contents of
-     * the GTFS file at the supplied filesystem path. Forces the feedId to the
-     * supplied value if the parameter is non-null.
+     * Static factory method returning a new temp-file-backed instance of GTFSFeed containing the contents of the GTFS
+     * file at the supplied filesystem path, and stored at a temporary lo. Forces the feed's id to the supplied value
+     * if the parameter is non-null.
      */
-    public static GTFSFeed fromFile(String file, String feedId) {
-        GTFSFeed feed = new GTFSFeed();
-        ZipFile zip;
+    public static GTFSFeed fromFile (String file, String uniqueId) {
         try {
-            zip = new ZipFile(file);
-            if (feedId == null) {
-                feed.loadFromFile(zip);
-            }
-            else {
-                feed.loadFromFile(zip, feedId);
-            }
-            zip.close();
+            GTFSFeed feed = new GTFSFeed();
+            feed.loadFromFile(new File(file), uniqueId);
             return feed;
         } catch (Exception e) {
             LOG.error("Error loading GTFS: {}", e.getMessage());
             throw new RuntimeException(e);
         }
-    }
-
-    public boolean hasFeedInfo () {
-        return !this.feedInfo.isEmpty();
-    }
-
-    public FeedInfo getFeedInfo () {
-        return this.hasFeedInfo() ? this.feedInfo.values().iterator().next() : null;
     }
 
     /**
@@ -429,9 +419,8 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
     }
 
     public Collection<Frequency> getFrequencies (String trip_id) {
-        // IntelliJ tells me all these casts are unnecessary, and that's also my feeling, but the code won't compile
-        // without them
-        return (List<Frequency>) frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
+        return (List<Frequency>) frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI))
+                .stream()
                 .map(t2 -> ((Tuple2<String, Frequency>) t2).b)
                 .collect(Collectors.toList());
     }
@@ -783,6 +772,7 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
         }
     }
 
+    /** Internal constructor to set up a new GTFSFeed given an already-constructed MapDB instance. */
     private GTFSFeed (DB db) {
         this.db = db;
 
@@ -799,16 +789,29 @@ public class GTFSFeed implements Cloneable, AutoCloseable, Closeable {
         shape_points = db.getTreeMap("shape_points");
         patternForTrip = db.getTreeMap("patternForTrip");
 
-        feedId = db.getAtomicString("feed_id").get();
-        checksum = db.getAtomicLong("checksum").get();
+        uniqueId = db.getAtomicString("unique_id");
+        sourceFileName = db.getAtomicString("source_file_name");
+        checksum = db.getAtomicLong("checksum");
 
         // Use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
-        // None of the other maps contain JTS objects.
+        // None of the other maps contain JTS objects so we let them use the default MapDB serialization.
         patterns = db.createTreeMap("patterns")
                 .valueSerializer(Serializer.JAVA)
                 .makeOrGet();
 
         errors = db.getTreeSet("errors");
+    }
+
+    public String getUniqueId () {
+        return uniqueId.get();
+    }
+
+    public String getOriginalFilename () {
+        return sourceFileName.get();
+    }
+
+    public long getChecksum () {
+        return checksum.get();
     }
 
 }
