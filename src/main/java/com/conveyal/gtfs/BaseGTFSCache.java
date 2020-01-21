@@ -126,6 +126,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         return put(null, feedFile, idGenerator);
     }
 
+    // TODO rename these methods. This does a lot more than a typical Map.put method so the name gets confusing.
     private T put (String id, File feedFile, Function<GTFSFeed, String> idGenerator) throws Exception {
         // generate temporary ID to name files
         String tempId = id != null ? id : UUID.randomUUID().toString();
@@ -146,7 +147,8 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
         String cleanId = cleanId(id);
 
-        feed.close(); // make sure everything is written to disk
+        // Close the DB and flush to disk before we start moving and copying files around.
+        feed.close();
 
         if (idGenerator != null) {
             // This mess seems to be necessary to get around Windows file locks.
@@ -180,10 +182,10 @@ public abstract class BaseGTFSCache<T extends Closeable> {
             LOG.info("db files written.");
         }
 
-        // reconnect to feed database
+        // Reopen the feed database so we can return it ready for use to the caller. Note that we do not add the feed
+        // to the cache here. The returned feed is inserted automatically into the LoadingCache by the CacheLoader.
         feed = new GTFSFeed(new File(cacheDir, cleanId + ".v2.db").getAbsolutePath());
         T processed = processFeed(feed);
-        cache.put(id, processed);
         return processed;
     }
 
