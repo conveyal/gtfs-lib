@@ -48,6 +48,14 @@ public abstract class BaseGTFSCache<T extends Closeable> {
     private static AmazonS3 s3 = null;
     private LoadingCache<String, T> cache;
 
+    public BaseGTFSCache(String bucket, File cacheDir) {
+        this(bucket, null, cacheDir);
+    }
+
+    public BaseGTFSCache(String bucket, String bucketFolder, File cacheDir) {
+        this(null, bucket, bucketFolder, cacheDir);
+    }
+
     /** If bucket is null, work offline and do not use S3 */
     public BaseGTFSCache(String awsRegion, String bucket, String bucketFolder, File cacheDir) {
         if (awsRegion == null || bucket == null) LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
