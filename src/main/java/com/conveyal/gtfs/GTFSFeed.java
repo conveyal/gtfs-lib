@@ -25,7 +25,6 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
-import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.ExecutionError;
 import org.geotools.referencing.GeodeticCalculator;
 import org.locationtech.jts.algorithm.ConvexHull;
@@ -85,42 +84,66 @@ import static com.conveyal.gtfs.util.GeometryUtil.geometryFactory;
 import static com.conveyal.gtfs.util.Util.human;
 
 /**
- * All entities must be from a single feed namespace.
- * Composed of several GTFSTables.
+ * This is a MapDB-backed representation of the data from a single GTFS feed.
+ * All entities are expected to be from a single namespace, do not load several feeds into a single GTFSFeed.
  */
 public class GTFSFeed implements Cloneable, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeed.class);
     private static final DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
+    /** The MapDB database handling persistence of Maps to a pair of disk files behind the scenes. */
     private DB db;
 
     public String feedId = null;
 
-    // TODO make all of these Maps MapDBs so the entire GTFSFeed is persistent and uses constant memory
+    // All tables below should be MapDB maps so the entire GTFSFeed is persistent and uses constant memory.
 
-    /* Some of these should be multimaps since they don't have an obvious unique key. */
+    /** Map from agency_id to Agency entity. */
     public final Map<String, Agency> agency;
+
+    /**
+     * Map from empty string to FeedInfo entity, this should probably be a set but keeping this representation for
+     * compatibility with existing MapDB files.
+     */
     public final Map<String, FeedInfo> feedInfo;
-    // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
+
+    // Sets of tuples are used to make multimaps in mapdb:
+    // https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
+    /** Multimap from ??? to Frequency entities. */
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
+
+    /** Map from route_id to Route entity. */
     public final Map<String, Route> routes;
+
+    /** Map from stop_id to Stop entity. */
     public final Map<String, Stop> stops;
+
+    /** Map from ? to ? */
     public final Map<String, Transfer> transfers;
+
+    /** Map from trip_id to Trip entity. */
     public final BTreeMap<String, Trip> trips;
 
+    // FIXME this is this only thing that is a plain map, not in the MapDB
     public final Set<String> transitIds = new HashSet<>();
-    /** CRC32 of the GTFS file this was loaded from */
+
+    /**
+     * CRC32 of the GTFS file this was loaded from.
+     * FIXME actually it's xored CRC32s, and why are we not just accessing the mapdb atomic long directly?
+     */
     public long checksum;
 
-    /* Map from 2-tuples of (shape_id, shape_pt_sequence) to shape points */
+    /** Map from 2-tuples of (shape_id, shape_pt_sequence) to ShapePoint entities. */
     public final ConcurrentNavigableMap<Tuple2<String, Integer>, ShapePoint> shape_points;
 
-    /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
+    /**
+     * Map from 2-tuples of (trip_id, stop_sequence) to StopTime entities. Tuple2's parameter types are not specified
+     * because a later function call requires passing Fun.HI (an Object) as a parameter.
+     */
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
-//    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
+// TODO remove the below 4 fields?
     /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
     public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
     public final ConcurrentMap<String, Long> stopCountByStopTime;
@@ -128,35 +151,41 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final NavigableSet<Tuple2<String, String>> tripsPerService;
 
     public final NavigableSet<Tuple2<String, String>> servicesPerDate;
+/////////
 
-    /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
+    /** A fare is a fare_attribute and all fare_rules that reference that fare_attribute. TODO what is the key? */
     public final Map<String, Fare> fares;
 
-    /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
+    /** A service is a calendar entry and all calendar_dates that modify that calendar entry. TODO what is the key? */
     public final BTreeMap<String, Service> services;
 
-    /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
+    /**
+     * A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading.
+     * TODO store these outside the mapdb for size? If we just don't create this map, old workers should not fail.
+     * Ideally we'd report the errors to the backend when it first builds the MapDB.
+     */
     public final NavigableSet<GTFSError> errors;
 
-    /* Stops spatial index which gets built lazily by getSpatialIndex() */
+    // TODO eliminate if not used
+    /** Stops spatial index which gets built lazily by getSpatialIndex() */
     private transient STRtree spatialIndex;
 
-    /* Convex hull of feed (based on stops) built lazily by getConvexHull() */
+    // TODO eliminate if not used
+    /** Convex hull of feed (based on stops) built lazily by getConvexHull() */
     private transient Polygon convexHull;
 
-    /* Merged stop buffers polygon built lazily by getMergedBuffers() */
+    // TODO eliminate if not used
+    /** Merged stop buffers polygon built lazily by getMergedBuffers() */
     private transient Geometry mergedBuffers;
 
-    /* Map routes to associated trip patterns. */
-    // TODO: Hash Multimapping in guava (might need dependency).
+    /** Map from pattern IDs to Pattern entities (which are generated by us, not found in GTFS). */
     public final Map<String, Pattern> patterns;
 
-    // TODO bind this to map above so that it is kept up to date automatically
+    /** Map from each trip_id to ID of trip pattern containing that trip. TODO rename to patternForTrip. */
     public final Map<String, String> tripPatternMap;
-    private boolean loaded = false;
 
-    /* A place to store an event bus that is passed through constructor. */
-    public transient EventBus eventBus;
+    /** Once a GTFSFeed has one feed loaded into it, we set this to true to block loading any additional feeds. */
+    private boolean loaded = false;
 
     /**
      * The order in which we load the tables is important for two reasons.
@@ -208,26 +237,31 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Calendar.Loader(this, serviceTable).loadTable(zip);
         new CalendarDate.Loader(this, serviceTable).loadTable(zip);
         this.services.putAll(serviceTable);
-        serviceTable = null; // free memory
+        // Joined Services have been persisted to MapDB. Release in-memory HashMap for garbage collection.
+        serviceTable = null;
 
-        // Same deal
+        // Joining is performed for Fares as for Services above.
         Map<String, Fare> fares = new HashMap<>();
         new FareAttribute.Loader(this, fares).loadTable(zip);
         new FareRule.Loader(this, fares).loadTable(zip);
         this.fares.putAll(fares);
-        fares = null; // free memory
+        // Joined Fares have been persisted to MapDB. Release in-memory HashMap for garbage collection.
+        fares = null;
 
+        // Comment out the StopTime and/or ShapePoint loaders for quick testing on large feeds.
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
         new Transfer.Loader(this).loadTable(zip);
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
-        new StopTime.Loader(this).loadTable(zip); // comment out this line for quick testing using NL feed
+        new StopTime.Loader(this).loadTable(zip);
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
+
+        // TODO remove these Bind calls if they are not used
         LOG.info("Building trips per service index");
         Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
         LOG.info("Building services per date index");
@@ -289,6 +323,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
     }
 
+    // TODO remove if unused
     public FeedStats calculateStats() {
         FeedStats feedStats = new FeedStats(this);
         return feedStats;
@@ -348,6 +383,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
+     * TODO remove if unused
      * TODO rename getStopSpatialIndex to make it clear what the index contains.
      */
     public STRtree getSpatialIndex () {
@@ -841,7 +877,11 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     protected void finalize() throws IOException {
-        if (!db.isClosed()) LOG.error("MapDB database was not closed before it was garbage collected. This is a bug!");
+        // Although everyone recommends against using finalizers to take actions, as far as I know they are a good place
+        // to assert that cleanup actions were taken before an object went out of scope.
+        if (db != null && !db.isClosed()) {
+            LOG.error("MapDB database was not closed before it was garbage collected. This is a bug!");
+        }
     }
 
     public void close () {
@@ -940,6 +980,8 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         tripPatternMap = db.getTreeMap("patternForTrip");
 
+        // TODO get the maps but don't keep the fields, to maintain backward compatibility?
+        //  However the implementation looks like get-or-create, so old workers will probably just create empty maps.
         stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
         stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
         tripsPerService = db.getTreeSet("tripsPerService");

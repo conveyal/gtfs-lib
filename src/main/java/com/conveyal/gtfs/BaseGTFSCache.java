@@ -38,6 +38,7 @@ import java.util.zip.ZipFile;
  * prevent this as it cannot be removed if it is referenced elsewhere.
  */
 public abstract class BaseGTFSCache<T extends Closeable> {
+
     private static final Logger LOG = LoggerFactory.getLogger(BaseGTFSCache.class);
 
     private static final String GTFS_EXTENSION = ".zip";
@@ -45,6 +46,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
     private static final String DBP_EXTENSION = ".db.p";
 
     public final String bucket;
+
     public final String bucketFolder;
 
     public final File cacheDir;
@@ -118,14 +120,20 @@ public abstract class BaseGTFSCache<T extends Closeable> {
     }
 
     /**
-     * Add a GTFS feed to this cache with the given ID. NB this is not the feed ID, because feed IDs are not
-     * unique when you load multiple versions of the same feed.
+     * Build the MapDB files for the given GTFS feed ZIP, with the specified ID, and return the MapDB (without
+     * putting it in the cache). This ID is not the feed's self-declared feed ID, because we may load multiple
+     * versions of the same feed.
      */
     public T put (String id, File feedFile) throws Exception {
         return put(id, feedFile, null);
     }
 
-    /** Add a GTFS feed to this cache where the ID is calculated from the feed itself */
+    /**
+     * Build the MapDB files for the given GTFS feed ZIP, with the specified ID, and return the MapDB (without
+     * putting it in the cache). The supplied function will generate a unique name for the feed (in case multiple
+     * versions of the same feed are loaded), and is evaluated after the feed is already loaded so it can examine the
+     * contents of the feed when generating the ID.
+     */
     public T put (Function<GTFSFeed, String> idGenerator, File feedFile) throws Exception {
         return put(null, feedFile, idGenerator);
     }
@@ -167,23 +175,22 @@ public abstract class BaseGTFSCache<T extends Closeable> {
             originalDbp.delete();
         }
 
-        // upload feed
-        // TODO best way to do this? Should we zip the files together?
+        // Upload feed and MapDB files to S3 for long-term retrieval by workers and future backends.
         if (bucket != null) {
-            LOG.info("Writing feed to s3 cache");
+            LOG.info("Writing feed to S3 for long-term storage.");
             String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
 
             // write zip to s3 if not already there
             if (!s3.doesObjectExist(bucket, key + GTFS_EXTENSION)) {
                 s3.putObject(bucket, key + GTFS_EXTENSION, feedFile);
-                LOG.info("Zip file written.");
+                LOG.info("GTFS zip file written.");
             }
             else {
                 LOG.info("Zip file already exists on s3.");
             }
             s3.putObject(bucket, key + DB_EXTENSION, new File(cacheDir, cleanId + DB_EXTENSION));
             s3.putObject(bucket, key + DBP_EXTENSION, new File(cacheDir, cleanId + DBP_EXTENSION));
-            LOG.info("db files written.");
+            LOG.info("GTFS MapDB files written to S3.");
         }
 
         // Reopen the feed database so we can return it ready for use to the caller. Note that we do not add the feed
@@ -216,7 +223,8 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
     /** retrieve a feed from local cache or S3 */
     private T retrieveAndProcessFeed (String originalId) {
-        // see if we have it cached locally
+
+        // First try to load an already-existing GTFS MapDB cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
         File dbFile = new File(cacheDir, id + DB_EXTENSION);
@@ -234,6 +242,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
             }
         }
 
+        // Fallback - try to fetch an already-built GTFS MapDB from S3
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
@@ -262,8 +271,9 @@ public abstract class BaseGTFSCache<T extends Closeable> {
                 LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
         }
-        // if we fell through to here, getting the mapdb was unsuccessful
-        // grab GTFS from S3 if it is not found locally
+
+        // Fetching an already built MapDB from S3 was unsuccessful.
+        // Instead, try to build a MapDB from the original GTFS ZIP in the local cache, and falling back to S3.
         File feedFile = new File(cacheDir, id + GTFS_EXTENSION);
         if (feedFile.exists()) {
             LOG.info("Loading feed from local cache directory...");
