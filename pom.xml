@@ -209,7 +209,7 @@
   </repositories>
 
   <dependencies>
-    <!-- CSV parser -->
+    <!-- CSV parser. GTFS is a set of zipped CSV files. -->
     <dependency>
       <groupId>net.sourceforge.javacsv</groupId>
       <artifactId>javacsv</artifactId>
@@ -228,12 +228,13 @@
     	<artifactId>jcommander</artifactId>
     	<version>1.30</version>
     </dependency>
+    <!-- Guava provides a lot of functionality and tools "missing" from the Java standard library. -->
     <dependency>
     	<groupId>com.google.guava</groupId>
     	<artifactId>guava</artifactId>
     	<version>28.1-jre</version>
     </dependency>
-    <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
+    <!-- Hamcrest is an assertion library used in a few tests. -->
     <dependency>
       <groupId>org.hamcrest</groupId>
       <artifactId>java-hamcrest</artifactId>
@@ -245,28 +246,33 @@
     	<artifactId>mapdb</artifactId>
     	<version>1.0.8</version>
     </dependency>
-    <!-- Our logging API, no implementation specified as gtfs-lib is a library. -->
+    <!-- Our logging API. -->
     <dependency>
     	<groupId>org.slf4j</groupId>
     	<artifactId>slf4j-api</artifactId>
     	<version>1.7.30</version>
     </dependency>
+    <!-- An implementation of the logging API. Ideally there shouldn't be one as gtfs-lib is a library,
+         but this library includes a few command line tools. -->
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
       <version>1.7.30</version>
       <scope>runtime</scope>
     </dependency>
+    <!-- Commons IO gives us BOMInputStream for handling UTF-8 BOMs. -->
     <dependency>
     	<groupId>commons-io</groupId>
     	<artifactId>commons-io</artifactId>
     	<version>2.6</version>
     </dependency>
+    <!-- Geotools provides GIS functionality on top of JTS topology suite. -->
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-main</artifactId>
       <version>${geotools.version}</version>
     </dependency>
+    <!-- The EPSG coordinate reference system catalog as an HSQL database. -->
     <dependency>
       <groupId>org.geotools</groupId>
       <artifactId>gt-epsg-hsql</artifactId>
@@ -294,6 +300,7 @@
       <artifactId>trove4j</artifactId>
       <version>3.0.3</version>
     </dependency>
+    <!-- Commons Math gives us FastMath and MersenneTwister. -->
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
