@@ -47,8 +47,6 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
     public final String bucket;
 
-    public final String bucketFolder;
-
     public final File cacheDir;
 
     private static AmazonS3 s3 = null;
@@ -58,12 +56,8 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         this(bucket, null, cacheDir);
     }
 
-    public BaseGTFSCache(String bucket, String bucketFolder, File cacheDir) {
-        this(null, bucket, bucketFolder, cacheDir);
-    }
-
     /** If bucket is null, work offline and do not use S3 */
-    public BaseGTFSCache(String awsRegion, String bucket, String bucketFolder, File cacheDir) {
+    public BaseGTFSCache(String awsRegion, String bucket, File cacheDir) {
         if (awsRegion == null || bucket == null) LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
         else {
             s3 = AmazonS3ClientBuilder.standard().withRegion(awsRegion).build();
@@ -71,7 +65,6 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         }
 
         this.bucket = bucket;
-        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
 
         this.cacheDir = cacheDir;
 
@@ -178,18 +171,17 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         // Upload feed and MapDB files to S3 for long-term retrieval by workers and future backends.
         if (bucket != null) {
             LOG.info("Writing feed to S3 for long-term storage.");
-            String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
 
             // write zip to s3 if not already there
-            if (!s3.doesObjectExist(bucket, key + GTFS_EXTENSION)) {
-                s3.putObject(bucket, key + GTFS_EXTENSION, feedFile);
+            if (!s3.doesObjectExist(bucket, cleanId + GTFS_EXTENSION)) {
+                s3.putObject(bucket, cleanId + GTFS_EXTENSION, feedFile);
                 LOG.info("GTFS zip file written.");
             }
             else {
                 LOG.info("Zip file already exists on s3.");
             }
-            s3.putObject(bucket, key + DB_EXTENSION, new File(cacheDir, cleanId + DB_EXTENSION));
-            s3.putObject(bucket, key + DBP_EXTENSION, new File(cacheDir, cleanId + DBP_EXTENSION));
+            s3.putObject(bucket, cleanId + DB_EXTENSION, new File(cacheDir, cleanId + DB_EXTENSION));
+            s3.putObject(bucket, cleanId + DBP_EXTENSION, new File(cacheDir, cleanId + DBP_EXTENSION));
             LOG.info("GTFS MapDB files written to S3.");
         }
 
@@ -226,7 +218,6 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
         // First try to load an already-existing GTFS MapDB cached locally
         String id = cleanId(originalId);
-        String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
         File dbFile = new File(cacheDir, id + DB_EXTENSION);
         GTFSFeed feed;
         if (dbFile.exists()) {
@@ -246,14 +237,14 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
-                S3Object db = s3.getObject(bucket, key + DB_EXTENSION);
+                S3Object db = s3.getObject(bucket, id + DB_EXTENSION);
                 InputStream is = db.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(dbFile);
                 ByteStreams.copy(is, fos);
                 is.close();
                 fos.close();
 
-                S3Object dbp = s3.getObject(bucket, key + DBP_EXTENSION);
+                S3Object dbp = s3.getObject(bucket, id + DBP_EXTENSION);
                 InputStream isp = dbp.getObjectContent();
                 FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + DBP_EXTENSION));
                 ByteStreams.copy(isp, fosp);
@@ -266,7 +257,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
                     return processFeed(feed);
                 }
             } catch (AmazonS3Exception e) {
-                LOG.warn("DB file for key {} does not exist on S3.", key);
+                LOG.warn("DB file for key {} does not exist on S3.", id);
             } catch (ExecutionException | IOException e) {
                 LOG.warn("Error retrieving MapDB from S3, will load from original GTFS.", e);
             }
@@ -282,14 +273,14 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         if (!feedFile.exists() && bucket != null) {
             LOG.info("Feed not found locally, downloading from S3.");
             try {
-                S3Object gtfs = s3.getObject(bucket, key + GTFS_EXTENSION);
+                S3Object gtfs = s3.getObject(bucket, id + GTFS_EXTENSION);
                 InputStream is = gtfs.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(feedFile);
                 ByteStreams.copy(is, fos);
                 is.close();
                 fos.close();
             } catch (Exception e) {
-                LOG.error("Could not download feed at s3://{}/{}.", bucket, key);
+                LOG.error("Could not download feed at s3://{}/{}.", bucket, id);
                 throw new RuntimeException(e);
             }
         }
