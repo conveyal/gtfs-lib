@@ -687,7 +687,12 @@ public class GTFSFeed implements Cloneable, Closeable {
                 serviceDates.add(LocalDate.from(dateFormatter.parse(Integer.toString(service.calendar.start_date))));
                 serviceDates.add(LocalDate.from(dateFormatter.parse(Integer.toString(service.calendar.end_date))));
             }
-            serviceDates.addAll(service.calendar_dates.keySet());
+            for (CalendarDate calendarDate : service.calendar_dates.values()) {
+                // This predicate should really be an instance method on CalendarDate, as it recurs in multiple places.
+                if (calendarDate.exception_type == 1) {
+                    serviceDates.add(calendarDate.date);
+                }
+            }
         }
         return serviceDates;
     }
