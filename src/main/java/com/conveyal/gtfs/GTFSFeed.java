@@ -19,7 +19,6 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -27,7 +26,6 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ExecutionError;
 import org.geotools.referencing.GeodeticCalculator;
-import org.locationtech.jts.algorithm.ConvexHull;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
 import org.locationtech.jts.geom.Envelope;
@@ -38,7 +36,6 @@ import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.mapdb.BTreeMap;
-import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
@@ -54,9 +51,7 @@ import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -69,12 +64,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
-import java.util.SortedSet;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -143,16 +135,6 @@ public class GTFSFeed implements Cloneable, Closeable {
      */
     public final BTreeMap<Tuple2, StopTime> stop_times;
 
-// TODO remove the below 4 fields?
-    /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
-    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
-    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
-    public final NavigableSet<Tuple2<String, String>> tripsPerService;
-
-    public final NavigableSet<Tuple2<String, String>> servicesPerDate;
-/////////
-
     /** A fare is a fare_attribute and all fare_rules that reference that fare_attribute. TODO what is the key? */
     public final Map<String, Fare> fares;
 
@@ -169,10 +151,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     // TODO eliminate if not used
     /** Stops spatial index which gets built lazily by getSpatialIndex() */
     private transient STRtree spatialIndex;
-
-    // TODO eliminate if not used
-    /** Convex hull of feed (based on stops) built lazily by getConvexHull() */
-    private transient Polygon convexHull;
 
     // TODO eliminate if not used
     /** Merged stop buffers polygon built lazily by getMergedBuffers() */
@@ -261,27 +239,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.info("{}", error);
         }
 
-        // TODO remove these Bind calls if they are not used
-        LOG.info("Building trips per service index");
-        Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
-        LOG.info("Building services per date index");
-        Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
-
-            LocalDate startDate = service.calendar != null
-                    ? LocalDate.parse(String.valueOf(service.calendar.start_date), dateFormatter)
-                    : service.calendar_dates.keySet().stream().sorted().findFirst().get();
-            LocalDate endDate = service.calendar != null
-                    ? LocalDate.parse(String.valueOf(service.calendar.end_date), dateFormatter)
-                    : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
-            // end date for Period.between is not inclusive
-            int daysOfService = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
-            return IntStream.range(0, daysOfService)
-                    .mapToObj(offset -> startDate.plusDays(offset))
-                    .filter(service::activeOn)
-                    .map(date -> date.format(dateFormatter))
-                    .toArray(size -> new String[size]);
-        });
-
+        // Prevent loading additional feeds into this MapDB.
         loaded = true;
     }
 
@@ -321,12 +279,6 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.error("Error saving GTFS: {}", e.getMessage());
             throw new RuntimeException(e);
         }
-    }
-
-    // TODO remove if unused
-    public FeedStats calculateStats() {
-        FeedStats feedStats = new FeedStats(this);
-        return feedStats;
     }
 
     /**
@@ -770,59 +722,18 @@ public class GTFSFeed implements Cloneable, Closeable {
         return distance / time; // meters per second
     }
 
-    /** Get list of stop_times for a given stop_id. */
-    public List<StopTime> getStopTimesForStop (String stop_id) {
-        SortedSet<Tuple2<String, Tuple2>> index = this.stopStopTimeSet
-                .subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.stop_times.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    public List<Trip> getTripsForService (String service_id) {
-        SortedSet<Tuple2<String, String>> index = this.tripsPerService
-                .subSet(new Tuple2<>(service_id, null), new Tuple2(service_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.trips.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    /** Get list of services for each date of service. */
-    public List<Service> getServicesForDate (LocalDate date) {
-        String dateString = date.format(dateFormatter);
-        SortedSet<Tuple2<String, String>> index = this.servicesPerDate
-                .subSet(new Tuple2<>(dateString, null), new Tuple2(dateString, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.services.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
+    // FIXME this is only adding the first and last dates of each calendar, but that's enough for finding the range.
+    // TODO reimplement returning service density by mode per day?
     public List<LocalDate> getDatesOfService () {
-        return this.servicesPerDate.stream()
-                .map(tuple -> LocalDate.parse(tuple.a, dateFormatter))
-                .collect(Collectors.toList());
-    }
-
-    /** Get list of distinct trips (filters out multiple visits by a trip) a given stop_id. */
-    public List<Trip> getDistinctTripsForStop (String stop_id) {
-        return getStopTimesForStop(stop_id).stream()
-                .map(stopTime -> this.trips.get(stopTime.trip_id))
-                .distinct()
-                .collect(Collectors.toList());
-    }
-
-    /** Get the likely time zone for a stop using the agency of the first stop time encountered for the stop. */
-    public ZoneId getAgencyTimeZoneForStop (String stop_id) {
-        StopTime stopTime = getStopTimesForStop(stop_id).iterator().next();
-
-        Trip trip = this.trips.get(stopTime.trip_id);
-        Route route = this.routes.get(trip.route_id);
-        Agency agency = route.agency_id != null ? this.agency.get(route.agency_id) : this.agency.get(0);
-
-        return ZoneId.of(agency.agency_timezone);
+        List<LocalDate> serviceDates = new ArrayList<>();
+        for (Service service : this.services.values()) {
+            if (service.calendar != null) {
+                serviceDates.add(LocalDate.from(dateFormatter.parse(Integer.toString(service.calendar.start_date))));
+                serviceDates.add(LocalDate.from(dateFormatter.parse(Integer.toString(service.calendar.end_date))));
+            }
+            serviceDates.addAll(service.calendar_dates.keySet());
+        }
+        return serviceDates;
     }
 
     // TODO: code review
@@ -831,9 +742,6 @@ public class GTFSFeed implements Cloneable, Closeable {
 //            synchronized (this) {
                 Collection<Geometry> polygons = new ArrayList<>();
                 for (Stop stop : this.stops.values()) {
-                    if (getStopTimesForStop(stop.stop_id).isEmpty()) {
-                        continue;
-                    }
                     if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
                         continue;
                     }
@@ -849,20 +757,6 @@ public class GTFSFeed implements Cloneable, Closeable {
 //            }
         }
         return this.mergedBuffers;
-    }
-
-    public Polygon getConvexHull() {
-        if (this.convexHull == null) {
-            synchronized (this) {
-                List<Coordinate> coordinates = this.stops.values().stream().map(
-                        stop -> new Coordinate(stop.stop_lon, stop.stop_lat)
-                ).collect(Collectors.toList());
-                Coordinate[] coords = coordinates.toArray(new Coordinate[coordinates.size()]);
-                ConvexHull convexHull = new ConvexHull(coords, geometryFactory);
-                this.convexHull = (Polygon) convexHull.getConvexHull();
-            }
-        }
-        return this.convexHull;
     }
 
     /**
@@ -982,13 +876,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .makeOrGet();
 
         patternForTrip = db.getTreeMap("patternForTrip");
-
-        // TODO get the maps but don't keep the fields, to maintain backward compatibility?
-        //  However the implementation looks like get-or-create, so old workers will probably just create empty maps.
-        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
-        stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
-        tripsPerService = db.getTreeSet("tripsPerService");
-        servicesPerDate = db.getTreeSet("servicesPerDate");
 
         errors = db.getTreeSet("errors");
     }

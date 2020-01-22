@@ -1,13 +1,10 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
-import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.storage.StorageException;
 import org.junit.Test;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.equalTo;
 
 /**
  * Unit tests to verify functionality of classes that load fields from GTFS tables.
