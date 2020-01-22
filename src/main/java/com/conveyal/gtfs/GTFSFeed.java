@@ -28,12 +28,10 @@ import com.google.common.util.concurrent.ExecutionError;
 import org.geotools.referencing.GeodeticCalculator;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
@@ -148,11 +146,7 @@ public class GTFSFeed implements Cloneable, Closeable {
      */
     public final NavigableSet<GTFSError> errors;
 
-    // TODO eliminate if not used
-    /** Stops spatial index which gets built lazily by getSpatialIndex() */
-    private transient STRtree spatialIndex;
-
-    // TODO eliminate if not used
+    // TODO eliminate if not used by Analysis
     /** Merged stop buffers polygon built lazily by getMergedBuffers() */
     private transient Geometry mergedBuffers;
 
@@ -317,10 +311,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         return !this.feedInfo.isEmpty();
     }
 
-    public FeedInfo getFeedInfo () {
-        return this.hasFeedInfo() ? this.feedInfo.values().iterator().next() : null;
-    }
-
     /**
      * For the given trip ID, fetch all the stop times in order of increasing stop_sequence.
      * This is an efficient iteration over a tree map.
@@ -332,40 +322,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                         Fun.t2(trip_id, Fun.HI)
                 );
         return tripStopTimes.values();
-    }
-
-    /**
-     * TODO remove if unused
-     * TODO rename getStopSpatialIndex to make it clear what the index contains.
-     */
-    public STRtree getSpatialIndex () {
-        if (this.spatialIndex == null) {
-            synchronized (this) {
-                if (this.spatialIndex == null) {
-                    // build spatial index
-                    STRtree stopIndex = new STRtree();
-                    for(Stop stop : this.stops.values()) {
-                        try {
-                            if (Double.isNaN(stop.stop_lat) || Double.isNaN(stop.stop_lon)) {
-                                continue;
-                            }
-                            Coordinate stopCoord = new Coordinate(stop.stop_lat, stop.stop_lon);
-                            stopIndex.insert(new Envelope(stopCoord), stop);
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-
-                    }
-                    try {
-                        stopIndex.build();
-                        this.spatialIndex = stopIndex;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-        return this.spatialIndex;
     }
 
     /** Get the shape for the given shape ID */
