@@ -40,6 +40,10 @@ import java.util.zip.ZipFile;
 public abstract class BaseGTFSCache<T extends Closeable> {
     private static final Logger LOG = LoggerFactory.getLogger(BaseGTFSCache.class);
 
+    private static final String GTFS_EXTENSION = ".zip";
+    private static final String DB_EXTENSION = ".db";
+    private static final String DBP_EXTENSION = ".db.p";
+
     public final String bucket;
     public final String bucketFolder;
 
@@ -80,7 +84,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
                 // TODO elaborate on why we would want to do this.
                 if (bucket != null) {
                     String id = removalNotification.getKey();
-                    String[] extensions = {".zip"}; // used to include ".db", ".db.p" as well.  See #119
+                    String[] extensions = {GTFS_EXTENSION}; // used to include ".db", ".db.p" as well.  See #119
                     // delete local cache files (including zip) when feed removed from cache
                     for (String type : extensions) {
                         File file = new File(cacheDir, id + type);
@@ -133,8 +137,8 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
         // read the feed
         String cleanTempId = cleanId(tempId);
-        File dbFile = new File(cacheDir, cleanTempId + ".v2.db");
-        File movedFeedFile = new File(cacheDir, cleanTempId + ".zip");
+        File dbFile = new File(cacheDir, cleanTempId + DB_EXTENSION);
+        File movedFeedFile = new File(cacheDir, cleanTempId + GTFS_EXTENSION);
 
         // don't copy if we're loading from a locally-cached feed
         if (!feedFile.equals(movedFeedFile)) Files.copy(feedFile, movedFeedFile);
@@ -152,12 +156,12 @@ public abstract class BaseGTFSCache<T extends Closeable> {
 
         if (idGenerator != null) {
             // This mess seems to be necessary to get around Windows file locks.
-            File originalZip = new File(cacheDir, cleanTempId + ".zip");
-            File originalDb = new File(cacheDir, cleanTempId + ".v2.db");
-            File originalDbp = new File(cacheDir, cleanTempId + ".v2.db.p");
-            Files.copy(originalZip,(new File(cacheDir, cleanId + ".zip")));
-            Files.copy(originalDb,(new File(cacheDir, cleanId + ".v2.db")));
-            Files.copy(originalDbp,(new File(cacheDir, cleanId + ".v2.db.p")));
+            File originalZip = new File(cacheDir, cleanTempId + GTFS_EXTENSION);
+            File originalDb = new File(cacheDir, cleanTempId + DB_EXTENSION);
+            File originalDbp = new File(cacheDir, cleanTempId + DBP_EXTENSION);
+            Files.copy(originalZip,(new File(cacheDir, cleanId + GTFS_EXTENSION)));
+            Files.copy(originalDb,(new File(cacheDir, cleanId + DB_EXTENSION)));
+            Files.copy(originalDbp,(new File(cacheDir, cleanId + DBP_EXTENSION)));
             originalZip.delete();
             originalDb.delete();
             originalDbp.delete();
@@ -170,21 +174,21 @@ public abstract class BaseGTFSCache<T extends Closeable> {
             String key = bucketFolder != null ? String.join("/", bucketFolder, cleanId) : cleanId;
 
             // write zip to s3 if not already there
-            if (!s3.doesObjectExist(bucket, key + ".zip")) {
-                s3.putObject(bucket, key + ".zip", feedFile);
+            if (!s3.doesObjectExist(bucket, key + GTFS_EXTENSION)) {
+                s3.putObject(bucket, key + GTFS_EXTENSION, feedFile);
                 LOG.info("Zip file written.");
             }
             else {
                 LOG.info("Zip file already exists on s3.");
             }
-            s3.putObject(bucket, key + ".v2.db", new File(cacheDir, cleanId + ".v2.db"));
-            s3.putObject(bucket, key + ".v2.db.p", new File(cacheDir, cleanId + ".v2.db.p"));
+            s3.putObject(bucket, key + DB_EXTENSION, new File(cacheDir, cleanId + DB_EXTENSION));
+            s3.putObject(bucket, key + DBP_EXTENSION, new File(cacheDir, cleanId + DBP_EXTENSION));
             LOG.info("db files written.");
         }
 
         // Reopen the feed database so we can return it ready for use to the caller. Note that we do not add the feed
         // to the cache here. The returned feed is inserted automatically into the LoadingCache by the CacheLoader.
-        feed = new GTFSFeed(new File(cacheDir, cleanId + ".v2.db").getAbsolutePath());
+        feed = new GTFSFeed(new File(cacheDir, cleanId + DB_EXTENSION).getAbsolutePath());
         T processed = processFeed(feed);
         return processed;
     }
@@ -215,7 +219,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         // see if we have it cached locally
         String id = cleanId(originalId);
         String key = bucketFolder != null ? String.join("/", bucketFolder, id) : id;
-        File dbFile = new File(cacheDir, id + ".v2.db");
+        File dbFile = new File(cacheDir, id + DB_EXTENSION);
         GTFSFeed feed;
         if (dbFile.exists()) {
             LOG.info("Processed GTFS was found cached locally");
@@ -233,16 +237,16 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         if (bucket != null) {
             try {
                 LOG.info("Attempting to download cached GTFS MapDB.");
-                S3Object db = s3.getObject(bucket, key + ".v2.db");
+                S3Object db = s3.getObject(bucket, key + DB_EXTENSION);
                 InputStream is = db.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(dbFile);
                 ByteStreams.copy(is, fos);
                 is.close();
                 fos.close();
 
-                S3Object dbp = s3.getObject(bucket, key + ".v2.db.p");
+                S3Object dbp = s3.getObject(bucket, key + DBP_EXTENSION);
                 InputStream isp = dbp.getObjectContent();
-                FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + ".v2.db.p"));
+                FileOutputStream fosp = new FileOutputStream(new File(cacheDir, id + DBP_EXTENSION));
                 ByteStreams.copy(isp, fosp);
                 isp.close();
                 fosp.close();
@@ -260,7 +264,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         }
         // if we fell through to here, getting the mapdb was unsuccessful
         // grab GTFS from S3 if it is not found locally
-        File feedFile = new File(cacheDir, id + ".zip");
+        File feedFile = new File(cacheDir, id + GTFS_EXTENSION);
         if (feedFile.exists()) {
             LOG.info("Loading feed from local cache directory...");
         }
@@ -268,7 +272,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
         if (!feedFile.exists() && bucket != null) {
             LOG.info("Feed not found locally, downloading from S3.");
             try {
-                S3Object gtfs = s3.getObject(bucket, key + ".zip");
+                S3Object gtfs = s3.getObject(bucket, key + GTFS_EXTENSION);
                 InputStream is = gtfs.getObjectContent();
                 FileOutputStream fos = new FileOutputStream(feedFile);
                 ByteStreams.copy(is, fos);
@@ -299,7 +303,7 @@ public abstract class BaseGTFSCache<T extends Closeable> {
     public abstract GTFSFeed getFeed (String id);
 
     private void deleteLocalDBFiles(String id) {
-        String[] extensions = {".v2.db", ".v2.db.p"};
+        String[] extensions = {DB_EXTENSION, DBP_EXTENSION};
         // delete ONLY local cache db files
         for (String type : extensions) {
             File file = new File(cacheDir, id + type);
