@@ -20,7 +20,6 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.FeedStats;
-import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Iterables;
@@ -75,7 +74,6 @@ import java.util.SortedSet;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
@@ -289,39 +287,6 @@ public class GTFSFeed implements Cloneable, Closeable {
             LOG.error("Error saving GTFS: {}", e.getMessage());
             throw new RuntimeException(e);
         }
-    }
-//    public void validate (EventBus eventBus, Validator... validators) {
-//        if (eventBus == null) {
-//
-//        }
-//        for (Validator validator : validators) {
-//            validator.getClass().getSimpleName();
-//            validator.validate(this, false);
-//        }
-//    }
-    public void validate (boolean repair, Validator... validators) {
-        long startValidation = System.currentTimeMillis();
-        for (Validator validator : validators) {
-            try {
-                long startValidator = System.currentTimeMillis();
-//                validator.validate(this, repair);
-                long endValidator = System.currentTimeMillis();
-                long diff = endValidator - startValidator;
-                LOG.info("{} finished in {} milliseconds.", validator.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(diff));
-            } catch (Exception e) {
-                LOG.error("Could not run {} validator.", validator.getClass().getSimpleName());
-//                LOG.error(e.toString());
-                e.printStackTrace();
-            }
-        }
-        long endValidation = System.nanoTime();
-        long total = endValidation - startValidation;
-        LOG.info("{} validators completed in {} milliseconds.", validators.length, TimeUnit.NANOSECONDS.toMillis(total));
-    }
-
-    // validate function call that should explicitly list each validator to run on GTFSFeed
-    public void validate () {
-/////////////////
     }
 
     public FeedStats calculateStats() {
