@@ -66,7 +66,6 @@ public class Calendar extends Entity implements Serializable {
                 // TODO check valid dates
                 c.start_date = getIntField("start_date", true, 18500101, 22001231);
                 c.end_date = getIntField("end_date", true, 18500101, 22001231);
-                c.feed = feed;
                 c.feed_id = feed.feedId;
                 service.calendar = c;
             }

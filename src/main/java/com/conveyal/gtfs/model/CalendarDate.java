@@ -4,10 +4,10 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DuplicateKeyError;
 import com.google.common.base.Function;
 import com.google.common.collect.Iterators;
-import java.time.LocalDate;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -58,7 +58,6 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
                 cd.service_id = service_id;
                 cd.date = date;
                 cd.exception_type = getIntField("exception_type", true, 1, 2);
-                cd.feed = feed;
                 service.calendar_dates.put(date, cd);
             }
         }

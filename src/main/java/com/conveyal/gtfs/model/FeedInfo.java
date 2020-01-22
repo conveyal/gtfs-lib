@@ -3,10 +3,9 @@ package com.conveyal.gtfs.model;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.GeneralError;
 
-import java.time.LocalDate;
-
 import java.io.IOException;
 import java.net.URL;
+import java.time.LocalDate;
 import java.util.Iterator;
 
 public class FeedInfo extends Entity implements Cloneable {
@@ -50,7 +49,6 @@ public class FeedInfo extends Entity implements Cloneable {
             fi.feed_start_date = getDateField("feed_start_date", false);
             fi.feed_end_date = getDateField("feed_end_date", false);
             fi.feed_version = getStringField("feed_version", false);
-            fi.feed = feed;
             if (feed.feedInfo.isEmpty()) {
                 feed.feedInfo.put("NONE", fi);
                 feed.feedId = fi.feed_id;

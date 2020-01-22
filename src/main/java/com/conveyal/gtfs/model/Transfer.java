@@ -48,7 +48,6 @@ public class Transfer extends Entity {
             getRefField("from_trip_id", false, feed.trips);
             getRefField("to_trip_id", false, feed.trips);
 
-            tr.feed = feed;
             feed.transfers.put(Long.toString(row), tr);
         }
 

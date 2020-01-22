@@ -16,7 +16,6 @@ import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.util.Deduplicator;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
-
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,9 +49,6 @@ public abstract class Entity implements Serializable {
     private static final long serialVersionUID = -3576441868127607448L;
     public static final int INT_MISSING = Integer.MIN_VALUE;
     public int sourceFileLine;
-
-    /* The feed from which this entity was loaded. */
-    transient GTFSFeed feed;
 
     /**
      * This method should be overridden by each Entity subtype to return the proper key field for that subtype.
