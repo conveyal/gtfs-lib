@@ -2,13 +2,12 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.google.common.base.Joiner;
-import org.locationtech.jts.geom.LineString;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static com.conveyal.gtfs.util.GeometryUtil.toLegacyLineString;
 
 /**
  * Created by landon on 2/5/16.
@@ -24,7 +23,10 @@ public class Pattern implements Serializable {
     public List<String> associatedTrips;
     // TODO: add set of shapes
 //    public Set<String> associatedShapes;
-    public LineString geometry;
+
+    // This is the only place in the library we are still using the old JTS package name. These objects are
+    // serialized into MapDB files. We want to read and write MapDB files that old workers can understand.
+    public com.vividsolutions.jts.geom.LineString geometry;
     public String name;
     public String route_id;
     public static Joiner joiner = Joiner.on("-").skipNulls();
@@ -47,7 +49,7 @@ public class Pattern implements Serializable {
         Trip trip;
 
         trip = feed.trips.get(trip_id);
-        this.geometry = feed.getTripGeometry(trip.trip_id);
+        this.geometry = toLegacyLineString(feed.getTripGeometry(trip.trip_id));
 
         // patterns are now on one and only one route
         this.route_id = trip.route_id;
@@ -70,4 +72,5 @@ public class Pattern implements Serializable {
         // TODO: Implement segmentFraction using JTS to segment out LineString by stops.
 
     }
+
 }

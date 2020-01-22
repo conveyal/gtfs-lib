@@ -34,7 +34,6 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
@@ -84,6 +83,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import static com.conveyal.gtfs.util.GeometryUtil.geometryFactory;
 import static com.conveyal.gtfs.util.Util.human;
 
 /**
@@ -148,9 +148,6 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Merged stop buffers polygon built lazily by getMergedBuffers() */
     private transient Geometry mergedBuffers;
-
-    /** A JTS geometry factory to produce LineString geometries. */
-    private static final GeometryFactory gf = new GeometryFactory();
 
     /* Map routes to associated trip patterns. */
     // TODO: Hash Multimapping in guava (might need dependency).
@@ -700,7 +697,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 Double lon = stop.stop_lon;
                 coordinates.add(new Coordinate(lon, lat));
             }
-            ls = gf.createLineString(coordinates.toCoordinateArray());
+            ls = geometryFactory.createLineString(coordinates.toCoordinateArray());
         }
         // set ls equal to null if there is only one stopTime to avoid an exception when creating linestring
         else{
@@ -836,11 +833,11 @@ public class GTFSFeed implements Cloneable, Closeable {
                     if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
                         continue;
                     }
-                    Point stopPoint = gf.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
+                    Point stopPoint = geometryFactory.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
                     Polygon stopBuffer = (Polygon) stopPoint.buffer(.01);
                     polygons.add(stopBuffer);
                 }
-                Geometry multiGeometry = gf.buildGeometry(polygons);
+                Geometry multiGeometry = geometryFactory.buildGeometry(polygons);
                 this.mergedBuffers = multiGeometry.union();
                 if (polygons.size() > 100) {
                     this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);
@@ -857,7 +854,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                         stop -> new Coordinate(stop.stop_lon, stop.stop_lat)
                 ).collect(Collectors.toList());
                 Coordinate[] coords = coordinates.toArray(new Coordinate[coordinates.size()]);
-                ConvexHull convexHull = new ConvexHull(coords, gf);
+                ConvexHull convexHull = new ConvexHull(coords, geometryFactory);
                 this.convexHull = (Polygon) convexHull.getConvexHull();
             }
         }

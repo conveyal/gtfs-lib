@@ -1,17 +1,14 @@
 package com.conveyal.gtfs.util;
 
 import com.conveyal.gtfs.model.Stop;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.apache.commons.math3.util.FastMath;
+import org.locationtech.jts.geom.Coordinate;
 
 /**
  * The methods and classes in this package should eventually be part of a shared Conveyal library.
  */
 public abstract class Util {
-
-    public static GeometryFactory geometryFactory = new GeometryFactory();
 
     public static final double METERS_PER_DEGREE_LATITUDE = 111111.111;
 
