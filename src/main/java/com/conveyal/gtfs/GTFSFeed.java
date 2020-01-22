@@ -1,20 +1,45 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.GTFSError;
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.validator.*;
-import com.conveyal.gtfs.validator.Validator;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Fare;
+import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.FeedInfo;
+import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.model.Shape;
+import com.conveyal.gtfs.model.ShapePoint;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.stats.FeedStats;
+import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.validator.service.GeoUtils;
-import com.google.common.collect.*;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
+import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.ExecutionError;
+import org.geotools.referencing.GeodeticCalculator;
 import org.locationtech.jts.algorithm.ConvexHull;
-import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateList;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
-import org.geotools.referencing.GeodeticCalculator;
 import org.mapdb.BTreeMap;
 import org.mapdb.Bind;
 import org.mapdb.DB;
@@ -35,7 +60,19 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Set;
+import java.util.SortedSet;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
@@ -927,6 +964,9 @@ public class GTFSFeed implements Cloneable, Closeable {
         services = db.getTreeMap("services");
         shape_points = db.getTreeMap("shape_points");
 
+        // Note that the feedId and checksum fields are manually read in and out of entries in the MapDB, rather than
+        // the class fields themselves being of type Atomic.String and Atomic.Long. This avoids any locking and
+        // MapDB retrieval overhead for these fields which are used very frequently.
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();
 
