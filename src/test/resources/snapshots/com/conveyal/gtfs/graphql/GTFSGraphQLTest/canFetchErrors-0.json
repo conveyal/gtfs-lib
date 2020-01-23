@@ -3,9 +3,14 @@
     "feed" : {
       "error_counts" : [ {
         "count" : 1,
-        "message" : "This stop is not referenced by any trips.",
+        "message" : "No service_ids were active on a date within the range of dates with defined service.",
         "priority" : "MEDIUM",
-        "type" : "STOP_UNUSED"
+        "type" : "DATE_NO_SERVICE"
+      }, {
+        "count" : 1,
+        "message" : "All travel times in the feed are rounded to the minute, which may cause unexpected results in routing applications where travel times are zero.",
+        "priority" : "LOW",
+        "type" : "FEED_TRAVEL_TIMES_ROUNDED"
       }, {
         "count" : 1,
         "message" : "A required field was missing or empty in a particular row.",
@@ -13,19 +18,14 @@
         "type" : "MISSING_FIELD"
       }, {
         "count" : 1,
-        "message" : "No service_ids were active on a date within the range of dates with defined service.",
-        "priority" : "MEDIUM",
-        "type" : "DATE_NO_SERVICE"
-      }, {
-        "count" : 1,
         "message" : "The long name of a route should complement the short name, not include it.",
         "priority" : "LOW",
         "type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME"
       }, {
         "count" : 1,
-        "message" : "All travel times in the feed are rounded to the minute, which may cause unexpected results in routing applications where travel times are zero.",
-        "priority" : "LOW",
-        "type" : "FEED_TRAVEL_TIMES_ROUNDED"
+        "message" : "This stop is not referenced by any trips.",
+        "priority" : "MEDIUM",
+        "type" : "STOP_UNUSED"
       } ],
       "errors" : [ {
         "bad_value" : "agency_url",
