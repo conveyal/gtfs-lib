@@ -2,6 +2,7 @@ package com.conveyal.gtfs.graphql.fetchers;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.graphql.GTFSGraphQL;
+import com.conveyal.gtfs.validator.model.Priority;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import org.apache.commons.dbutils.DbUtils;
@@ -61,11 +62,13 @@ public class ErrorCountFetcher implements DataFetcher {
         public NewGTFSErrorType type;
         public int count;
         public String message;
+        public Priority priority;
 
         public ErrorCount(NewGTFSErrorType errorType, int count) {
             this.type = errorType;
             this.count = count;
             this.message = errorType.englishMessage;
+            this.priority = errorType.priority;
         }
     }
 
