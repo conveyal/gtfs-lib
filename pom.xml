@@ -234,6 +234,13 @@
     	<artifactId>guava</artifactId>
     	<version>28.1-jre</version>
     </dependency>
+    <!-- Caffeine is a Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use
+         the async capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's. -->
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+      <version>2.8.1</version>
+    </dependency>
     <!-- Hamcrest is an assertion library used in a few tests. -->
     <dependency>
       <groupId>org.hamcrest</groupId>
