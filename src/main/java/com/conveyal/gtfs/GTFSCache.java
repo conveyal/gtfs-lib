@@ -24,11 +24,7 @@ import java.util.function.Function;
 import java.util.zip.ZipFile;
 
 /**
- * Fast cache for GTFS feeds stored on S3.
- *
- * Depending on the application, we often want to store additional data with a GTFS feed. Thus, you can subclass this
- * class and override the processFeed function with a function that transforms a GTFSFeed object into whatever objects
- * you need. If you just need to store GTFSFeeds without any additional data, see the GTFSCache class.
+ * Cache for MapDBs holding GTFS feed, mirrored to S3.
  *
  * This uses a soft-values cache because (it is assumed) you do not want to have multiple copies of the same GTFS feed
  * in memory. When you are storing a reference to the original GTFS feed, it may be retrieved from the cache and held
@@ -36,9 +32,9 @@ import java.util.zip.ZipFile;
  * we would connect another GTFSFeed to the same mapdb, which seems like an ideal way to corrupt mapdbs. SoftReferences
  * prevent this as it cannot be removed if it is referenced elsewhere.
  */
-public class BaseGTFSCache {
+public class GTFSCache {
 
-    private static final Logger LOG = LoggerFactory.getLogger(BaseGTFSCache.class);
+    private static final Logger LOG = LoggerFactory.getLogger(GTFSCache.class);
 
     private static final String GTFS_EXTENSION = ".zip";
     private static final String DB_EXTENSION = ".db";
@@ -52,7 +48,7 @@ public class BaseGTFSCache {
     private LoadingCache<String, GTFSFeed> cache;
 
     /** If bucket is null, work offline and do not use S3 */
-    public BaseGTFSCache(String awsRegion, String bucket, File cacheDir) {
+    public GTFSCache (String awsRegion, String bucket, File cacheDir) {
         if (awsRegion == null || bucket == null) LOG.info("No AWS region/bucket specified; GTFS Cache will run locally");
         else {
             s3 = AmazonS3ClientBuilder.standard().withRegion(awsRegion).build();
