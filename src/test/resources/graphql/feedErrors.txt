@@ -11,7 +11,6 @@ query($namespace: String) {
       bad_value
       error_id
       error_type
-      error_type_priority
       entity_id
       entity_sequence
       entity_type

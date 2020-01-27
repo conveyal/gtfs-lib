@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.graphql;
 
 import com.conveyal.gtfs.graphql.fetchers.ErrorCountFetcher;
-import com.conveyal.gtfs.graphql.fetchers.ErrorPriorityFetcher;
 import com.conveyal.gtfs.graphql.fetchers.FeedFetcher;
 import com.conveyal.gtfs.graphql.fetchers.JDBCFetcher;
 import com.conveyal.gtfs.graphql.fetchers.MapFetcher;
@@ -422,7 +421,6 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("entity_id"))
             .field(MapFetcher.field("entity_sequence", GraphQLInt))
             .field(MapFetcher.field("bad_value"))
-            .field(ErrorPriorityFetcher.field("error_type_priority"))
             .build();
 
     /**

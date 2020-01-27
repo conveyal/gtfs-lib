@@ -34,7 +34,6 @@
         "entity_type" : "Agency",
         "error_id" : 0,
         "error_type" : "MISSING_FIELD",
-        "error_type_priority" : "MEDIUM",
         "line_number" : 2
       }, {
         "bad_value" : "route 1",
@@ -43,7 +42,6 @@
         "entity_type" : "Route",
         "error_id" : 1,
         "error_type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME",
-        "error_type_priority" : "LOW",
         "line_number" : 2
       }, {
         "bad_value" : null,
@@ -52,7 +50,6 @@
         "entity_type" : null,
         "error_id" : 2,
         "error_type" : "FEED_TRAVEL_TIMES_ROUNDED",
-        "error_type_priority" : "LOW",
         "line_number" : null
       }, {
         "bad_value" : "1234567",
@@ -61,7 +58,6 @@
         "entity_type" : "Stop",
         "error_id" : 3,
         "error_type" : "STOP_UNUSED",
-        "error_type_priority" : "MEDIUM",
         "line_number" : 6
       }, {
         "bad_value" : "20170916",
@@ -70,7 +66,6 @@
         "entity_type" : null,
         "error_id" : 4,
         "error_type" : "DATE_NO_SERVICE",
-        "error_type_priority" : "MEDIUM",
         "line_number" : null
       } ],
       "feed_version" : "1.0"
