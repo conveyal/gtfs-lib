@@ -1,6 +1,12 @@
 query($namespace: String) {
   feed(namespace: $namespace) {
     feed_version
+    error_counts {
+      count
+      message
+      priority
+      type
+    }
     errors {
       bad_value
       error_id
