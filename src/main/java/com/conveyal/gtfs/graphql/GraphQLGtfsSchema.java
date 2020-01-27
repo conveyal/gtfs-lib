@@ -457,6 +457,7 @@ public class GraphQLGtfsSchema {
             .field(string("type"))
             .field(intt("count"))
             .field(string("message"))
+            .field(string("priority"))
             .build();
 
     /**
