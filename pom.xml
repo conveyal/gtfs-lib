@@ -313,5 +313,12 @@
       <artifactId>commons-math3</artifactId>
       <version>3.0</version>
     </dependency>
+    <!-- Embedded key-value store with Java Object binding -->
+    <dependency>
+      <groupId>com.sleepycat</groupId>
+      <artifactId>je</artifactId>
+      <version>18.3.12</version>
+    </dependency>
+
   </dependencies>
 </project>

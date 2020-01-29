@@ -25,6 +25,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.util.concurrent.ExecutionError;
+import com.sleepycat.persist.PrimaryIndex;
 import org.geotools.referencing.GeodeticCalculator;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
@@ -62,6 +63,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.NavigableSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
@@ -215,27 +217,27 @@ public class GTFSFeed implements Cloneable, Closeable {
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
         // we're done loading them
         Map<String, Service> serviceTable = new HashMap<>();
-        new Calendar.Loader(this, serviceTable).loadTable(zip);
-        new CalendarDate.Loader(this, serviceTable).loadTable(zip);
+//        new Calendar.Loader(this, serviceTable).loadTable(zip);
+//        new CalendarDate.Loader(this, serviceTable).loadTable(zip);
         this.services.putAll(serviceTable);
         // Joined Services have been persisted to MapDB. Release in-memory HashMap for garbage collection.
         serviceTable = null;
 
         // Joining is performed for Fares as for Services above.
         Map<String, Fare> fares = new HashMap<>();
-        new FareAttribute.Loader(this, fares).loadTable(zip);
-        new FareRule.Loader(this, fares).loadTable(zip);
+//        new FareAttribute.Loader(this, fares).loadTable(zip);
+//        new FareRule.Loader(this, fares).loadTable(zip);
         this.fares.putAll(fares);
         // Joined Fares have been persisted to MapDB. Release in-memory HashMap for garbage collection.
         fares = null;
 
         // Comment out the StopTime and/or ShapePoint loaders for quick testing on large feeds.
-        new Route.Loader(this).loadTable(zip);
-        new ShapePoint.Loader(this).loadTable(zip);
+//        new Route.Loader(this).loadTable(zip);
+//        new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
-        new Transfer.Loader(this).loadTable(zip);
+//        new Transfer.Loader(this).loadTable(zip);
         new Trip.Loader(this).loadTable(zip);
-        new Frequency.Loader(this).loadTable(zip);
+//        new Frequency.Loader(this).loadTable(zip);
         new StopTime.Loader(this).loadTable(zip);
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
@@ -847,6 +849,6 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         patternForTrip = db.getTreeMap("patternForTrip");
 
-        errors = db.getTreeSet("errors");
+        errors = new TreeSet<>();
     }
 }

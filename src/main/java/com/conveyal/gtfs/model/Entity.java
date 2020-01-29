@@ -16,6 +16,7 @@ import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.util.Deduplicator;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
+import com.sleepycat.persist.model.Persistent;
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,7 +44,7 @@ import java.util.zip.ZipOutputStream;
  * An abstract base class that represents a row in a GTFS table, e.g. a Stop, Trip, or Agency.
  * One concrete subclass is defined for each table in a GTFS feed.
  */
-// TODO K is the key type for this table
+@Persistent
 public abstract class Entity implements Serializable {
 
     private static final long serialVersionUID = -3576441868127607448L;

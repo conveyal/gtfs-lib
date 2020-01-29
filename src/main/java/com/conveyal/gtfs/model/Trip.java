@@ -1,15 +1,19 @@
 package com.conveyal.gtfs.model;
 
+import com.conveyal.gtfs.BerkeleyFeed;
 import com.conveyal.gtfs.GTFSFeed;
+import com.sleepycat.persist.model.PrimaryKey;
 
 import java.io.IOException;
 import java.util.Iterator;
 
+@com.sleepycat.persist.model.Entity
 public class Trip extends Entity {
 
     private static final long serialVersionUID = -4869384750974542712L;
     public String route_id;
     public String service_id;
+    @PrimaryKey
     public String trip_id;
     public String trip_headsign;
     public String trip_short_name;
@@ -56,6 +60,38 @@ public class Trip extends Entity {
             // TODO confirm existence of shape ID
             getRefField("service_id", true, feed.services);
             getRefField("route_id", true, feed.routes);
+        }
+
+    }
+
+    public static class BLoader extends BerkeleyLoader<Trip> {
+
+        public BLoader(BerkeleyFeed feed) {
+            super(feed, "trips");
+        }
+
+        @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
+        public void loadOneRow() throws IOException {
+            Trip t = new Trip();
+
+            t.sourceFileLine  = row + 1; // offset line number by 1 to account for 0-based row index
+            t.route_id        = getStringField("route_id", true);
+            t.service_id      = getStringField("service_id", true);
+            t.trip_id         = getStringField("trip_id", true);
+            t.trip_headsign   = getStringField("trip_headsign", false);
+            t.trip_short_name = getStringField("trip_short_name", false);
+            t.direction_id    = getIntField("direction_id", false, 0, 1);
+            t.block_id        = getStringField("block_id", false); // make a blocks multimap
+            t.shape_id        = getStringField("shape_id", false);
+            t.bikes_allowed   = getIntField("bikes_allowed", false, 0, 2);
+            t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
+            // t.feed_id = feed.feedId;
+            feed.trips.put(t);
         }
 
     }

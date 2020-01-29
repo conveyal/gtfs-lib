@@ -1,6 +1,9 @@
 package com.conveyal.gtfs.model;
 
+import com.conveyal.gtfs.BerkeleyFeed;
 import com.conveyal.gtfs.GTFSFeed;
+import com.sleepycat.persist.model.KeyField;
+import com.sleepycat.persist.model.PrimaryKey;
 import org.mapdb.Fun;
 
 import java.io.IOException;
@@ -11,9 +14,13 @@ import java.util.Iterator;
  * Represents a GTFS StopTime. Note that once created and saved in a feed, stop times are by convention immutable
  * because they are in a MapDB.
  */
+@com.sleepycat.persist.model.Entity
 public class StopTime extends Entity implements Cloneable, Serializable {
 
     private static final long serialVersionUID = -8883780047901081832L;
+    @PrimaryKey
+    public TripAndSequence tripAndSequence;
+
     /* StopTime cannot directly reference Trips or Stops because they would be serialized into the MapDB. */
     public String trip_id;
     public int    arrival_time = INT_MISSING;
@@ -64,6 +71,48 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
             feed.stop_times.put(new Fun.Tuple2(st.trip_id, st.stop_sequence), st);
+
+            /*
+              Check referential integrity without storing references. StopTime cannot directly reference Trips or
+              Stops because they would be serialized into the MapDB.
+             */
+            getRefField("trip_id", true, feed.trips);
+            getRefField("stop_id", true, feed.stops);
+        }
+
+    }
+
+    // BLoader should maybe subclass loader and just override a new store() method, separate from object construction.
+    public static class BLoader extends BerkeleyLoader<StopTime> {
+
+        public BLoader(BerkeleyFeed feed) {
+            super(feed, "stop_times");
+        }
+
+        @Override
+        protected boolean isRequired() {
+            return true;
+        }
+
+        @Override
+        public void loadOneRow() throws IOException {
+            StopTime st = new StopTime();
+            st.sourceFileLine = row + 1; // offset line number by 1 to account for 0-based row index
+            st.trip_id        = getStringField("trip_id", true);
+            // TODO: arrival_time and departure time are not required, but if one is present the other should be
+            // also, if this is the first or last stop, they are both required
+            st.arrival_time   = getTimeField("arrival_time", false);
+            st.departure_time = getTimeField("departure_time", false);
+            st.stop_id        = getStringField("stop_id", true);
+            st.stop_sequence  = getIntField("stop_sequence", true, 0, Integer.MAX_VALUE);
+            st.stop_headsign  = getStringField("stop_headsign", false);
+            st.pickup_type    = getIntField("pickup_type", false, 0, 3); // TODO add ranges as parameters
+            st.drop_off_type  = getIntField("drop_off_type", false, 0, 3);
+            st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
+            st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
+
+            st.tripAndSequence = new TripAndSequence(st.trip_id, st.stop_sequence);
+            feed.stopTimes.put(st);
 
             /*
               Check referential integrity without storing references. StopTime cannot directly reference Trips or
