@@ -107,7 +107,7 @@
       }, {
         "id" : 6,
         "location_type" : 0,
-        "parent_station" : "123",
+        "parent_station" : "bad_stop_id_ref",
         "patterns" : [ ],
         "routes" : [ ],
         "stop_code" : null,
