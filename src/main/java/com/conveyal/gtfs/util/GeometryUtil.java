@@ -21,13 +21,17 @@ public class GeometryUtil {
      * @return an old-style JTS LineString object from the com.vividsolutions package.
      */
     public static com.vividsolutions.jts.geom.LineString toLegacyLineString (LineString lineString) {
-        com.vividsolutions.jts.geom.Coordinate[] legacyCoordinates =
-                new com.vividsolutions.jts.geom.Coordinate[lineString.getNumPoints()];
-        for (int c = 0; c < lineString.getNumPoints(); c++) {
-            Coordinate coordinate = lineString.getCoordinateN(c);
-            legacyCoordinates[c] = new com.vividsolutions.jts.geom.Coordinate(coordinate.x, coordinate.y);
+        if (lineString == null) {
+            return null;
+        } else {
+            com.vividsolutions.jts.geom.Coordinate[] legacyCoordinates =
+                    new com.vividsolutions.jts.geom.Coordinate[lineString.getNumPoints()];
+            for (int c = 0; c < lineString.getNumPoints(); c++) {
+                Coordinate coordinate = lineString.getCoordinateN(c);
+                legacyCoordinates[c] = new com.vividsolutions.jts.geom.Coordinate(coordinate.x, coordinate.y);
+            }
+            return legacyGeometryFactory.createLineString(legacyCoordinates);
         }
-        return legacyGeometryFactory.createLineString(legacyCoordinates);
     }
 
 }
