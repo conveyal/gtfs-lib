@@ -30,6 +30,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Arrays;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -95,9 +96,9 @@ public abstract class GTFS {
     /**
      * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
      */
-    public static ValidationResult validate (String feedId, DataSource dataSource, FeedValidator... additionalValidators) {
+    public static ValidationResult validate (String feedId, DataSource dataSource, Class<? extends FeedValidator>... additionalValidators) {
         Feed feed = new Feed(dataSource, feedId);
-        ValidationResult result = feed.validate(additionalValidators);
+        ValidationResult result = feed.validate(Arrays.asList(additionalValidators));
         return result;
     }
 
