@@ -74,7 +74,7 @@ public class Feed {
      * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
      * That would also avoid having to reconnect the error storage to the DB.
      */
-    public ValidationResult validate () {
+    public ValidationResult validate (FeedValidator... additionalValidators) {
         long validationStartTime = System.currentTimeMillis();
         // Create an empty validation result that will have its fields populated by certain validators.
         ValidationResult validationResult = new ValidationResult();
@@ -89,13 +89,16 @@ public class Feed {
         int errorCountBeforeValidation = errorStorage.getErrorCount();
 
         List<FeedValidator> feedValidators = Arrays.asList(
-                new MisplacedStopValidator(this, errorStorage, validationResult),
-                new DuplicateStopsValidator(this, errorStorage),
-                new FaresValidator(this, errorStorage),
-                new FrequencyValidator(this, errorStorage),
-                new TimeZoneValidator(this, errorStorage),
-                new NewTripTimesValidator(this, errorStorage),
-                new NamesValidator(this, errorStorage));
+            new MisplacedStopValidator(this, errorStorage, validationResult),
+            new DuplicateStopsValidator(this, errorStorage),
+            new FaresValidator(this, errorStorage),
+            new FrequencyValidator(this, errorStorage),
+            new TimeZoneValidator(this, errorStorage),
+            new NewTripTimesValidator(this, errorStorage),
+            new NamesValidator(this, errorStorage)
+        );
+        // Add any additional validators specified in args.
+        feedValidators.addAll(Arrays.asList(additionalValidators));
 
         for (FeedValidator feedValidator : feedValidators) {
             String validatorName = feedValidator.getClass().getSimpleName();
