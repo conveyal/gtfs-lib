@@ -7,7 +7,7 @@ import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.conveyal.gtfs.validator.FeedValidator;
+import com.conveyal.gtfs.validator.CustomValidatorRequest;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
@@ -29,8 +29,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -94,15 +92,18 @@ public abstract class GTFS {
     }
 
     /**
-     * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
+     * Shorthand for calling validate() without custom validators.
      */
     public static ValidationResult validate (String feedId, DataSource dataSource) {
-        return validate(feedId, dataSource, new ArrayList<>());
+        return validate(feedId, dataSource, null);
     }
 
-    public static ValidationResult validate (String feedId, DataSource dataSource, List<Class<? extends FeedValidator>> additionalValidatorClasses) {
+    /**
+     * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
+     */
+    public static ValidationResult validate (String feedId, DataSource dataSource, CustomValidatorRequest customValidatorReq) {
         Feed feed = new Feed(dataSource, feedId);
-        ValidationResult result = feed.validate(additionalValidatorClasses);
+        ValidationResult result = feed.validate(customValidatorReq);
         return result;
     }
 

@@ -9,11 +9,13 @@ import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.validator.CustomValidatorRequest;
 import com.conveyal.gtfs.validator.FeedValidator;
 import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
@@ -316,18 +318,39 @@ public class GTFSTest {
 
         PersistenceExpectation[] expectations = PersistenceExpectation.list();
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
-                new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
-                new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
-                new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
-                new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
-                new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
-                new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
-                new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED) // Not related, not worrying about this one.
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED) // Not related, not worrying about this one.
         );
         assertThat(
-                "Long-field-value test passes",
-                runIntegrationTestOnFolder("fake-agency-mtc-long-fields", nullValue(), expectations, errorExpectations),
-                equalTo(true)
+            "Long-field-value test passes",
+            runIntegrationTestOnFolder("fake-agency-mtc-long-fields", nullValue(), expectations, errorExpectations,
+                (feed, errorSource) -> {
+                    return Lists.newArrayList(new MTCValidator(feed, errorSource));
+                }),
+            equalTo(true)
+        );
+    }
+
+    /**
+     * Shorthand for next method.
+     */
+    private boolean runIntegrationTestOnFolder(
+        String folderName,
+        Matcher<Object> fatalExceptionExpectation,
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations
+    ) {
+        return runIntegrationTestOnFolder(
+            folderName,
+            fatalExceptionExpectation,
+            persistenceExpectations,
+            errorExpectations,
+            null
         );
     }
 
@@ -339,7 +362,8 @@ public class GTFSTest {
         String folderName,
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
-        ErrorExpectation[] errorExpectations
+        ErrorExpectation[] errorExpectations,
+        CustomValidatorRequest customValidatorReq
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -350,7 +374,25 @@ public class GTFSTest {
             e.printStackTrace();
             return false;
         }
-        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations);
+        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations, customValidatorReq);
+    }
+
+    /**
+     * Shorthand for next method.
+     */
+    private boolean runIntegrationTestOnZipFile(
+        String zipFileName,
+        Matcher<Object> fatalExceptionExpectation,
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations
+    ) {
+        return runIntegrationTestOnZipFile(
+            zipFileName,
+            fatalExceptionExpectation,
+            persistenceExpectations,
+            errorExpectations,
+            null
+        );
     }
 
     /**
@@ -366,7 +408,8 @@ public class GTFSTest {
         String zipFileName,
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
-        ErrorExpectation[] errorExpectations
+        ErrorExpectation[] errorExpectations,
+        CustomValidatorRequest customValidatorReq
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
@@ -383,7 +426,7 @@ public class GTFSTest {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, extraValidatorClasses);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidatorReq);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;

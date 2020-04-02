@@ -12,14 +12,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
 
@@ -74,11 +70,18 @@ public class Feed {
     }
 
     /**
+     * Shorthand for calling validate() without custom validators.
+     */
+    public ValidationResult validate () {
+        return validate(null);
+    }
+
+    /**
      * TODO check whether validation has already occurred, overwrite results.
      * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
      * That would also avoid having to reconnect the error storage to the DB.
      */
-    public ValidationResult validate (List<Class<? extends FeedValidator>> additionalValidatorClasses) {
+    public ValidationResult validate (CustomValidatorRequest customValidatorReq) {
         long validationStartTime = System.currentTimeMillis();
         // Create an empty validation result that will have its fields populated by certain validators.
         ValidationResult validationResult = new ValidationResult();
@@ -92,7 +95,7 @@ public class Feed {
         }
         int errorCountBeforeValidation = errorStorage.getErrorCount();
 
-        ArrayList<FeedValidator> feedValidators = Lists.newArrayList(
+        List<FeedValidator> feedValidators = Lists.newArrayList(
             new MisplacedStopValidator(this, errorStorage, validationResult),
             new DuplicateStopsValidator(this, errorStorage),
             new FaresValidator(this, errorStorage),
@@ -102,16 +105,10 @@ public class Feed {
             new NamesValidator(this, errorStorage)
         );
 
-        // Instantiate any additional validators and
-        // add them to the list of validators.
-        for (Class<? extends FeedValidator> validatorClass : additionalValidatorClasses) {
-            try {
-                Constructor<? extends FeedValidator> constructor = validatorClass.getConstructor(Feed.class, SQLErrorStorage.class);
-                feedValidators.add(constructor.newInstance(this, errorStorage));
-            } catch (NoSuchMethodException | InstantiationException | IllegalAccessException | InvocationTargetException e) {
-                e.printStackTrace();
-            }
-        }
+        // Add additional validators, if any provided.
+        List<FeedValidator> customValidators = null;
+        if (customValidatorReq != null) customValidators = customValidatorReq.getCustomValidators(this, errorStorage);
+        if (customValidators != null) feedValidators.addAll(customValidators);
 
         for (FeedValidator feedValidator : feedValidators) {
             String validatorName = feedValidator.getClass().getSimpleName();
