@@ -16,6 +16,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
 
@@ -70,18 +71,11 @@ public class Feed {
     }
 
     /**
-     * Shorthand for calling validate() without custom validators.
-     */
-    public ValidationResult validate () {
-        return validate(null);
-    }
-
-    /**
      * TODO check whether validation has already occurred, overwrite results.
      * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
      * That would also avoid having to reconnect the error storage to the DB.
      */
-    public ValidationResult validate (CustomValidatorRequest customValidatorReq) {
+    public ValidationResult validate (BiFunction<Feed, SQLErrorStorage, FeedValidator>... additionalValidators) {
         long validationStartTime = System.currentTimeMillis();
         // Create an empty validation result that will have its fields populated by certain validators.
         ValidationResult validationResult = new ValidationResult();
@@ -106,9 +100,10 @@ public class Feed {
         );
 
         // Add additional validators, if any provided.
-        List<FeedValidator> customValidators = null;
-        if (customValidatorReq != null) customValidators = customValidatorReq.getCustomValidators(this, errorStorage);
-        if (customValidators != null) feedValidators.addAll(customValidators);
+        for (BiFunction<Feed, SQLErrorStorage, FeedValidator> validator : additionalValidators) {
+            FeedValidator v = validator.apply(this, errorStorage);
+            feedValidators.add(v);
+        }
 
         for (FeedValidator feedValidator : feedValidators) {
             String validatorName = feedValidator.getClass().getSimpleName();
