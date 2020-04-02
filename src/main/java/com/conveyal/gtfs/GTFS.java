@@ -92,18 +92,11 @@ public abstract class GTFS {
     }
 
     /**
-     * Shorthand for calling validate() without custom validators.
-     */
-    public static ValidationResult validate (String feedId, DataSource dataSource) {
-        return validate(feedId, dataSource, null);
-    }
-
-    /**
      * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
      */
-    public static ValidationResult validate (String feedId, DataSource dataSource, CustomValidatorRequest customValidatorReq) {
+    public static ValidationResult validate (String feedId, DataSource dataSource, CustomValidatorRequest... customValidatorRequests) {
         Feed feed = new Feed(dataSource, feedId);
-        ValidationResult result = feed.validate(customValidatorReq);
+        ValidationResult result = feed.validate(customValidatorRequests);
         return result;
     }
 

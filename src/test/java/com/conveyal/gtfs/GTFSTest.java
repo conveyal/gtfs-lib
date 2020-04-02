@@ -328,10 +328,13 @@ public class GTFSTest {
         );
         assertThat(
             "Long-field-value test passes",
-            runIntegrationTestOnFolder("fake-agency-mtc-long-fields", nullValue(), expectations, errorExpectations,
-                (feed, errorSource) -> {
-                    return Lists.newArrayList(new MTCValidator(feed, errorSource));
-                }),
+            runIntegrationTestOnFolder(
+                "fake-agency-mtc-long-fields",
+                nullValue(),
+                expectations,
+                errorExpectations,
+                MTCValidator::new
+            ),
             equalTo(true)
         );
     }
@@ -363,7 +366,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        CustomValidatorRequest customValidatorReq
+        CustomValidatorRequest customValidatorRequest
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -374,7 +377,13 @@ public class GTFSTest {
             e.printStackTrace();
             return false;
         }
-        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations, customValidatorReq);
+        return runIntegrationTestOnZipFile(
+            zipFileName,
+            fatalExceptionExpectation,
+            persistenceExpectations,
+            errorExpectations,
+            customValidatorRequest
+        );
     }
 
     /**
@@ -409,7 +418,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        CustomValidatorRequest customValidatorReq
+        CustomValidatorRequest customValidatorRequest
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
@@ -426,7 +435,7 @@ public class GTFSTest {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidatorReq);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidatorRequest);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
