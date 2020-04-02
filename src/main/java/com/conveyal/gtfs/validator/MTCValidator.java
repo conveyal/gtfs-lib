@@ -7,10 +7,9 @@ import com.conveyal.gtfs.model.*;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.FIELD_VALUE_TOO_LONG;
 
 /**
- * MTCValidator validates a GTFS feed according to the following
- * additional guidelines by 511 MTC:
- * - Field values should not exceed some number of characters.
- * Those requirements can be found by searching for the word 'character'.
+ * MTCValidator checks in a GTFS feed that the length of certain field values
+ * do not exceed the 511 MTC guidelines. (TODO: add guidelines URL.)
+ * To refer to specific limits, search the guidelines for the word 'character'.
  */
 public class MTCValidator extends FeedValidator {
 
@@ -38,10 +37,18 @@ public class MTCValidator extends FeedValidator {
         // TODO: Handle calendar_attributes.txt?
     }
 
-    boolean fieldLengthShouldNotExceed(Entity entity, Object objValue, int maxLength) {
+    /**
+     * Checks that the length of a string (or Object.toString()) does not exceed a length.
+     * Reports an error if the length is exceeded.
+     * @param entity The containing GTFS entity (for error reporting purposes).
+     * @param objValue The value to check.
+     * @param maxLength The length to check, should be positive or zero.
+     * @return true if the length of objValue.toString() is maxLength or less or if objValue is null; false otherwise.
+     */
+    public boolean fieldLengthShouldNotExceed(Entity entity, Object objValue, int maxLength) {
         String value = objValue != null ? objValue.toString() : "";
         if (value.length() > maxLength) {
-            if (errorStorage != null) registerError(entity, FIELD_VALUE_TOO_LONG, value);
+            if (errorStorage != null) registerError(entity, FIELD_VALUE_TOO_LONG, "[over " + maxLength + " characters] " + value);
             return false;
         }
         return true;
