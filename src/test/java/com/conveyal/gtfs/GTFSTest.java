@@ -2,6 +2,8 @@ package com.conveyal.gtfs;
 
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.storage.ErrorExpectation;
@@ -9,7 +11,6 @@ import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.conveyal.gtfs.validator.CustomValidatorRequest;
 import com.conveyal.gtfs.validator.FeedValidator;
 import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
@@ -42,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -58,8 +60,6 @@ public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     private static final String JDBC_URL = "jdbc:postgresql://localhost";
     private static final Logger LOG = LoggerFactory.getLogger(GTFSTest.class);
-
-    private List<Class<? extends FeedValidator>> extraValidatorClasses = new ArrayList<>();
 
     // setup a stream to capture the output from the program
     @Before
@@ -314,8 +314,6 @@ public class GTFSTest {
      */
     @Test
     public void canLoadFeedWithLongFieldValues () {
-        extraValidatorClasses.add(MTCValidator.class);
-
         PersistenceExpectation[] expectations = PersistenceExpectation.list();
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
@@ -363,7 +361,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        CustomValidatorRequest customValidatorReq
+        BiFunction<Feed, SQLErrorStorage, List<FeedValidator>> customValidatorRequest
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -374,7 +372,7 @@ public class GTFSTest {
             e.printStackTrace();
             return false;
         }
-        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations, customValidatorReq);
+        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations, customValidatorRequest);
     }
 
     /**
@@ -409,7 +407,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        CustomValidatorRequest customValidatorReq
+        BiFunction<Feed, SQLErrorStorage, List<FeedValidator>> customValidatorRequest
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
@@ -426,7 +424,7 @@ public class GTFSTest {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidatorReq);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidatorRequest);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;

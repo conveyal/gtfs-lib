@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
@@ -7,7 +8,7 @@ import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.conveyal.gtfs.validator.CustomValidatorRequest;
+import com.conveyal.gtfs.validator.FeedValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
@@ -29,6 +30,8 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
+import java.util.function.BiFunction;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -101,10 +104,9 @@ public abstract class GTFS {
     /**
      * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
      */
-    public static ValidationResult validate (String feedId, DataSource dataSource, CustomValidatorRequest customValidatorReq) {
+    public static ValidationResult validate (String feedId, DataSource dataSource, BiFunction<Feed, SQLErrorStorage, List<FeedValidator>> customValidatorRequest) {
         Feed feed = new Feed(dataSource, feedId);
-        ValidationResult result = feed.validate(customValidatorReq);
-        return result;
+        return feed.validate(customValidatorRequest);
     }
 
     /**
