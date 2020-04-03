@@ -2,6 +2,8 @@ package com.conveyal.gtfs;
 
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.storage.ErrorExpectation;
@@ -41,6 +43,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -57,8 +60,6 @@ public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
     private static final String JDBC_URL = "jdbc:postgresql://localhost";
     private static final Logger LOG = LoggerFactory.getLogger(GTFSTest.class);
-
-    private List<Class<? extends FeedValidator>> extraValidatorClasses = new ArrayList<>();
 
     // setup a stream to capture the output from the program
     @Before
@@ -313,8 +314,6 @@ public class GTFSTest {
      */
     @Test
     public void canLoadFeedWithLongFieldValues () {
-        extraValidatorClasses.add(MTCValidator.class);
-
         PersistenceExpectation[] expectations = PersistenceExpectation.list();
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
