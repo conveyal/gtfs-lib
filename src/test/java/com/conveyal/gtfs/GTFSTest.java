@@ -2,8 +2,6 @@ package com.conveyal.gtfs;
 
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
-import com.conveyal.gtfs.error.SQLErrorStorage;
-import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.storage.ErrorExpectation;
@@ -12,7 +10,6 @@ import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.validator.FeedValidatorCreator;
-import com.conveyal.gtfs.validator.FeedValidator;
 import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
@@ -38,12 +35,9 @@ import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.List;
-import java.util.function.BiFunction;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
