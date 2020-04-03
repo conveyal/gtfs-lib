@@ -15,6 +15,7 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
@@ -74,32 +75,36 @@ public class Feed {
      * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
      * That would also avoid having to reconnect the error storage to the DB.
      */
-    public ValidationResult validate (CustomValidatorRequest... customValidatorRequests) {
+    public ValidationResult validate (ValidatorCreator... additionalValidators) {
         long validationStartTime = System.currentTimeMillis();
         // Create an empty validation result that will have its fields populated by certain validators.
         ValidationResult validationResult = new ValidationResult();
         // Error tables should already be present from the initial load.
         // Reconnect to the existing error tables.
-        SQLErrorStorage errorStorage = null;
+        SQLErrorStorage errorStorage;
         try {
             errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
         } catch (SQLException | InvalidNamespaceException ex) {
             throw new StorageException(ex);
         }
         int errorCountBeforeValidation = errorStorage.getErrorCount();
-
-        List<FeedValidator> feedValidators = Lists.newArrayList(
-            new MisplacedStopValidator(this, errorStorage, validationResult),
-            new DuplicateStopsValidator(this, errorStorage),
-            new FaresValidator(this, errorStorage),
-            new FrequencyValidator(this, errorStorage),
-            new TimeZoneValidator(this, errorStorage),
-            new NewTripTimesValidator(this, errorStorage),
-            new NamesValidator(this, errorStorage)
+        List<FeedValidator> feedValidators = new ArrayList<>();
+        // Add misplaced stop validator (takes non-standard args for constructor).
+        feedValidators.add(new MisplacedStopValidator(this, errorStorage, validationResult));
+        // For other validators, add to list of validators to create.
+        List<ValidatorCreator> validatorsToCreate = Lists.newArrayList(
+            DuplicateStopsValidator::new,
+            FaresValidator::new,
+            FrequencyValidator::new,
+            TimeZoneValidator::new,
+            NewTripTimesValidator::new,
+            NamesValidator::new
         );
-
-        for (CustomValidatorRequest request : customValidatorRequests) {
-            FeedValidator validator = request.apply(this, errorStorage);
+        // Add any additional validators specified in this method's args.
+        validatorsToCreate.addAll(Arrays.asList(additionalValidators));
+        // Instantiate validators and add to list of feed validators to run.
+        for (ValidatorCreator creator : validatorsToCreate) {
+            FeedValidator validator = creator.createValidator(this, errorStorage);
             feedValidators.add(validator);
         }
 

@@ -9,13 +9,12 @@ import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.conveyal.gtfs.validator.CustomValidatorRequest;
+import com.conveyal.gtfs.validator.ValidatorCreator;
 import com.conveyal.gtfs.validator.FeedValidator;
 import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
 import org.apache.commons.io.FileUtils;
@@ -366,7 +365,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        CustomValidatorRequest customValidatorRequest
+        ValidatorCreator customValidator
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -382,7 +381,7 @@ public class GTFSTest {
             fatalExceptionExpectation,
             persistenceExpectations,
             errorExpectations,
-            customValidatorRequest
+            customValidator
         );
     }
 
@@ -418,7 +417,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        CustomValidatorRequest customValidatorRequest
+        ValidatorCreator customValidator
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
@@ -435,7 +434,7 @@ public class GTFSTest {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidatorRequest);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidator);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
