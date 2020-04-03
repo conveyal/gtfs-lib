@@ -95,7 +95,7 @@ public class Feed {
         );
         // Create additional validators specified in this method's args and add to list of feed validators to run.
         for (FeedValidatorCreator creator : additionalValidators) {
-            feedValidators.add(creator.create(this, errorStorage));
+            if (creator != null) feedValidators.add(creator.create(this, errorStorage));
         }
 
         for (FeedValidator feedValidator : feedValidators) {
