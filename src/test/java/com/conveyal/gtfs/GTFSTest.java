@@ -332,24 +332,6 @@ public class GTFSTest {
     }
 
     /**
-     * Shorthand for next method.
-     */
-    private boolean runIntegrationTestOnFolder(
-        String folderName,
-        Matcher<Object> fatalExceptionExpectation,
-        PersistenceExpectation[] persistenceExpectations,
-        ErrorExpectation[] errorExpectations
-    ) {
-        return runIntegrationTestOnFolder(
-            folderName,
-            fatalExceptionExpectation,
-            persistenceExpectations,
-            errorExpectations,
-            null
-        );
-    }
-
-    /**
      * A helper method that will zip a specified folder in test/main/resources and call
      * {@link #runIntegrationTestOnZipFile} on that file.
      */
@@ -358,7 +340,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        FeedValidatorCreator customValidator
+        FeedValidatorCreator... customValidators
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -374,25 +356,7 @@ public class GTFSTest {
             fatalExceptionExpectation,
             persistenceExpectations,
             errorExpectations,
-            customValidator
-        );
-    }
-
-    /**
-     * Shorthand for next method.
-     */
-    private boolean runIntegrationTestOnZipFile(
-        String zipFileName,
-        Matcher<Object> fatalExceptionExpectation,
-        PersistenceExpectation[] persistenceExpectations,
-        ErrorExpectation[] errorExpectations
-    ) {
-        return runIntegrationTestOnZipFile(
-            zipFileName,
-            fatalExceptionExpectation,
-            persistenceExpectations,
-            errorExpectations,
-            null
+            customValidators
         );
     }
 
@@ -410,7 +374,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        FeedValidatorCreator customValidator
+        FeedValidatorCreator... customValidators
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
@@ -427,7 +391,7 @@ public class GTFSTest {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidator);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidators);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
