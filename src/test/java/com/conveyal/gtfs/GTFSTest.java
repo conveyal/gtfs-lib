@@ -9,7 +9,7 @@ import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.conveyal.gtfs.validator.ValidatorCreator;
+import com.conveyal.gtfs.validator.FeedValidatorCreator;
 import com.conveyal.gtfs.validator.FeedValidator;
 import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
@@ -365,7 +365,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        ValidatorCreator customValidator
+        FeedValidatorCreator customValidator
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -417,7 +417,7 @@ public class GTFSTest {
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        ValidatorCreator customValidator
+        FeedValidatorCreator customValidator
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);

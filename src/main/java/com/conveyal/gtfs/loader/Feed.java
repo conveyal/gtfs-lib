@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.*;
@@ -14,8 +13,6 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
@@ -33,20 +30,15 @@ public class Feed {
     // This may be the empty string if the feed is stored in the root ("public") schema.
     public final String tablePrefix;
 
-    public final TableReader<Agency> agencies;
-    public final TableReader<Calendar> calendars;
-    public final TableReader<CalendarDate> calendarDates;
+    public final TableReader<Agency>        agencies;
+    public final TableReader<Calendar>      calendars;
+    public final TableReader<CalendarDate>  calendarDates;
     public final TableReader<FareAttribute> fareAttributes;
-    public final TableReader<Frequency> frequencies;
-    public final TableReader<Route> routes;
-    public final TableReader<Stop>  stops;
-    public final TableReader<Trip>  trips;
-//    public final TableReader<ShapePoint> shapePoints;
-    public final TableReader<StopTime>   stopTimes;
-
-    /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
-    // TODO remove this and use only NewGTFSErrors in Validators, loaded into a JDBC table
-    public final List<GTFSError> errors = new ArrayList<>();
+    public final TableReader<Frequency>     frequencies;
+    public final TableReader<Route>         routes;
+    public final TableReader<Stop>          stops;
+    public final TableReader<Trip>          trips;
+    public final TableReader<StopTime>      stopTimes;
 
     /**
      * Create a feed that reads tables over a JDBC connection. The connection should already be set to the right
@@ -66,16 +58,19 @@ public class Feed {
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
         stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
         trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
-//        shapePoints = new JDBCTableReader(Table.SHAPES, dataSource, tablePrefix, EntityPopulator.SHAPE_POINT);
         stopTimes = new JDBCTableReader(Table.STOP_TIMES, dataSource, tablePrefix, EntityPopulator.STOP_TIME);
     }
 
     /**
+     * Run the standard validation checks for this feed and store the validation errors in the database. Optionally,
+     * takes one or more {@link FeedValidatorCreator} in the form of lambda method refs (e.g., {@code MTCValidator::new}),
+     * which this method will instantiate and run after the standard validation checks have been completed.
+     * 
      * TODO check whether validation has already occurred, overwrite results.
-     * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded data is 100% visible.
-     * That would also avoid having to reconnect the error storage to the DB.
+     * TODO allow validation within feed loading process, so the same connection can be used, and we're certain loaded
+     *   data is 100% visible. That would also avoid having to reconnect the error storage to the DB.
      */
-    public ValidationResult validate (ValidatorCreator... additionalValidators) {
+    public ValidationResult validate (FeedValidatorCreator... additionalValidators) {
         long validationStartTime = System.currentTimeMillis();
         // Create an empty validation result that will have its fields populated by certain validators.
         ValidationResult validationResult = new ValidationResult();
@@ -88,24 +83,19 @@ public class Feed {
             throw new StorageException(ex);
         }
         int errorCountBeforeValidation = errorStorage.getErrorCount();
-        List<FeedValidator> feedValidators = new ArrayList<>();
-        // Add misplaced stop validator (takes non-standard args for constructor).
-        feedValidators.add(new MisplacedStopValidator(this, errorStorage, validationResult));
-        // For other validators, add to list of validators to create.
-        List<ValidatorCreator> validatorsToCreate = Lists.newArrayList(
-            DuplicateStopsValidator::new,
-            FaresValidator::new,
-            FrequencyValidator::new,
-            TimeZoneValidator::new,
-            NewTripTimesValidator::new,
-            NamesValidator::new
+        // Create list of standard validators to run on every feed.
+        List<FeedValidator> feedValidators = Lists.newArrayList(
+            new MisplacedStopValidator(this, errorStorage, validationResult),
+            new DuplicateStopsValidator(this, errorStorage),
+            new FaresValidator(this, errorStorage),
+            new FrequencyValidator(this, errorStorage),
+            new TimeZoneValidator(this, errorStorage),
+            new NewTripTimesValidator(this, errorStorage),
+            new NamesValidator(this, errorStorage)
         );
-        // Add any additional validators specified in this method's args.
-        validatorsToCreate.addAll(Arrays.asList(additionalValidators));
-        // Instantiate validators and add to list of feed validators to run.
-        for (ValidatorCreator creator : validatorsToCreate) {
-            FeedValidator validator = creator.createValidator(this, errorStorage);
-            feedValidators.add(validator);
+        // Create additional validators specified in this method's args and add to list of feed validators to run.
+        for (FeedValidatorCreator creator : additionalValidators) {
+            feedValidators.add(creator.create(this, errorStorage));
         }
 
         for (FeedValidator feedValidator : feedValidators) {
@@ -113,7 +103,6 @@ public class Feed {
             try {
                 LOG.info("Running {}.", validatorName);
                 int errorCountBefore = errorStorage.getErrorCount();
-                // todo why not just pass the feed and errorstorage in here?
                 feedValidator.validate();
                 LOG.info("{} found {} errors.", validatorName, errorStorage.getErrorCount() - errorCountBefore);
             } catch (Exception e) {
