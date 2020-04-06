@@ -11,6 +11,7 @@ public enum NewGTFSErrorType {
     URL_FORMAT(Priority.MEDIUM, "URL format should be <scheme>://<authority><path>?<query>#<fragment>"),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),
     ILLEGAL_FIELD_VALUE(Priority.MEDIUM, "Fields may not contain tabs, carriage returns or new lines."),
+    // The error type below is an MTC-specific requirement.
     FIELD_VALUE_TOO_LONG(Priority.MEDIUM, "Field value has too many characters."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     FARE_TRANSFER_MISMATCH(Priority.MEDIUM, "A fare that does not permit transfers has a non-zero transfer duration."),

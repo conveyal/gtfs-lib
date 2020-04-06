@@ -4,12 +4,18 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.*;
 
+import java.net.URL;
+
 import static com.conveyal.gtfs.error.NewGTFSErrorType.FIELD_VALUE_TOO_LONG;
 
 /**
- * MTCValidator checks in a GTFS feed that the length of certain field values
- * do not exceed the 511 MTC guidelines. (TODO: add guidelines URL.)
- * To refer to specific limits, search the guidelines for the word 'character'.
+ * MTCValidator runs a set of custom validation checks for GTFS feeds managed by MTC in Data Tools.
+ * The checks consist of validating field lengths at this time per the 511 MTC guidelines at
+ * https://github.com/ibi-group/datatools-ui/files/4438625/511.Transit_Data.Guidelines_V2.0_3-27-2020.pdf.
+ * For specific field lengths, search the guidelines for the word 'character'.
+ *
+ * Note that other validations, e.g. on GTFS+ files, are discussed in
+ * https://github.com/ibi-group/datatools-ui/issues/544.
  */
 public class MTCValidator extends FeedValidator {
 
@@ -33,24 +39,25 @@ public class MTCValidator extends FeedValidator {
             fieldLengthShouldNotExceed(trip, trip.trip_headsign, 120);
             fieldLengthShouldNotExceed(trip, trip.trip_short_name, 50);
         }
-
-        // TODO: Handle calendar_attributes.txt?
     }
 
     /**
-     * Checks that the length of a string (or Object.toString()) does not exceed a length.
+     * Checks that the length of a string does not exceed a certain length.
      * Reports an error if the length is exceeded.
      * @param entity The containing GTFS entity (for error reporting purposes).
-     * @param objValue The value to check.
+     * @param value The String value to check.
      * @param maxLength The length to check, should be positive or zero.
-     * @return true if the length of objValue.toString() is maxLength or less or if objValue is null; false otherwise.
+     * @return true if value.length() is maxLength or less, or if value is null; false otherwise.
      */
-    public boolean fieldLengthShouldNotExceed(Entity entity, Object objValue, int maxLength) {
-        String value = objValue != null ? objValue.toString() : "";
+    public boolean fieldLengthShouldNotExceed(Entity entity, String value, int maxLength) {
         if (value.length() > maxLength) {
             if (errorStorage != null) registerError(entity, FIELD_VALUE_TOO_LONG, "[over " + maxLength + " characters] " + value);
             return false;
         }
         return true;
+    }
+
+    public boolean fieldLengthShouldNotExceed(Entity entity, URL url, int maxLength) {
+        return fieldLengthShouldNotExceed(entity, url != null ? url.toString() : "", maxLength);
     }
 }
