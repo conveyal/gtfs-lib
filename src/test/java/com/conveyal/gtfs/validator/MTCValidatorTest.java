@@ -12,8 +12,8 @@ public class MTCValidatorTest {
     @Test
     public void fieldlLengthShouldNotExceed() {
         MTCValidator validator = new MTCValidator(null, null);
-        assertThat(validator.fieldLengthShouldNotExceed(null, "abcdefghijklmnopqrstwxyz1234567890", 20), is(false));
-        assertThat(validator.fieldLengthShouldNotExceed(null, "abcdef", 20), is(true));
+        assertThat(validator.validateFieldLength(null, "abcdefghijklmnopqrstwxyz1234567890", 20), is(false));
+        assertThat(validator.validateFieldLength(null, "abcdef", 20), is(true));
     }
 
     @Test
@@ -22,7 +22,7 @@ public class MTCValidatorTest {
 
         // You can also pass objects, in that case it will use toString().
         URL url = new URL("http://www.gtfs.org");
-        assertThat(validator.fieldLengthShouldNotExceed(null, url, 10), is(false));
-        assertThat(validator.fieldLengthShouldNotExceed(null, url, 30), is(true));
+        assertThat(validator.validateFieldLength(null, url, 10), is(false));
+        assertThat(validator.validateFieldLength(null, url, 30), is(true));
     }
 }
