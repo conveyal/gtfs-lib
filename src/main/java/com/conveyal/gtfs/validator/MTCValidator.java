@@ -26,18 +26,18 @@ public class MTCValidator extends FeedValidator {
     @Override
     public void validate() {
         for (Agency agency : feed.agencies) {
-            fieldLengthShouldNotExceed(agency, agency.agency_id, 50);
-            fieldLengthShouldNotExceed(agency, agency.agency_name, 50);
-            fieldLengthShouldNotExceed(agency, agency.agency_url, 500);
+            validateFieldLength(agency, agency.agency_id, 50);
+            validateFieldLength(agency, agency.agency_name, 50);
+            validateFieldLength(agency, agency.agency_url, 500);
         }
 
         for (Stop stop : feed.stops) {
-            fieldLengthShouldNotExceed(stop, stop.stop_name, 100);
+            validateFieldLength(stop, stop.stop_name, 100);
         }
 
         for (Trip trip : feed.trips) {
-            fieldLengthShouldNotExceed(trip, trip.trip_headsign, 120);
-            fieldLengthShouldNotExceed(trip, trip.trip_short_name, 50);
+            validateFieldLength(trip, trip.trip_headsign, 120);
+            validateFieldLength(trip, trip.trip_short_name, 50);
         }
     }
 
@@ -49,15 +49,15 @@ public class MTCValidator extends FeedValidator {
      * @param maxLength The length to check, should be positive or zero.
      * @return true if value.length() is maxLength or less, or if value is null; false otherwise.
      */
-    public boolean fieldLengthShouldNotExceed(Entity entity, String value, int maxLength) {
-        if (value.length() > maxLength) {
+    public boolean validateFieldLength(Entity entity, String value, int maxLength) {
+        if (value != null && value.length() > maxLength) {
             if (errorStorage != null) registerError(entity, FIELD_VALUE_TOO_LONG, "[over " + maxLength + " characters] " + value);
             return false;
         }
         return true;
     }
 
-    public boolean fieldLengthShouldNotExceed(Entity entity, URL url, int maxLength) {
-        return fieldLengthShouldNotExceed(entity, url != null ? url.toString() : "", maxLength);
+    public boolean validateFieldLength(Entity entity, URL url, int maxLength) {
+        return validateFieldLength(entity, url != null ? url.toString() : "", maxLength);
     }
 }
