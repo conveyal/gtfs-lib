@@ -7,6 +7,7 @@ import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.validator.FeedValidatorCreator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
@@ -15,10 +16,10 @@ import org.apache.commons.dbcp2.ConnectionFactory;
 import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
 import org.apache.commons.dbcp2.PoolableConnectionFactory;
 import org.apache.commons.dbcp2.PoolingDataSource;
-import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
@@ -28,7 +29,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -94,9 +94,9 @@ public abstract class GTFS {
     /**
      * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
      */
-    public static ValidationResult validate (String feedId, DataSource dataSource) {
+    public static ValidationResult validate (String feedId, DataSource dataSource, FeedValidatorCreator... additionalValidators) {
         Feed feed = new Feed(dataSource, feedId);
-        ValidationResult result = feed.validate();
+        ValidationResult result = feed.validate(additionalValidators);
         return result;
     }
 

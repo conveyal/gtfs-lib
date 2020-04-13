@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.util.json;
 
-import com.conveyal.geojson.GeoJsonModule;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -36,7 +35,11 @@ public class JsonManager<T> {
         this.theClass = theClass;
         this.mapper = new ObjectMapper();
         mapper.addMixInAnnotations(Rectangle2D.class, Rectangle2DMixIn.class);
-        mapper.registerModule(new GeoJsonModule());
+        // FIXME: This codepath is deprecated in versions greater than 4.x, but there may be a need to replace this
+        //  Jackson module to handle GeoJSON. If there is an issue with de-/serialization, might be good to take a look
+        //  at https://github.com/opentripplanner/OpenTripPlanner/blob/08e034faace255e092211290220af3f60e553fa7/pom.xml#L515-L532
+        //  (dependency used in OTP).
+//        mapper.registerModule(new GeoJsonModule());
         SimpleModule deser = new SimpleModule();
 
         deser.addDeserializer(LocalDate.class, new JacksonSerializers.LocalDateStringDeserializer());
