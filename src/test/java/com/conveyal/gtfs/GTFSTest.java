@@ -9,12 +9,13 @@ import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.validator.FeedValidatorCreator;
+import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
-import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.hamcrest.Matcher;
@@ -32,16 +33,11 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
 import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Date;
 import java.util.Iterator;
-import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -306,6 +302,34 @@ public class GTFSTest {
         );
     }
 
+    /**
+     * Tests that a GTFS feed with long field values generates corresponding
+     * validation errors per MTC guidelines.
+     */
+    @Test
+    public void canLoadFeedWithLongFieldValues () {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list();
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED) // Not related, not worrying about this one.
+        );
+        assertThat(
+            "Long-field-value test passes",
+            runIntegrationTestOnFolder(
+                "fake-agency-mtc-long-fields",
+                nullValue(),
+                expectations,
+                errorExpectations,
+                MTCValidator::new
+            ),
+            equalTo(true)
+        );
+    }
 
     /**
      * A helper method that will zip a specified folder in test/main/resources and call
@@ -315,7 +339,8 @@ public class GTFSTest {
         String folderName,
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
-        ErrorExpectation[] errorExpectations
+        ErrorExpectation[] errorExpectations,
+        FeedValidatorCreator... customValidators
     ) {
         LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
@@ -326,7 +351,13 @@ public class GTFSTest {
             e.printStackTrace();
             return false;
         }
-        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations, errorExpectations);
+        return runIntegrationTestOnZipFile(
+            zipFileName,
+            fatalExceptionExpectation,
+            persistenceExpectations,
+            errorExpectations,
+            customValidators
+        );
     }
 
     /**
@@ -342,7 +373,8 @@ public class GTFSTest {
         String zipFileName,
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
-        ErrorExpectation[] errorExpectations
+        ErrorExpectation[] errorExpectations,
+        FeedValidatorCreator... customValidators
     ) {
         String testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
@@ -359,7 +391,7 @@ public class GTFSTest {
             // load and validate feed
             LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource);
+            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource, customValidators);
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
