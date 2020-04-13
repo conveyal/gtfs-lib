@@ -39,6 +39,7 @@ public class GTFSMain {
 
         if(cmd.hasOption("validate")) {
             feed.validate();
+            // FIXME: See JsonManager.class for discussion about potential issues serializing GeoJSON.
             JsonManager<ValidationResult> json = new JsonManager(ValidationResult.class);
             ValidationResult result = new ValidationResult(arguments[0], feed);
             String resultString = json.writePretty(result);
