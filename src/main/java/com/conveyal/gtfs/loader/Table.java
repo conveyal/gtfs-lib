@@ -520,6 +520,9 @@ public class Table {
             // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
             InputStream bomInputStream = new BOMInputStream(zipInputStream);
             CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
+            // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
+            // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
+            csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
