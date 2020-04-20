@@ -141,6 +141,13 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            // The below "wrong number of fields" errors are for empty new lines
+            // found in the file.
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
