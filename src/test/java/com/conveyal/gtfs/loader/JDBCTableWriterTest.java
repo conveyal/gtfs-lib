@@ -84,7 +84,7 @@ public class JDBCTableWriterTest {
         connection.commit();
         LOG.info("feeds table created");
         // Create an empty snapshot to create a new namespace and all the tables
-        FeedLoadResult result = makeSnapshot(null, testDataSource);
+        FeedLoadResult result = makeSnapshot(null, testDataSource, false);
         testNamespace = result.uniqueIdentifier;
         // Create a service calendar and two stops, both of which are necessary to perform pattern and trip tests.
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
@@ -98,7 +98,7 @@ public class JDBCTableWriterTest {
         // validate feed to create additional tables
         validate(testGtfsGLNamespace, testDataSource);
         // load into editor via snapshot
-        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(testGtfsGLNamespace, testDataSource);
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(testGtfsGLNamespace, testDataSource, false);
         SnapshotResult snapshotResult = snapshotter.copyTables();
         testGtfsGLSnapshotNamespace = snapshotResult.uniqueIdentifier;
     }

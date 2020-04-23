@@ -266,9 +266,7 @@ public class GTFSTest {
                     new RecordExpectation("arrival_time", 25200, "07:00:00"),
                     new RecordExpectation("departure_time", 25200, "07:00:00"),
                     new RecordExpectation("stop_id", "4u6g"),
-                    // the string expectation for stop_sequence is different because of how stop_times are
-                    // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
-                    new RecordExpectation("stop_sequence", 1, "1", "0"),
+                    new RecordExpectation("stop_sequence", 1),
                     new RecordExpectation("pickup_type", 0),
                     new RecordExpectation("drop_off_type", 0),
                     new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
@@ -428,21 +426,20 @@ public class GTFSTest {
 
         // Verify that making a snapshot from an existing feed database, then exporting that snapshot to a GTFS zip file
         // works as expected
-        try {
-            LOG.info("copy GTFS from created namespace");
-            SnapshotResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
-            assertThatSnapshotIsErrorFree(copyResult);
-            LOG.info("export GTFS from copied namespace");
-            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
-            assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
-        } catch (IOException e) {
-            e.printStackTrace();
-            TestUtils.dropDB(testDBName);
-            return false;
-        } catch (AssertionError e) {
-            TestUtils.dropDB(testDBName);
-            throw e;
-        }
+        boolean snapshotIsOk = assertThatSnapshotIsSuccessful(namespace, dataSource, testDBName, persistenceExpectations, false);
+        if (!snapshotIsOk) return false;
+        // Also, verify that if we're normalizing stop_times#stop_sequence, the stop_sequence values conform with our
+        // expectations (zero-based, incrementing values).
+        PersistenceExpectation[] expectationsWithNormalizedStopTimesSequence =
+            updatePersistenceExpectationsWithNormalizedStopTimesSequence(persistenceExpectations);
+        boolean normalizedSnapshotIsOk = assertThatSnapshotIsSuccessful(
+            namespace,
+            dataSource,
+            testDBName,
+            expectationsWithNormalizedStopTimesSequence,
+            true
+        );
+        if (!normalizedSnapshotIsOk) return false;
 
         // Verify that deleting a feed works as expected.
         try (Connection connection = dataSource.getConnection()) {
@@ -519,6 +516,31 @@ public class GTFSTest {
             this.expected = expected;
             this.found = found;
         }
+    }
+
+    private boolean assertThatSnapshotIsSuccessful(
+        String namespace,
+        DataSource dataSource,
+        String testDBName,
+        PersistenceExpectation[] persistenceExpectations,
+        boolean normalizeStopTimes
+    ) {
+        try {
+            LOG.info("copy GTFS from created namespace");
+            SnapshotResult copyResult = GTFS.makeSnapshot(namespace, dataSource, normalizeStopTimes);
+            assertThatSnapshotIsErrorFree(copyResult);
+            LOG.info("export GTFS from copied namespace");
+            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
+        } catch (IOException e) {
+            e.printStackTrace();
+            TestUtils.dropDB(testDBName);
+            return false;
+        } catch (AssertionError e) {
+            TestUtils.dropDB(testDBName);
+            throw e;
+        }
+        return true;
     }
 
     /**
@@ -798,127 +820,152 @@ public class GTFSTest {
                 new RecordExpectation("agency_timezone", "America/Los_Angeles")
             }
         ),
-            new PersistenceExpectation(
-                "calendar",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("monday", 1),
-                    new RecordExpectation("tuesday", 1),
-                    new RecordExpectation("wednesday", 1),
-                    new RecordExpectation("thursday", 1),
-                    new RecordExpectation("friday", 1),
-                    new RecordExpectation("saturday", 1),
-                    new RecordExpectation("sunday", 1),
-                    new RecordExpectation("start_date", "20170915"),
-                    new RecordExpectation("end_date", "20170917")
-                }
-            ),
-            new PersistenceExpectation(
-                "calendar_dates",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("date", 20170916),
-                    new RecordExpectation("exception_type", 2)
-                }
-            ),
-            new PersistenceExpectation(
-                "fare_attributes",
-                new RecordExpectation[]{
-                    new RecordExpectation("fare_id", "route_based_fare"),
-                    new RecordExpectation("price", 1.23, 0),
-                    new RecordExpectation("currency_type", "USD")
-                }
-            ),
-            new PersistenceExpectation(
-                "fare_rules",
-                new RecordExpectation[]{
-                    new RecordExpectation("fare_id", "route_based_fare"),
-                    new RecordExpectation("route_id", "1")
-                }
-            ),
-            new PersistenceExpectation(
-                "feed_info",
-                new RecordExpectation[]{
-                    new RecordExpectation("feed_id", "fake_transit"),
-                    new RecordExpectation("feed_publisher_name", "Conveyal"),
-                    new RecordExpectation(
-                        "feed_publisher_url", "http://www.conveyal.com"
-                    ),
-                    new RecordExpectation("feed_lang", "en"),
-                    new RecordExpectation("feed_version", "1.0")
-                }
-            ),
-            new PersistenceExpectation(
-                "frequencies",
-                new RecordExpectation[]{
-                    new RecordExpectation("trip_id", "frequency-trip"),
-                    new RecordExpectation("start_time", 28800, "08:00:00"),
-                    new RecordExpectation("end_time", 32400, "09:00:00"),
-                    new RecordExpectation("headway_secs", 1800),
-                    new RecordExpectation("exact_times", 0)
-                }
-            ),
-            new PersistenceExpectation(
-                "routes",
-                new RecordExpectation[]{
-                    new RecordExpectation("agency_id", "1"),
-                    new RecordExpectation("route_id", "1"),
-                    new RecordExpectation("route_short_name", "1"),
-                    new RecordExpectation("route_long_name", "Route 1"),
-                    new RecordExpectation("route_type", 3),
-                    new RecordExpectation("route_color", "7CE6E7")
-                }
-            ),
-            new PersistenceExpectation(
-                "shapes",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
-                    ),
-                    new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
-                    new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
-                    new RecordExpectation("shape_pt_sequence", 2),
-                    new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
-                }
-            ),
-            new PersistenceExpectation(
-                "stop_times",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-                    ),
-                    new RecordExpectation("arrival_time", 25200, "07:00:00"),
-                    new RecordExpectation("departure_time", 25200, "07:00:00"),
-                    new RecordExpectation("stop_id", "4u6g"),
-                    // the string expectation for stop_sequence is different because of how stop_times are
-                    // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
-                    new RecordExpectation("stop_sequence", 1, "1", "0"),
-                    new RecordExpectation("pickup_type", 0),
-                    new RecordExpectation("drop_off_type", 0),
-                    new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
-                }
-            ),
-            new PersistenceExpectation(
-                "trips",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-                    ),
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("route_id", "1"),
-                    new RecordExpectation("direction_id", 0),
-                    new RecordExpectation(
-                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
-                    ),
-                    new RecordExpectation("bikes_allowed", 0),
-                    new RecordExpectation("wheelchair_accessible", 0)
-                }
-            )
+        new PersistenceExpectation(
+            "calendar",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                ),
+                new RecordExpectation("monday", 1),
+                new RecordExpectation("tuesday", 1),
+                new RecordExpectation("wednesday", 1),
+                new RecordExpectation("thursday", 1),
+                new RecordExpectation("friday", 1),
+                new RecordExpectation("saturday", 1),
+                new RecordExpectation("sunday", 1),
+                new RecordExpectation("start_date", "20170915"),
+                new RecordExpectation("end_date", "20170917")
+            }
+        ),
+        new PersistenceExpectation(
+            "calendar_dates",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                ),
+                new RecordExpectation("date", 20170916),
+                new RecordExpectation("exception_type", 2)
+            }
+        ),
+        new PersistenceExpectation(
+            "fare_attributes",
+            new RecordExpectation[]{
+                new RecordExpectation("fare_id", "route_based_fare"),
+                new RecordExpectation("price", 1.23, 0),
+                new RecordExpectation("currency_type", "USD")
+            }
+        ),
+        new PersistenceExpectation(
+            "fare_rules",
+            new RecordExpectation[]{
+                new RecordExpectation("fare_id", "route_based_fare"),
+                new RecordExpectation("route_id", "1")
+            }
+        ),
+        new PersistenceExpectation(
+            "feed_info",
+            new RecordExpectation[]{
+                new RecordExpectation("feed_id", "fake_transit"),
+                new RecordExpectation("feed_publisher_name", "Conveyal"),
+                new RecordExpectation(
+                    "feed_publisher_url", "http://www.conveyal.com"
+                ),
+                new RecordExpectation("feed_lang", "en"),
+                new RecordExpectation("feed_version", "1.0")
+            }
+        ),
+        new PersistenceExpectation(
+            "frequencies",
+            new RecordExpectation[]{
+                new RecordExpectation("trip_id", "frequency-trip"),
+                new RecordExpectation("start_time", 28800, "08:00:00"),
+                new RecordExpectation("end_time", 32400, "09:00:00"),
+                new RecordExpectation("headway_secs", 1800),
+                new RecordExpectation("exact_times", 0)
+            }
+        ),
+        new PersistenceExpectation(
+            "routes",
+            new RecordExpectation[]{
+                new RecordExpectation("agency_id", "1"),
+                new RecordExpectation("route_id", "1"),
+                new RecordExpectation("route_short_name", "1"),
+                new RecordExpectation("route_long_name", "Route 1"),
+                new RecordExpectation("route_type", 3),
+                new RecordExpectation("route_color", "7CE6E7")
+            }
+        ),
+        new PersistenceExpectation(
+            "shapes",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                ),
+                new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
+                new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
+                new RecordExpectation("shape_pt_sequence", 2),
+                new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
+            }
+        ),
+        new PersistenceExpectation(
+            "stop_times",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                ),
+                new RecordExpectation("arrival_time", 25200, "07:00:00"),
+                new RecordExpectation("departure_time", 25200, "07:00:00"),
+                new RecordExpectation("stop_id", "4u6g"),
+                new RecordExpectation("stop_sequence", 1),
+                new RecordExpectation("pickup_type", 0),
+                new RecordExpectation("drop_off_type", 0),
+                new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
+            }
+        ),
+        new PersistenceExpectation(
+            "trips",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                ),
+                new RecordExpectation(
+                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                ),
+                new RecordExpectation("route_id", "1"),
+                new RecordExpectation("direction_id", 0),
+                new RecordExpectation(
+                    "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                ),
+                new RecordExpectation("bikes_allowed", 0),
+                new RecordExpectation("wheelchair_accessible", 0)
+            }
+        )
     };
+
+    /**
+     * Update persistence expectations to expect normalized stop_sequence values (zero-based, incrementing).
+     */
+    private PersistenceExpectation[] updatePersistenceExpectationsWithNormalizedStopTimesSequence(
+        PersistenceExpectation[] inputExpectations
+    ) {
+        PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[inputExpectations.length];
+        // Add all of the table expectations.
+        for (int i = 0; i < inputExpectations.length; i++) {
+            // Collect record expectations.
+            PersistenceExpectation inputExpectation = inputExpectations[i];
+            RecordExpectation[] newRecordExpectations = new RecordExpectation[inputExpectation.recordExpectations.length];
+            for (int j = 0; j < inputExpectation.recordExpectations.length; j++) {
+                RecordExpectation newRecordExpectation = inputExpectation.recordExpectations[j].clone();
+                // Update the stop_sequence expectation to be normalized.
+                if (newRecordExpectation.fieldName.equals("stop_sequence")) {
+                    newRecordExpectation.intExpectation = 0;
+                }
+                newRecordExpectations[j] = newRecordExpectation;
+            }
+            // Once cloning/updating has been done for all record expectations, add the new table expectation to the
+            // array.
+            persistenceExpectations[i] = new PersistenceExpectation(inputExpectation.tableName, newRecordExpectations);
+        }
+        return persistenceExpectations;
+    }
 }
