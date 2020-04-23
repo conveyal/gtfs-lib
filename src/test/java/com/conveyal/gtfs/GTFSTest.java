@@ -428,9 +428,17 @@ public class GTFSTest {
         // works as expected
         boolean snapshotIsOk = assertThatSnapshotIsSuccessful(namespace, dataSource, testDBName, persistenceExpectations, false);
         if (!snapshotIsOk) return false;
-        // Also, verify that if we're normalizing stop_times#stop_sequence
-        PersistenceExpectation[] expectationsWithNormalizedStopTimes =  updatePersistenceExpectationsWithNormalizedStopTimes(persistenceExpectations);
-        boolean normalizedSnapshotIsOk = assertThatSnapshotIsSuccessful(namespace, dataSource, testDBName, expectationsWithNormalizedStopTimes, true);
+        // Also, verify that if we're normalizing stop_times#stop_sequence, the stop_sequence values conform with our
+        // expectations (zero-based, incrementing values).
+        PersistenceExpectation[] expectationsWithNormalizedStopTimesSequence =
+            updatePersistenceExpectationsWithNormalizedStopTimesSequence(persistenceExpectations);
+        boolean normalizedSnapshotIsOk = assertThatSnapshotIsSuccessful(
+            namespace,
+            dataSource,
+            testDBName,
+            expectationsWithNormalizedStopTimesSequence,
+            true
+        );
         if (!normalizedSnapshotIsOk) return false;
 
         // Verify that deleting a feed works as expected.
@@ -935,23 +943,28 @@ public class GTFSTest {
     };
 
     /**
-     * Update persistence expectations to expect normalized stop_sequence values.
+     * Update persistence expectations to expect normalized stop_sequence values (zero-based, incrementing).
      */
-    private PersistenceExpectation[] updatePersistenceExpectationsWithNormalizedStopTimes(PersistenceExpectation[] inputExpectations) {
+    private PersistenceExpectation[] updatePersistenceExpectationsWithNormalizedStopTimesSequence(
+        PersistenceExpectation[] inputExpectations
+    ) {
         PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[inputExpectations.length];
         // Add all of the table expectations.
         for (int i = 0; i < inputExpectations.length; i++) {
             // Collect record expectations.
-            RecordExpectation[] newRecordExpectations = new RecordExpectation[inputExpectations[i].recordExpectations.length];
-            for (int j = 0; j < inputExpectations[i].recordExpectations.length; j++) {
-                newRecordExpectations[j] = inputExpectations[i].recordExpectations[j].clone();
+            PersistenceExpectation inputExpectation = inputExpectations[i];
+            RecordExpectation[] newRecordExpectations = new RecordExpectation[inputExpectation.recordExpectations.length];
+            for (int j = 0; j < inputExpectation.recordExpectations.length; j++) {
+                RecordExpectation newRecordExpectation = inputExpectation.recordExpectations[j].clone();
                 // Update the stop_sequence expectation to be normalized.
-                if (newRecordExpectations[j].fieldName.equals("stop_sequence")) {
-                    newRecordExpectations[j].intExpectation = 0;
+                if (newRecordExpectation.fieldName.equals("stop_sequence")) {
+                    newRecordExpectation.intExpectation = 0;
                 }
+                newRecordExpectations[j] = newRecordExpectation;
             }
-
-            persistenceExpectations[i] = new PersistenceExpectation(inputExpectations[i].tableName, newRecordExpectations);
+            // Once cloning/updating has been done for all record expectations, add the new table expectation to the
+            // array.
+            persistenceExpectations[i] = new PersistenceExpectation(inputExpectation.tableName, newRecordExpectations);
         }
         return persistenceExpectations;
     }

@@ -837,6 +837,11 @@ public class Table {
      *
      * Note: the stop_times table is a special case that will optionally normalize the stop_sequence values to be
      * zero-based and incrementing.
+     *
+     * @param connection            SQL connection
+     * @param tableToClone          table name to clone (in the dot notation: namespace.gtfs_table)
+     * @param normalizeStopTimes    whether to normalize stop times (set stop_sequence values to be zero-based and
+     *                              incrementing)
      */
     public boolean createSqlTableFrom(Connection connection, String tableToClone, boolean normalizeStopTimes) {
         long startTime = System.currentTimeMillis();
