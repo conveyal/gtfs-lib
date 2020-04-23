@@ -39,6 +39,13 @@ public class JdbcGtfsSnapshotter {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsSnapshotter.class);
 
     private final DataSource dataSource;
+    /**
+     * Whether to normalize stop_times#stop_sequence values on snapshot (or leave them intact).
+     *
+     * TODO: if more options are added in the future, this should be folded into a SnapshotOptions
+     *   object.
+     */
+    private final boolean normalizeStopTimes;
 
     // These fields will be filled in once feed snapshot begins.
     private Connection connection;
@@ -49,10 +56,13 @@ public class JdbcGtfsSnapshotter {
     /**
      * @param feedId namespace (schema) to snapshot. If null, a blank snapshot will be created.
      * @param dataSource the JDBC data source with database connection details
+     * @param normalizeStopTimes whether to keep stop sequence values intact or normalize to be zero-based and
+     *                           incrementing
      */
-    public JdbcGtfsSnapshotter(String feedId, DataSource dataSource) {
+    public JdbcGtfsSnapshotter(String feedId, DataSource dataSource, boolean normalizeStopTimes) {
         this.feedIdToSnapshot = feedId;
         this.dataSource = dataSource;
+        this.normalizeStopTimes = normalizeStopTimes;
     }
 
     /**
@@ -135,7 +145,7 @@ public class JdbcGtfsSnapshotter {
                 // Otherwise, use the createTableFrom method to copy the data from the original.
                 String fromTableName = String.format("%s.%s", feedIdToSnapshot, table.name);
                 LOG.info("Copying table {} to {}", fromTableName, targetTable.name);
-                success = targetTable.createSqlTableFrom(connection, fromTableName);
+                success = targetTable.createSqlTableFrom(connection, fromTableName, normalizeStopTimes);
             }
             // Only create indexes if table creation was successful.
             if (success && createIndexes) {
