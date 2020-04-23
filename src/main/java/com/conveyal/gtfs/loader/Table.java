@@ -834,8 +834,16 @@ public class Table {
     /**
      * Creates a SQL table from the table to clone. This uses the SQL syntax "create table x as y" not only copies the
      * table structure, but also the data from the original table. Creating table indexes is not handled by this method.
+     *
+     * Note: the stop_times table is a special case that will optionally normalize the stop_sequence values to be
+     * zero-based and incrementing.
+     *
+     * @param connection            SQL connection
+     * @param tableToClone          table name to clone (in the dot notation: namespace.gtfs_table)
+     * @param normalizeStopTimes    whether to normalize stop times (set stop_sequence values to be zero-based and
+     *                              incrementing)
      */
-    public boolean createSqlTableFrom(Connection connection, String tableToClone) {
+    public boolean createSqlTableFrom(Connection connection, String tableToClone, boolean normalizeStopTimes) {
         long startTime = System.currentTimeMillis();
         try {
             Statement statement = connection.createStatement();
@@ -843,7 +851,7 @@ public class Table {
             String dropSql = String.format("drop table if exists %s", name);
             LOG.info(dropSql);
             statement.execute(dropSql);
-            if (tableToClone.endsWith("stop_times")) {
+            if (tableToClone.endsWith("stop_times") && normalizeStopTimes) {
                 normalizeAndCloneStopTimes(statement, name, tableToClone);
             } else {
                 // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.

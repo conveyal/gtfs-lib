@@ -81,14 +81,22 @@ public abstract class GTFS {
      *   1. The tables' id column has been modified to be auto-incrementing.
      *   2. Primary keys may be added to certain columns/tables.
      *   3. Additional editor-specific columns are added to certain tables.
-     * @param feedId        feed ID (schema namespace) to copy from
-     * @param dataSource    JDBC connection to existing database
-     * @return              FIXME should this be a separate SnapshotResult object?
+     * @param feedId                feed ID (schema namespace) to copy from
+     * @param dataSource            JDBC connection to existing database
+     * @param normalizeStopTimes    whether to normalize stop sequence values on snapshot
+     * @return the result of the snapshot
      */
-    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource) {
-        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource);
+    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource, boolean normalizeStopTimes) {
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource, normalizeStopTimes);
         SnapshotResult result = snapshotter.copyTables();
         return result;
+    }
+
+    /**
+     * Overloaded makeSnapshot method that defaults to normalize stop times.
+     */
+    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource) {
+        return makeSnapshot(feedId, dataSource, true);
     }
 
     /**
@@ -277,7 +285,7 @@ public abstract class GTFS {
             }
             if (namespaceToSnapshot != null) {
                 LOG.info("Snapshotting feed with unique identifier {}", namespaceToSnapshot);
-                FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource);
+                FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource, false);
                 if (storeResults) {
                     File snapshotResultFile = new File(directory, String.format("%s-snapshot.json", snapshotResult.uniqueIdentifier));
                     LOG.info("Storing validation result at {}", snapshotResultFile.getAbsolutePath());
