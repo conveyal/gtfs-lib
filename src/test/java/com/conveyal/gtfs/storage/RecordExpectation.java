@@ -97,7 +97,8 @@ public class RecordExpectation {
         return copy;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
         return "RecordExpectation{" + "acceptedDelta=" + acceptedDelta + ", doubleExpectation=" + doubleExpectation
             + ", editorExpectation='" + editorExpectation + '\'' + ", expectedFieldType=" + expectedFieldType
             + ", fieldName='" + fieldName + '\'' + ", intExpectation=" + intExpectation + ", stringExpectation='"

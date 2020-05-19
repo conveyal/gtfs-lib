@@ -1020,11 +1020,14 @@ public class GTFSTest {
         Multimap<String, ValuePair> mismatches
     ) {
         contextDescription = String.format("in the %s", contextDescription);
+        // Assert that more than 0 records were found
         assertThat(
             String.format("No records found %s", contextDescription),
             numRecordsSearched,
             ComparatorMatcherBuilder.<Integer>usingNaturalOrdering().greaterThan(0)
         );
+        // If the record wasn't found, but at least one mismatching record was found, return info about the record that
+        // was found to attempt to aid with debugging.
         if (!foundRecord && mismatches != null) {
             for (String field : mismatches.keySet()) {
                 Collection<ValuePair> valuePairs = mismatches.get(field);
@@ -1041,14 +1044,12 @@ public class GTFSTest {
                 }
             }
         } else {
-            if (!foundRecord) {
-                LOG.error("Unfound Record:");
-                LOG.error(persistenceExpectation.toString());
-            }
+            // Assert that the record was found
             assertThat(
                 String.format(
-                    "The record as defined in the PersistenceExpectation was not found %s.",
-                    contextDescription
+                    "The record as defined in the PersistenceExpectation was not found %s. Unfound Record: %s",
+                    contextDescription,
+                    persistenceExpectation.toString()
                 ),
                 foundRecord,
                 equalTo(true)

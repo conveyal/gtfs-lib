@@ -34,7 +34,8 @@ public class PersistenceExpectation {
         return expectations;
     }
 
-    @Override public String toString() {
+    @Override
+    public String toString() {
         return "PersistenceExpectation{" + "tableName='" + tableName + '\'' + ", recordExpectations=" + Arrays
             .toString(recordExpectations) + ", appliesToEditorDatabaseOnly=" + appliesToEditorDatabaseOnly + '}';
     }
