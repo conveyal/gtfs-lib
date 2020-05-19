@@ -1,0 +1,7 @@
+trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint
+non-frequency-trip,07:00:00,07:00:00,4u6g,1,,0,0,0.0000000,
+non-frequency-trip,07:01:00,07:01:00,johv,2,,0,0,341.4491961,
+non-frequency-trip-2,08:00:00,08:00:00,4u6g,1,,0,0,0.0000000,
+non-frequency-trip-2,08:01:00,08:01:00,johv,2,,0,0,341.4491961,
+frequency-trip,09:00:00,09:00:00,4u6g,1,,0,0,0.0000000,
+frequency-trip,09:01:00,09:01:00,johv,2,,0,0,341.4491961,

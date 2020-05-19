@@ -18,7 +18,9 @@ import java.sql.Statement;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.createFeedRegistryIfNotExists;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.createSchema;
@@ -225,7 +227,7 @@ public class JdbcGtfsSnapshotter {
                 Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
 
                 // Keep track of calendars by service id in case we need to add dummy calendar entries.
-                Map<String, Calendar> calendarsByServiceId = new HashMap<>();
+                Map<String, Calendar> dummyCalendarsByServiceId = new HashMap<>();
 
                 // Iterate through calendar dates to build up to get maps from exceptions to their dates.
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
@@ -241,7 +243,7 @@ public class JdbcGtfsSnapshotter {
                         addedServiceForDate.put(date, calendarDate.service_id);
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
-                        Calendar calendar = calendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+                        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
                         calendar.service_id = calendarDate.service_id;
                         if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
                             calendar.start_date = calendarDate.date;
@@ -249,7 +251,7 @@ public class JdbcGtfsSnapshotter {
                         if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
                             calendar.end_date = calendarDate.date;
                         }
-                        calendarsByServiceId.put(calendarDate.service_id, calendar);
+                        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
                         removedServiceForDate.put(date, calendarDate.service_id);
                     }
@@ -274,42 +276,53 @@ public class JdbcGtfsSnapshotter {
                 }
                 scheduleExceptionsTracker.executeRemaining();
 
-                // determine if we appear to be working with a calendar_dates-only feed.
-                // If so, we must also add dummy entries to the calendar table
-                if (
-                    feedIdToSnapshot != null &&
-                    !tableExists(feedIdToSnapshot, "calendar") &&
-                    calendarDatesReader.getRowCount() > 0
-                ) {
-                    sql = String.format(
-                        "insert into %s (service_id, description, start_date, end_date, " +
-                            "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
-                            "values (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)",
-                        tablePrefix + "calendar"
-                    );
-                    PreparedStatement calendarStatement = connection.prepareStatement(sql);
-                    final BatchTracker calendarsTracker = new BatchTracker(
-                        "calendar",
-                        calendarStatement
-                    );
-                    for (Calendar calendar : calendarsByServiceId.values()) {
-                        calendarStatement.setString(1, calendar.service_id);
-                        calendarStatement.setString(
-                            2,
-                            String.format("%s (auto-generated)", calendar.service_id)
-                        );
-                        calendarStatement.setString(
-                            3,
-                            calendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
-                        );
-                        calendarStatement.setString(
-                            4,
-                            calendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
-                        );
-                        calendarsTracker.addBatch();
-                    }
-                    calendarsTracker.executeRemaining();
+                // fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
+                // table.
+                JDBCTableReader<Calendar> calendarReader = new JDBCTableReader(
+                    Table.CALENDAR,
+                    dataSource,
+                    feedIdToSnapshot + ".",
+                    EntityPopulator.CALENDAR
+                );
+                Set<String> calendarServiceIds = new HashSet<>();
+                for (Calendar calendar : calendarReader.getAll()) {
+                    calendarServiceIds.add(calendar.service_id);
                 }
+
+                // For service_ids that only existed in the calendar_dates table, insert auto-generated, "blank"
+                // (no days of week specified) calendar entries.
+                sql = String.format(
+                    "insert into %s (service_id, description, start_date, end_date, " +
+                        "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
+                        "values (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)",
+                    tablePrefix + "calendar"
+                );
+                PreparedStatement calendarStatement = connection.prepareStatement(sql);
+                final BatchTracker calendarsTracker = new BatchTracker(
+                    "calendar",
+                    calendarStatement
+                );
+                for (Calendar dummyCalendar : dummyCalendarsByServiceId.values()) {
+                    if (calendarServiceIds.contains(dummyCalendar.service_id)) {
+                        // This service_id already exists in the calendar table. No need to create auto-generated entry.
+                        continue;
+                    }
+                    calendarStatement.setString(1, dummyCalendar.service_id);
+                    calendarStatement.setString(
+                        2,
+                        String.format("%s (auto-generated)", dummyCalendar.service_id)
+                    );
+                    calendarStatement.setString(
+                        3,
+                        dummyCalendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                    );
+                    calendarStatement.setString(
+                        4,
+                        dummyCalendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                    );
+                    calendarsTracker.addBatch();
+                }
+                calendarsTracker.executeRemaining();
 
                 connection.commit();
             } catch (Exception e) {
