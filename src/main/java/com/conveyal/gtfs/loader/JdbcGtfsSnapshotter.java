@@ -227,7 +227,7 @@ public class JdbcGtfsSnapshotter {
                 Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
 
                 // Keep track of calendars by service id in case we need to add dummy calendar entries.
-                Map<String, Calendar> calendarsByServiceId = new HashMap<>();
+                Map<String, Calendar> dummyCalendarsByServiceId = new HashMap<>();
 
                 // Iterate through calendar dates to build up to get maps from exceptions to their dates.
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
@@ -243,7 +243,7 @@ public class JdbcGtfsSnapshotter {
                         addedServiceForDate.put(date, calendarDate.service_id);
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
-                        Calendar calendar = calendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+                        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
                         calendar.service_id = calendarDate.service_id;
                         if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
                             calendar.start_date = calendarDate.date;
@@ -251,7 +251,7 @@ public class JdbcGtfsSnapshotter {
                         if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
                             calendar.end_date = calendarDate.date;
                         }
-                        calendarsByServiceId.put(calendarDate.service_id, calendar);
+                        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
                         removedServiceForDate.put(date, calendarDate.service_id);
                     }
@@ -289,7 +289,8 @@ public class JdbcGtfsSnapshotter {
                     calendarServiceIds.add(calendar.service_id);
                 }
 
-                // add auto-generated entries to the calendar table that only existed in the calendar_dates table
+                // For service_ids that only existed in the calendar_dates table, insert auto-generated, "blank"
+                // (no days of week specified) calendar entries.
                 sql = String.format(
                     "insert into %s (service_id, description, start_date, end_date, " +
                         "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
@@ -301,23 +302,23 @@ public class JdbcGtfsSnapshotter {
                     "calendar",
                     calendarStatement
                 );
-                for (Calendar calendar : calendarsByServiceId.values()) {
-                    if (calendarServiceIds.contains(calendar.service_id)) {
+                for (Calendar dummyCalendar : dummyCalendarsByServiceId.values()) {
+                    if (calendarServiceIds.contains(dummyCalendar.service_id)) {
                         // This service_id already exists in the calendar table. No need to create auto-generated entry.
                         continue;
                     }
-                    calendarStatement.setString(1, calendar.service_id);
+                    calendarStatement.setString(1, dummyCalendar.service_id);
                     calendarStatement.setString(
                         2,
-                        String.format("%s (auto-generated)", calendar.service_id)
+                        String.format("%s (auto-generated)", dummyCalendar.service_id)
                     );
                     calendarStatement.setString(
                         3,
-                        calendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                        dummyCalendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
                     );
                     calendarStatement.setString(
                         4,
-                        calendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                        dummyCalendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
                     );
                     calendarsTracker.addBatch();
                 }

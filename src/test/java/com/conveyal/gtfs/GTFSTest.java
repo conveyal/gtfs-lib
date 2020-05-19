@@ -630,8 +630,7 @@ public class GTFSTest {
             // There should be no schema records matching the deleted namespace.
             assertThat(schemaCount, is(0));
         } catch (SQLException | InvalidNamespaceException e) {
-            LOG.error("An error occurred while deleting a schema!");
-            e.printStackTrace();
+            LOG.error("An error occurred while deleting a schema!", e);
             TestUtils.dropDB(testDBName);
             return false;
         } catch (AssertionError e) {
@@ -730,12 +729,13 @@ public class GTFSTest {
         String namespace,
         PersistenceExpectation[] persistenceExpectations,
         ErrorExpectation[] errorExpectations,
-        boolean editorDatabase
+        boolean isEditorDatabase
     ) throws SQLException {
         // Store field mismatches here (to provide assertion statements with more details).
         Multimap<String, ValuePair> fieldsWithMismatches = ArrayListMultimap.create();
-        // Check that no validators failed during validation in non-editor databases.
-        if (!editorDatabase) {
+        // Check that no validators failed during validation in non-editor databases only (validators do not run
+        // when creating an editor database).
+        if (!isEditorDatabase) {
             assertThat(
                 "One or more validators failed during GTFS import.",
                 countValidationErrorsOfType(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED),
@@ -745,7 +745,7 @@ public class GTFSTest {
         // run through testing expectations
         LOG.info("testing expectations of record storage in the database");
         for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
-            if (persistenceExpectation.appliesToEditorDatabaseOnly && !editorDatabase) continue;
+            if (persistenceExpectation.appliesToEditorDatabaseOnly && !isEditorDatabase) continue;
             // select all entries from a table
             String sql = String.format(
                 "select * from %s.%s",
@@ -817,7 +817,10 @@ public class GTFSTest {
             );
         }
         // Skip error expectation analysis on editor database
-        if (editorDatabase) return;
+        if (isEditorDatabase) {
+            LOG.info("Skipping error expectations for non-editor database.");
+            return;
+        }
         // Expect zero errors if errorExpectations is null.
         if (errorExpectations == null) errorExpectations = new ErrorExpectation[]{};
         // Check that error expectations match errors stored in database.
