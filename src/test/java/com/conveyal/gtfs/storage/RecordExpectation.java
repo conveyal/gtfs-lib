@@ -96,4 +96,13 @@ public class RecordExpectation {
         copy.doubleExpectation = this.doubleExpectation;
         return copy;
     }
+
+    @Override
+    public String toString() {
+        return "RecordExpectation{" + "acceptedDelta=" + acceptedDelta + ", doubleExpectation=" + doubleExpectation
+            + ", editorExpectation='" + editorExpectation + '\'' + ", expectedFieldType=" + expectedFieldType
+            + ", fieldName='" + fieldName + '\'' + ", intExpectation=" + intExpectation + ", stringExpectation='"
+            + stringExpectation + '\'' + ", stringExpectationInCSV=" + stringExpectationInCSV
+            + ", editorStringExpectation=" + editorStringExpectation + '}';
+    }
 }
