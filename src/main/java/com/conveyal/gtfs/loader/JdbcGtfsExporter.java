@@ -5,12 +5,14 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
+import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
@@ -309,7 +311,9 @@ public class JdbcGtfsExporter {
             // TableLoadResult.
             LOG.error("Exception while creating snapshot: {}", ex.toString());
             ex.printStackTrace();
-            result.fatalException = ex.getMessage();
+            result.fatalException = ex.toString();
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
     }
@@ -325,7 +329,8 @@ public class JdbcGtfsExporter {
         zip_properties.put("create", "false");
 
         // Specify the path to the ZIP File that you want to read as a File System
-        URI zip_disk = URI.create("jar:file://" + outFile);
+        // (File#toURI allows this to work across different operating systems, including Windows)
+        URI zip_disk = URI.create("jar:" + new File(outFile).toURI());
 
         // Create ZIP file System
         try (FileSystem fileSystem = FileSystems.newFileSystem(zip_disk, zip_properties)) {
@@ -354,7 +359,7 @@ public class JdbcGtfsExporter {
             } catch (SQLException e) {
                 LOG.error("failed to generate select statement for existing fields");
                 TableLoadResult tableLoadResult = new TableLoadResult();
-                tableLoadResult.fatalException = e.getMessage();
+                tableLoadResult.fatalException = e.toString();
                 e.printStackTrace();
                 return tableLoadResult;
             }
@@ -402,7 +407,7 @@ public class JdbcGtfsExporter {
             } catch (SQLException ex) {
                 ex.printStackTrace();
             }
-            tableLoadResult.fatalException = e.getMessage();
+            tableLoadResult.fatalException = e.toString();
             LOG.error("Exception while exporting tables", e);
         }
         return tableLoadResult;

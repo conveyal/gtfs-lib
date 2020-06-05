@@ -14,6 +14,8 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.conveyal.gtfs.graphql.fetchers.JDBCFetcher.validateNamespace;
+
 /**
  * Fetch the summary row for a particular loaded feed, based on its namespace.
  * This essentially gets the row from the top-level summary table of all feeds that have been loaded into the database.
@@ -25,13 +27,14 @@ public class FeedFetcher implements DataFetcher {
     @Override
     public Map<String, Object> get (DataFetchingEnvironment environment) {
         String namespace = environment.getArgument("namespace"); // This is the unique table prefix (the "schema").
+        validateNamespace(namespace);
         StringBuilder sqlBuilder = new StringBuilder();
         sqlBuilder.append(String.format("select * from feeds where namespace = '%s'", namespace));
         Connection connection = null;
         try {
             connection = GTFSGraphQL.getConnection();
             Statement statement = connection.createStatement();
-            LOG.info("SQL: {}", sqlBuilder.toString());
+            LOG.debug("SQL: {}", sqlBuilder.toString());
             if (statement.execute(sqlBuilder.toString())) {
                 ResultSet resultSet = statement.getResultSet();
                 ResultSetMetaData meta = resultSet.getMetaData();

@@ -1,12 +1,13 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
-import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+import java.util.Set;
 
 public class IntegerField extends Field {
 
@@ -28,31 +29,32 @@ public class IntegerField extends Field {
         this.maxValue = maxValue;
     }
 
-    private int validate (String string) {
-        int i;
+    private ValidateFieldResult<Integer> validate (String string) {
+        ValidateFieldResult<Integer> result = new ValidateFieldResult<>();
         try {
-            i = Integer.parseInt(string);
+            result.clean = Integer.parseInt(string);
         } catch (NumberFormatException e) {
-            throw new StorageException(NewGTFSErrorType.NUMBER_PARSING, string);
+            result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.NUMBER_PARSING, string));
         }
-        if (i < minValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_SMALL, string);
-        if (i > maxValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, string);
-        return i;
+        if (result.clean < minValue) result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.NUMBER_TOO_SMALL, string));
+        if (result.clean > maxValue) result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.NUMBER_TOO_LARGE, string));
+        return result;
     }
 
     @Override
-    public void setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public Set<NewGTFSError> setParameter (PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setInt(oneBasedIndex, validate(string));
+            ValidateFieldResult<Integer> result = validate(string);
+            preparedStatement.setInt(oneBasedIndex, result.clean);
+            return result.errors;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
     }
 
     @Override
-    public String validateAndConvert (String string) {
-        validate(string);
-        return string;
+    public ValidateFieldResult<String> validateAndConvert (String string) {
+        return ValidateFieldResult.from(validate(string));
     }
 
     @Override

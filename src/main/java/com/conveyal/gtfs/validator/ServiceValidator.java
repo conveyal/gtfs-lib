@@ -27,12 +27,16 @@ import java.sql.Statement;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK;
 
 /**
  * This will validate that service date information is coherent, and attempt to deduce or validate the range of dates
@@ -52,7 +56,7 @@ import java.util.Set;
 public class ServiceValidator extends TripValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServiceValidator.class);
-
+    private HashMap<String, List<BlockInterval>> blockIntervals = new HashMap<>();
     private Map<String, ServiceInfo> serviceInfoForServiceId = new HashMap<>();
 
     private Map<LocalDate, DateInfo> dateInfoForDate = new HashMap<>();
@@ -63,6 +67,19 @@ public class ServiceValidator extends TripValidator {
 
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+        if (trip.block_id != null) {
+            // If the trip has a block_id, add a new block interval to the map.
+            BlockInterval blockInterval = new BlockInterval();
+            blockInterval.trip = trip;
+            StopTime firstStopTime = stopTimes.get(0);
+            blockInterval.startTime = firstStopTime.departure_time;
+            blockInterval.firstStop = firstStopTime;
+            blockInterval.lastStop = stopTimes.get(stopTimes.size() - 1);
+            // Construct new list of intervals if none exists for encountered block_id.
+            blockIntervals
+                .computeIfAbsent(trip.block_id, k -> new ArrayList<>())
+                .add(blockInterval);
+        }
         int firstStopDeparture = stopTimes.get(0).departure_time;
         int lastStopArrival = stopTimes.get(stopTimes.size() - 1).arrival_time;
         if (firstStopDeparture == Entity.INT_MISSING || lastStopArrival == Entity.INT_MISSING) {
@@ -95,7 +112,11 @@ public class ServiceValidator extends TripValidator {
      */
     @Override
     public void complete(ValidationResult validationResult) {
+        validateServiceInfo(validationResult);
+        validateBlocks();
+    }
 
+    private void validateServiceInfo(ValidationResult validationResult) {
         LOG.info("Merging calendars and calendar_dates...");
 
         // First handle the calendar entries, which define repeating weekly schedules.
@@ -106,19 +127,18 @@ public class ServiceValidator extends TripValidator {
                 for (LocalDate date = calendar.start_date; date.isBefore(endDate) || date.isEqual(endDate); date = date.plusDays(1)) {
                     DayOfWeek dayOfWeek = date.getDayOfWeek();
                     if (    (dayOfWeek == DayOfWeek.MONDAY && calendar.monday > 0) ||
-                            (dayOfWeek == DayOfWeek.TUESDAY && calendar.tuesday > 0) ||
-                            (dayOfWeek == DayOfWeek.WEDNESDAY && calendar.wednesday > 0) ||
-                            (dayOfWeek == DayOfWeek.THURSDAY && calendar.thursday > 0) ||
-                            (dayOfWeek == DayOfWeek.FRIDAY && calendar.friday > 0) ||
-                            (dayOfWeek == DayOfWeek.SATURDAY && calendar.saturday > 0) ||
-                            (dayOfWeek == DayOfWeek.SUNDAY && calendar.sunday > 0)) {
+                        (dayOfWeek == DayOfWeek.TUESDAY && calendar.tuesday > 0) ||
+                        (dayOfWeek == DayOfWeek.WEDNESDAY && calendar.wednesday > 0) ||
+                        (dayOfWeek == DayOfWeek.THURSDAY && calendar.thursday > 0) ||
+                        (dayOfWeek == DayOfWeek.FRIDAY && calendar.friday > 0) ||
+                        (dayOfWeek == DayOfWeek.SATURDAY && calendar.saturday > 0) ||
+                        (dayOfWeek == DayOfWeek.SUNDAY && calendar.sunday > 0)) {
                         // Service is active on this date.
                         serviceInfoForServiceId.computeIfAbsent(calendar.service_id, ServiceInfo::new).datesActive.add(date);
                     }
                 }
             } catch (Exception ex) {
-                LOG.error(ex.getMessage());
-                ex.printStackTrace();
+                LOG.error("Error validating service entries (merging calendars and calendar_dates)", ex);
                 // Continue on to next calendar entry.
             }
         }
@@ -156,7 +176,7 @@ public class ServiceValidator extends TripValidator {
                 registerError(NewGTFSError.forFeed(NewGTFSErrorType.SERVICE_NEVER_ACTIVE, serviceInfo.serviceId));
                 for (String tripId : serviceInfo.tripIds) {
                     registerError(
-                            NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE)
+                        NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE)
                                     .setEntityId(tripId)
                                     .setBadValue(tripId));
                 }
@@ -181,14 +201,23 @@ public class ServiceValidator extends TripValidator {
             LocalDate firstDate = LocalDate.MAX;
             LocalDate lastDate = LocalDate.MIN;
             for (LocalDate date : dateInfoForDate.keySet()) {
+                // If the date is invalid, skip.
+                if (date == null) {
+                    LOG.error("Encountered null date. Did something go wrong with computeIfAbsent?");
+                    continue;
+                }
                 if (date.isBefore(firstDate)) firstDate = date;
                 if (date.isAfter(lastDate)) lastDate = date;
             }
             // Copy some useful information into the ValidationResult object to return to the caller.
+            // These variables are actually not directly tied to data in the calendar_dates.txt file.  Instead, they
+            // represent the first and last date respectively of any entry in the calendar.txt and calendar_dates.txt
+            // files.
             validationResult.firstCalendarDate = firstDate;
             validationResult.lastCalendarDate = lastDate;
             // Is this any different? firstDate.until(lastDate, ChronoUnit.DAYS);
-            int nDays = (int) ChronoUnit.DAYS.between(firstDate, lastDate) + 1;
+            // If no days were found in the dateInfoForDate, nDays is a very large negative number, so we default to 0.
+            int nDays = Math.max(0, (int) ChronoUnit.DAYS.between(firstDate, lastDate) + 1);
             validationResult.dailyBusSeconds = new int[nDays];
             validationResult.dailyTramSeconds = new int[nDays];
             validationResult.dailyMetroSeconds = new int[nDays];
@@ -212,7 +241,7 @@ public class ServiceValidator extends TripValidator {
                     // Check for low or zero service, which seems to happen even when services are defined.
                     // This will also catch cases where dateInfo was null and the new instance contains no service.
                     registerError(NewGTFSError.forFeed(NewGTFSErrorType.DATE_NO_SERVICE,
-                            DateField.GTFS_DATE_FORMATTER.format(date)));
+                                                       DateField.GTFS_DATE_FORMATTER.format(date)));
                 }
             }
         }
@@ -285,7 +314,7 @@ public class ServiceValidator extends TripValidator {
 
             String serviceDurationsTableName = feed.tablePrefix + "service_durations";
             sql = String.format("create table %s (service_id varchar, route_type integer, " +
-                    "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
+                                    "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
             LOG.info(sql);
             statement.execute(sql);
             sql = String.format("insert into %s values (?, ?, ?)", serviceDurationsTableName);
@@ -320,7 +349,7 @@ public class ServiceValidator extends TripValidator {
         LOG.info("Done.");
     }
 
-    private static class ServiceInfo {
+    static class ServiceInfo {
 
         final String serviceId;
         TIntIntHashMap durationByRouteType = new TIntIntHashMap();
@@ -337,7 +366,7 @@ public class ServiceValidator extends TripValidator {
 
     }
 
-    private static class DateInfo {
+    static class DateInfo {
 
         final LocalDate date;
         TIntIntHashMap durationByRouteType = new TIntIntHashMap();
@@ -360,5 +389,60 @@ public class ServiceValidator extends TripValidator {
             });
             tripCount += serviceInfo.tripIds.size();
         }
+    }
+
+    /**
+     * Checks that trips which run on the same block (i.e., share a block_id) do not overlap. The block_id
+     * represents a vehicle in service, so there must not be any trips on the same block interval that start while another
+     * block trip is running.
+     *
+     * NOTE: This validation check happens in the {@link ServiceValidator} because it depends on information derived
+     * about which service calendars operate on which feed dates ({@link #serviceInfoForServiceId}).
+     */
+    private void validateBlocks () {
+        // Iterate over each block and determine if there are any trips that overlap one another.
+        for (String blockId : blockIntervals.keySet()) {
+            List<BlockInterval> intervals = blockIntervals.get(blockId);
+            intervals.sort(Comparator.comparingInt(i -> i.startTime));
+            // Iterate over each interval (except for the last) comparing it to every other interval (so the last interval
+            // is handled through the course of iteration).
+            // FIXME this has complexity of n^2, there has to be a better way.
+            for (int n = 0; n < intervals.size() - 1; n++) {
+                BlockInterval interval1 = intervals.get(n);
+                // Compare the interval at position N with all other intervals at position N+1 to the end of the list.
+                for (BlockInterval interval2 : intervals.subList(n + 1, intervals.size())) {
+                    if (interval1.lastStop.departure_time <= interval2.firstStop.arrival_time || interval2.lastStop.departure_time <= interval1.firstStop.arrival_time) {
+                        continue;
+                    }
+                    // If either trip's last departure occurs after the other's first arrival, they overlap. We still
+                    // need to determine if they operate on the same day though.
+                    if (interval1.trip.service_id.equals(interval2.trip.service_id)) {
+                        // If the overlapping trips share a service_id, record an error.
+                        registerError(interval1.trip, TRIP_OVERLAP_IN_BLOCK, interval2.trip.trip_id);
+                    } else {
+                        // Trips overlap but don't have the same service_id.
+                        // Check to see if service days fall on the same days of the week.
+                        ServiceValidator.ServiceInfo info1 = serviceInfoForServiceId.get(interval1.trip.service_id);
+                        ServiceValidator.ServiceInfo info2 = serviceInfoForServiceId.get(interval2.trip.service_id);
+                        Set<LocalDate> overlappingDates = new HashSet<>(info1.datesActive); // use the copy constructor
+                        overlappingDates.retainAll(info2.datesActive);
+                        if (overlappingDates.size() > 0) {
+                            registerError(interval1.trip, TRIP_OVERLAP_IN_BLOCK, interval2.trip.trip_id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    /**
+     * A simple class used during validation to store details the run interval for a block trip.
+     */
+    private class BlockInterval {
+        Trip trip;
+        Integer startTime;
+        StopTime firstStop;
+        StopTime lastStop;
     }
 }

@@ -1,14 +1,18 @@
 package com.conveyal.gtfs.validator;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 import static com.conveyal.gtfs.util.Util.fastDistance;
@@ -20,6 +24,8 @@ import static com.conveyal.gtfs.validator.NewTripTimesValidator.*;
 public class SpeedTripValidator extends TripValidator {
 
     public static final double MIN_SPEED_KPH = 0.5;
+    private boolean allTravelTimesAreRounded = true;
+    private Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
 
     public SpeedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
@@ -42,20 +48,36 @@ public class SpeedTripValidator extends TripValidator {
         double distanceMeters = 0;
         for (int i = beginIndex + 1; i < stopTimes.size(); i++) {
             StopTime currStopTime = stopTimes.get(i);
+            if (currStopTime.pickup_type == 1 && currStopTime.drop_off_type == 1 && currStopTime.timepoint == 0) {
+                // stop_time allows neither pickup or drop off and is not a timepoint, so it serves no purpose.
+                registerError(currStopTime, NewGTFSErrorType.STOP_TIME_UNUSED);
+            }
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
+            // Check that shape_dist_traveled is increasing. Note: we skip checking the first index because it appears
+            // to be a common practice for agencies to omit a 0.0 value during export. Because most feed consumers
+            // likely will just default a missing value to 0.0, we skip this check because it causes excessive noise in
+            // validation results.
+            if (beginIndex > 0) checkShapeDistTraveled(prevStopTime, currStopTime);
             if (missingBothTimes(currStopTime)) {
                 // FixMissingTimes has already been called, so both arrival and departure time are missing.
-                // The spec allows this. Other than accumulating distance, skip this StopTime.
+                // The spec allows this. Other than accumulating distance, skip this StopTime. If this stop_time serves
+                // as a timepoint; however, this is considered an error.
+                if (currStopTime.timepoint == 1) registerError(currStopTime, NewGTFSErrorType.TIMEPOINT_MISSING_TIMES);
                 continue;
             }
             if (currStopTime.departure_time < currStopTime.arrival_time) {
                 registerError(currStopTime, DEPARTURE_BEFORE_ARRIVAL);
             }
-            // TODO detect the case where all travel times are rounded off to minutes (i.e. tt % 60 == 0)
-            // In that case determine the maximum and minimum possible speed by adding/removing one minute of slack.
+            // Detect if travel times are rounded off to minutes.
+            boolean bothTravelTimesRounded = areTravelTimesRounded(prevStopTime) && areTravelTimesRounded(currStopTime);
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
+            // If travel times are rounded and travel time is zero, determine the maximum and minimum possible speed
+            // by adding/removing one minute of slack.
+            if (bothTravelTimesRounded && travelTimeSeconds == 0) {
+                travelTimeSeconds += 60;
+            }
             if (checkDistanceAndTime(distanceMeters, travelTimeSeconds, currStopTime)) {
                 // If distance and time are OK, we've got valid numbers to calculate a travel speed.
                 double kph = (distanceMeters / 1000D) / (travelTimeSeconds / 60D / 60D);
@@ -74,6 +96,45 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
+     * Register shape dist traveled error if current stop time has a value AND either the previous value is
+     * missing (if at least one stop time has a value, all stop times for the trip should) OR if current value
+     * is less than or equal to the previous value. Note: if the previous shape_dist_traveled value is present and the
+     * current value is missing, the previous value will be greater than the current stop time's value because
+     * {@link Entity#DOUBLE_MISSING} is the lowest possible double value. This in turn will register an error.
+     */
+    private void checkShapeDistTraveled(StopTime previous, StopTime current) {
+        if (
+            current.shape_dist_traveled != Entity.DOUBLE_MISSING &&
+            (
+                previous.shape_dist_traveled == Entity.DOUBLE_MISSING ||
+                current.shape_dist_traveled <= previous.shape_dist_traveled
+            )
+        ) {
+            registerError(current, SHAPE_DIST_TRAVELED_NOT_INCREASING, current.shape_dist_traveled);
+        }
+    }
+
+    /**
+     * Completing this feed validator means checking if there were any unrounded travel times in the feed and (if so)
+     * registering any zero travel time errors that were passed over before the first unrounded travel time was
+     * encountered. If in fact all travel times are rounded to the minute, store a special feed-wide error in this case.
+     */
+    public void complete (ValidationResult validationResult) {
+        if (!allTravelTimesAreRounded) storeErrors(travelTimeZeroErrors);
+        else registerError(NewGTFSError.forFeed(FEED_TRAVEL_TIMES_ROUNDED, null));
+    }
+
+    /**
+     * Check that arrival and departure time for a stop time are rounded to the minute and update
+     * {@link #allTravelTimesAreRounded} accordingly.
+     */
+    private boolean areTravelTimesRounded(StopTime stopTime) {
+        boolean bothTravelTimesAreRounded = stopTime.departure_time % 60 == 0 && stopTime.arrival_time % 60 == 0;
+        if (!bothTravelTimesAreRounded) this.allTravelTimesAreRounded = false;
+        return bothTravelTimesAreRounded;
+    }
+
+    /**
      * This just pulls some of the range checking logic out of the main trip checking loop so it's more readable.
      * @return true if all values are OK
      */
@@ -88,7 +149,10 @@ public class SpeedTripValidator extends TripValidator {
             registerError(stopTime, TRAVEL_TIME_NEGATIVE, travelTimeSeconds);
             good = false;
         } else if (travelTimeSeconds == 0) {
-            registerError(stopTime, TRAVEL_TIME_ZERO);
+            // Only register the travel time zero error if not all travel times are rounded. Otherwise, hold onto the
+            // error in the travelTimeZeroErrors collection until the completion of this validator.
+            if (!allTravelTimesAreRounded) registerError(stopTime, TRAVEL_TIME_ZERO);
+            else travelTimeZeroErrors.add(createUnregisteredError(stopTime, TRAVEL_TIME_ZERO));
             good = false;
         }
         return good;
@@ -97,7 +161,7 @@ public class SpeedTripValidator extends TripValidator {
     /**
      * @return max speed in km/hour.
      */
-    private double getMaxSpeedKph (Route route) {
+    private static double getMaxSpeedKph (Route route) {
         int type = -1;
         if (route != null) type = route.route_type;
         switch (type) {

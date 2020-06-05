@@ -14,6 +14,7 @@ public class FareAttribute extends Entity {
     private static final long serialVersionUID = 2157859372072056891L;
     public static final int UNLIMITED_TRANSFERS = Integer.MAX_VALUE;
     public String fare_id;
+    public String agency_id;
     public double price;
     public String currency_type;
     public int payment_method;
@@ -40,6 +41,7 @@ public class FareAttribute extends Entity {
         setIntParameter(statement, oneBasedIndex++, payment_method);
         // FIXME Entity.INT_MISSING causing out of range error on small int
         setIntParameter(statement, oneBasedIndex++, transfers);
+        statement.setString(oneBasedIndex++, agency_id);
         setIntParameter(statement, oneBasedIndex++, transfer_duration);
     }
 
@@ -72,6 +74,7 @@ public class FareAttribute extends Entity {
                 fa.currency_type = getStringField("currency_type", true);
                 fa.payment_method = getIntField("payment_method", true, 0, 1);
                 fa.transfers = getIntField("transfers", false, 0, 10, UNLIMITED_TRANSFERS); // in the GTFS spec, a missing value means "unlimited", so we default to UNLIMITED_TRANSFERS (or MAX_INT) when no value is found
+                fa.agency_id = getStringField("agency_id", false);
                 fa.transfer_duration = getIntField("transfer_duration", false, 0, 24 * 60 * 60);
                 fa.feed = feed;
                 fa.feed_id = feed.feedId;
@@ -89,13 +92,14 @@ public class FareAttribute extends Entity {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"fare_id", "price", "currency_type", "payment_method",
+            writer.writeRecord(new String[] {"fare_id", "agency_id", "price", "currency_type", "payment_method",
                     "transfers", "transfer_duration"});
         }
 
         @Override
         public void writeOneRow(FareAttribute fa) throws IOException {
             writeStringField(fa.fare_id);
+            writeStringField(fa.agency_id);
             writeDoubleField(fa.price);
             writeStringField(fa.currency_type);
             writeIntField(fa.payment_method);

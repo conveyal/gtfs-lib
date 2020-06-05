@@ -2,6 +2,7 @@ package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import org.apache.commons.dbutils.DbUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -86,6 +88,12 @@ public class SQLErrorStorage {
         }
     }
 
+    public void storeErrors (Set<NewGTFSError> errors) {
+        for (NewGTFSError error : errors) {
+            storeError(error);
+        }
+    }
+
     /**
      * Commits any outstanding error inserts and returns the error count via a SQL query.
      */
@@ -123,13 +131,10 @@ public class SQLErrorStorage {
      * commitAndClose() should only be called when access to SQLErrorStorage is no longer needed.
      */
     public void commitAndClose() {
-        try {
-            this.commit();
-            // Close the connection permanently (should be called only after errorStorage instance no longer needed).
-            connection.close();
-        } catch (SQLException ex) {
-            throw new StorageException(ex);
-        }
+        LOG.info("Committing errors and closing SQL connection.");
+        this.commit();
+        // Close the connection permanently (should be called only after errorStorage instance no longer needed).
+        DbUtils.closeQuietly(connection);
     }
 
     private void createErrorTables() {

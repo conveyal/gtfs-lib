@@ -56,7 +56,7 @@ public class GTFSFeedTest {
         //executed only once, before the first test
         simpleGtfsZipFileName = null;
         try {
-            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency");
+            simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -171,18 +171,6 @@ public class GTFSFeedTest {
     }
 
     /**
-     * Make sure the correct timezone of a stop is returned
-     */
-    @Test
-    public void canGetAgencyTimeZoneForStop() {
-        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
-        assertThat(
-            feed.getAgencyTimeZoneForStop("4u6g").getId(),
-            equalTo("America/Los_Angeles")
-        );
-    }
-
-    /**
      * Make sure that a GTFS feed with interpolated stop times have calculated times after feed processing
      * @throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes
      */
@@ -190,7 +178,7 @@ public class GTFSFeedTest {
     public void canGetInterpolatedTimes() throws GTFSFeed.FirstAndLastStopsDoNotHaveTimes, IOException {
         String tripId = "a30277f8-e50a-4a85-9141-b1e0da9d429d";
 
-        String gtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-interpolated-stop-times");
+        String gtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-interpolated-stop-times", true);
 
         GTFSFeed feed = GTFSFeed.fromFile(gtfsZipFileName);
         Iterable<StopTime> stopTimes = feed.getInterpolatedStopTimesForTrip(tripId);
@@ -233,18 +221,6 @@ public class GTFSFeedTest {
     }
 
     /**
-     * Make sure a list of services for a date can be calculated
-     */
-    @Test
-    public void canGetServicesForDate() {
-        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
-        assertThat(
-            feed.getServicesForDate(LocalDate.of(2017,9,17)).get(0).service_id,
-            equalTo("04100312-8fe1-46a5-a9f2-556f39478f57")
-        );
-    }
-
-    /**
      * Make sure a spatial index of stops can be calculated
      */
     @Test
@@ -252,7 +228,8 @@ public class GTFSFeedTest {
         GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
         assertThat(
             feed.getSpatialIndex().size(),
-            equalTo(2)
+            // This should reflect the number of stops in src/test/resources/fake-agency/stops.txt
+            equalTo(5)
         );
     }
 

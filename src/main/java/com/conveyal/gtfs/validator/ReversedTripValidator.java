@@ -46,7 +46,8 @@ public class ReversedTripValidator extends TripValidator {
             if (trip.shape_id == null) {
                 isValid = false;
                 if (missingShapeErrorCount < errorLimit) {
-                    feed.errors.add(new MissingShapeError(trip));
+                    // FIXME store MissingShape errors
+                    // feed.errors.add(new MissingShapeError(trip));
                 }
                 missingShapeErrorCount++;
                 continue;
@@ -98,7 +99,8 @@ public class ReversedTripValidator extends TripValidator {
             // check if first stop is x times closer to end of shape than the beginning or last stop is x times closer to start than the end
             if (distanceFirstStopToStart > (distanceFirstStopToEnd * distanceMultiplier) && distanceLastStopToEnd > (distanceLastStopToStart * distanceMultiplier)) {
                 if (reversedTripShapeErrorCount < errorLimit) {
-                    feed.errors.add(new ReversedTripShapeError(trip));
+                    // FIXME store ReversedTripShape errors
+                    // feed.errors.add(new ReversedTripShapeError(trip));
                 }
                 reversedTripShapeErrorCount++;
                 isValid = false;
@@ -107,7 +109,8 @@ public class ReversedTripValidator extends TripValidator {
         if (missingCoordinatesErrorCount > 0) {
             for (Map.Entry<ShapePoint, List<String>> shapeError : missingShapesMap.entrySet()) {
                 String[] tripIdList = shapeError.getValue().toArray(new String[shapeError.getValue().size()]);
-                feed.errors.add(new ShapeMissingCoordinatesError(shapeError.getKey(), tripIdList));
+                // FIXME store ShapeMissingCoordinates errors
+                // feed.errors.add(new ShapeMissingCoordinatesError(shapeError.getKey(), tripIdList));
             }
         }
         return isValid;

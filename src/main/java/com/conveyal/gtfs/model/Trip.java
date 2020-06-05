@@ -77,7 +77,8 @@ public class Trip extends Entity {
             t.wheelchair_accessible = getIntField("wheelchair_accessible", false, 0, 2);
             t.feed = feed;
             t.feed_id = feed.feedId;
-            feed.trips.put(t.trip_id, t);
+            // Attempting to put a null key or value will cause an NPE in BTreeMap
+            if (t.trip_id != null) feed.trips.put(t.trip_id, t);
 
             /*
               Check referential integrity without storing references. Trip cannot directly reference Services or

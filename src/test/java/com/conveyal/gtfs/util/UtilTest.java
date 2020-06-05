@@ -15,8 +15,11 @@ import static org.junit.Assert.fail;
  */
 public class UtilTest {
 
-    @Before // setup()
-    public void before() throws Exception {
+    /**
+     * Ensure locale (for {@link #canHumanize()}) is set correctly before doing anything else.
+     */
+    @Before
+    public void before() {
         java.util.Locale.setDefault(java.util.Locale.US);
     }
 

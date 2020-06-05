@@ -6,7 +6,6 @@ import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.Validator;
-import com.conveyal.gtfs.stats.FeedStats;
 import com.conveyal.gtfs.util.Util;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.*;
@@ -17,7 +16,6 @@ import org.locationtech.jts.geom.*;
 import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.mapdb.BTreeMap;
-import org.mapdb.Bind;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.Fun;
@@ -33,17 +31,12 @@ import java.io.FileOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -83,16 +76,6 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
     public final BTreeMap<Tuple2, StopTime> stop_times;
-
-//    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
-    /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
-    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
-    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
-    public final NavigableSet<Tuple2<String, String>> tripsPerService;
-
-    public final NavigableSet<Tuple2<String, String>> servicesPerDate;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
@@ -196,29 +179,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         for (GTFSError error : errors) {
             LOG.info("{}", error);
         }
-        LOG.info("Building stop to stop times index");
-        Bind.histogram(stop_times, stopCountByStopTime, (key, stopTime) -> stopTime.stop_id);
-        Bind.secondaryKeys(stop_times, stopStopTimeSet, (key, stopTime) -> new String[] {stopTime.stop_id});
-        LOG.info("Building trips per service index");
-        Bind.secondaryKeys(trips, tripsPerService, (key, trip) -> new String[] {trip.service_id});
-        LOG.info("Building services per date index");
-        Bind.secondaryKeys(services, servicesPerDate, (key, service) -> {
-
-            LocalDate startDate = service.calendar != null
-                    ? service.calendar.start_date
-                    : service.calendar_dates.keySet().stream().sorted().findFirst().get();
-            LocalDate endDate = service.calendar != null
-                    ? service.calendar.end_date
-                    : service.calendar_dates.keySet().stream().sorted().reduce((first, second) -> second).get();
-            // end date for Period.between is not inclusive
-            int daysOfService = (int) ChronoUnit.DAYS.between(startDate, endDate.plus(1, ChronoUnit.DAYS));
-            return IntStream.range(0, daysOfService)
-                    .mapToObj(offset -> startDate.plusDays(offset))
-                    .filter(service::activeOn)
-                    .map(date -> date.format(dateFormatter))
-                    .toArray(size -> new String[size]);
-        });
-
         loaded = true;
     }
 
@@ -264,15 +224,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             throw new RuntimeException(e);
         }
     }
-//    public void validate (EventBus eventBus, Validator... validators) {
-//        if (eventBus == null) {
-//
-//        }
-//        for (Validator validator : validators) {
-//            validator.getClass().getSimpleName();
-//            validator.validate(this, false);
-//        }
-//    }
+
     public void validate (boolean repair, Validator... validators) {
         long startValidation = System.currentTimeMillis();
         for (Validator validator : validators) {
@@ -296,11 +248,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     // validate function call that should explicitly list each validator to run on GTFSFeed
     public void validate () {
 /////////////////
-    }
-
-    public FeedStats calculateStats() {
-        FeedStats feedStats = new FeedStats(this);
-        return feedStats;
     }
 
     /**
@@ -598,87 +545,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         return distance / time; // meters per second
     }
 
-    /** Get list of stop_times for a given stop_id. */
-    public List<StopTime> getStopTimesForStop (String stop_id) {
-        SortedSet<Tuple2<String, Tuple2>> index = this.stopStopTimeSet
-                .subSet(new Tuple2<>(stop_id, null), new Tuple2(stop_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.stop_times.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    public List<Trip> getTripsForService (String service_id) {
-        SortedSet<Tuple2<String, String>> index = this.tripsPerService
-                .subSet(new Tuple2<>(service_id, null), new Tuple2(service_id, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.trips.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    /** Get list of services for each date of service. */
-    public List<Service> getServicesForDate (LocalDate date) {
-        String dateString = date.format(dateFormatter);
-        SortedSet<Tuple2<String, String>> index = this.servicesPerDate
-                .subSet(new Tuple2<>(dateString, null), new Tuple2(dateString, Fun.HI));
-
-        return index.stream()
-                .map(tuple -> this.services.get(tuple.b))
-                .collect(Collectors.toList());
-    }
-
-    public List<LocalDate> getDatesOfService () {
-        return this.servicesPerDate.stream()
-                .map(tuple -> LocalDate.parse(tuple.a, dateFormatter))
-                .collect(Collectors.toList());
-    }
-
-    /** Get list of distinct trips (filters out multiple visits by a trip) a given stop_id. */
-    public List<Trip> getDistinctTripsForStop (String stop_id) {
-        return getStopTimesForStop(stop_id).stream()
-                .map(stopTime -> this.trips.get(stopTime.trip_id))
-                .distinct()
-                .collect(Collectors.toList());
-    }
-
-    /** Get the likely time zone for a stop using the agency of the first stop time encountered for the stop. */
-    public ZoneId getAgencyTimeZoneForStop (String stop_id) {
-        StopTime stopTime = getStopTimesForStop(stop_id).iterator().next();
-
-        Trip trip = this.trips.get(stopTime.trip_id);
-        Route route = this.routes.get(trip.route_id);
-        Agency agency = route.agency_id != null ? this.agency.get(route.agency_id) : this.agency.get(0);
-
-        return ZoneId.of(agency.agency_timezone);
-    }
-
-    // TODO: code review
-    public Geometry getMergedBuffers() {
-        if (this.mergedBuffers == null) {
-//            synchronized (this) {
-                Collection<Geometry> polygons = new ArrayList<>();
-                for (Stop stop : this.stops.values()) {
-                    if (getStopTimesForStop(stop.stop_id).isEmpty()) {
-                        continue;
-                    }
-                    if (stop.stop_lat > -1 && stop.stop_lat < 1 || stop.stop_lon > -1 && stop.stop_lon < 1) {
-                        continue;
-                    }
-                    Point stopPoint = gf.createPoint(new Coordinate(stop.stop_lon, stop.stop_lat));
-                    Polygon stopBuffer = (Polygon) stopPoint.buffer(.01);
-                    polygons.add(stopBuffer);
-                }
-                Geometry multiGeometry = gf.buildGeometry(polygons);
-                this.mergedBuffers = multiGeometry.union();
-                if (polygons.size() > 100) {
-                    this.mergedBuffers = DouglasPeuckerSimplifier.simplify(this.mergedBuffers, .001);
-                }
-//            }
-        }
-        return this.mergedBuffers;
-    }
-
     public Polygon getConvexHull() {
         if (this.convexHull == null) {
             synchronized (this) {
@@ -781,11 +647,6 @@ public class GTFSFeed implements Cloneable, Closeable {
                 .makeOrGet();
 
         tripPatternMap = db.getTreeMap("patternForTrip");
-
-        stopCountByStopTime = db.getTreeMap("stopCountByStopTime");
-        stopStopTimeSet = db.getTreeSet("stopStopTimeSet");
-        tripsPerService = db.getTreeSet("tripsPerService");
-        servicesPerDate = db.getTreeSet("servicesPerDate");
 
         errors = db.getTreeSet("errors");
     }

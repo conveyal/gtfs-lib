@@ -35,6 +35,7 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.Locale;
@@ -213,7 +214,7 @@ public abstract class Entity implements Serializable {
             if (str != null) try {
                 dateTime = LocalDate.parse(str, DateField.GTFS_DATE_FORMATTER);
                 checkRangeInclusive(2000, 2100, dateTime.getYear());
-            } catch (IllegalArgumentException iae) {
+            } catch (IllegalArgumentException | DateTimeParseException e) {
                 feed.errors.add(new DateParseError(tableName, row, column));
             }
             return dateTime;

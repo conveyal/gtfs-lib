@@ -1,11 +1,13 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.storage.StorageException;
 
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+import java.util.Set;
 
 /**
  * Created by abyrd on 2017-03-31
@@ -19,27 +21,34 @@ public class ShortField extends Field {
         this.maxValue = maxValue;
     }
 
-    private short validate (String string) {
-        if (string == null || string.isEmpty()) return 0; // Default numeric fields to zero.
-        short s = Short.parseShort(string);
-        if (s < 0) throw new StorageException(NewGTFSErrorType.NUMBER_NEGATIVE, string);
-        if (s > maxValue) throw new StorageException(NewGTFSErrorType.NUMBER_TOO_LARGE, string);
-        return s;
+    private ValidateFieldResult<Short> validate (String string) {
+        ValidateFieldResult<Short> result = new ValidateFieldResult<>();
+        if (string == null || string.isEmpty()) {
+            // Default numeric fields to zero.
+            result.clean = 0;
+            return result;
+        }
+        result.clean = Short.parseShort(string);
+        if (result.clean < 0) result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.NUMBER_NEGATIVE, string));
+        if (result.clean > maxValue) result.errors.add(NewGTFSError.forFeed(NewGTFSErrorType.NUMBER_TOO_LARGE, string));
+        return result;
     }
 
     @Override
-    public void setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
+    public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
         try {
-            preparedStatement.setShort(oneBasedIndex, validate(string));
+            ValidateFieldResult<Short> result = validate(string);
+            preparedStatement.setShort(oneBasedIndex, result.clean);
+            return result.errors;
         } catch (Exception ex) {
             throw new StorageException(ex);
         }
     }
 
     @Override
-    public String validateAndConvert(String string) {
-        validate(string);
-        return string;
+    public ValidateFieldResult<String> validateAndConvert(String string) {
+        ValidateFieldResult<String> result = ValidateFieldResult.from(validate(string));
+        return result;
     }
 
     @Override

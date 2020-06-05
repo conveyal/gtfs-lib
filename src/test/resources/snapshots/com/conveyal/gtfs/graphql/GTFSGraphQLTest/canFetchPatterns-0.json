@@ -1,0 +1,206 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "patterns" : [ {
+        "direction_id" : 0,
+        "id" : 1,
+        "name" : "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips)",
+        "pattern_id" : "1",
+        "pattern_stops" : [ {
+          "default_dwell_time" : 0,
+          "default_travel_time" : 0,
+          "drop_off_type" : 0,
+          "id" : 1,
+          "pattern_id" : "1",
+          "pickup_type" : 0,
+          "shape_dist_traveled" : 0.0,
+          "stop" : [ {
+            "stop_id" : "4u6g"
+          } ],
+          "stop_id" : "4u6g",
+          "stop_sequence" : 0,
+          "timepoint" : null
+        }, {
+          "default_dwell_time" : 0,
+          "default_travel_time" : 60,
+          "drop_off_type" : 0,
+          "id" : 2,
+          "pattern_id" : "1",
+          "pickup_type" : 0,
+          "shape_dist_traveled" : 341.4491961,
+          "stop" : [ {
+            "stop_id" : "johv"
+          } ],
+          "stop_id" : "johv",
+          "stop_sequence" : 1,
+          "timepoint" : null
+        } ],
+        "route" : [ {
+          "route_id" : "1"
+        } ],
+        "route_id" : "1",
+        "shape" : [ {
+          "point_type" : null,
+          "shape_dist_traveled" : 0.0,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.0612132,
+          "shape_pt_lon" : -122.0074332,
+          "shape_pt_sequence" : 1
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 7.4997067,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.061172,
+          "shape_pt_lon" : -122.0075,
+          "shape_pt_sequence" : 2
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 33.8739075,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.061359,
+          "shape_pt_lon" : -122.007683,
+          "shape_pt_sequence" : 3
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 109.0402932,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.060878,
+          "shape_pt_lon" : -122.008278,
+          "shape_pt_sequence" : 4
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 184.6078298,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.060359,
+          "shape_pt_lon" : -122.008828,
+          "shape_pt_sequence" : 5
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 265.8053023,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.059761,
+          "shape_pt_lon" : -122.009354,
+          "shape_pt_sequence" : 6
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 357.8617018,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.059066,
+          "shape_pt_lon" : -122.009919,
+          "shape_pt_sequence" : 7
+        } ],
+        "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+        "stops" : [ {
+          "stop_id" : "4u6g"
+        }, {
+          "stop_id" : "johv"
+        } ],
+        "trip_count" : 1,
+        "trips" : [ {
+          "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+        } ],
+        "use_frequency" : null
+      }, {
+        "direction_id" : 0,
+        "id" : 2,
+        "name" : "2 stops from Butler Ln to Child Stop (1 trips)",
+        "pattern_id" : "2",
+        "pattern_stops" : [ {
+          "default_dwell_time" : 0,
+          "default_travel_time" : 0,
+          "drop_off_type" : 0,
+          "id" : 3,
+          "pattern_id" : "2",
+          "pickup_type" : 0,
+          "shape_dist_traveled" : 0.0,
+          "stop" : [ {
+            "stop_id" : "4u6g"
+          } ],
+          "stop_id" : "4u6g",
+          "stop_sequence" : 0,
+          "timepoint" : null
+        }, {
+          "default_dwell_time" : 0,
+          "default_travel_time" : 1740,
+          "drop_off_type" : 0,
+          "id" : 4,
+          "pattern_id" : "2",
+          "pickup_type" : 0,
+          "shape_dist_traveled" : 341.4491961,
+          "stop" : [ {
+            "stop_id" : "1234"
+          } ],
+          "stop_id" : "1234",
+          "stop_sequence" : 1,
+          "timepoint" : null
+        } ],
+        "route" : [ {
+          "route_id" : "1"
+        } ],
+        "route_id" : "1",
+        "shape" : [ {
+          "point_type" : null,
+          "shape_dist_traveled" : 0.0,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.0612132,
+          "shape_pt_lon" : -122.0074332,
+          "shape_pt_sequence" : 1
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 7.4997067,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.061172,
+          "shape_pt_lon" : -122.0075,
+          "shape_pt_sequence" : 2
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 33.8739075,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.061359,
+          "shape_pt_lon" : -122.007683,
+          "shape_pt_sequence" : 3
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 109.0402932,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.060878,
+          "shape_pt_lon" : -122.008278,
+          "shape_pt_sequence" : 4
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 184.6078298,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.060359,
+          "shape_pt_lon" : -122.008828,
+          "shape_pt_sequence" : 5
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 265.8053023,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.059761,
+          "shape_pt_lon" : -122.009354,
+          "shape_pt_sequence" : 6
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 357.8617018,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.059066,
+          "shape_pt_lon" : -122.009919,
+          "shape_pt_sequence" : 7
+        } ],
+        "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+        "stops" : [ {
+          "stop_id" : "4u6g"
+        }, {
+          "stop_id" : "1234"
+        } ],
+        "trip_count" : 1,
+        "trips" : [ {
+          "trip_id" : "frequency-trip"
+        } ],
+        "use_frequency" : null
+      } ]
+    }
+  }
+}

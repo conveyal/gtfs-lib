@@ -1,0 +1,7 @@
+service_id,date,exception_type
+04100312-8fe1-46a5-a9f2-556f39478f57,bad_date,2
+04100312-8fe1-46a5-a9f2-556f39478f57,bad_date2,1
+123_ID_NOT_EXISTS,20190301,2
+123_ID_NOT_EXISTS,20190301,1
+123_ID_NOT_EXISTS,bad_date,1
+123_ID_NOT_EXISTS,bad_date,2
