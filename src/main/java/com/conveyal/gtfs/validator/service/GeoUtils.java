@@ -32,7 +32,12 @@ public class GeoUtils {
     public static double getDistance(LineString tripGeometry) {
       double distance = 0;
       for (int i = 0; i < tripGeometry.getNumPoints() - 1; i++) {
-        distance += Util.fastDistance(tripGeometry.getCoordinateN(i).x, tripGeometry.getCoordinateN(i).y, tripGeometry.getCoordinateN(i + 1).x, tripGeometry.getCoordinateN(i + 1).y);
+        distance += Util.fastDistance(
+            tripGeometry.getCoordinateN(i).y,
+            tripGeometry.getCoordinateN(i).x,
+            tripGeometry.getCoordinateN(i + 1).y,
+            tripGeometry.getCoordinateN(i + 1).x
+        );
       }
 
       return distance;

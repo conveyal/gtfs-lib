@@ -90,11 +90,31 @@ public class ReversedTripValidator extends TripValidator {
                 continue;
             }
 
-            Double distanceFirstStopToStart = Util.fastDistance(firstStopCoord.x, firstStopCoord.y, firstShapeCoord.x, firstShapeCoord.y);
-            Double distanceFirstStopToEnd = Util.fastDistance(firstStopCoord.x, firstStopCoord.y, lastShapeCoord.x, lastShapeCoord.y);
+            Double distanceFirstStopToStart = Util.fastDistance(
+                firstStopCoord.y,
+                firstStopCoord.x,
+                firstShapeCoord.y,
+                firstShapeCoord.x
+            );
+            Double distanceFirstStopToEnd = Util.fastDistance(
+                firstStopCoord.y,
+                firstStopCoord.x,
+                lastShapeCoord.y,
+                lastShapeCoord.x
+            );
 
-            Double distanceLastStopToEnd = Util.fastDistance(lastStopCoord.x, lastStopCoord.y, lastShapeCoord.x, lastShapeCoord.y);
-            Double distanceLastStopToStart = Util.fastDistance(lastStopCoord.x, lastStopCoord.y, firstShapeCoord.x, firstShapeCoord.y);
+            Double distanceLastStopToEnd = Util.fastDistance(
+                lastStopCoord.y,
+                lastStopCoord.x,
+                lastShapeCoord.y,
+                lastShapeCoord.x
+            );
+            Double distanceLastStopToStart = Util.fastDistance(
+                lastStopCoord.y,
+                lastStopCoord.x,
+                firstShapeCoord.y,
+                firstShapeCoord.x
+            );
 
             // check if first stop is x times closer to end of shape than the beginning or last stop is x times closer to start than the end
             if (distanceFirstStopToStart > (distanceFirstStopToEnd * distanceMultiplier) && distanceLastStopToEnd > (distanceLastStopToStart * distanceMultiplier)) {
