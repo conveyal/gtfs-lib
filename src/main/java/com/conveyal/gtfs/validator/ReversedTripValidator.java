@@ -6,11 +6,9 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.*;
-import com.conveyal.gtfs.validator.service.GeoUtils;
+import com.conveyal.gtfs.util.Util;
 import com.google.common.collect.Iterables;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Coordinate;
 import org.mapdb.Fun;
 
 import java.util.ArrayList;
@@ -24,8 +22,6 @@ import java.util.Map;
 public class ReversedTripValidator extends TripValidator {
 
     private static Double distanceMultiplier = 1.0;
-
-    private static GeometryFactory geometryFactory = new GeometryFactory();
 
     public ReversedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
@@ -68,10 +64,6 @@ public class ReversedTripValidator extends TripValidator {
 
             Coordinate firstStopCoord;
             Coordinate lastStopCoord;
-            Geometry firstShapeGeom;
-            Geometry lastShapeGeom;
-            Geometry firstStopGeom;
-            Geometry lastStopGeom;
             Coordinate firstShapeCoord;
             Coordinate lastShapeCoord;
 
@@ -80,14 +72,9 @@ public class ReversedTripValidator extends TripValidator {
                 firstStopCoord = new Coordinate(feed.stops.get(firstStop.stop_id).stop_lat, feed.stops.get(firstStop.stop_id).stop_lon);
                 lastStopCoord = new Coordinate(feed.stops.get(lastStop.stop_id).stop_lat, feed.stops.get(lastStop.stop_id).stop_lon);
 
-                firstStopGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstStopCoord));
-                lastStopGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastStopCoord));
-
                 firstShapeCoord = new Coordinate(firstShape.shape_pt_lat, firstShape.shape_pt_lon);
                 lastShapeCoord = new Coordinate(lastShape.shape_pt_lat, lastShape.shape_pt_lon);
 
-                firstShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(firstShapeCoord));
-                lastShapeGeom = geometryFactory.createPoint(GeoUtils.convertLatLonToEuclidean(lastShapeCoord));
             } catch (Exception any) {
                 isValid = false;
                 List<String> listOfTrips;
@@ -103,11 +90,31 @@ public class ReversedTripValidator extends TripValidator {
                 continue;
             }
 
-            Double distanceFirstStopToStart = firstStopGeom.distance(firstShapeGeom);
-            Double distanceFirstStopToEnd = firstStopGeom.distance(lastShapeGeom);
+            Double distanceFirstStopToStart = Util.fastDistance(
+                firstStopCoord.y,
+                firstStopCoord.x,
+                firstShapeCoord.y,
+                firstShapeCoord.x
+            );
+            Double distanceFirstStopToEnd = Util.fastDistance(
+                firstStopCoord.y,
+                firstStopCoord.x,
+                lastShapeCoord.y,
+                lastShapeCoord.x
+            );
 
-            Double distanceLastStopToEnd = lastStopGeom.distance(lastShapeGeom);
-            Double distanceLastStopToStart = lastStopGeom.distance(firstShapeGeom);
+            Double distanceLastStopToEnd = Util.fastDistance(
+                lastStopCoord.y,
+                lastStopCoord.x,
+                lastShapeCoord.y,
+                lastShapeCoord.x
+            );
+            Double distanceLastStopToStart = Util.fastDistance(
+                lastStopCoord.y,
+                lastStopCoord.x,
+                firstShapeCoord.y,
+                firstShapeCoord.x
+            );
 
             // check if first stop is x times closer to end of shape than the beginning or last stop is x times closer to start than the end
             if (distanceFirstStopToStart > (distanceFirstStopToEnd * distanceMultiplier) && distanceLastStopToEnd > (distanceLastStopToStart * distanceMultiplier)) {

@@ -50,7 +50,6 @@
 
   <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
-    <geotools.version>14.0</geotools.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -162,9 +161,6 @@
                     <Main-Class>com.conveyal.gtfs.GTFSMain</Main-Class>
                   </manifestEntries>
                 </transformer>
-                <!-- files overwrite each other and geotools does not function without this.
-                  http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
               </transformers>
               <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
               <filters>
@@ -252,9 +248,9 @@
     	<version>18.0</version>
     </dependency>
     <dependency>
-    	<groupId>com.vividsolutions</groupId>
-    	<artifactId>jts</artifactId>
-    	<version>1.13</version>
+    	<groupId>org.locationtech.jts</groupId>
+    	<artifactId>jts-core</artifactId>
+    	<version>1.16.1</version>
     </dependency>
     <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
     <dependency>
@@ -298,16 +294,6 @@
       <groupId>commons-dbutils</groupId>
       <artifactId>commons-dbutils</artifactId>
       <version>1.6</version>
-    </dependency>
-    <dependency>
-      <groupId>org.geotools</groupId>
-      <artifactId>gt-api</artifactId>
-      <version>${geotools.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.geotools</groupId>
-      <artifactId>gt-epsg-hsql</artifactId>
-      <version>11-beta</version>
     </dependency>
     <!-- For uploading / downloading things from Amazon S3.
          We should really eliminate this functionality, it's out of scope for this gtfs-lib library. -->

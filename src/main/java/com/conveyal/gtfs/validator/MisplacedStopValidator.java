@@ -4,7 +4,7 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.storage.BooleanAsciiGrid;
-import com.vividsolutions.jts.geom.Envelope;
+import org.locationtech.jts.geom.Envelope;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.STOP_GEOGRAPHIC_OUTLIER;
