@@ -82,7 +82,7 @@ public class Table {
     /** When snapshotting a table for editor use, this indicates whether a primary key constraint should be added to ID. */
     private boolean usePrimaryKey = false;
     /** Indicates whether the table has unique key field. */
-    private boolean hasUniqueKeyField = true;
+    public boolean hasUniqueKeyField = true;
     /**
      * Indicates whether the table has a compound key that must be used in conjunction with the key field to determine
      * table uniqueness(e.g., transfers#to_stop_id).
@@ -152,9 +152,12 @@ public class Table {
     ).addPrimaryKey();
 
     // FIXME: Should we add some constraint on number of rows that this table has? Perhaps this is a GTFS editor specific
-    // feature.
+    //  feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
+        // feed_id is not the first field because that would label it as the key field, which we do not want because the
+        // key field cannot be optional.
+        new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
@@ -256,7 +259,7 @@ public class Table {
             // FIXME: Do we need an index on from_ and to_stop_id
             new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
-            new StringField("transfer_type", REQUIRED),
+            new ShortField("transfer_type", REQUIRED, 3),
             new StringField("min_transfer_time", OPTIONAL))
             .addPrimaryKey()
             .keyFieldIsNotUnique()
@@ -286,12 +289,12 @@ public class Table {
             // FIXME: Do we need an index on stop_id
             new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
 //                    .indexThisColumn(),
-            // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are reqiured
+            // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are required
             new TimeField("arrival_time", OPTIONAL),
             new TimeField("departure_time", OPTIONAL),
             new StringField("stop_headsign", OPTIONAL),
-            new ShortField("pickup_type", OPTIONAL, 2),
-            new ShortField("drop_off_type", OPTIONAL, 2),
+            new ShortField("pickup_type", OPTIONAL, 3),
+            new ShortField("drop_off_type", OPTIONAL, 3),
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
@@ -349,7 +352,7 @@ public class Table {
     }
 
     /** Fluent method to set whether the table has a compound key, e.g., transfers#to_stop_id. */
-    private Table hasCompoundKey() {
+    public Table hasCompoundKey() {
         this.compoundKey = true;
         return this;
     }
@@ -478,10 +481,15 @@ public class Table {
         String tableName = namespace == null
                 ? name
                 : String.join(".", namespace, name);
-        String questionMarks = String.join(", ", Collections.nCopies(editorFields().size(), "?"));
         String joinedFieldNames = commaSeparatedNames(editorFields());
         String idValue = setDefaultId ? "DEFAULT" : "?";
-        return String.format("insert into %s (id, %s) values (%s, %s)", tableName, joinedFieldNames, idValue, questionMarks);
+        return String.format(
+            "insert into %s (id, %s) values (%s, %s)",
+            tableName,
+            joinedFieldNames,
+            idValue,
+            String.join(", ", Collections.nCopies(editorFields().size(), "?"))
+        );
     }
 
     /**
@@ -512,6 +520,9 @@ public class Table {
             // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
             InputStream bomInputStream = new BOMInputStream(zipInputStream);
             CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
+            // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
+            // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
+            csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
@@ -582,6 +593,14 @@ public class Table {
             fieldsString = commaSeparatedNames(requiredFields(), fieldPrefix, true);
         } else fieldsString = "*";
         return String.format("select %s from %s", fieldsString, tableName);
+    }
+
+    /**
+     * Shorthand wrapper for calling {@link #generateSelectSql(String, Requirement)}. Note: this does not prefix field
+     * names with the namespace, so cannot serve as a replacement for {@link #generateSelectAllExistingFieldsSql}.
+     */
+    public String generateSelectAllSql (String namespace) {
+        return generateSelectSql(namespace, Requirement.PROPRIETARY);
     }
 
     /**
@@ -815,8 +834,16 @@ public class Table {
     /**
      * Creates a SQL table from the table to clone. This uses the SQL syntax "create table x as y" not only copies the
      * table structure, but also the data from the original table. Creating table indexes is not handled by this method.
+     *
+     * Note: the stop_times table is a special case that will optionally normalize the stop_sequence values to be
+     * zero-based and incrementing.
+     *
+     * @param connection            SQL connection
+     * @param tableToClone          table name to clone (in the dot notation: namespace.gtfs_table)
+     * @param normalizeStopTimes    whether to normalize stop times (set stop_sequence values to be zero-based and
+     *                              incrementing)
      */
-    public boolean createSqlTableFrom(Connection connection, String tableToClone) {
+    public boolean createSqlTableFrom(Connection connection, String tableToClone, boolean normalizeStopTimes) {
         long startTime = System.currentTimeMillis();
         try {
             Statement statement = connection.createStatement();
@@ -824,7 +851,7 @@ public class Table {
             String dropSql = String.format("drop table if exists %s", name);
             LOG.info(dropSql);
             statement.execute(dropSql);
-            if (tableToClone.endsWith("stop_times")) {
+            if (tableToClone.endsWith("stop_times") && normalizeStopTimes) {
                 normalizeAndCloneStopTimes(statement, name, tableToClone);
             } else {
                 // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.
@@ -938,101 +965,6 @@ public class Table {
 
     public Table getParentTable() {
         return parentTable;
-    }
-
-    /**
-     * During table load, checks the uniqueness of the entity ID and that references are valid. NOTE: This method
-     * defaults the key field and order field names to this table's values.
-     * @param keyValue          key value for the record being checked
-     * @param lineNumber        line number of the record being checked
-     * @param field             field currently being checked
-     * @param value             value that corresponds to field
-     * @param referenceTracker  reference tracker in which to store references
-     * @return                  any duplicate or bad reference errors.
-     */
-    public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, ReferenceTracker referenceTracker) {
-        return checkReferencesAndUniqueness(keyValue, lineNumber, field, value, referenceTracker, getKeyFieldName(), getOrderFieldName());
-    }
-
-    /**
-     * During table load, checks the uniqueness of the entity ID and that references are valid. These references are
-     * stored in the provided reference tracker. Any non-unique IDs or invalid references will store an error. NOTE:
-     * this instance of checkReferencesAndUniqueness allows for arbitrarily setting the keyField and orderField, which
-     * is helpful for checking uniqueness of fields that are not the standard primary key (e.g., route_short_name).
-     */
-    public Set<NewGTFSError> checkReferencesAndUniqueness(String keyValue, int lineNumber, Field field, String value, ReferenceTracker referenceTracker, String keyField, String orderField) {
-        Set<NewGTFSError> errors = new HashSet<>();
-        // Store field-scoped transit ID for referential integrity check. (Note, entity scoping doesn't work here because
-        // we need to cross-check multiple entity types for valid references, e.g., stop times and trips both share trip
-        // id.)
-        // If table has an order field, that order field should supersede the key field as the "unique" field. In other
-        // words, if it has an order field, the unique key is actually compound -- made up of the keyField + orderField.
-        String uniqueKeyField = orderField != null
-            ? orderField
-            // If table has no unique key field (e.g., calendar_dates or transfers), there is no need to check for
-            // duplicates.
-            : !hasUniqueKeyField
-                ? null
-                : keyField;
-        String transitId = String.join(":", keyField, keyValue);
-
-        // If the field is optional and there is no value present, skip check.
-        if (!field.isRequired() && "".equals(value)) return Collections.EMPTY_SET;
-
-        // First, handle referential integrity check.
-        boolean isOrderField = field.name.equals(orderField);
-        if (field.isForeignReference()) {
-            // Check referential integrity if the field is a foreign reference. Note: the reference table must be loaded
-            // before the table/value being currently checked.
-            String referenceField = field.referenceTable.getKeyFieldName();
-            String referenceTransitId = String.join(":", referenceField, value);
-
-            if (!referenceTracker.transitIds.contains(referenceTransitId)) {
-                // If the reference tracker does not contain
-                NewGTFSError referentialIntegrityError = NewGTFSError.forLine(
-                        this, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
-                        .setEntityId(keyValue);
-                // If the field is an order field, set the sequence for the new error.
-                if (isOrderField) referentialIntegrityError.setSequence(value);
-                errors.add(referentialIntegrityError);
-            }
-        }
-        // Next, handle duplicate ID check.
-        // In most cases there is no need to check for duplicate IDs if the field is a foreign reference. However,
-        // transfers#to_stop_id is defined as an order field, so we need to check that this field (which is both a
-        // foreign ref and order field) is dataset unique in conjunction with the key field.
-        // These hold references to the set of IDs to check for duplicates and the ID to check. These depend on
-        // whether an order field is part of the "unique ID."
-        Set<String> listOfUniqueIds = referenceTracker.transitIds;
-        String uniqueId = transitId;
-
-        // Next, check that the ID is table-unique. For example, the trip_id field is table unique in trips.txt and
-        // the the stop_sequence field (joined with trip_id) is table unique in stop_times.txt.
-        if (field.name.equals(uniqueKeyField)) {
-            // Check for duplicate IDs and store entity-scoped IDs for referential integrity check
-            if (isOrderField) {
-                // Check duplicate reference in set of field-scoped id:sequence (e.g., stop_sequence:12345:2)
-                // This should not be scoped by key field because there may be conflicts (e.g., with trip_id="12345:2"
-                listOfUniqueIds = referenceTracker.transitIdsWithSequence;
-                uniqueId = String.join(":", field.name, keyValue, value);
-            }
-            // Add ID and check duplicate reference in entity-scoped IDs (e.g., stop_id:12345)
-            boolean valueAlreadyExists = !listOfUniqueIds.add(uniqueId);
-            if (valueAlreadyExists) {
-                // If the value is a duplicate, add an error.
-                NewGTFSError duplicateIdError = NewGTFSError.forLine(this, lineNumber, DUPLICATE_ID, uniqueId)
-                                                            .setEntityId(keyValue);
-                if (isOrderField) duplicateIdError.setSequence(value);
-                errors.add(duplicateIdError);
-            }
-        } else if (field.name.equals(keyField)) {
-            // We arrive here if the field is not a foreign reference and not the unique key field on the table (e.g.,
-            // shape_pt_sequence), but is still a key on the table. For example, this is where we add shape_id from
-            // the shapes table, so that when we check the referential integrity of trips#shape_id, we know that the
-            // shape_id exists in the shapes table. It also handles tracking calendar_dates#service_id values.
-            referenceTracker.transitIds.add(uniqueId);
-        }
-        return errors;
     }
 
     /**

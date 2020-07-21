@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_lang,agency_phone,agency_email,agency_timezone,agency_fare_url
+100000000,Fake Transit,http://example.com,,,,America/Los_Angeles,

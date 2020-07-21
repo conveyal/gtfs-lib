@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
@@ -47,21 +48,30 @@ public class SpeedTripValidator extends TripValidator {
         double distanceMeters = 0;
         for (int i = beginIndex + 1; i < stopTimes.size(); i++) {
             StopTime currStopTime = stopTimes.get(i);
+            if (currStopTime.pickup_type == 1 && currStopTime.drop_off_type == 1 && currStopTime.timepoint == 0) {
+                // stop_time allows neither pickup or drop off and is not a timepoint, so it serves no purpose.
+                registerError(currStopTime, NewGTFSErrorType.STOP_TIME_UNUSED);
+            }
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
-            // Check that shape_dist_traveled is increasing.
-            checkShapeDistTraveled(prevStopTime, currStopTime);
+            // Check that shape_dist_traveled is increasing. Note: we skip checking the first index because it appears
+            // to be a common practice for agencies to omit a 0.0 value during export. Because most feed consumers
+            // likely will just default a missing value to 0.0, we skip this check because it causes excessive noise in
+            // validation results.
+            if (beginIndex > 0) checkShapeDistTraveled(prevStopTime, currStopTime);
             if (missingBothTimes(currStopTime)) {
                 // FixMissingTimes has already been called, so both arrival and departure time are missing.
-                // The spec allows this. Other than accumulating distance, skip this StopTime.
+                // The spec allows this. Other than accumulating distance, skip this StopTime. If this stop_time serves
+                // as a timepoint; however, this is considered an error.
+                if (currStopTime.timepoint == 1) registerError(currStopTime, NewGTFSErrorType.TIMEPOINT_MISSING_TIMES);
                 continue;
             }
             if (currStopTime.departure_time < currStopTime.arrival_time) {
                 registerError(currStopTime, DEPARTURE_BEFORE_ARRIVAL);
             }
             // Detect if travel times are rounded off to minutes.
-            boolean bothTravelTimesRounded = areTravelTimesRounded(prevStopTime);
+            boolean bothTravelTimesRounded = areTravelTimesRounded(prevStopTime) && areTravelTimesRounded(currStopTime);
             double travelTimeSeconds = currStopTime.arrival_time - prevStopTime.departure_time;
             // If travel times are rounded and travel time is zero, determine the maximum and minimum possible speed
             // by adding/removing one minute of slack.
@@ -86,7 +96,7 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * Register shape dist traveled error if current stop time has a value AND either and the previous value is
+     * Register shape dist traveled error if current stop time has a value AND either the previous value is
      * missing (if at least one stop time has a value, all stop times for the trip should) OR if current value
      * is less than or equal to the previous value. Note: if the previous shape_dist_traveled value is present and the
      * current value is missing, the previous value will be greater than the current stop time's value because

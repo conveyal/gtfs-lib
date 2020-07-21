@@ -142,6 +142,7 @@ public class GraphQLGtfsSchema {
     public static final GraphQLObjectType feedInfoType = newObject().name("feed_info")
             .description("A GTFS feed_info object")
             .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("feed_id"))
             .field(MapFetcher.field("feed_publisher_name"))
             .field(MapFetcher.field("feed_publisher_url"))
             .field(MapFetcher.field("feed_lang"))
@@ -190,11 +191,13 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pattern_id"))
             .field(newFieldDefinition()
                     .name("stop_times")
-                    // forward reference to the as yet undefined stopTimeType (must be defined after tripType)
+                    // forward reference to the as yet undefined stopTimeType (must be defined
+                    // after tripType)
                     .type(new GraphQLList(new GraphQLTypeReference("stopTime")))
-                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
-                    // (i.e., nested types that typically would only be nested under another entity and only make sense
-                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally"
+                    //  nested types (i.e., nested types that typically would only be nested under
+                    //  another entity and only make sense with the entire set -- fares -> fare
+                    //  rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher(
                             "stop_times",
@@ -333,6 +336,18 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("parent_station"))
             .field(MapFetcher.field("location_type", GraphQLInt))
             .field(MapFetcher.field("wheelchair_boarding", GraphQLInt))
+            // Returns all stops that reference parent stop's stop_id
+            .field(newFieldDefinition()
+                    .name("child_stops")
+                    .type(new GraphQLList(new GraphQLTypeReference("stop")))
+                    .dataFetcher(new JDBCFetcher(
+                        "stops",
+                        "stop_id",
+                        null,
+                        false,
+                        "parent_station"
+                    ))
+                    .build())
             .field(RowCountFetcher.field("stop_time_count", "stop_times", "stop_id"))
             .field(newFieldDefinition()
                     .name("patterns")
@@ -442,6 +457,7 @@ public class GraphQLGtfsSchema {
             .field(string("type"))
             .field(intt("count"))
             .field(string("message"))
+            .field(string("priority"))
             .build();
 
     /**

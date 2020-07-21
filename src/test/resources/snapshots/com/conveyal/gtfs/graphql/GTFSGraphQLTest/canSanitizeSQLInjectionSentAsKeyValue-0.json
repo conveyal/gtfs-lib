@@ -1,0 +1,43 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "routes" : [ {
+        "agency_id" : "1",
+        "count" : 1,
+        "id" : 2,
+        "pattern_count" : 2,
+        "patterns" : [ {
+          "pattern_id" : "1"
+        }, {
+          "pattern_id" : "2"
+        } ],
+        "publicly_visible" : null,
+        "route_branding_url" : null,
+        "route_color" : "7CE6E7",
+        "route_desc" : null,
+        "route_id" : "' OR 1=1; Select '99",
+        "route_long_name" : "Route 1",
+        "route_short_name" : "1",
+        "route_text_color" : "FFFFFF",
+        "route_type" : 3,
+        "route_url" : null,
+        "status" : null,
+        "stops" : [ {
+          "stop_id" : "4u6g"
+        }, {
+          "stop_id" : "johv"
+        }, {
+          "stop_id" : "1234"
+        } ],
+        "trip_count" : 2,
+        "trips" : [ {
+          "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+        }, {
+          "trip_id" : "frequency-trip"
+        } ],
+        "wheelchair_accessible" : null
+      } ]
+    }
+  }
+}

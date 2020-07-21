@@ -18,8 +18,12 @@ import java.sql.Statement;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.createFeedRegistryIfNotExists;
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.createSchema;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
 /**
@@ -37,6 +41,13 @@ public class JdbcGtfsSnapshotter {
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsSnapshotter.class);
 
     private final DataSource dataSource;
+    /**
+     * Whether to normalize stop_times#stop_sequence values on snapshot (or leave them intact).
+     *
+     * TODO: if more options are added in the future, this should be folded into a SnapshotOptions
+     *   object.
+     */
+    private final boolean normalizeStopTimes;
 
     // These fields will be filled in once feed snapshot begins.
     private Connection connection;
@@ -47,10 +58,13 @@ public class JdbcGtfsSnapshotter {
     /**
      * @param feedId namespace (schema) to snapshot. If null, a blank snapshot will be created.
      * @param dataSource the JDBC data source with database connection details
+     * @param normalizeStopTimes whether to keep stop sequence values intact or normalize to be zero-based and
+     *                           incrementing
      */
-    public JdbcGtfsSnapshotter(String feedId, DataSource dataSource) {
+    public JdbcGtfsSnapshotter(String feedId, DataSource dataSource, boolean normalizeStopTimes) {
         this.feedIdToSnapshot = feedId;
         this.dataSource = dataSource;
+        this.normalizeStopTimes = normalizeStopTimes;
     }
 
     /**
@@ -107,6 +121,8 @@ public class JdbcGtfsSnapshotter {
             LOG.error("Exception while creating snapshot: {}", ex.toString());
             ex.printStackTrace();
             result.fatalException = ex.toString();
+        } finally {
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
     }
@@ -131,7 +147,7 @@ public class JdbcGtfsSnapshotter {
                 // Otherwise, use the createTableFrom method to copy the data from the original.
                 String fromTableName = String.format("%s.%s", feedIdToSnapshot, table.name);
                 LOG.info("Copying table {} to {}", fromTableName, targetTable.name);
-                success = targetTable.createSqlTableFrom(connection, fromTableName);
+                success = targetTable.createSqlTableFrom(connection, fromTableName, normalizeStopTimes);
             }
             // Only create indexes if table creation was successful.
             if (success && createIndexes) {
@@ -211,7 +227,7 @@ public class JdbcGtfsSnapshotter {
                 Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
 
                 // Keep track of calendars by service id in case we need to add dummy calendar entries.
-                Map<String, Calendar> calendarsByServiceId = new HashMap<>();
+                Map<String, Calendar> dummyCalendarsByServiceId = new HashMap<>();
 
                 // Iterate through calendar dates to build up to get maps from exceptions to their dates.
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
@@ -227,7 +243,7 @@ public class JdbcGtfsSnapshotter {
                         addedServiceForDate.put(date, calendarDate.service_id);
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
-                        Calendar calendar = calendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+                        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
                         calendar.service_id = calendarDate.service_id;
                         if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
                             calendar.start_date = calendarDate.date;
@@ -235,7 +251,7 @@ public class JdbcGtfsSnapshotter {
                         if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
                             calendar.end_date = calendarDate.date;
                         }
-                        calendarsByServiceId.put(calendarDate.service_id, calendar);
+                        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
                         removedServiceForDate.put(date, calendarDate.service_id);
                     }
@@ -260,42 +276,53 @@ public class JdbcGtfsSnapshotter {
                 }
                 scheduleExceptionsTracker.executeRemaining();
 
-                // determine if we appear to be working with a calendar_dates-only feed.
-                // If so, we must also add dummy entries to the calendar table
-                if (
-                    feedIdToSnapshot != null &&
-                    !tableExists(feedIdToSnapshot, "calendar") &&
-                    calendarDatesReader.getRowCount() > 0
-                ) {
-                    sql = String.format(
-                        "insert into %s (service_id, description, start_date, end_date, " +
-                            "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
-                            "values (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)",
-                        tablePrefix + "calendar"
-                    );
-                    PreparedStatement calendarStatement = connection.prepareStatement(sql);
-                    final BatchTracker calendarsTracker = new BatchTracker(
-                        "calendar",
-                        calendarStatement
-                    );
-                    for (Calendar calendar : calendarsByServiceId.values()) {
-                        calendarStatement.setString(1, calendar.service_id);
-                        calendarStatement.setString(
-                            2,
-                            String.format("%s (auto-generated)", calendar.service_id)
-                        );
-                        calendarStatement.setString(
-                            3,
-                            calendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
-                        );
-                        calendarStatement.setString(
-                            4,
-                            calendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
-                        );
-                        calendarsTracker.addBatch();
-                    }
-                    calendarsTracker.executeRemaining();
+                // fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
+                // table.
+                JDBCTableReader<Calendar> calendarReader = new JDBCTableReader(
+                    Table.CALENDAR,
+                    dataSource,
+                    feedIdToSnapshot + ".",
+                    EntityPopulator.CALENDAR
+                );
+                Set<String> calendarServiceIds = new HashSet<>();
+                for (Calendar calendar : calendarReader.getAll()) {
+                    calendarServiceIds.add(calendar.service_id);
                 }
+
+                // For service_ids that only existed in the calendar_dates table, insert auto-generated, "blank"
+                // (no days of week specified) calendar entries.
+                sql = String.format(
+                    "insert into %s (service_id, description, start_date, end_date, " +
+                        "monday, tuesday, wednesday, thursday, friday, saturday, sunday)" +
+                        "values (?, ?, ?, ?, 0, 0, 0, 0, 0, 0, 0)",
+                    tablePrefix + "calendar"
+                );
+                PreparedStatement calendarStatement = connection.prepareStatement(sql);
+                final BatchTracker calendarsTracker = new BatchTracker(
+                    "calendar",
+                    calendarStatement
+                );
+                for (Calendar dummyCalendar : dummyCalendarsByServiceId.values()) {
+                    if (calendarServiceIds.contains(dummyCalendar.service_id)) {
+                        // This service_id already exists in the calendar table. No need to create auto-generated entry.
+                        continue;
+                    }
+                    calendarStatement.setString(1, dummyCalendar.service_id);
+                    calendarStatement.setString(
+                        2,
+                        String.format("%s (auto-generated)", dummyCalendar.service_id)
+                    );
+                    calendarStatement.setString(
+                        3,
+                        dummyCalendar.start_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                    );
+                    calendarStatement.setString(
+                        4,
+                        dummyCalendar.end_date.format(DateTimeFormatter.BASIC_ISO_DATE)
+                    );
+                    calendarsTracker.addBatch();
+                }
+                calendarsTracker.executeRemaining();
 
                 connection.commit();
             } catch (Exception e) {
@@ -415,17 +442,14 @@ public class JdbcGtfsSnapshotter {
      */
     private void registerSnapshot () {
         try {
-            Statement statement = connection.createStatement();
+            // We cannot simply insert into the feeds table because if we are creating an empty snapshot (to create/edit
+            // a GTFS feed from scratch), the feed registry table will not exist.
             // TODO copy over feed_id and feed_version from source namespace?
-
-            // FIXME do the following only on databases that support schemas.
-            // SQLite does not support them. Is there any advantage of schemas over flat tables?
-            statement.execute("create schema " + tablePrefix);
             // TODO: Record total snapshot processing time?
-            // Simply insert into feeds table (no need for table creation) because making a snapshot presumes that the
-            // feeds table already exists.
+            createFeedRegistryIfNotExists(connection);
+            createSchema(connection, tablePrefix);
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, null, null, null, null, null, current_timestamp, ?)");
+                    "insert into feeds values (?, null, null, null, null, null, current_timestamp, ?, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, feedIdToSnapshot);
             insertStatement.execute();

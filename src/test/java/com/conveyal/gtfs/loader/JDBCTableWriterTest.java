@@ -6,6 +6,9 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
@@ -15,6 +18,8 @@ import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.hamcrest.Matcher;
+import org.hamcrest.Matchers;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -24,16 +29,20 @@ import org.slf4j.LoggerFactory;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.UUID;
 
 import static com.conveyal.gtfs.GTFS.createDataSource;
+import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
+import static com.conveyal.gtfs.GTFS.validate;
+import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 
 /**
  * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
@@ -48,6 +57,7 @@ public class JDBCTableWriterTest {
     private static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
+    private static String testGtfsGLSnapshotNamespace;
     private static String simpleServiceId = "1";
     private static String firstStopId = "1";
     private static String lastStopId = "2";
@@ -70,19 +80,32 @@ public class JDBCTableWriterTest {
         testDataSource = createDataSource (dbConnectionUrl, null, null);
         LOG.info("creating feeds table because it isn't automatically generated unless you import a feed");
         Connection connection = testDataSource.getConnection();
-        connection.createStatement()
-            .execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                "snapshot_of varchar)");
+        connection.createStatement().execute(JdbcGtfsLoader.getCreateFeedRegistrySQL());
         connection.commit();
         LOG.info("feeds table created");
         // Create an empty snapshot to create a new namespace and all the tables
-        FeedLoadResult result = makeSnapshot(null, testDataSource);
+        FeedLoadResult result = makeSnapshot(null, testDataSource, false);
         testNamespace = result.uniqueIdentifier;
         // Create a service calendar and two stops, both of which are necessary to perform pattern and trip tests.
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
         createSimpleStop(firstStopId, "First Stop", firstStopLat, firstStopLon);
         createSimpleStop(lastStopId, "Last Stop", lastStopLat, lastStopLon);
+
+        /** Load the following real-life GTFS for use with {@link JDBCTableWriterTest#canUpdateServiceId()}  **/
+        // load feed into db
+        FeedLoadResult feedLoadResult = load(getResourceFileName("real-world-gtfs-feeds/gtfs_GL.zip"), testDataSource);
+        String testGtfsGLNamespace = feedLoadResult.uniqueIdentifier;
+        // validate feed to create additional tables
+        validate(testGtfsGLNamespace, testDataSource);
+        // load into editor via snapshot
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(testGtfsGLNamespace, testDataSource, false);
+        SnapshotResult snapshotResult = snapshotter.copyTables();
+        testGtfsGLSnapshotNamespace = snapshotResult.uniqueIdentifier;
+    }
+
+    @AfterClass
+    public static void tearDownClass() {
+        TestUtils.dropDB(testDBName);
     }
 
     @Test
@@ -94,6 +117,7 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         FeedInfoDTO feedInfoInput = new FeedInfoDTO();
         String publisherName = "test-publisher";
+        feedInfoInput.feed_id = null;
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
@@ -140,12 +164,7 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, feedInfoTable.name);
 
         // make sure record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-            "select * from %s.%s where id=%d",
-            testNamespace,
-            feedInfoTable.name,
-            createdFeedInfo.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFeedInfo.id, feedInfoTable));
     }
 
     /**
@@ -157,6 +176,7 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         FeedInfoDTO feedInfoInput = new FeedInfoDTO();
         String publisherName = "' OR 1 = 1; SELECT '1";
+        feedInfoInput.feed_id = "fake_id";
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
@@ -190,8 +210,8 @@ public class JDBCTableWriterTest {
         fareInput.price = 2.50;
         fareInput.agency_id = "RTA";
         fareInput.payment_method = 0;
-        // Empty value should be permitted for transfers and transfer_duration
-        fareInput.transfers = null;
+        // Empty string value or null should be permitted for transfers and transfer_duration
+        fareInput.transfers = "";
         fareInput.transfer_duration = null;
         FareRuleDTO fareRuleInput = new FareRuleDTO();
         // Fare ID should be assigned to "child entity" by editor automatically.
@@ -216,9 +236,24 @@ public class JDBCTableWriterTest {
         assertThat(createdFare.fare_id, equalTo(fareId));
         assertThat(createdFare.fare_rules[0].fare_id, equalTo(fareId));
 
+        // Ensure transfers value is null to check database integrity.
+        ResultSet resultSet = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES);
+        while (resultSet.next()) {
+            // We must match against null value for transfers because the database stored value will
+            // not be an empty string, but null.
+            assertResultValue(resultSet, "transfers", Matchers.nullValue());
+            assertResultValue(resultSet, "fare_id", equalTo(fareInput.fare_id));
+            assertResultValue(resultSet, "currency_type", equalTo(fareInput.currency_type));
+            assertResultValue(resultSet, "price", equalTo(fareInput.price));
+            assertResultValue(resultSet, "agency_id", equalTo(fareInput.agency_id));
+            assertResultValue(resultSet, "payment_method", equalTo(fareInput.payment_method));
+            assertResultValue(resultSet, "transfer_duration", equalTo(fareInput.transfer_duration));
+        }
+
         // try to update record
         String updatedFareId = "3B";
         createdFare.fare_id = updatedFareId;
+        createdFare.transfers = "0";
 
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(fareTable);
@@ -236,6 +271,13 @@ public class JDBCTableWriterTest {
         assertThat(updatedFareDTO.fare_id, equalTo(updatedFareId));
         assertThat(updatedFareDTO.fare_rules[0].fare_id, equalTo(updatedFareId));
 
+        // Ensure transfers value is updated correctly to check database integrity.
+        ResultSet updatedResult = getResultSetForId(createdFare.id, Table.FARE_ATTRIBUTES);
+        while (updatedResult.next()) {
+            assertResultValue(updatedResult, "transfers", equalTo(0));
+            assertResultValue(updatedResult, "fare_id", equalTo(createdFare.fare_id));
+        }
+
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(fareTable);
         int deleteOutput = deleteTableWriter.delete(
@@ -245,32 +287,10 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
         // make sure fare_attributes record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                fareTable.name,
-                createdFare.id
-        ));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFare.id, fareTable));
 
         // make sure fare_rules record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
-                testNamespace,
-                Table.FARE_RULES.name,
-                createdFare.fare_rules[0].id
-        ));
-    }
-
-    void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
-        assertThatSqlQueryYieldsRowCount(sql, 0);
-    }
-
-    private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
-        LOG.info(sql);
-        int recordCount = 0;
-        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
-        while (rs.next()) recordCount++;
-        assertThat("Records matching query should equal expected count.", recordCount, equalTo(expectedRowCount));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdFare.fare_rules[0].id, Table.FARE_RULES));
     }
 
     @Test
@@ -318,63 +338,158 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
         // make sure route record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(String.format(
-                "select * from %s.%s where id=%d",
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdRoute.id, routeTable));
+    }
+
+    /**
+     * Ensure that a simple {@link ScheduleException} can be created, updated, and deleted.
+     */
+    @Test
+    public void canCreateUpdateAndDeleteScheduleExceptions() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
+        final Class<ScheduleExceptionDTO> scheduleExceptionDTOClass = ScheduleExceptionDTO.class;
+        // Create new object to be saved.
+        ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
+        exceptionInput.name = "Halloween";
+        exceptionInput.exemplar = 9; // Add, swap, or remove type
+        exceptionInput.removed_service = new String[]{simpleServiceId};
+        String[] halloweenDate = new String[]{"20191031"};
+        exceptionInput.dates = halloweenDate;
+        TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
+        ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput,
+                                                                         scheduleExceptionDTOClass);
+        // Make sure saved data matches expected data.
+        assertThat(scheduleException.removed_service[0], equalTo(simpleServiceId));
+        ResultSet resultSet = getResultSetForId(scheduleException.id, scheduleExceptionTable, "removed_service");
+        while (resultSet.next()) {
+            String[] array = (String[]) resultSet.getArray(1).getArray();
+            for (int i = 0; i < array.length; i++) {
+                assertEquals(exceptionInput.removed_service[i], array[i]);
+            }
+        }
+        // try to update record
+        String[] updatedDates = new String[]{"20191031", "20201031"};
+        scheduleException.dates = updatedDates;
+        // covert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String updateOutput = updateTableWriter.update(
+            scheduleException.id,
+            mapper.writeValueAsString(scheduleException),
+            true
+        );
+        LOG.info("update {} output:", scheduleExceptionTable.name);
+        LOG.info(updateOutput);
+        ScheduleExceptionDTO updatedDTO = mapper.readValue(updateOutput, scheduleExceptionDTOClass);
+        // Make sure saved data matches expected data.
+        assertThat(updatedDTO.dates, equalTo(updatedDates));
+        ResultSet rs2 = getResultSetForId(scheduleException.id, scheduleExceptionTable, "dates");
+        while (rs2.next()) {
+            String[] array = (String[]) rs2.getArray(1).getArray();
+            for (int i = 0; i < array.length; i++) {
+                assertEquals(updatedDates[i], array[i]);
+            }
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(scheduleExceptionTable);
+        int deleteOutput = deleteTableWriter.delete(
+            scheduleException.id,
+            true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
+        // Make sure route record does not exist in DB.
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(scheduleException.id, scheduleExceptionTable));
+    }
+
+    /**
+     * This test verifies that stop_times#shape_dist_traveled (and other "linked fields") are updated when a pattern
+     * is updated.
+     */
+    @Test
+    public void shouldUpdateStopTimeShapeDistTraveledOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = newUUID();
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndPattern(
+            routeId,
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternStopDTO[]{
+                new PatternStopDTO(patternId, firstStopId, 0),
+                new PatternStopDTO(patternId, lastStopId, 1)
+            },
+            0
+        );
+        // Make sure saved data matches expected data.
+        assertThat(pattern.route_id, equalTo(routeId));
+        // Create trip so we can check that the stop_time values are updated after the patter update.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
+        PreparedStatement statement = testDataSource.getConnection().prepareStatement(
+            String.format(
+                "select shape_dist_traveled from %s.stop_times where stop_sequence=1 and trip_id='%s'",
                 testNamespace,
-                routeTable.name,
-                createdRoute.id
-        ));
+                createdTrip.trip_id
+            )
+        );
+        ResultSet resultSet = statement.executeQuery();
+        while (resultSet.next()) {
+            // First stop_time shape_dist_traveled should be zero.
+            assertThat(resultSet.getInt(1), equalTo(0));
+        }
+        // Update pattern_stop#shape_dist_traveled and check that the stop_time's shape_dist value is updated.
+        final double updatedShapeDistTraveled = 45.5;
+        pattern.pattern_stops[1].shape_dist_traveled = updatedShapeDistTraveled;
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern: {}", updatedPatternOutput);
+        ResultSet resultSet2 = statement.executeQuery();
+        while (resultSet2.next()) {
+            // First stop_time shape_dist_traveled should be updated.
+            assertThat(resultSet2.getDouble(1), equalTo(updatedShapeDistTraveled));
+        }
     }
 
-    /**
-     * Create and store a simple route for testing.
-     */
-    private static RouteDTO createSimpleTestRoute(String routeId, String agencyId, String shortName, String longName, int routeType) throws InvalidNamespaceException, IOException, SQLException {
-        RouteDTO input = new RouteDTO();
-        input.route_id = routeId;
-        input.agency_id = agencyId;
-        // Empty value should be permitted for transfers and transfer_duration
-        input.route_short_name = shortName;
-        input.route_long_name = longName;
-        input.route_type = routeType;
-        // convert object to json and save it
-        JdbcTableWriter createTableWriter = createTestTableWriter(Table.ROUTES);
-        String output = createTableWriter.create(mapper.writeValueAsString(input), true);
-        LOG.info("create {} output:", Table.ROUTES.name);
-        LOG.info(output);
-        // parse output
-        return mapper.readValue(output, RouteDTO.class);
-    }
-
-    /**
-     * Creates a pattern by first creating a route and then a pattern for that route.
-     */
-    private static PatternDTO createRouteAndSimplePattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
-        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[]{}, new PatternStopDTO[]{}, 0);
-    }
-
-    /**
-     * Creates a pattern by first creating a route and then a pattern for that route.
-     */
-    private static PatternDTO createRouteAndPattern(String routeId, String patternId, String name, String shapeId, ShapePointDTO[] shapes, PatternStopDTO[] patternStops, int useFrequency) throws InvalidNamespaceException, SQLException, IOException {
-        // Create new route
-        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
-        // Create new pattern for route
-        PatternDTO input = new PatternDTO();
-        input.pattern_id = patternId;
-        input.route_id = routeId;
-        input.name = name;
-        input.use_frequency = useFrequency;
-        input.shape_id = shapeId;
-        input.shapes = shapes;
-        input.pattern_stops = patternStops;
-        // Write the pattern to the database
-        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
-        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
-        LOG.info("create {} output:", Table.PATTERNS.name);
-        LOG.info(output);
-        // Parse output
-        return mapper.readValue(output, PatternDTO.class);
+    @Test
+    public void shouldDeleteReferencingTripsAndStopTimesOnPatternDelete() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = "9834914";
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndSimplePattern(routeId, "9901900", "The Line");
+        // make sure saved data matches expected data
+        assertThat(pattern.route_id, equalTo(routeId));
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
+        // Delete pattern record
+        JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
+        int deleteOutput = deletePatternWriter.delete(pattern.id, true);
+        LOG.info("deleted {} records from {}", deleteOutput, Table.PATTERNS.name);
+        // Check that pattern record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(pattern.id, Table.PATTERNS));
+        // Check that trip records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.TRIPS.name,
+                pattern.pattern_id
+            ));
+        // Check that stop_times records for trip do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.STOP_TIMES.name,
+                createdTrip.trip_id
+            ));
     }
 
     /**
@@ -456,32 +571,168 @@ public class JDBCTableWriterTest {
         LOG.info("Updated pattern output: {}", updatedPatternOutput);
         // Create new trip for the pattern
         String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createTripOutput);
         TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
         // Update trip
         // TODO: Add update and delete tests for updating pattern stops, stop_times, and frequencies.
         String updatedTripId = "100A";
         createdTrip.trip_id = updatedTripId;
         JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
-        String updateTripOutput = updateTripWriter.update(tripInput.id, mapper.writeValueAsString(createdTrip), true);
+        String updateTripOutput = updateTripWriter.update(createdTrip.id, mapper.writeValueAsString(createdTrip), true);
+        LOG.info(updateTripOutput);
         TripDTO updatedTrip = mapper.readValue(updateTripOutput, TripDTO.class);
         // Check that saved data matches expected data
         assertThat(updatedTrip.frequencies[0].start_time, equalTo(startTime));
         assertThat(updatedTrip.trip_id, equalTo(updatedTripId));
         // Delete trip record
         JdbcTableWriter deleteTripWriter = createTestTableWriter(tripsTable);
-        int deleteOutput = deleteTripWriter.delete(
-            createdTrip.id,
-            true
-        );
+        int deleteOutput = deleteTripWriter.delete(createdTrip.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, tripsTable.name);
-        // Check that record does not exist in DB
+        // Check that trip record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where id=%d",
                 testNamespace,
                 tripsTable.name,
-                createdTrip.id
+                updatedTrip.id
             ));
+        // Check that stop_times records do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.STOP_TIMES.name,
+                updatedTrip.trip_id
+            ));
+    }
+
+    /**
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int)} can normalize stop times to a pattern's
+     * default travel times.
+     */
+    @Test
+    public void canNormalizePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table tripsTable = Table.TRIPS;
+        int initialTravelTime = 60; // one minute
+        int startTime = 6 * 60 * 60; // 6AM
+        String patternId = "123456";
+        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, firstStopId, 0),
+            new PatternStopDTO(patternId, lastStopId, 1)
+        };
+        patternStops[1].default_travel_time = initialTravelTime;
+        PatternDTO pattern = createRouteAndPattern(newUUID(),
+                                                   patternId,
+                                                   "Pattern A",
+                                                   null,
+                                                   new ShapePointDTO[]{},
+                                                   patternStops,
+                                                   0);
+        // Create trip with travel times that match pattern stops.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
+        JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
+        String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createTripOutput);
+        TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
+        // Update pattern stop with new travel time.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        int updatedTravelTime = 3600; // one hour
+        pattern.pattern_stops[1].default_travel_time = updatedTravelTime;
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+        // Normalize stop times.
+        JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
+        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
+        // Read pattern stops from database and check that the arrivals/departures have been updated.
+        JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
+                                                                       testDataSource,
+                                                                       testNamespace + ".",
+                                                                       EntityPopulator.STOP_TIME);
+        int index = 0;
+        for (StopTime stopTime : stopTimesTable.getOrdered(createdTrip.trip_id)) {
+            LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
+            assertThat(stopTime.arrival_time, equalTo(startTime + index * updatedTravelTime));
+            index++;
+        }
+        // Ensure that updated stop times equals pattern stops length
+        assertThat(index, equalTo(patternStops.length));
+    }
+
+    /**
+     * This test makes sure that updated the service_id will properly update affected referenced entities properly.
+     * This test case was initially developed to prove that https://github.com/conveyal/gtfs-lib/issues/203 is
+     * happening.
+     */
+    @Test
+    public void canUpdateServiceId() throws InvalidNamespaceException, IOException, SQLException {
+        // change the service id
+        JdbcTableWriter tableWriter = new JdbcTableWriter(Table.CALENDAR, testDataSource, testGtfsGLSnapshotNamespace);
+        tableWriter.update(
+            2,
+            "{\"id\":2,\"service_id\":\"test\",\"description\":\"MoTuWeThFrSaSu\",\"monday\":1,\"tuesday\":1,\"wednesday\":1,\"thursday\":1,\"friday\":1,\"saturday\":1,\"sunday\":1,\"start_date\":\"20180526\",\"end_date\":\"20201231\"}",
+            true
+        );
+
+        // assert that the amount of stop times equals the original amount of stop times in the feed
+        assertThatSqlQueryYieldsRowCount(
+            String.format(
+                "select * from %s.%s",
+                testGtfsGLSnapshotNamespace,
+                Table.STOP_TIMES.name
+            ),
+            53
+        );
+    }
+
+    /*****************************************************************************************************************
+     * End tests, begin helpers
+     ****************************************************************************************************************/
+
+    private static String newUUID() {
+        return UUID.randomUUID().toString();
+    }
+
+    /**
+     * Constructs SQL query for the specified ID and columns and returns the resulting result set.
+     */
+    private String getColumnsForId(int id, Table table, String... columns) {
+        String sql = String.format(
+            "select %s from %s.%s where id=%d",
+            columns.length > 0 ? String.join(", ", columns) : "*",
+            testNamespace,
+            table.name,
+            id
+        );
+        LOG.info(sql);
+        return sql;
+    }
+
+    /**
+     * Executes SQL query for the specified ID and columns and returns the resulting result set.
+     */
+    private ResultSet getResultSetForId(int id, Table table, String... columns) throws SQLException {
+        String sql = getColumnsForId(id, table, columns);
+        return testDataSource.getConnection().prepareStatement(sql).executeQuery();
+    }
+
+    /**
+     * Asserts that a given value for the specified field in result set matches provided matcher.
+     */
+    private void assertResultValue(ResultSet resultSet, String field, Matcher matcher) throws SQLException {
+        assertThat(resultSet.getObject(field), matcher);
+    }
+
+    private void assertThatSqlQueryYieldsRowCount(String sql, int expectedRowCount) throws SQLException {
+        LOG.info(sql);
+        int recordCount = 0;
+        ResultSet rs = testDataSource.getConnection().prepareStatement(sql).executeQuery();
+        while (rs.next()) recordCount++;
+        assertThat("Records matching query should equal expected count.", recordCount, equalTo(expectedRowCount));
+    }
+
+    void assertThatSqlQueryYieldsZeroRows(String sql) throws SQLException {
+        assertThatSqlQueryYieldsRowCount(sql, 0);
     }
 
     /**
@@ -505,6 +756,53 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * Construct (without writing to the database) a timetable trip.
+     */
+    private TripDTO constructTimetableTrip(String patternId, String routeId, int startTime, int travelTime) {
+        TripDTO tripInput = new TripDTO();
+        tripInput.pattern_id = patternId;
+        tripInput.route_id = routeId;
+        tripInput.service_id = simpleServiceId;
+        tripInput.stop_times = new StopTimeDTO[]{
+            new StopTimeDTO(firstStopId, startTime, startTime, 0),
+            new StopTimeDTO(lastStopId, startTime + travelTime, startTime + travelTime, 1)
+        };
+        tripInput.frequencies = new FrequencyDTO[]{};
+        return tripInput;
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndPattern(String routeId, String patternId, String name, String shapeId, ShapePointDTO[] shapes, PatternStopDTO[] patternStops, int useFrequency) throws InvalidNamespaceException, SQLException, IOException {
+        // Create new route
+        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
+        // Create new pattern for route
+        PatternDTO input = new PatternDTO();
+        input.pattern_id = patternId;
+        input.route_id = routeId;
+        input.name = name;
+        input.use_frequency = useFrequency;
+        input.shape_id = shapeId;
+        input.shapes = shapes;
+        input.pattern_stops = patternStops;
+        // Write the pattern to the database
+        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
+        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.PATTERNS.name);
+        LOG.info(output);
+        // Parse output
+        return mapper.readValue(output, PatternDTO.class);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndSimplePattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
+        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[]{}, new PatternStopDTO[]{}, 0);
+    }
+
+    /**
      * Create and store a simple stop entity.
      */
     private static StopDTO createSimpleStop(String stopId, String stopName, double latitude, double longitude) throws InvalidNamespaceException, IOException, SQLException {
@@ -518,6 +816,26 @@ public class JDBCTableWriterTest {
         LOG.info("create {} output:", Table.STOPS.name);
         LOG.info(output);
         return mapper.readValue(output, StopDTO.class);
+    }
+
+    /**
+     * Create and store a simple route for testing.
+     */
+    private static RouteDTO createSimpleTestRoute(String routeId, String agencyId, String shortName, String longName, int routeType) throws InvalidNamespaceException, IOException, SQLException {
+        RouteDTO input = new RouteDTO();
+        input.route_id = routeId;
+        input.agency_id = agencyId;
+        // Empty value should be permitted for transfers and transfer_duration
+        input.route_short_name = shortName;
+        input.route_long_name = longName;
+        input.route_type = routeType;
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.ROUTES);
+        String output = createTableWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.ROUTES.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, RouteDTO.class);
     }
 
     /**
@@ -540,10 +858,5 @@ public class JDBCTableWriterTest {
         LOG.info("create {} output:", Table.CALENDAR.name);
         LOG.info(output);
         return mapper.readValue(output, CalendarDTO.class);
-    }
-
-    @AfterClass
-    public static void tearDownClass() {
-        TestUtils.dropDB(testDBName);
     }
 }

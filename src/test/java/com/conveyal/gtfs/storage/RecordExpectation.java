@@ -64,6 +64,11 @@ public class RecordExpectation {
         this.acceptedDelta = acceptedDelta;
     }
 
+    /** Constructor only used for {@link #clone}. */
+    private RecordExpectation(String fieldname) {
+        this.fieldName = fieldname;
+    }
+
     public String getStringifiedExpectation(boolean fromEditor) {
         if (fromEditor && editorStringExpectation) return editorExpectation;
         if (stringExpectationInCSV) return stringExpectation;
@@ -77,5 +82,27 @@ public class RecordExpectation {
             default:
                 return null;
         }
+    }
+
+    /** Clone a record expectation. Note: new fields should be added here. */
+    public RecordExpectation clone() {
+        RecordExpectation copy = new RecordExpectation(this.fieldName);
+        copy.expectedFieldType = this.expectedFieldType;
+        copy.editorExpectation = this.editorExpectation;
+        copy.intExpectation = this.intExpectation;
+        copy.stringExpectation = this.stringExpectation;
+        copy.stringExpectationInCSV = this.stringExpectationInCSV;
+        copy.acceptedDelta = this.acceptedDelta;
+        copy.doubleExpectation = this.doubleExpectation;
+        return copy;
+    }
+
+    @Override
+    public String toString() {
+        return "RecordExpectation{" + "acceptedDelta=" + acceptedDelta + ", doubleExpectation=" + doubleExpectation
+            + ", editorExpectation='" + editorExpectation + '\'' + ", expectedFieldType=" + expectedFieldType
+            + ", fieldName='" + fieldName + '\'' + ", intExpectation=" + intExpectation + ", stringExpectation='"
+            + stringExpectation + '\'' + ", stringExpectationInCSV=" + stringExpectationInCSV
+            + ", editorStringExpectation=" + editorStringExpectation + '}';
     }
 }

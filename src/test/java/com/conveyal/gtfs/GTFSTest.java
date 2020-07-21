@@ -4,9 +4,13 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.SnapshotResult;
+import com.conveyal.gtfs.storage.ErrorExpectation;
 import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
 import com.conveyal.gtfs.storage.RecordExpectation;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.validator.FeedValidatorCreator;
+import com.conveyal.gtfs.validator.MTCValidator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
@@ -31,7 +35,9 @@ import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -46,6 +52,7 @@ import static org.junit.Assert.assertThat;
  */
 public class GTFSTest {
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
+    private static final String JDBC_URL = "jdbc:postgresql://localhost";
     private static final Logger LOG = LoggerFactory.getLogger(GTFSTest.class);
 
     // setup a stream to capture the output from the program
@@ -95,11 +102,19 @@ public class GTFSTest {
      */
     @Test
     public void canLoadAndExportSimpleAgency() {
+        ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+        );
         assertThat(
             runIntegrationTestOnFolder(
                 "fake-agency",
                 nullValue(),
-                fakeAgencyPersistenceExpectations
+                fakeAgencyPersistenceExpectations,
+                fakeAgencyErrorExpectations
             ),
             equalTo(true)
         );
@@ -118,9 +133,56 @@ public class GTFSTest {
                 }
             )
         );
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
+            // The below "wrong number of fields" errors are for empty new lines
+            // found in the file.
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
+            new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+        );
         assertThat(
             "Integration test passes",
-            runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations),
+            runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations, errorExpectations),
+            equalTo(true)
+        );
+    }
+
+    /**
+     * Tests that a GTFS feed with errors is loaded properly and that the various errors were detected and stored in the
+     * database.
+     */
+    @Test
+    public void canLoadFeedWithErrors () {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list();
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.FARE_TRANSFER_MISMATCH, equalTo("fare-02")),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP, equalTo("freq-01_08:30:00_to_10:15:00_every_15m00s")),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP, equalTo("freq-01_08:30:00_to_10:15:00_every_15m00s")),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.FREQUENCY_PERIOD_OVERLAP),
+            new ErrorExpectation(NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK, equalTo("1A00000"))
+        );
+        assertThat(
+            "Integration test passes",
+            runIntegrationTestOnFolder("fake-agency-overlapping-trips", nullValue(), expectations, errorExpectations),
             equalTo(true)
         );
     }
@@ -144,9 +206,29 @@ public class GTFSTest {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        // TODO Add error expectations argument that expects NewGTFSErrorType.TABLE_IN_SUBDIRECTORY error type.
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+        );
         assertThat(
-            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations),
+            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, errorExpectations),
             equalTo(true)
         );
     }
@@ -184,9 +266,7 @@ public class GTFSTest {
                     new RecordExpectation("arrival_time", 25200, "07:00:00"),
                     new RecordExpectation("departure_time", 25200, "07:00:00"),
                     new RecordExpectation("stop_id", "4u6g"),
-                    // the string expectation for stop_sequence is different because of how stop_times are
-                    // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
-                    new RecordExpectation("stop_sequence", 1, "1", "0"),
+                    new RecordExpectation("stop_sequence", 1),
                     new RecordExpectation("pickup_type", 0),
                     new RecordExpectation("drop_off_type", 0),
                     new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
@@ -211,26 +291,216 @@ public class GTFSTest {
                 }
             )
         };
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
+        );
         assertThat(
             runIntegrationTestOnFolder(
                 "fake-agency-only-calendar-dates",
                 nullValue(),
-                persistenceExpectations
+                persistenceExpectations,
+                errorExpectations
             ),
             equalTo(true)
         );
     }
 
+    /**
+     * Tests whether the simple gtfs can be loaded and exported if it has a mixture of service_id definitions in both
+     * the calendar.txt and calendar_dates.txt files.
+     */@Test
+    public void canLoadAndExportSimpleAgencyWithMixtureOfCalendarDefinitions() {
+        PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[]{
+            new PersistenceExpectation(
+                "agency",
+                new RecordExpectation[]{
+                    new RecordExpectation("agency_id", "1"),
+                    new RecordExpectation("agency_name", "Fake Transit"),
+                    new RecordExpectation("agency_timezone", "America/Los_Angeles")
+                }
+            ),
+            // calendar.txt-only expectation
+            new PersistenceExpectation(
+                "calendar",
+                new RecordExpectation[]{
+                    new RecordExpectation("service_id", "only-in-calendar-txt"),
+                    new RecordExpectation("start_date", 20170915),
+                    new RecordExpectation("end_date", 20170917)
+                }
+            ),
+            // calendar.txt and calendar-dates.txt expectation
+            new PersistenceExpectation(
+                "calendar",
+                new RecordExpectation[]{
+                    new RecordExpectation("service_id", "in-both-calendar-txt-and-calendar-dates"),
+                    new RecordExpectation("start_date", 20170918),
+                    new RecordExpectation("end_date", 20170920)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "in-both-calendar-txt-and-calendar-dates"
+                    ),
+                    new RecordExpectation("date", 20170920),
+                    new RecordExpectation("exception_type", 2)
+                }
+            ),
+            // calendar-dates.txt-only expectation
+            new PersistenceExpectation(
+                "calendar",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "only-in-calendar-dates-txt"
+                    ),
+                    new RecordExpectation("start_date", 20170916),
+                    new RecordExpectation("end_date", 20170916)
+                },
+                true
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "only-in-calendar-dates-txt"
+                    ),
+                    new RecordExpectation("date", 20170916),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "stop_times",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "trip_id", "non-frequency-trip"
+                    ),
+                    new RecordExpectation("arrival_time", 25200, "07:00:00"),
+                    new RecordExpectation("departure_time", 25200, "07:00:00"),
+                    new RecordExpectation("stop_id", "4u6g"),
+                    new RecordExpectation("stop_sequence", 1),
+                    new RecordExpectation("pickup_type", 0),
+                    new RecordExpectation("drop_off_type", 0),
+                    new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
+                }
+            ),
+            // calendar-dates only expectation
+            new PersistenceExpectation(
+                "trips",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "trip_id", "non-frequency-trip"
+                    ),
+                    new RecordExpectation(
+                        "service_id", "only-in-calendar-dates-txt"
+                    ),
+                    new RecordExpectation("route_id", "1"),
+                    new RecordExpectation("direction_id", 0),
+                    new RecordExpectation(
+                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                    ),
+                    new RecordExpectation("bikes_allowed", 0),
+                    new RecordExpectation("wheelchair_accessible", 0)
+                }
+            ),
+            // calendar-only expectation
+            new PersistenceExpectation(
+                "trips",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "trip_id", "non-frequency-trip-2"
+                    ),
+                    new RecordExpectation(
+                        "service_id", "only-in-calendar-txt"
+                    ),
+                    new RecordExpectation("route_id", "1"),
+                    new RecordExpectation("direction_id", 0),
+                    new RecordExpectation(
+                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                    ),
+                    new RecordExpectation("bikes_allowed", 0),
+                    new RecordExpectation("wheelchair_accessible", 0)
+                }
+            ),
+            // calendar-dates and calendar expectation
+            new PersistenceExpectation(
+                "trips",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "trip_id", "frequency-trip"
+                    ),
+                    new RecordExpectation(
+                        "service_id", "in-both-calendar-txt-and-calendar-dates"
+                    ),
+                    new RecordExpectation("route_id", "1"),
+                    new RecordExpectation("direction_id", 0),
+                    new RecordExpectation(
+                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                    ),
+                    new RecordExpectation("bikes_allowed", 0),
+                    new RecordExpectation("wheelchair_accessible", 0)
+                }
+            )
+        };
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
+        );
+        assertThat(
+            runIntegrationTestOnFolder(
+                "fake-agency-mixture-of-calendar-definitions",
+                nullValue(),
+                persistenceExpectations,
+                errorExpectations
+            ),
+            equalTo(true)
+        );
+    }
+
+    /**
+     * Tests that a GTFS feed with long field values generates corresponding
+     * validation errors per MTC guidelines.
+     */
+    @Test
+    public void canLoadFeedWithLongFieldValues () {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list();
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FIELD_VALUE_TOO_LONG),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED) // Not related, not worrying about this one.
+        );
+        assertThat(
+            "Long-field-value test passes",
+            runIntegrationTestOnFolder(
+                "fake-agency-mtc-long-fields",
+                nullValue(),
+                expectations,
+                errorExpectations,
+                MTCValidator::new
+            ),
+            equalTo(true)
+        );
+    }
 
     /**
      * A helper method that will zip a specified folder in test/main/resources and call
-     * {@link #runIntegrationTestOnZipFile(String, Matcher, PersistenceExpectation[])} on that file.
+     * {@link #runIntegrationTestOnZipFile} on that file.
      */
     private boolean runIntegrationTestOnFolder(
         String folderName,
         Matcher<Object> fatalExceptionExpectation,
-        PersistenceExpectation[] persistenceExpectations
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations,
+        FeedValidatorCreator... customValidators
     ) {
+        LOG.info("Running integration test on folder {}", folderName);
         // zip up test folder into temp zip file
         String zipFileName = null;
         try {
@@ -239,23 +509,33 @@ public class GTFSTest {
             e.printStackTrace();
             return false;
         }
-        return runIntegrationTestOnZipFile(zipFileName, fatalExceptionExpectation, persistenceExpectations);
+        return runIntegrationTestOnZipFile(
+            zipFileName,
+            fatalExceptionExpectation,
+            persistenceExpectations,
+            errorExpectations,
+            customValidators
+        );
     }
 
     /**
      * A helper method that will run GTFS#main with a certain zip file.
-     * This tests whether a GTFS zip file can be loaded without any errors.
-     *
-     * After the GTFS is loaded, this will also initiate an export of a GTFS from the database and check
-     * the integrity of the exported GTFS.
+     * This tests whether a GTFS zip file can be loaded without any errors. The full list of steps includes:
+     * 1. GTFS#load
+     * 2. GTFS#validate
+     * 3. exportGtfs/check exported GTFS integrity
+     * 4. makeSnapshot
+     * 5. Delete feed/namespace
      */
     private boolean runIntegrationTestOnZipFile(
         String zipFileName,
         Matcher<Object> fatalExceptionExpectation,
-        PersistenceExpectation[] persistenceExpectations
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations,
+        FeedValidatorCreator... customValidators
     ) {
-        String newDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", newDBName);
+        String testDBName = TestUtils.generateNewDB();
+        String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
         DataSource dataSource = GTFS.createDataSource(
             dbConnectionUrl,
             null,
@@ -265,55 +545,101 @@ public class GTFSTest {
         String namespace;
 
         // Verify that loading the feed completes and data is stored properly
-        try {
+        try (Connection connection = dataSource.getConnection()) {
             // load and validate feed
-            LOG.info("load and validate feed");
+            LOG.info("load and validate GTFS file {}", zipFileName);
             FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource);
+            ValidationResult validationResult = GTFS.validate(
+                loadResult.uniqueIdentifier,
+                dataSource,
+                customValidators
+            );
 
             assertThat(validationResult.fatalException, is(fatalExceptionExpectation));
             namespace = loadResult.uniqueIdentifier;
+            assertThatImportedGtfsMeetsExpectations(
+                connection,
+                namespace,
+                persistenceExpectations,
+                errorExpectations,
+                false
+            );
 
-            assertThatImportedGtfsMeetsExpectations(dataSource.getConnection(), namespace, persistenceExpectations);
-        } catch (SQLException e) {
-            TestUtils.dropDB(newDBName);
-            e.printStackTrace();
-            return false;
-        } catch (AssertionError e) {
-            TestUtils.dropDB(newDBName);
-            throw e;
-        }
-
-        // Verify that exporting the feed (in non-editor mode) completes and data is outputted properly
-        try {
+            // Verify that exporting the feed (in non-editor mode) completes and data is outputted properly
             LOG.info("export GTFS from created namespace");
             File tempFile = exportGtfs(namespace, dataSource, false);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, false);
-        } catch (IOException e) {
-            TestUtils.dropDB(newDBName);
+
+            // Verify that making a snapshot from an existing feed database, then exporting that snapshot to a GTFS zip
+            // file works as expected
+            boolean snapshotIsOk = assertThatSnapshotIsSuccessful(
+                connection,
+                namespace,
+                dataSource,
+                testDBName,
+                persistenceExpectations,
+                false
+            );
+            if (!snapshotIsOk) return false;
+            // Also, verify that if we're normalizing stop_times#stop_sequence, the stop_sequence values conform with
+            // our expectations (zero-based, incrementing values).
+            PersistenceExpectation[] expectationsWithNormalizedStopTimesSequence =
+                updatePersistenceExpectationsWithNormalizedStopTimesSequence(persistenceExpectations);
+            boolean normalizedSnapshotIsOk = assertThatSnapshotIsSuccessful(
+                connection,
+                namespace,
+                dataSource,
+                testDBName,
+                expectationsWithNormalizedStopTimesSequence,
+                true
+            );
+            if (!normalizedSnapshotIsOk) return false;
+        } catch (IOException | SQLException e) {
+            LOG.error("An error occurred while loading/snapshotting the database!");
+            TestUtils.dropDB(testDBName);
             e.printStackTrace();
             return false;
         } catch (AssertionError e) {
-            TestUtils.dropDB(newDBName);
+            TestUtils.dropDB(testDBName);
             throw e;
         }
 
-        // Verify that making a snapshot from an existing feed database, then exporting that snapshot to a GTFS zip file
-        // works as expected
-        try {
-            LOG.info("copy GTFS from created namespace");
-            SnapshotResult copyResult = GTFS.makeSnapshot(namespace, dataSource);
-            assertThatSnapshotIsErrorFree(copyResult);
-            LOG.info("export GTFS from copied namespace");
-            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
-            assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
-        } catch (IOException e) {
-            e.printStackTrace();
+        // Get a new connection here, because sometimes the old connection causes hanging issues upon trying to drop a
+        // schema (via deleting a GTFS namespace).
+        try (Connection connection = dataSource.getConnection()) {
+            // Verify that deleting a feed works as expected.
+            LOG.info("Deleting GTFS feed from database.");
+            GTFS.delete(namespace, dataSource);
+
+            String sql = String.format("select * from feeds where namespace = '%s'", namespace);
+            LOG.info(sql);
+            ResultSet resultSet = connection.prepareStatement(sql).executeQuery();
+            while (resultSet.next()) {
+                // Assert that the feed registry shows feed as deleted.
+                assertThat(resultSet.getBoolean("deleted"), is(true));
+            }
+            // Ensure that schema no longer exists for namespace (note: this is Postgres specific).
+            String schemaSql = String.format(
+                "SELECT * FROM information_schema.schemata where schema_name = '%s'",
+                namespace
+            );
+            LOG.info(schemaSql);
+            ResultSet schemaResultSet = connection.prepareStatement(schemaSql).executeQuery();
+            int schemaCount = 0;
+            while (schemaResultSet.next()) schemaCount++;
+            // There should be no schema records matching the deleted namespace.
+            assertThat(schemaCount, is(0));
+        } catch (SQLException | InvalidNamespaceException e) {
+            LOG.error("An error occurred while deleting a schema!", e);
+            TestUtils.dropDB(testDBName);
             return false;
-        } finally {
-            TestUtils.dropDB(newDBName);
+        } catch (AssertionError e) {
+            TestUtils.dropDB(testDBName);
+            throw e;
         }
 
+        // This should be run following all of the above tests (any new tests should go above these lines).
+        TestUtils.dropDB(testDBName);
         return true;
     }
 
@@ -339,38 +665,6 @@ public class GTFSTest {
         assertThat(snapshotResult.scheduleExceptions.fatalException, is(nullValue()));
     }
 
-    private String zipFolderAndLoadGTFS(String folderName, DataSource dataSource, PersistenceExpectation[] persistenceExpectations) {
-        // zip up test folder into temp zip file
-        String zipFileName;
-        try {
-            zipFileName = TestUtils.zipFolderFiles(folderName, true);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return null;
-        }
-        String namespace;
-        // Verify that loading the feed completes and data is stored properly
-        try {
-            // load and validate feed
-            LOG.info("load and validate feed");
-            FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
-            ValidationResult validationResult = GTFS.validate(loadResult.uniqueIdentifier, dataSource);
-            DataSource ds = GTFS.createDataSource(
-                    dataSource.getConnection().getMetaData().getURL(),
-                    null,
-                    null
-            );
-            assertThatLoadIsErrorFree(loadResult);
-            assertThat(validationResult.fatalException, is(nullValue()));
-            namespace = loadResult.uniqueIdentifier;
-            assertThatImportedGtfsMeetsExpectations(ds.getConnection(), namespace, persistenceExpectations);
-        } catch (SQLException | AssertionError e) {
-            e.printStackTrace();
-            return null;
-        }
-        return namespace;
-    }
-
     /**
      * Helper function to export a GTFS from the database to a temporary zip file.
      */
@@ -390,25 +684,68 @@ public class GTFSTest {
     }
 
     /**
+     * Creates a snapshot, and asserts persistence expectations on the newly-created database of that snapshot. Then,
+     * exports that snapshot to a GTFS and asserts persistence expectations on the newly-exported GTFS.
+     */
+    private boolean assertThatSnapshotIsSuccessful(
+        Connection connection,
+        String namespace,
+        DataSource dataSource,
+        String testDBName,
+        PersistenceExpectation[] persistenceExpectations,
+        boolean normalizeStopTimes
+    ) {
+        try {
+            LOG.info("copy GTFS from created namespace");
+            SnapshotResult copyResult = GTFS.makeSnapshot(namespace, dataSource, normalizeStopTimes);
+            assertThatSnapshotIsErrorFree(copyResult);
+            assertThatImportedGtfsMeetsExpectations(
+                connection,
+                copyResult.uniqueIdentifier,
+                persistenceExpectations,
+                null,
+                true
+            );
+            LOG.info("export GTFS from copied namespace");
+            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
+            assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
+        } catch (IOException | SQLException e) {
+            e.printStackTrace();
+            TestUtils.dropDB(testDBName);
+            return false;
+        } catch (AssertionError e) {
+            TestUtils.dropDB(testDBName);
+            throw e;
+        }
+        return true;
+    }
+
+    /**
      * Run through the list of persistence expectations to make sure that the feed was imported properly into the
      * database.
      */
     private void assertThatImportedGtfsMeetsExpectations(
         Connection connection,
         String namespace,
-        PersistenceExpectation[] persistenceExpectations
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations,
+        boolean isEditorDatabase
     ) throws SQLException {
         // Store field mismatches here (to provide assertion statements with more details).
         Multimap<String, ValuePair> fieldsWithMismatches = ArrayListMultimap.create();
-        // Check that no validators failed during validation.
-        assertThat(
-            "One or more validators failed during GTFS import.",
-            countValidationErrorsOfType(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED),
-            equalTo(0)
-        );
+        // Check that no validators failed during validation in non-editor databases only (validators do not run
+        // when creating an editor database).
+        if (!isEditorDatabase) {
+            assertThat(
+                "One or more validators failed during GTFS import.",
+                countValidationErrorsOfType(connection, namespace, NewGTFSErrorType.VALIDATOR_FAILED),
+                equalTo(0)
+            );
+        }
         // run through testing expectations
         LOG.info("testing expectations of record storage in the database");
         for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
+            if (persistenceExpectation.appliesToEditorDatabaseOnly && !isEditorDatabase) continue;
             // select all entries from a table
             String sql = String.format(
                 "select * from %s.%s",
@@ -421,28 +758,20 @@ public class GTFSTest {
             int numRecordsSearched = 0;
             while (rs.next()) {
                 numRecordsSearched++;
-                LOG.info(String.format("record %d in ResultSet", numRecordsSearched));
+                LOG.info("record {} in ResultSet", numRecordsSearched);
                 boolean allFieldsMatch = true;
                 for (RecordExpectation recordExpectation: persistenceExpectation.recordExpectations) {
                     switch (recordExpectation.expectedFieldType) {
                         case DOUBLE:
                             double doubleVal = rs.getDouble(recordExpectation.fieldName);
-                            LOG.info(String.format(
-                                "%s: %f",
-                                recordExpectation.fieldName,
-                                doubleVal
-                            ));
+                            LOG.info("{}: {}", recordExpectation.fieldName, doubleVal);
                             if (doubleVal != recordExpectation.doubleExpectation) {
                                 allFieldsMatch = false;
                             }
                             break;
                         case INT:
                             int intVal = rs.getInt(recordExpectation.fieldName);
-                            LOG.info(String.format(
-                                "%s: %d",
-                                recordExpectation.fieldName,
-                                intVal
-                            ));
+                            LOG.info("{}: {}", recordExpectation.fieldName, intVal);
                             if (intVal != recordExpectation.intExpectation) {
                                 fieldsWithMismatches.put(
                                         recordExpectation.fieldName,
@@ -453,21 +782,15 @@ public class GTFSTest {
                             break;
                         case STRING:
                             String strVal = rs.getString(recordExpectation.fieldName);
-                            LOG.info(String.format(
-                                "%s: %s",
-                                recordExpectation.fieldName,
-                                strVal
-                            ));
+                            LOG.info("{}: {}", recordExpectation.fieldName, strVal);
                             if (strVal == null && recordExpectation.stringExpectation == null) {
                                 break;
-                            } else if (
-                                (strVal == null && recordExpectation.stringExpectation != null) ||
-                                !strVal.equals(recordExpectation.stringExpectation)
-                            ) {
+                            } else if (strVal == null || !strVal.equals(recordExpectation.stringExpectation)) {
                                 fieldsWithMismatches.put(
                                     recordExpectation.fieldName,
                                     new ValuePair(recordExpectation.stringExpectation, strVal)
                                 );
+                                LOG.error("Expected {}, found {}", recordExpectation.stringExpectation, strVal);
                                 allFieldsMatch = false;
                             }
                             break;
@@ -482,10 +805,53 @@ public class GTFSTest {
                     LOG.info("Database record satisfies expectations.");
                     foundRecord = true;
                     break;
+                } else {
+                    LOG.error("Persistence mismatch on record {}", numRecordsSearched);
                 }
             }
-            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord, fieldsWithMismatches);
+            assertThatDatabasePersistenceExpectationRecordWasFound(
+                persistenceExpectation,
+                numRecordsSearched,
+                foundRecord,
+                fieldsWithMismatches
+            );
         }
+        // Skip error expectation analysis on editor database
+        if (isEditorDatabase) {
+            LOG.info("Skipping error expectations for non-editor database.");
+            return;
+        }
+        // Expect zero errors if errorExpectations is null.
+        if (errorExpectations == null) errorExpectations = new ErrorExpectation[]{};
+        // Check that error expectations match errors stored in database.
+        LOG.info("Checking {} error expectations", errorExpectations.length);
+        // select all entries from error table
+        String sql = String.format("select * from %s.errors", namespace);
+        LOG.info(sql);
+        ResultSet rs = connection.prepareStatement(sql).executeQuery();
+        int errorCount = 0;
+        Iterator<ErrorExpectation> errorExpectationIterator = Arrays.stream(errorExpectations).iterator();
+        while (rs.next()) {
+            errorCount++;
+            String errorType = rs.getString("error_type");
+            String entityType = rs.getString("entity_type");
+            String entityId = rs.getString("entity_id");
+            String badValue = rs.getString("bad_value");
+            LOG.info("Found error {}: {} {} {} {}", errorCount, errorType, entityId, entityType, badValue);
+            // Skip error expectation if not exists. But continue iteration to count all errors.
+            if (!errorExpectationIterator.hasNext()) continue;
+            ErrorExpectation errorExpectation = errorExpectationIterator.next();
+            LOG.info("Expecting error {}: {}", errorCount, errorExpectation.errorTypeMatcher);
+            // Error expectation must contain error type matcher. The others are optional.
+            assertThat(errorType, errorExpectation.errorTypeMatcher);
+            if (errorExpectation.entityTypeMatcher != null) assertThat(entityType, errorExpectation.entityTypeMatcher);
+            if (errorExpectation.entityIdMatcher != null) assertThat(entityId, errorExpectation.entityIdMatcher);
+            if (errorExpectation.badValueMatcher != null) assertThat(badValue, errorExpectation.badValueMatcher);
+        }
+        assertThat(
+            "Error count is equal to number of error expectations.",
+            errorCount,
+            equalTo(errorExpectations.length));
     }
 
     private static int countValidationErrorsOfType(
@@ -521,6 +887,9 @@ public class GTFSTest {
 
         // iterate through all expectations
         for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
+            if (persistenceExpectation.appliesToEditorDatabaseOnly) continue;
+            // No need to check that errors were exported because it is an internal table only.
+            if ("errors".equals(persistenceExpectation.tableName)) continue;
             final String tableFileName = persistenceExpectation.tableName + ".txt";
             LOG.info(String.format("reading table: %s", tableFileName));
 
@@ -579,7 +948,12 @@ public class GTFSTest {
                     foundRecord = true;
                 }
             }
-            assertThatPersistenceExpectationRecordWasFound(numRecordsSearched, foundRecord, null);
+            assertThatCSVPersistenceExpectationRecordWasFound(
+                persistenceExpectation,
+                tableFileName,
+                numRecordsSearched,
+                foundRecord
+            );
         }
     }
 
@@ -600,32 +974,83 @@ public class GTFSTest {
     }
 
     /**
+     * Helper that calls assertion with corresponding context for better error reporting.
+     */
+    private void assertThatDatabasePersistenceExpectationRecordWasFound(
+        PersistenceExpectation persistenceExpectation,
+        int numRecordsSearched,
+        boolean foundRecord,
+        Multimap<String, ValuePair> fieldsWithMismatches
+    ) {
+        assertThatPersistenceExpectationRecordWasFound(
+            persistenceExpectation,
+            String.format("Database table `%s`", persistenceExpectation.tableName),
+            numRecordsSearched,
+            foundRecord,
+            fieldsWithMismatches
+        );
+    }
+
+    /**
+     * Helper that calls assertion with corresponding context for better error reporting.
+     */
+    private void assertThatCSVPersistenceExpectationRecordWasFound(
+        PersistenceExpectation persistenceExpectation,
+        String tableFileName,
+        int numRecordsSearched,
+        boolean foundRecord
+    ) {
+        assertThatPersistenceExpectationRecordWasFound(
+            persistenceExpectation,
+            String.format("CSV file `%s`", tableFileName),
+            numRecordsSearched,
+            foundRecord,
+            null
+        );
+    }
+
+    /**
      * Helper method to make sure a persistence expectation was actually found after searching through records
      */
     private void assertThatPersistenceExpectationRecordWasFound(
+        PersistenceExpectation persistenceExpectation,
+        String contextDescription,
         int numRecordsSearched,
         boolean foundRecord,
         Multimap<String, ValuePair> mismatches
     ) {
+        contextDescription = String.format("in the %s", contextDescription);
+        // Assert that more than 0 records were found
         assertThat(
-            "No records found in the ResultSet/CSV file",
+            String.format("No records found %s", contextDescription),
             numRecordsSearched,
             ComparatorMatcherBuilder.<Integer>usingNaturalOrdering().greaterThan(0)
         );
-        if (mismatches != null) {
+        // If the record wasn't found, but at least one mismatching record was found, return info about the record that
+        // was found to attempt to aid with debugging.
+        if (!foundRecord && mismatches != null) {
             for (String field : mismatches.keySet()) {
                 Collection<ValuePair> valuePairs = mismatches.get(field);
                 for (ValuePair valuePair : valuePairs) {
                     assertThat(
-                        String.format("The value expected for %s was not found", field),
-                        valuePair.expected,
-                        equalTo(valuePair.found)
+                        String.format(
+                            "The value expected for %s was not found %s. NOTE: there could be other values, but the first found value is shown.",
+                            field,
+                            contextDescription
+                        ),
+                        valuePair.found,
+                        equalTo(valuePair.expected)
                     );
                 }
             }
         } else {
+            // Assert that the record was found
             assertThat(
-                "The record as defined in the PersistenceExpectation was not found.",
+                String.format(
+                    "The record as defined in the PersistenceExpectation was not found %s. Unfound Record: %s",
+                    contextDescription,
+                    persistenceExpectation.toString()
+                ),
                 foundRecord,
                 equalTo(true)
             );
@@ -644,127 +1069,156 @@ public class GTFSTest {
                 new RecordExpectation("agency_timezone", "America/Los_Angeles")
             }
         ),
-            new PersistenceExpectation(
-                "calendar",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("monday", 1),
-                    new RecordExpectation("tuesday", 1),
-                    new RecordExpectation("wednesday", 1),
-                    new RecordExpectation("thursday", 1),
-                    new RecordExpectation("friday", 1),
-                    new RecordExpectation("saturday", 1),
-                    new RecordExpectation("sunday", 1),
-                    new RecordExpectation("start_date", "20170915"),
-                    new RecordExpectation("end_date", "20170917")
-                }
-            ),
-            new PersistenceExpectation(
-                "calendar_dates",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("date", 20170916),
-                    new RecordExpectation("exception_type", 2)
-                }
-            ),
-            new PersistenceExpectation(
-                "fare_attributes",
-                new RecordExpectation[]{
-                    new RecordExpectation("fare_id", "route_based_fare"),
-                    new RecordExpectation("price", 1.23, 0),
-                    new RecordExpectation("currency_type", "USD")
-                }
-            ),
-            new PersistenceExpectation(
-                "fare_rules",
-                new RecordExpectation[]{
-                    new RecordExpectation("fare_id", "route_based_fare"),
-                    new RecordExpectation("route_id", "1")
-                }
-            ),
-            new PersistenceExpectation(
-                "feed_info",
-                new RecordExpectation[]{
-                    new RecordExpectation("feed_publisher_name", "Conveyal"
-                    ),
-                    new RecordExpectation(
-                        "feed_publisher_url", "http://www.conveyal.com"
-                    ),
-                    new RecordExpectation("feed_lang", "en"),
-                    new RecordExpectation("feed_version", "1.0")
-                }
-            ),
-            new PersistenceExpectation(
-                "frequencies",
-                new RecordExpectation[]{
-                    new RecordExpectation("trip_id", "frequency-trip"),
-                    new RecordExpectation("start_time", 28800, "08:00:00"),
-                    new RecordExpectation("end_time", 32400, "09:00:00"),
-                    new RecordExpectation("headway_secs", 1800),
-                    new RecordExpectation("exact_times", 0)
-                }
-            ),
-            new PersistenceExpectation(
-                "routes",
-                new RecordExpectation[]{
-                    new RecordExpectation("agency_id", "1"),
-                    new RecordExpectation("route_id", "1"),
-                    new RecordExpectation("route_short_name", "1"),
-                    new RecordExpectation("route_long_name", "Route 1"),
-                    new RecordExpectation("route_type", 3),
-                    new RecordExpectation("route_color", "7CE6E7")
-                }
-            ),
-            new PersistenceExpectation(
-                "shapes",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
-                    ),
-                    new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
-                    new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
-                    new RecordExpectation("shape_pt_sequence", 2),
-                    new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
-                }
-            ),
-            new PersistenceExpectation(
-                "stop_times",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-                    ),
-                    new RecordExpectation("arrival_time", 25200, "07:00:00"),
-                    new RecordExpectation("departure_time", 25200, "07:00:00"),
-                    new RecordExpectation("stop_id", "4u6g"),
-                    // the string expectation for stop_sequence is different because of how stop_times are
-                    // converted to 0-based indexes in Table.normalizeAndCloneStopTimes
-                    new RecordExpectation("stop_sequence", 1, "1", "0"),
-                    new RecordExpectation("pickup_type", 0),
-                    new RecordExpectation("drop_off_type", 0),
-                    new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
-                }
-            ),
-            new PersistenceExpectation(
-                "trips",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
-                    ),
-                    new RecordExpectation(
-                        "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                    ),
-                    new RecordExpectation("route_id", "1"),
-                    new RecordExpectation("direction_id", 0),
-                    new RecordExpectation(
-                        "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
-                    ),
-                    new RecordExpectation("bikes_allowed", 0),
-                    new RecordExpectation("wheelchair_accessible", 0)
-                }
-            )
+        new PersistenceExpectation(
+            "calendar",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                ),
+                new RecordExpectation("monday", 1),
+                new RecordExpectation("tuesday", 1),
+                new RecordExpectation("wednesday", 1),
+                new RecordExpectation("thursday", 1),
+                new RecordExpectation("friday", 1),
+                new RecordExpectation("saturday", 1),
+                new RecordExpectation("sunday", 1),
+                new RecordExpectation("start_date", "20170915"),
+                new RecordExpectation("end_date", "20170917")
+            }
+        ),
+        new PersistenceExpectation(
+            "calendar_dates",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                ),
+                new RecordExpectation("date", 20170916),
+                new RecordExpectation("exception_type", 2)
+            }
+        ),
+        new PersistenceExpectation(
+            "fare_attributes",
+            new RecordExpectation[]{
+                new RecordExpectation("fare_id", "route_based_fare"),
+                new RecordExpectation("price", 1.23, 0),
+                new RecordExpectation("currency_type", "USD")
+            }
+        ),
+        new PersistenceExpectation(
+            "fare_rules",
+            new RecordExpectation[]{
+                new RecordExpectation("fare_id", "route_based_fare"),
+                new RecordExpectation("route_id", "1")
+            }
+        ),
+        new PersistenceExpectation(
+            "feed_info",
+            new RecordExpectation[]{
+                new RecordExpectation("feed_id", "fake_transit"),
+                new RecordExpectation("feed_publisher_name", "Conveyal"),
+                new RecordExpectation(
+                    "feed_publisher_url", "http://www.conveyal.com"
+                ),
+                new RecordExpectation("feed_lang", "en"),
+                new RecordExpectation("feed_version", "1.0")
+            }
+        ),
+        new PersistenceExpectation(
+            "frequencies",
+            new RecordExpectation[]{
+                new RecordExpectation("trip_id", "frequency-trip"),
+                new RecordExpectation("start_time", 28800, "08:00:00"),
+                new RecordExpectation("end_time", 32400, "09:00:00"),
+                new RecordExpectation("headway_secs", 1800),
+                new RecordExpectation("exact_times", 0)
+            }
+        ),
+        new PersistenceExpectation(
+            "routes",
+            new RecordExpectation[]{
+                new RecordExpectation("agency_id", "1"),
+                new RecordExpectation("route_id", "1"),
+                new RecordExpectation("route_short_name", "1"),
+                new RecordExpectation("route_long_name", "Route 1"),
+                new RecordExpectation("route_type", 3),
+                new RecordExpectation("route_color", "7CE6E7")
+            }
+        ),
+        new PersistenceExpectation(
+            "shapes",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                ),
+                new RecordExpectation("shape_pt_lat", 37.061172, 0.00001),
+                new RecordExpectation("shape_pt_lon", -122.007500, 0.00001),
+                new RecordExpectation("shape_pt_sequence", 2),
+                new RecordExpectation("shape_dist_traveled", 7.4997067, 0.01)
+            }
+        ),
+        new PersistenceExpectation(
+            "stop_times",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                ),
+                new RecordExpectation("arrival_time", 25200, "07:00:00"),
+                new RecordExpectation("departure_time", 25200, "07:00:00"),
+                new RecordExpectation("stop_id", "4u6g"),
+                new RecordExpectation("stop_sequence", 1),
+                new RecordExpectation("pickup_type", 0),
+                new RecordExpectation("drop_off_type", 0),
+                new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
+            }
+        ),
+        new PersistenceExpectation(
+            "trips",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"
+                ),
+                new RecordExpectation(
+                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
+                ),
+                new RecordExpectation("route_id", "1"),
+                new RecordExpectation("direction_id", 0),
+                new RecordExpectation(
+                    "shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"
+                ),
+                new RecordExpectation("bikes_allowed", 0),
+                new RecordExpectation("wheelchair_accessible", 0)
+            }
+        )
     };
+
+    /**
+     * Update persistence expectations to expect normalized stop_sequence values (zero-based, incrementing).
+     */
+    private PersistenceExpectation[] updatePersistenceExpectationsWithNormalizedStopTimesSequence(
+        PersistenceExpectation[] inputExpectations
+    ) {
+        PersistenceExpectation[] persistenceExpectations = new PersistenceExpectation[inputExpectations.length];
+        // Add all of the table expectations.
+        for (int i = 0; i < inputExpectations.length; i++) {
+            // Collect record expectations.
+            PersistenceExpectation inputExpectation = inputExpectations[i];
+            RecordExpectation[] newRecordExpectations = new RecordExpectation[inputExpectation.recordExpectations.length];
+            for (int j = 0; j < inputExpectation.recordExpectations.length; j++) {
+                RecordExpectation newRecordExpectation = inputExpectation.recordExpectations[j].clone();
+                // Update the stop_sequence expectation to be normalized.
+                if (newRecordExpectation.fieldName.equals("stop_sequence")) {
+                    newRecordExpectation.intExpectation = 0;
+                }
+                newRecordExpectations[j] = newRecordExpectation;
+            }
+            // Once cloning/updating has been done for all record expectations, add the new table expectation to the
+            // array.
+            persistenceExpectations[i] = new PersistenceExpectation(
+                inputExpectation.tableName,
+                newRecordExpectations,
+                inputExpectation.appliesToEditorDatabaseOnly
+            );
+        }
+        return persistenceExpectations;
+    }
 }

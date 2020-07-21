@@ -1,0 +1,4 @@
+# See https://help.github.com/articles/about-codeowners/
+
+# A Conveyal employee is required to approve PR merges
+* @conveyal/employees
