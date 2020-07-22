@@ -1,8 +1,6 @@
 language: java
-dist: trusty # jdk 8 not available on xenial
-# This library uses Java 8 features and Travis doesn't (yet) support OpenJDK 8
 jdk:
-  - oraclejdk8
+  - openjdk8
 
 addons:
   postgresql: "9.6"
