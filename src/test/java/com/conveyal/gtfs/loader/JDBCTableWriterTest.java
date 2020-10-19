@@ -42,6 +42,7 @@ import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
@@ -438,9 +439,15 @@ public class JDBCTableWriterTest {
         assertThat(pattern.route_id, equalTo(routeId));
         // Create trip so we can check that the stop_time values are updated after the patter update.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        // Set trip_id to empty string to verify that it gets overwritten with auto-generated ID.
+        tripInput.trip_id = "";
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check that trip_id is not empty.
+        assertNotEquals("", createdTrip.trip_id);
+        // Check that trip exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
         PreparedStatement statement = testDataSource.getConnection().prepareStatement(
             String.format(
