@@ -43,8 +43,10 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
@@ -439,13 +441,17 @@ public class JDBCTableWriterTest {
         assertThat(pattern.route_id, equalTo(routeId));
         // Create trip so we can check that the stop_time values are updated after the patter update.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
-        // Set trip_id to empty string to verify that it gets overwritten with auto-generated ID.
+        // Set trip_id to empty string to verify that it gets overwritten with auto-generated UUID.
         tripInput.trip_id = "";
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
         // Check that trip_id is not empty.
         assertNotEquals("", createdTrip.trip_id);
+        // Check that trip_id is a UUID.
+        LOG.info("New trip_id = {}", createdTrip.trip_id);
+        UUID uuid = UUID.fromString(createdTrip.trip_id);
+        assertNotNull(uuid);
         // Check that trip exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
@@ -456,6 +462,7 @@ public class JDBCTableWriterTest {
                 createdTrip.trip_id
             )
         );
+        LOG.info(statement.toString());
         ResultSet resultSet = statement.executeQuery();
         while (resultSet.next()) {
             // First stop_time shape_dist_traveled should be zero.
