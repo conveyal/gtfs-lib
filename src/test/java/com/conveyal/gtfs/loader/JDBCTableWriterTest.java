@@ -42,6 +42,7 @@ import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 
 /**
@@ -302,7 +303,9 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         String routeId = "500";
         RouteDTO createdRoute = createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
-
+        // Set values to empty strings/null to later verify that they are set to null in the database.
+        createdRoute.route_color = "";
+        createdRoute.route_sort_order = "";
         // make sure saved data matches expected data
         assertThat(createdRoute.route_id, equalTo(routeId));
         // TODO: Verify with a SQL query that the database now contains the created data (we may need to use the same
@@ -312,7 +315,7 @@ public class JDBCTableWriterTest {
         String updatedRouteId = "600";
         createdRoute.route_id = updatedRouteId;
 
-        // covert object to json and save it
+        // convert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(routeTable);
         String updateOutput = updateTableWriter.update(
                 createdRoute.id,
@@ -326,9 +329,17 @@ public class JDBCTableWriterTest {
 
         // make sure saved data matches expected data
         assertThat(updatedRouteDTO.route_id, equalTo(updatedRouteId));
-        // TODO: Verify with a SQL query that the database now contains the updated data (we may need to use the same
-        //       db connection to do this successfully?)
-
+        // Ensure route_color is null (not empty string).
+        LOG.info("route_color: {}", updatedRouteDTO.route_color);
+        assertNull(updatedRouteDTO.route_color);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedRouteDTO.id, routeTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "route_color", Matchers.nullValue());
+            assertResultValue(resultSet, "route_id", equalTo(createdRoute.route_id));
+            assertResultValue(resultSet, "route_sort_order", Matchers.nullValue());
+            assertResultValue(resultSet, "route_type", equalTo(createdRoute.route_type));
+        }
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(routeTable);
         int deleteOutput = deleteTableWriter.delete(
