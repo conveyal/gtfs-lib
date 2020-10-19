@@ -407,6 +407,7 @@ public class JdbcTableWriter implements TableWriter {
             LOG.debug("{}={}", field.name, value);
             try {
                 if (value == null || value.isNull()) {
+                    // If there is a required field missing from the JSON object, an exception will be thrown below.
                     if (field.isRequired() && !field.isEmptyValuePermitted()) {
                         // Only register the field as missing if the value is null, the field is required, and empty
                         // values are not permitted. For example, a null value for fare_attributes#transfers should not
@@ -417,25 +418,33 @@ public class JdbcTableWriter implements TableWriter {
                     // Handle setting null value on statement
                     field.setNull(preparedStatement, index);
                 } else {
-                    List<String> values = new ArrayList<>();
+                    // For fields that are not missing, handle setting different field types.
                     if (value.isArray()) {
+                        // Array field type expects comma-delimited values.
+                        List<String> values = new ArrayList<>();
                         for (JsonNode node : value) {
                             values.add(node.asText());
                         }
                         field.setParameter(preparedStatement, index, String.join(",", values));
                     } else {
                         String text = value.asText();
-                        // If the field is a ShortField and the string is empty, set value to null. Otherwise, set
-                        // parameter with string.
-                        if (field instanceof ShortField && text.isEmpty()) field.setNull(preparedStatement, index);
-                        else field.setParameter(preparedStatement, index, text);
+                        // If the string is empty, set value to null (for StringField, ShortField, etc.). Otherwise, set
+                        // parameter with string value.
+                        if (text.isEmpty()) {
+                            // Update JSON object that is returned in response (to reflect database value).
+                            // Note: see return value of JdbcTableWriter#update.
+                            jsonObject.set(field.name, null);
+                            field.setNull(preparedStatement, index);
+                        } else {
+                            field.setParameter(preparedStatement, index, text);
+                        }
                     }
                 }
             } catch (StorageException e) {
                 LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
                 if (field.name.contains("_time")) {
                     // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
-                    // currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
+                    //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
                     try {
                         if (value == null || value.isNull()) {
                             if (field.isRequired()) {
@@ -464,7 +473,6 @@ public class JdbcTableWriter implements TableWriter {
             index += 1;
         }
         if (missingFieldNames.size() > 0) {
-//            String joinedFieldNames = missingFieldNames.stream().collect(Collectors.joining(", "));
             throw new SQLException(
                 String.format(
                     "The following field(s) are missing from JSON %s object: %s",
@@ -1280,21 +1288,26 @@ public class JdbcTableWriter implements TableWriter {
         final boolean isCreating = id == null;
         String keyField = table.getKeyFieldName();
         String tableName = String.join(".", namespace, table.name);
-        if (jsonObject.get(keyField) == null || jsonObject.get(keyField).isNull()) {
-            // FIXME: generate key field automatically for certain entities (e.g., trip ID). Maybe this should be
-            // generated for all entities if null?
+        JsonNode val = jsonObject.get(keyField);
+        if (val == null || val.isNull() || val.asText().isEmpty()) {
+            // Handle different cases where the value is missing.
             if ("trip_id".equals(keyField)) {
+                // Generate key field automatically for certain entities (e.g., trip ID).
+                // FIXME: Maybe this should be generated for all entities if null?
                 jsonObject.put(keyField, UUID.randomUUID().toString());
             } else if ("agency_id".equals(keyField)) {
+                // agency_id is not required if there is only one row in the agency table. Otherwise, it is required.
                 LOG.warn("agency_id field for agency id={} is null.", id);
                 int rowSize = getRowCount(tableName, connection);
                 if (rowSize > 1 || (isCreating && rowSize > 0)) {
                     throw new SQLException("agency_id must not be null if more than one agency exists.");
                 }
             } else {
+                // In all other cases where a key field is missing, throw an exception.
                 throw new SQLException(String.format("Key field %s must not be null", keyField));
             }
         }
+        // Re-get the string key value (in case trip_id was added to the JSON object above).
         String keyValue = jsonObject.get(keyField).asText();
         // If updating key field, check that there is no ID conflict on value (e.g., stop_id or route_id)
         TIntSet uniqueIds = getIdsForCondition(tableName, keyField, keyValue, connection);
