@@ -7,10 +7,12 @@ import com.conveyal.gtfs.model.*;
 import java.net.URL;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.FIELD_VALUE_TOO_LONG;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.SERVICE_WITHOUT_DAYS;
 
 /**
  * MTCValidator runs a set of custom validation checks for GTFS feeds managed by MTC in Data Tools.
- * The checks consist of validating field lengths at this time per the 511 MTC guidelines at
+ * At this time, the checks consist of validating field lengths and that calendars apply to
+ * at least one day of the week per the 511 MTC guidelines at
  * https://github.com/ibi-group/datatools-ui/files/4438625/511.Transit_Data.Guidelines_V2.0_3-27-2020.pdf.
  * For specific field lengths, search the guidelines for the word 'character'.
  *
@@ -25,6 +27,7 @@ public class MTCValidator extends FeedValidator {
 
     @Override
     public void validate() {
+        // Validate field lengths (agency, stop, trip).
         for (Agency agency : feed.agencies) {
             validateFieldLength(agency, agency.agency_id, 50);
             validateFieldLength(agency, agency.agency_name, 50);
@@ -39,6 +42,32 @@ public class MTCValidator extends FeedValidator {
             validateFieldLength(trip, trip.trip_headsign, 120);
             validateFieldLength(trip, trip.trip_short_name, 50);
         }
+
+        // Validate that calendars apply to at least one day of the week.
+        for (Calendar calendar : feed.calendars) {
+            validateCalendarDays(calendar);
+        }
+    }
+
+    /**
+     * Checks that a {@link Calendar} entity is applicable for at least one day of the week
+     * (i.e. at least one of the fields for Monday-Sunday is set to '1').
+     * @param calendar The {@link Calendar} entity to check.
+     * @return true if at least one field for Monday-Sunday is set to 1, false otherwise.
+     */
+    public boolean validateCalendarDays(Calendar calendar) {
+        boolean result = calendar.monday == 1
+            || calendar.tuesday == 1
+            || calendar.wednesday == 1
+            || calendar.thursday == 1
+            || calendar.friday == 1
+            || calendar.saturday == 1
+            || calendar.sunday == 1;
+
+        if (!result) {
+            if (errorStorage != null) registerError(calendar, SERVICE_WITHOUT_DAYS, "[Service applies to no day of the week.]");
+        }
+        return result;
     }
 
     /**

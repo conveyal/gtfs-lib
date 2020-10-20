@@ -44,6 +44,9 @@ public enum NewGTFSErrorType {
     ROUTE_UNUSED(Priority.HIGH, "This route is defined but has no trips."),
     SERVICE_NEVER_ACTIVE(Priority.MEDIUM, "A service code was defined, but is never active on any date."),
     SERVICE_UNUSED(Priority.MEDIUM, "A service code was defined, but is never referenced by any trips."),
+    SERVICE_WITHOUT_DAYS(Priority.MEDIUM, "At least one of the days of the week fields (Monday,\n" +
+        "Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday) must have its value set to '1'\n" +
+        "for each service defined in this file."),
     SHAPE_DIST_TRAVELED_NOT_INCREASING(Priority.MEDIUM, "Shape distance traveled must increase with stop times."),
     SHAPE_MISSING_COORDINATE(Priority.MEDIUM, "???"),
     SHAPE_REVERSED(Priority.MEDIUM, "A shape appears to be intended for vehicles running the opposite direction on the route."),

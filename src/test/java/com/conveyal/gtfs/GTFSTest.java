@@ -490,6 +490,31 @@ public class GTFSTest {
     }
 
     /**
+     * Tests that a GTFS feed with a service id without calendar days assigned
+     * (i.e. when 'monday' through 'sunday' fields are set to zero)
+     * generates a validation error per MTC guidelines.
+     */
+    @Test
+    public void canLoadFeedWithServiceWithoutDays() {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list();
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_WITHOUT_DAYS),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED) // Not related, not worrying about this one.
+        );
+        assertThat(
+            "service-without-days test passes",
+            runIntegrationTestOnFolder(
+                "fake-agency-service-without-days",
+                nullValue(),
+                expectations,
+                errorExpectations,
+                MTCValidator::new
+            ),
+            equalTo(true)
+        );
+    }
+
+    /**
      * A helper method that will zip a specified folder in test/main/resources and call
      * {@link #runIntegrationTestOnZipFile} on that file.
      */
