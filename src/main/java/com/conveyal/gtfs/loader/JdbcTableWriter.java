@@ -390,6 +390,7 @@ public class JdbcTableWriter implements TableWriter {
     ) throws SQLException {
         // JDBC SQL statements use a one-based index for setting fields/parameters
         List<String> missingFieldNames = new ArrayList<>();
+        // One-based index for prepared statement.
         int index = 1;
         for (Field field : table.editorFields()) {
             if (!jsonObject.has(field.name)) {
@@ -415,8 +416,8 @@ public class JdbcTableWriter implements TableWriter {
                         missingFieldNames.add(field.name);
                         continue;
                     }
-                    // Handle setting null value on statement
-                    field.setNull(preparedStatement, index);
+                    // Set value to null if empty value is OK and update JSON.
+                    setFieldToNullAndUpdateJson(preparedStatement, jsonObject, field, index);
                 } else {
                     // For fields that are not missing, handle setting different field types.
                     if (value.isArray()) {
@@ -431,10 +432,8 @@ public class JdbcTableWriter implements TableWriter {
                         // If the string is empty, set value to null (for StringField, ShortField, etc.). Otherwise, set
                         // parameter with string value.
                         if (text.isEmpty()) {
-                            // Update JSON object that is returned in response (to reflect database value).
-                            // Note: see return value of JdbcTableWriter#update.
-                            jsonObject.set(field.name, null);
-                            field.setNull(preparedStatement, index);
+                            // Set field to null and update JSON.
+                            setFieldToNullAndUpdateJson(preparedStatement, jsonObject, field, index);
                         } else {
                             field.setParameter(preparedStatement, index, text);
                         }
@@ -470,6 +469,7 @@ public class JdbcTableWriter implements TableWriter {
                     throw e;
                 }
             }
+            // Increment index for next field.
             index += 1;
         }
         if (missingFieldNames.size() > 0) {
@@ -481,6 +481,23 @@ public class JdbcTableWriter implements TableWriter {
                 )
             );
         }
+    }
+
+    /**
+     * Set field to null in prepared statement and update JSON object that is ultimately returned (see return value of
+     * {@link #update}.) in response to reflect actual database value that will be persisted. This method should be
+     * used in cases where the jsonObject value is missing or detected to be an empty string.
+     */
+    private static void setFieldToNullAndUpdateJson(
+        PreparedStatement preparedStatement,
+        ObjectNode jsonObject,
+        Field field,
+        int oneBasedIndex
+    ) throws SQLException {
+        // Update the jsonObject so that the JSON that gets returned correctly reflects persisted value.
+        jsonObject.set(field.name, null);
+        // Set field to null in prepared statement.
+        field.setNull(preparedStatement, oneBasedIndex);
     }
 
     /**
