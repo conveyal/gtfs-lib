@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.SERVICE_WITHOUT_DAYS_OF_WEEK;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TRIP_OVERLAP_IN_BLOCK;
 
 /**
@@ -121,6 +122,11 @@ public class ServiceValidator extends TripValidator {
 
         // First handle the calendar entries, which define repeating weekly schedules.
         for (Calendar calendar : feed.calendars) {
+            // Validate that calendars apply to at least one day of the week.
+            if (!isCalendarUsedDuringWeek(calendar)) {
+                if (errorStorage != null) registerError(calendar, SERVICE_WITHOUT_DAYS_OF_WEEK);
+            }
+
             try {
                 LocalDate endDate = calendar.end_date;
                 // Loop over all days in this calendar entry, recording on which ones it is active.
@@ -444,5 +450,21 @@ public class ServiceValidator extends TripValidator {
         Integer startTime;
         StopTime firstStop;
         StopTime lastStop;
+    }
+
+    /**
+     * Checks that a {@link Calendar} entity is applicable for at least one day of the week
+     * (i.e. at least one of the fields for Monday-Sunday is set to '1').
+     * @param calendar The {@link Calendar} entity to check.
+     * @return true if at least one field for Monday-Sunday is set to 1, false otherwise.
+     */
+    public static boolean isCalendarUsedDuringWeek(Calendar calendar) {
+        return calendar.monday == 1 ||
+            calendar.tuesday == 1 ||
+            calendar.wednesday == 1 ||
+            calendar.thursday == 1 ||
+            calendar.friday == 1 ||
+            calendar.saturday == 1 ||
+            calendar.sunday == 1;
     }
 }
