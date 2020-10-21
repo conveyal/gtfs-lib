@@ -10,8 +10,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.FIELD_VALUE_TOO_LONG;
 
 /**
  * MTCValidator runs a set of custom validation checks for GTFS feeds managed by MTC in Data Tools.
- * At this time, the checks consist of validating field lengths and that calendars apply to
- * at least one day of the week per the 511 MTC guidelines at
+ * The checks consist of validating field lengths at this time per the 511 MTC guidelines at
  * https://github.com/ibi-group/datatools-ui/files/4438625/511.Transit_Data.Guidelines_V2.0_3-27-2020.pdf.
  * For specific field lengths, search the guidelines for the word 'character'.
  *
