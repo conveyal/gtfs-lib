@@ -25,7 +25,6 @@ public class MTCValidator extends FeedValidator {
 
     @Override
     public void validate() {
-        // Validate field lengths (agency, stop, trip).
         for (Agency agency : feed.agencies) {
             validateFieldLength(agency, agency.agency_id, 50);
             validateFieldLength(agency, agency.agency_name, 50);
