@@ -10,14 +10,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 
 public class MTCValidatorTest {
     @Test
-    public void fieldlLengthShouldNotExceed() {
+    public void canValidateFieldLength() {
         MTCValidator validator = new MTCValidator(null, null);
         assertThat(validator.validateFieldLength(null, "abcdefghijklmnopqrstwxyz1234567890", 20), is(false));
         assertThat(validator.validateFieldLength(null, "abcdef", 20), is(true));
     }
 
     @Test
-    public void fieldlLengthShouldNotExceed_usingObject() throws MalformedURLException {
+    public void canValidateFieldLength_usingObject() throws MalformedURLException {
         MTCValidator validator = new MTCValidator(null, null);
 
         // You can also pass objects, in that case it will use toString().
