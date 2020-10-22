@@ -490,6 +490,30 @@ public class GTFSTest {
     }
 
     /**
+     * Tests that a GTFS feed with a service id that doesn't apply to any day of the week
+     * (i.e. when 'monday' through 'sunday' fields are set to zero)
+     * generates a validation error.
+     */
+    @Test
+    public void canLoadFeedWithServiceWithoutDaysOfWeek() {
+        PersistenceExpectation[] expectations = PersistenceExpectation.list();
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED), // Not related, not worrying about this one.
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_WITHOUT_DAYS_OF_WEEK)
+        );
+        assertThat(
+            "service-without-days test passes",
+            runIntegrationTestOnFolder(
+                "fake-agency-service-without-days",
+                nullValue(),
+                expectations,
+                errorExpectations
+            ),
+            equalTo(true)
+        );
+    }
+
+    /**
      * A helper method that will zip a specified folder in test/main/resources and call
      * {@link #runIntegrationTestOnZipFile} on that file.
      */
