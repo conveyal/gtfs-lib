@@ -5,6 +5,7 @@ import com.conveyal.gtfs.graphql.fetchers.FeedFetcher;
 import com.conveyal.gtfs.graphql.fetchers.JDBCFetcher;
 import com.conveyal.gtfs.graphql.fetchers.MapFetcher;
 import com.conveyal.gtfs.graphql.fetchers.NestedJDBCFetcher;
+import com.conveyal.gtfs.graphql.fetchers.PolylineFetcher;
 import com.conveyal.gtfs.graphql.fetchers.RowCountFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SQLColumnFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SourceObjectFetcher;
@@ -163,6 +164,12 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_pt_sequence", GraphQLInt))
             .field(MapFetcher.field("point_type", GraphQLInt))
             .build();
+
+    // Represents a set of rows from shapes.txt joined by shape_id
+    public static final GraphQLObjectType shapeType = newObject().name("shape")
+        .field(string("shape_id"))
+        .field(string("polyline"))
+        .build();
 
 
     // Represents rows from frequencies.txt
@@ -644,6 +651,20 @@ public class GraphQLGtfsSchema {
                     // DataFetchers can either be class instances implementing the interface, or a static function reference
                     .dataFetcher(new JDBCFetcher("patterns"))
                     .build())
+            .field(newFieldDefinition()
+                .name("shapes")
+                .type(new GraphQLList(shapeType))
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .argument(floatArg(MIN_LAT))
+                .argument(floatArg(MIN_LON))
+                .argument(floatArg(MAX_LAT))
+                .argument(floatArg(MAX_LON))
+                .argument(multiStringArg("shape_id"))
+                // DataFetchers can either be class instances implementing the interface, or a static function reference
+                .dataFetcher(new PolylineFetcher())
+                .build())
             // Then the fields for the sub-tables within the feed (loaded directly from GTFS).
             .field(newFieldDefinition()
                     .name("agency")
@@ -798,8 +819,6 @@ public class GraphQLGtfsSchema {
             .newSchema()
             .query(feedQuery)
 //            .query(patternsForStopQuery)
-            // TODO: Add mutations.
-            // .mutation(someMutation)
             .build();
 
 

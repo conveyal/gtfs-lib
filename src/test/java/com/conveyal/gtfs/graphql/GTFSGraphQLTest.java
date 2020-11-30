@@ -118,6 +118,12 @@ public class GTFSGraphQLTest {
         assertThat(queryGraphQL("feedPatterns.txt"), matchesSnapshot());
     }
 
+    /** Tests that the patterns of a feed can be fetched. */
+    @Test(timeout=5000)
+    public void canFetchPolylines() throws IOException {
+        assertThat(queryGraphQL("feedPolylines.txt"), matchesSnapshot());
+    }
+
     /** Tests that the agencies of a feed can be fetched. */
     @Test(timeout=5000)
     public void canFetchAgencies() throws IOException {
