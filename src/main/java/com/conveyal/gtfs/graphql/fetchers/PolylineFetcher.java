@@ -21,6 +21,15 @@ import java.util.Map;
 
 /**
  * GraphQL fetcher to get encoded polylines for all shapes in a GTFS feed.
+ *
+ * Note: this fetcher was developed to prevent out of memory errors associated with requesting all trip patterns with
+ * their associated shapes. Previously, attempting to fetch all shapes for a large feed would require a separate SQL
+ * query for each shape (to join on shape_id) and result in many duplicated shapes in the response.
+ *
+ * Running a shapes polyline query on a 2017 Macbook Pro (2.5 GHz Dual-Core Intel Core i7) results in the following:
+ * - NL feed (11291 shapes): ~12 seconds (but nobody should be editing such a large feed in the editor)
+ * - TriMet (1302 shapes): ~8 seconds
+ * - MBTA (1272 shapes): ~4 seconds
  */
 public class PolylineFetcher implements DataFetcher {
     public static final Logger LOG = LoggerFactory.getLogger(PolylineFetcher.class);
@@ -36,7 +45,7 @@ public class PolylineFetcher implements DataFetcher {
             connection = GTFSGraphQL.getConnection();
             Statement statement = connection.createStatement();
             String sql = String.format(
-                "select shape_id, shape_pt_lon, shape_pt_lat from %s.shapes order by shape_id",
+                "select shape_id, shape_pt_lon, shape_pt_lat from %s.shapes order by shape_id, shape_pt_sequence",
                 namespace
             );
             LOG.info("SQL: {}", sql);
