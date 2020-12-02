@@ -16,6 +16,11 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+/**
+ * Contains tests for {@link PolylineUtils}. This code is taken/derived from the mapbox-java project (MIT license):
+ *
+ * https://github.com/mapbox/mapbox-java/blob/master/services-geojson/src/test/java/com/mapbox/geojson/utils/PolylineUtilsTest.java
+ */
 public class PolylineUtilsTest {
 
     private static final int PRECISION_6 = 6;

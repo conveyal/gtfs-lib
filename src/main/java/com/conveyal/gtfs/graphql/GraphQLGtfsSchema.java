@@ -166,7 +166,7 @@ public class GraphQLGtfsSchema {
             .build();
 
     // Represents a set of rows from shapes.txt joined by shape_id
-    public static final GraphQLObjectType shapeType = newObject().name("shape")
+    public static final GraphQLObjectType shapeEncodedPolylineType = newObject().name("shapeEncodedPolyline")
         .field(string("shape_id"))
         .field(string("polyline"))
         .build();
@@ -652,16 +652,8 @@ public class GraphQLGtfsSchema {
                     .dataFetcher(new JDBCFetcher("patterns"))
                     .build())
             .field(newFieldDefinition()
-                .name("shapes")
-                .type(new GraphQLList(shapeType))
-                .argument(intArg(ID_ARG))
-                .argument(intArg(LIMIT_ARG))
-                .argument(intArg(OFFSET_ARG))
-                .argument(floatArg(MIN_LAT))
-                .argument(floatArg(MIN_LON))
-                .argument(floatArg(MAX_LAT))
-                .argument(floatArg(MAX_LON))
-                .argument(multiStringArg("shape_id"))
+                .name("shapes_as_polylines")
+                .type(new GraphQLList(shapeEncodedPolylineType))
                 // DataFetchers can either be class instances implementing the interface, or a static function reference
                 .dataFetcher(new PolylineFetcher())
                 .build())

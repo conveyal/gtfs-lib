@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.util;
 
-import com.sun.istack.internal.NotNull;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -37,8 +36,7 @@ public final class PolylineUtils {
      * @see <a href="https://github.com/googlemaps/android-maps-utils/blob/master/library/src/com/google/maps/android/PolyUtil.java">Part of algorithm came from this source.</a>
      * @since 1.0.0
      */
-    @NotNull
-    public static List<Point> decode(@NotNull final String encodedPath, int precision) {
+    public static List<Point> decode(final String encodedPath, int precision) {
         GeometryFactory gf = new GeometryFactory();
         int len = encodedPath.length();
 
@@ -88,8 +86,7 @@ public final class PolylineUtils {
      * @return a String representing a path string
      * @since 1.0.0
      */
-    @NotNull
-    public static String encode(@NotNull final List<Point> path, int precision) {
+    public static String encode(final List<Point> path, int precision) {
         long lastLat = 0;
         long lastLng = 0;
 
@@ -137,8 +134,7 @@ public final class PolylineUtils {
      * @see <a href="http://mourner.github.io/simplify-js/">JavaScript implementation</a>
      * @since 1.2.0
      */
-    @NotNull
-    public static List<Point> simplify(@NotNull List<Point> points) {
+    public static List<Point> simplify(List<Point> points) {
         return simplify(points, SIMPLIFY_DEFAULT_TOLERANCE, SIMPLIFY_DEFAULT_HIGHEST_QUALITY);
     }
 
@@ -153,8 +149,7 @@ public final class PolylineUtils {
      * @see <a href="http://mourner.github.io/simplify-js/">JavaScript implementation</a>
      * @since 1.2.0
      */
-    @NotNull
-    public static List<Point> simplify(@NotNull List<Point> points, double tolerance) {
+    public static List<Point> simplify(List<Point> points, double tolerance) {
         return simplify(points, tolerance, SIMPLIFY_DEFAULT_HIGHEST_QUALITY);
     }
 
@@ -169,8 +164,7 @@ public final class PolylineUtils {
      * @see <a href="http://mourner.github.io/simplify-js/">JavaScript implementation</a>
      * @since 1.2.0
      */
-    @NotNull
-    public static List<Point> simplify(@NotNull List<Point> points, boolean highestQuality) {
+    public static List<Point> simplify(List<Point> points, boolean highestQuality) {
         return simplify(points, SIMPLIFY_DEFAULT_TOLERANCE, highestQuality);
     }
 
@@ -187,8 +181,7 @@ public final class PolylineUtils {
      * @see <a href="http://mourner.github.io/simplify-js/">JavaScript implementation</a>
      * @since 1.2.0
      */
-    @NotNull
-    public static List<Point> simplify(@NotNull List<Point> points, double tolerance,
+    public static List<Point> simplify(List<Point> points, double tolerance,
                                        boolean highestQuality) {
         if (points.size() <= 2) {
             return points;
