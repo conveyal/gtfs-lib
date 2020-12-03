@@ -12,12 +12,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
  * GraphQL fetcher to get encoded polylines for all shapes in a GTFS feed.
@@ -27,65 +30,75 @@ import java.util.Map;
  * query for each shape (to join on shape_id) and result in many duplicated shapes in the response.
  *
  * Running a shapes polyline query on a 2017 Macbook Pro (2.5 GHz Dual-Core Intel Core i7) results in the following:
- * - NL feed (11291 shapes): ~12 seconds (but nobody should be editing such a large feed in the editor)
- * - TriMet (1302 shapes): ~8 seconds
- * - MBTA (1272 shapes): ~4 seconds
+ * - NL feed (11291 shapes, 4.2M rows): ~13 seconds (but hopefully nobody is editing such a large feed in the editor)
+ * - TriMet (1909 shapes, 719K rows): ~3 seconds
+ * - MBTA (1272 shapes, 268K rows): 1-2 seconds
+ *
+ * This was originally handled in a single query to the shapes table that sorted on shape_id and shape_pt_sequence, but
+ * per Evan Siroky rec, we've split into two queries to reduce the number of sort operations significantly. For example:
+ *
+ * There are 719k lines in the TriMet shapes.txt file with 1,909 unique shape IDs (so about 377 points per
+ * shape on average). With that, the numbers become:
+ *
+ * 1 * 719k * log2(719k) = 13.9m operations
+ * 1909 * 377 * log2(377) = 6.1m operations
+ *
+ * NOTE: This doesn't provide much of a benefit for the NL feed (in fact, it appears to have a disbenefit/slowdown
+ * of about 1-2 seconds on average), but for the other feeds tested the double query approach was about twice as fast.
  */
 public class PolylineFetcher implements DataFetcher {
-    public static final Logger LOG = LoggerFactory.getLogger(PolylineFetcher.class);
+    private static final Logger LOG = LoggerFactory.getLogger(PolylineFetcher.class);
+    private static final GeometryFactory gf = new GeometryFactory();
 
     @Override
     public Object get(DataFetchingEnvironment environment) {
-        GeometryFactory gf = new GeometryFactory();
-        List<Shape> shapes = new ArrayList<>();
         Map<String, Object> parentFeedMap = environment.getSource();
         String namespace = (String) parentFeedMap.get("namespace");
         Connection connection = null;
         try {
+            List<Shape> shapes = new ArrayList<>();
             connection = GTFSGraphQL.getConnection();
-            Statement statement = connection.createStatement();
-            String sql = String.format(
-                "select shape_id, shape_pt_lon, shape_pt_lat from %s.shapes order by shape_id, shape_pt_sequence",
+            // First, collect all shape ids.
+            Set<String> shapeIds = new HashSet<>();
+            String getShapeIdsSql = String.format("select distinct shape_id from %s.shapes", namespace);
+            LOG.info(getShapeIdsSql);
+            ResultSet shapeIdsResult = connection.createStatement().executeQuery(getShapeIdsSql);
+            while (shapeIdsResult.next()) {
+                shapeIds.add(shapeIdsResult.getString(1));
+            }
+            // Next, iterate over shape ids and build shapes progressively.
+            PreparedStatement shapePointsStatement = connection.prepareStatement(String.format(
+                "select shape_pt_lon, shape_pt_lat from %s.shapes where shape_id = ? order by shape_pt_sequence",
                 namespace
-            );
-            LOG.info("SQL: {}", sql);
-            if (statement.execute(sql)) {
-                ResultSet result = statement.getResultSet();
-                String currentShapeId = null;
-                String nextShapeId;
+            ));
+            for (String shapeId : shapeIds) {
+                shapePointsStatement.setString(1, shapeId);
+                ResultSet result = shapePointsStatement.executeQuery();
                 List<Point> shapePoints = new ArrayList<>();
                 while (result.next()) {
-                    // Get values from SQL row.
-                    nextShapeId = result.getString(1);
-                    double lon = result.getDouble(2);
-                    double lat = result.getDouble(3);
-                    if (currentShapeId != null && !nextShapeId.equals(currentShapeId)) {
-                        // Finish current shape if new shape_id is encountered.
-                        shapes.add(new Shape(currentShapeId, shapePoints));
-                        // Start building new shape.
-                        shapePoints = new ArrayList<>();
-                    }
-                    // Update current shape_id and add shape point to list.
-                    currentShapeId = nextShapeId;
+                    // Get lon/lat values from SQL row.
+                    double lon = result.getDouble(1);
+                    double lat = result.getDouble(2);
                     shapePoints.add(gf.createPoint(new Coordinate(lon, lat)));
                 }
-                // Add the final shape when result iteration is finished.
-                shapes.add(new Shape(currentShapeId, shapePoints));
+                // Construct/add shape once all points have been gathered.
+                shapes.add(new Shape(shapeId, shapePoints));
             }
+            // Finally, return the shapes with encoded polylines.
+            return shapes;
         } catch (SQLException e) {
             throw new RuntimeException(e);
         } finally {
             DbUtils.closeQuietly(connection);
         }
-        return shapes;
     }
 
     /**
      * Simple class to return shapes for GraphQL response format.
      */
     public static class Shape {
-        public String shape_id;
-        public String polyline;
+        public final String shape_id;
+        public final String polyline;
 
         public Shape(String shape_id, List<Point> shapePoints) {
             this.shape_id = shape_id;
