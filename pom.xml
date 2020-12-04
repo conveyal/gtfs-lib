@@ -29,15 +29,15 @@
     </developer>
     <developer>
       <name>Landon Reed</name>
-      <email>lreed@conveyal.com</email>
-      <organization>Conveyal</organization>
-      <organizationUrl>http://conveyal.com/</organizationUrl>
+      <email>landon.reed@ibigroup.com</email>
+      <organization>IBI Group</organization>
+      <organizationUrl>https://ibigroup.com</organizationUrl>
     </developer>
     <developer>
-      <name>Matt Conway</name>
-      <email>mconway@conveyal.com</email>
-      <organization>Conveyal</organization>
-      <organizationUrl>http://conveyal.com/</organizationUrl>
+      <name>Evan Siroky</name>
+      <email>evan.siroky@ibigroup.com</email>
+      <organization>IBI Group</organization>
+      <organizationUrl>https://ibigroup.com</organizationUrl>
     </developer>
   </developers>
 
