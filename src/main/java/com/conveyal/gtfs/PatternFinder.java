@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -86,7 +87,8 @@ public class PatternFinder {
         // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
         int nextPatternId = 1;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
-        Map<TripPatternKey, Pattern> patterns = new HashMap<>();
+        // Use a LinkedHashMap so we can retrieve the entrySets later in the order of insertion.
+        Map<TripPatternKey, Pattern> patterns = new LinkedHashMap<>();
         // TODO assign patterns sequential small integer IDs (may include route)
         for (TripPatternKey key : tripsForPattern.keySet()) {
             Collection<Trip> trips = tripsForPattern.get(key);
