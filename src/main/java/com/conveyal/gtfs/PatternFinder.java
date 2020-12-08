@@ -11,6 +11,7 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateList;
@@ -45,7 +46,7 @@ public class PatternFinder {
     private static final Logger LOG = LoggerFactory.getLogger(PatternFinder.class);
 
     // A multi-map that groups trips together by their sequence of stops
-    private Multimap<TripPatternKey, Trip> tripsForPattern = HashMultimap.create();
+    private Multimap<TripPatternKey, Trip> tripsForPattern = LinkedHashMultimap.create();
 
     private int nTripsProcessed = 0;
 

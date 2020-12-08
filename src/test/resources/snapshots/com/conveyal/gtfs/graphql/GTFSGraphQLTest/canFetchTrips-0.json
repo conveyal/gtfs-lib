@@ -8,7 +8,7 @@
         "direction_id" : 0,
         "frequencies" : [ ],
         "id" : 2,
-        "pattern_id" : "2",
+        "pattern_id" : "1",
         "route_id" : "1",
         "service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57",
         "shape" : [ {
@@ -83,7 +83,7 @@
           "trip_id" : "frequency-trip"
         } ],
         "id" : 3,
-        "pattern_id" : "1",
+        "pattern_id" : "2",
         "route_id" : "1",
         "service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57",
         "shape" : [ {

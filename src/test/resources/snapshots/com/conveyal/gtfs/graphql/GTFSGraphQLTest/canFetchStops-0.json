@@ -39,7 +39,7 @@
         "location_type" : 0,
         "parent_station" : null,
         "patterns" : [ {
-          "pattern_id" : "2"
+          "pattern_id" : "1"
         } ],
         "routes" : [ {
           "route_id" : "1"
@@ -83,7 +83,7 @@
         "location_type" : 0,
         "parent_station" : "123",
         "patterns" : [ {
-          "pattern_id" : "1"
+          "pattern_id" : "2"
         } ],
         "routes" : [ {
           "route_id" : "1"
