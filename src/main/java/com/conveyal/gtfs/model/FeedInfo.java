@@ -44,6 +44,7 @@ public class FeedInfo extends Entity implements Cloneable {
         DateField feedEndDateField = (DateField) Table.FEED_INFO.getFieldForName("feed_end_date");
         String feedPublisherUrl = feed_publisher_url != null ? feed_publisher_url.toString() : null;
         statement.setString(oneBasedIndex++, feed_publisher_name);
+        statement.setString(oneBasedIndex++, feed_id);
         statement.setString(oneBasedIndex++, feedPublisherUrl);
         statement.setString(oneBasedIndex++, feed_lang);
         feedStartDateField.setParameter(statement, oneBasedIndex++, feed_start_date);

@@ -1,0 +1,3 @@
+service_id,date,exception_type
+in-both-calendar-txt-and-calendar-dates,20170920,2
+only-in-calendar-dates-txt,20170916,1

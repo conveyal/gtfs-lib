@@ -152,9 +152,12 @@ public class Table {
     ).addPrimaryKey();
 
     // FIXME: Should we add some constraint on number of rows that this table has? Perhaps this is a GTFS editor specific
-    // feature.
+    //  feature.
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
+        // feed_id is not the first field because that would label it as the key field, which we do not want because the
+        // key field cannot be optional.
+        new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
         new DateField("feed_start_date", OPTIONAL),
@@ -256,7 +259,7 @@ public class Table {
             // FIXME: Do we need an index on from_ and to_stop_id
             new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
-            new StringField("transfer_type", REQUIRED),
+            new ShortField("transfer_type", REQUIRED, 3),
             new StringField("min_transfer_time", OPTIONAL))
             .addPrimaryKey()
             .keyFieldIsNotUnique()
@@ -517,6 +520,9 @@ public class Table {
             // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
             InputStream bomInputStream = new BOMInputStream(zipInputStream);
             CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
+            // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
+            // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
+            csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
@@ -828,8 +834,16 @@ public class Table {
     /**
      * Creates a SQL table from the table to clone. This uses the SQL syntax "create table x as y" not only copies the
      * table structure, but also the data from the original table. Creating table indexes is not handled by this method.
+     *
+     * Note: the stop_times table is a special case that will optionally normalize the stop_sequence values to be
+     * zero-based and incrementing.
+     *
+     * @param connection            SQL connection
+     * @param tableToClone          table name to clone (in the dot notation: namespace.gtfs_table)
+     * @param normalizeStopTimes    whether to normalize stop times (set stop_sequence values to be zero-based and
+     *                              incrementing)
      */
-    public boolean createSqlTableFrom(Connection connection, String tableToClone) {
+    public boolean createSqlTableFrom(Connection connection, String tableToClone, boolean normalizeStopTimes) {
         long startTime = System.currentTimeMillis();
         try {
             Statement statement = connection.createStatement();
@@ -837,7 +851,7 @@ public class Table {
             String dropSql = String.format("drop table if exists %s", name);
             LOG.info(dropSql);
             statement.execute(dropSql);
-            if (tableToClone.endsWith("stop_times")) {
+            if (tableToClone.endsWith("stop_times") && normalizeStopTimes) {
                 normalizeAndCloneStopTimes(statement, name, tableToClone);
             } else {
                 // Adding the unlogged keyword gives about 12 percent speedup on loading, but is non-standard.

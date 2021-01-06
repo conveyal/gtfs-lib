@@ -5,6 +5,7 @@ import com.conveyal.gtfs.graphql.fetchers.FeedFetcher;
 import com.conveyal.gtfs.graphql.fetchers.JDBCFetcher;
 import com.conveyal.gtfs.graphql.fetchers.MapFetcher;
 import com.conveyal.gtfs.graphql.fetchers.NestedJDBCFetcher;
+import com.conveyal.gtfs.graphql.fetchers.PolylineFetcher;
 import com.conveyal.gtfs.graphql.fetchers.RowCountFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SQLColumnFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SourceObjectFetcher;
@@ -142,6 +143,7 @@ public class GraphQLGtfsSchema {
     public static final GraphQLObjectType feedInfoType = newObject().name("feed_info")
             .description("A GTFS feed_info object")
             .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("feed_id"))
             .field(MapFetcher.field("feed_publisher_name"))
             .field(MapFetcher.field("feed_publisher_url"))
             .field(MapFetcher.field("feed_lang"))
@@ -162,6 +164,12 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_pt_sequence", GraphQLInt))
             .field(MapFetcher.field("point_type", GraphQLInt))
             .build();
+
+    // Represents a set of rows from shapes.txt joined by shape_id
+    public static final GraphQLObjectType shapeEncodedPolylineType = newObject().name("shapeEncodedPolyline")
+        .field(string("shape_id"))
+        .field(string("polyline"))
+        .build();
 
 
     // Represents rows from frequencies.txt
@@ -456,6 +464,7 @@ public class GraphQLGtfsSchema {
             .field(string("type"))
             .field(intt("count"))
             .field(string("message"))
+            .field(string("priority"))
             .build();
 
     /**
@@ -642,6 +651,12 @@ public class GraphQLGtfsSchema {
                     // DataFetchers can either be class instances implementing the interface, or a static function reference
                     .dataFetcher(new JDBCFetcher("patterns"))
                     .build())
+            .field(newFieldDefinition()
+                .name("shapes_as_polylines")
+                .type(new GraphQLList(shapeEncodedPolylineType))
+                // DataFetchers can either be class instances implementing the interface, or a static function reference
+                .dataFetcher(new PolylineFetcher())
+                .build())
             // Then the fields for the sub-tables within the feed (loaded directly from GTFS).
             .field(newFieldDefinition()
                     .name("agency")
@@ -796,8 +811,6 @@ public class GraphQLGtfsSchema {
             .newSchema()
             .query(feedQuery)
 //            .query(patternsForStopQuery)
-            // TODO: Add mutations.
-            // .mutation(someMutation)
             .build();
 
 

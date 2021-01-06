@@ -2,6 +2,7 @@ package com.conveyal.gtfs.graphql.fetchers;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.graphql.GTFSGraphQL;
+import com.conveyal.gtfs.validator.model.Priority;
 import graphql.schema.DataFetcher;
 import graphql.schema.DataFetchingEnvironment;
 import org.apache.commons.dbutils.DbUtils;
@@ -41,7 +42,12 @@ public class ErrorCountFetcher implements DataFetcher {
         try {
             connection = GTFSGraphQL.getConnection();
             Statement statement = connection.createStatement();
-            String sql = String.format("select error_type, count(*) from %s.errors group by error_type", namespace);
+            String sql = String.format(
+                // this order_by is only needed to make sure that the testing snapshots are consistently in the same
+                // order during every test
+                "select error_type, count(*) from %s.errors group by error_type order by error_type",
+                namespace
+            );
             LOG.info("SQL: {}", sql);
             if (statement.execute(sql)) {
                 ResultSet resultSet = statement.getResultSet();
@@ -61,11 +67,13 @@ public class ErrorCountFetcher implements DataFetcher {
         public NewGTFSErrorType type;
         public int count;
         public String message;
+        public Priority priority;
 
         public ErrorCount(NewGTFSErrorType errorType, int count) {
             this.type = errorType;
             this.count = count;
             this.message = errorType.englishMessage;
+            this.priority = errorType.priority;
         }
     }
 

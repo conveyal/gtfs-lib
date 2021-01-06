@@ -1,0 +1,4 @@
+route_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,bikes_allowed,wheelchair_accessible,service_id
+1,non-frequency-trip,,,0,,5820f377-f947-4728-ac29-ac0102cbc34e,0,0,only-in-calendar-dates-txt
+1,non-frequency-trip-2,,,0,,5820f377-f947-4728-ac29-ac0102cbc34e,0,0,only-in-calendar-txt
+1,frequency-trip,,,0,,5820f377-f947-4728-ac29-ac0102cbc34e,0,0,in-both-calendar-txt-and-calendar-dates

@@ -41,7 +41,11 @@ import static com.conveyal.gtfs.TestUtils.getResourceFileName;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 /**
  * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
@@ -79,14 +83,11 @@ public class JDBCTableWriterTest {
         testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         LOG.info("creating feeds table because it isn't automatically generated unless you import a feed");
         Connection connection = testDataSource.getConnection();
-        connection.createStatement()
-            .execute("create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
-                "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
-                "snapshot_of varchar)");
+        connection.createStatement().execute(JdbcGtfsLoader.getCreateFeedRegistrySQL());
         connection.commit();
         LOG.info("feeds table created");
         // Create an empty snapshot to create a new namespace and all the tables
-        FeedLoadResult result = makeSnapshot(null, testDataSource);
+        FeedLoadResult result = makeSnapshot(null, testDataSource, false);
         testNamespace = result.uniqueIdentifier;
         // Create a service calendar and two stops, both of which are necessary to perform pattern and trip tests.
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
@@ -100,7 +101,7 @@ public class JDBCTableWriterTest {
         // validate feed to create additional tables
         validate(testGtfsGLNamespace, testDataSource);
         // load into editor via snapshot
-        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(testGtfsGLNamespace, testDataSource);
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(testGtfsGLNamespace, testDataSource, false);
         SnapshotResult snapshotResult = snapshotter.copyTables();
         testGtfsGLSnapshotNamespace = snapshotResult.uniqueIdentifier;
     }
@@ -119,6 +120,7 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         FeedInfoDTO feedInfoInput = new FeedInfoDTO();
         String publisherName = "test-publisher";
+        feedInfoInput.feed_id = null;
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
@@ -177,6 +179,7 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         FeedInfoDTO feedInfoInput = new FeedInfoDTO();
         String publisherName = "' OR 1 = 1; SELECT '1";
+        feedInfoInput.feed_id = "fake_id";
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
@@ -302,7 +305,9 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         String routeId = "500";
         RouteDTO createdRoute = createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
-
+        // Set values to empty strings/null to later verify that they are set to null in the database.
+        createdRoute.route_color = "";
+        createdRoute.route_sort_order = "";
         // make sure saved data matches expected data
         assertThat(createdRoute.route_id, equalTo(routeId));
         // TODO: Verify with a SQL query that the database now contains the created data (we may need to use the same
@@ -312,7 +317,7 @@ public class JDBCTableWriterTest {
         String updatedRouteId = "600";
         createdRoute.route_id = updatedRouteId;
 
-        // covert object to json and save it
+        // convert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(routeTable);
         String updateOutput = updateTableWriter.update(
                 createdRoute.id,
@@ -326,9 +331,17 @@ public class JDBCTableWriterTest {
 
         // make sure saved data matches expected data
         assertThat(updatedRouteDTO.route_id, equalTo(updatedRouteId));
-        // TODO: Verify with a SQL query that the database now contains the updated data (we may need to use the same
-        //       db connection to do this successfully?)
-
+        // Ensure route_color is null (not empty string).
+        LOG.info("route_color: {}", updatedRouteDTO.route_color);
+        assertNull(updatedRouteDTO.route_color);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedRouteDTO.id, routeTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "route_color", Matchers.nullValue());
+            assertResultValue(resultSet, "route_id", equalTo(createdRoute.route_id));
+            assertResultValue(resultSet, "route_sort_order", Matchers.nullValue());
+            assertResultValue(resultSet, "route_type", equalTo(createdRoute.route_type));
+        }
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(routeTable);
         int deleteOutput = deleteTableWriter.delete(
@@ -427,9 +440,19 @@ public class JDBCTableWriterTest {
         assertThat(pattern.route_id, equalTo(routeId));
         // Create trip so we can check that the stop_time values are updated after the patter update.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        // Set trip_id to empty string to verify that it gets overwritten with auto-generated UUID.
+        tripInput.trip_id = "";
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check that trip_id is not empty.
+        assertNotEquals("", createdTrip.trip_id);
+        // Check that trip_id is a UUID.
+        LOG.info("New trip_id = {}", createdTrip.trip_id);
+        UUID uuid = UUID.fromString(createdTrip.trip_id);
+        assertNotNull(uuid);
+        // Check that trip exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
         // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
         PreparedStatement statement = testDataSource.getConnection().prepareStatement(
             String.format(
@@ -438,6 +461,7 @@ public class JDBCTableWriterTest {
                 createdTrip.trip_id
             )
         );
+        LOG.info(statement.toString());
         ResultSet resultSet = statement.executeQuery();
         while (resultSet.next()) {
             // First stop_time shape_dist_traveled should be zero.

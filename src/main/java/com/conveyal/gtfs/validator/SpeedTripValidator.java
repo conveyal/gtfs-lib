@@ -55,8 +55,11 @@ public class SpeedTripValidator extends TripValidator {
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
-            // Check that shape_dist_traveled is increasing.
-            checkShapeDistTraveled(prevStopTime, currStopTime);
+            // Check that shape_dist_traveled is increasing. Note: we skip checking the first index because it appears
+            // to be a common practice for agencies to omit a 0.0 value during export. Because most feed consumers
+            // likely will just default a missing value to 0.0, we skip this check because it causes excessive noise in
+            // validation results.
+            if (beginIndex > 0) checkShapeDistTraveled(prevStopTime, currStopTime);
             if (missingBothTimes(currStopTime)) {
                 // FixMissingTimes has already been called, so both arrival and departure time are missing.
                 // The spec allows this. Other than accumulating distance, skip this StopTime. If this stop_time serves
@@ -93,7 +96,7 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * Register shape dist traveled error if current stop time has a value AND either and the previous value is
+     * Register shape dist traveled error if current stop time has a value AND either the previous value is
      * missing (if at least one stop time has a value, all stop times for the trip should) OR if current value
      * is less than or equal to the previous value. Note: if the previous shape_dist_traveled value is present and the
      * current value is missing, the previous value will be greater than the current stop time's value because
