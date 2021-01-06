@@ -31,7 +31,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
  *   in cases where the order of items in a list is not important.
  */
 public class GTFSGraphQLTest {
-    private static String testDBName;
+    public static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
 
