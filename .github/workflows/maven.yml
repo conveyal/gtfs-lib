@@ -29,6 +29,17 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
+    # Install node 12 for running maven-semantic-release.
+    - name: Use Node.js 12.x
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12.x
+    - name: Install maven-semantic-release
+      # FIXME: Enable cache for node packages (add package.json?)
+      run: |
+        yarn global add @conveyal/maven-semantic-release semantic-release
+        # Add yarn path to GITHUB_PATH so that global package is executable.
+        echo "$(yarn global bin)" >> $GITHUB_PATH
     - name: Setup Maven Cache
       uses: actions/cache@v2
       id: cache
