@@ -41,6 +41,7 @@ import java.util.Iterator;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static com.conveyal.gtfs.graphql.GTFSGraphQLTest.testDBName;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.equalTo;
@@ -558,13 +559,9 @@ public class GTFSTest {
         ErrorExpectation[] errorExpectations,
         FeedValidatorCreator... customValidators
     ) {
-        String testDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
-        DataSource dataSource = GTFS.createDataSource(
-            dbConnectionUrl,
-            null,
-            null
-        );
+        String newDBName = TestUtils.generateNewDB();
+        String dbConnectionUrl = String.join("/", JDBC_URL, newDBName);
+        DataSource dataSource = TestUtils.createTestDataSource(dbConnectionUrl);
 
         String namespace;
 

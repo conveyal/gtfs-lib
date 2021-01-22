@@ -31,7 +31,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
  *   in cases where the order of items in a list is not important.
  */
 public class GTFSGraphQLTest {
-    private static String testDBName;
+    public static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
 
@@ -45,7 +45,7 @@ public class GTFSGraphQLTest {
         // create a new database
         testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
-        testDataSource = createDataSource(dbConnectionUrl, null, null);
+        testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         // zip up test folder into temp zip file
         String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
         // load feed into db
@@ -67,7 +67,7 @@ public class GTFSGraphQLTest {
         // create a new database
         testInjectionDBName = TestUtils.generateNewDB();
         String injectionDbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testInjectionDBName);
-        testInjectionDataSource = createDataSource(injectionDbConnectionUrl, null, null);
+        testInjectionDataSource = TestUtils.createTestDataSource(injectionDbConnectionUrl);
         // load feed into db
         FeedLoadResult injectionFeedLoadResult = load(zipFileName, testInjectionDataSource);
         testInjectionNamespace = injectionFeedLoadResult.uniqueIdentifier;

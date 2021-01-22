@@ -34,7 +34,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.UUID;
 
-import static com.conveyal.gtfs.GTFS.createDataSource;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static com.conveyal.gtfs.GTFS.validate;
@@ -81,7 +80,7 @@ public class JDBCTableWriterTest {
         // Create a new database
         testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
-        testDataSource = createDataSource (dbConnectionUrl, null, null);
+        testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         LOG.info("creating feeds table because it isn't automatically generated unless you import a feed");
         Connection connection = testDataSource.getConnection();
         connection.createStatement().execute(JdbcGtfsLoader.getCreateFeedRegistrySQL());
