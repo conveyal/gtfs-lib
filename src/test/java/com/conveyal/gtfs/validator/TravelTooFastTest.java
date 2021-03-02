@@ -21,7 +21,7 @@ public class TravelTooFastTest {
         // create a new database
         testDBName = TestUtils.generateNewDB();
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
-        testDataSource = createDataSource(dbConnectionUrl, null, null);
+        testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
     }
 
     @AfterClass
