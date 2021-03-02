@@ -11,11 +11,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 
 public class TestUtils {
 
@@ -156,4 +159,28 @@ public class TestUtils {
     public static String fileNameWithDir(String directory, String filename) {
         return String.join(File.separator, directory, filename);
     }
+
+    /**
+     * Asserts that the result of a SQL count statement is equal to an expected value
+     *
+     * @param sql A SQL statement in the form of `SELECT count(*) FROM ...`
+     * @param expectedCount The expected count that is returned from the result of the SQL statement.
+     */
+    public static void assertThatSqlCountQueryYieldsExpectedCount(DataSource dataSource, String sql, int expectedCount) throws SQLException {
+        int count = -1;
+        LOG.info(sql);
+        // Encapsulate connection in try-with-resources to ensure it is closed and does not interfere with other tests.
+        try (Connection connection = dataSource.getConnection()) {
+            ResultSet resultSet = connection.prepareStatement(sql).executeQuery();
+            while (resultSet.next()) {
+                count = resultSet.getInt(1);
+            }
+        }
+        assertThat(
+            "Records matching query should equal expected count.",
+            count,
+            equalTo(expectedCount)
+        );
+    }
+
 }
