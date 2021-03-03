@@ -1,2 +1,0 @@
-route_id,service_id,trip_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed
-21,1,3025864,PALO ALTO TRANSIT CTR,,1,2145,101395,0,0
