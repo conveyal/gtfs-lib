@@ -55,7 +55,7 @@ public class SpeedTripValidator extends TripValidator {
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
-            // Redefine previous stop. This will allow the cumulative distance between stops to be calculated correctly.
+            // Redefine previous stop for next iteration (doing so here ensures the reassignment is not skipped if both stop times for the stop are missing).
             prevStop = currStop;
             // Check that shape_dist_traveled is increasing. Note: we skip checking the first index because it appears
             // to be a common practice for agencies to omit a 0.0 value during export. Because most feed consumers
