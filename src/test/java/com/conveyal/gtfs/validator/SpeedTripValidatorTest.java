@@ -71,6 +71,9 @@ public class SpeedTripValidatorTest {
         checkFeedHasError(TRAVEL_TOO_SLOW, "6", 3);
     }
 
+    /**
+     * Check that the test feed has exactly one error for the given type, entityId, and entitySequence.
+     */
     private void checkFeedHasError(NewGTFSErrorType type, String entityId, int entitySequence) {
         assertThatSqlCountQueryYieldsExpectedCount(
             testDataSource,
@@ -82,6 +85,9 @@ public class SpeedTripValidatorTest {
                 1);
     }
 
+    /**
+     * Check that the test feed is error free for the given type and entityId.
+     */
     private void checkFeedIsErrorFree(NewGTFSErrorType type, String entityId) {
         assertThatSqlCountQueryYieldsExpectedCount(
                 testDataSource,
