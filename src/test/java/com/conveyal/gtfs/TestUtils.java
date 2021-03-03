@@ -166,7 +166,7 @@ public class TestUtils {
      * @param sql A SQL statement in the form of `SELECT count(*) FROM ...`
      * @param expectedCount The expected count that is returned from the result of the SQL statement.
      */
-    public static void assertThatSqlCountQueryYieldsExpectedCount(DataSource dataSource, String sql, int expectedCount) throws SQLException {
+    public static void assertThatSqlCountQueryYieldsExpectedCount(DataSource dataSource, String sql, int expectedCount) {
         int count = -1;
         LOG.info(sql);
         // Encapsulate connection in try-with-resources to ensure it is closed and does not interfere with other tests.
@@ -175,6 +175,8 @@ public class TestUtils {
             while (resultSet.next()) {
                 count = resultSet.getInt(1);
             }
+        } catch (SQLException e) {
+            LOG.error("SQL error encountered", e);
         }
         assertThat(
             "Records matching query should equal expected count.",

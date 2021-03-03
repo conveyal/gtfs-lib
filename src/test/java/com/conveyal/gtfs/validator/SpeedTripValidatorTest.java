@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.TestUtils;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -11,13 +12,13 @@ import javax.sql.DataSource;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_FAST;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_SLOW;
 
 public class SpeedTripValidatorTest {
     private static String testDBName;
     private static DataSource testDataSource;
     private static String testNamespace;
-    private static final String TRAVEL_TOO_SLOW = "TRAVEL_TOO_SLOW";
-    private static final String TRAVEL_TOO_FAST = "TRAVEL_TOO_FAST";
 
     @BeforeClass
     public static void setUpClass() throws Exception {
@@ -39,46 +40,55 @@ public class SpeedTripValidatorTest {
     }
 
     @Test
-    public void canValidateNormalTravelSpeedWithAllStopTimes() throws Exception {
-        checkFeedErrorsForExpectOutcome(TRAVEL_TOO_FAST, "1", 9, 0);
+    public void tripTravelingAtNormalSpeedWithAllStopTimesIsErrorFree() {
+        checkFeedIsErrorFree(TRAVEL_TOO_FAST, "1");
+        checkFeedIsErrorFree(TRAVEL_TOO_SLOW, "1");
     }
 
     @Test
-    public void canValidateNormalTravelSpeedWithMissingStopTimes() throws Exception {
-        checkFeedErrorsForExpectOutcome(TRAVEL_TOO_FAST, "2", 3, 0);
+    public void tripTravelingAtNormalSpeedWithMissingStopTimesIsErrorFree() {
+        checkFeedIsErrorFree(TRAVEL_TOO_FAST, "2");
+        checkFeedIsErrorFree(TRAVEL_TOO_SLOW, "2");
     }
 
     @Test
-    public void canValidateTooFastTravelSpeedWithAllStopTimes() throws Exception {
-        checkFeedErrorsForExpectOutcome(TRAVEL_TOO_FAST, "3", 2, 1);
+    public void tripTravelingTooFastWithAllStopTimesHasError() {
+        checkFeedHasError(TRAVEL_TOO_FAST, "3", 2);
     }
 
     @Test
-    public void canValidateTooFastTravelSpeedWithMissingStopTimes() throws Exception {
-        checkFeedErrorsForExpectOutcome(TRAVEL_TOO_FAST, "4", 4, 1);
+    public void tripTravelingTooFastWithMissingStopTimesHasError() {
+        checkFeedHasError(TRAVEL_TOO_FAST, "4", 4);
     }
 
     @Test
-    public void canValidateTooSlowTravelSpeedWithAllStopTimes() throws Exception {
-        checkFeedErrorsForExpectOutcome(TRAVEL_TOO_SLOW, "5", 3, 1);
+    public void tripTravelingTooSlowWithAllStopTimesHasError() {
+        checkFeedHasError(TRAVEL_TOO_SLOW, "5", 3);
     }
 
     @Test
-    public void canValidateTooSlowTravelSpeedWithMissingStopTimes() throws Exception {
-        checkFeedErrorsForExpectOutcome(TRAVEL_TOO_SLOW, "6", 3, 1);
+    public void tripTravelingTooSlowWithMissingStopTimesHasError() {
+        checkFeedHasError(TRAVEL_TOO_SLOW, "6", 3);
     }
 
-    private void checkFeedErrorsForExpectOutcome(String errorType,
-                                                 String entityId,
-                                                 int entitySequence,
-                                                 int expectedCount) throws Exception {
+    private void checkFeedHasError(NewGTFSErrorType type, String entityId, int entitySequence) {
         assertThatSqlCountQueryYieldsExpectedCount(
             testDataSource,
             String.format("select count(*) from %s.errors where error_type = '%s' and entity_id = '%s' and entity_sequence = %s",
                 testNamespace,
-                errorType,
+                type,
                 entityId,
                 entitySequence),
-            expectedCount);
+                1);
+    }
+
+    private void checkFeedIsErrorFree(NewGTFSErrorType type, String entityId) {
+        assertThatSqlCountQueryYieldsExpectedCount(
+                testDataSource,
+                String.format("select count(*) from %s.errors where error_type = '%s' and entity_id = '%s'",
+                        testNamespace,
+                        type,
+                        entityId),
+                0);
     }
 }
