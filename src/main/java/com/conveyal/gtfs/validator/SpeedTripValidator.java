@@ -16,7 +16,7 @@ import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
 import static com.conveyal.gtfs.util.Util.fastDistance;
-import static com.conveyal.gtfs.validator.NewTripTimesValidator.*;
+import static com.conveyal.gtfs.validator.NewTripTimesValidator.missingBothTimes;
 
 /**
  * Created by abyrd on 2017-04-18
@@ -55,6 +55,9 @@ public class SpeedTripValidator extends TripValidator {
             Stop currStop = stops.get(i);
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
+            // Redefine previous stop for next iteration (doing so here ensures the reassignment is not skipped if both
+            // stop times for the stop are missing).
+            prevStop = currStop;
             // Check that shape_dist_traveled is increasing. Note: we skip checking the first index because it appears
             // to be a common practice for agencies to omit a 0.0 value during export. Because most feed consumers
             // likely will just default a missing value to 0.0, we skip this check because it causes excessive noise in
@@ -89,9 +92,8 @@ public class SpeedTripValidator extends TripValidator {
             }
             // Reset accumulated distance, we've processed a stop time with arrival or departure time specified.
             distanceMeters = 0;
-            // Record current stop and stopTime for the next iteration.
+            // Redefine current stopTime for the next iteration.
             prevStopTime = currStopTime;
-            prevStop = currStop;
         }
     }
 
