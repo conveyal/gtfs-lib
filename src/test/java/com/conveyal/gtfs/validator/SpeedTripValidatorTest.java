@@ -15,6 +15,11 @@ import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedC
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_FAST;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_SLOW;
 
+/**
+ * Distances recorded against each unit test have been produced using the lat/lon values from
+ * real-world-gtfs-feeds/VTA-gtfs-multiple-trips/stops.txt matching the start and end of each trip. The distances were
+ * calculated using https://www.geodatasource.com/distance-calculator.
+ */
 public class SpeedTripValidatorTest {
     private static String testDBName;
     private static DataSource testDataSource;
@@ -39,33 +44,69 @@ public class SpeedTripValidatorTest {
         TestUtils.dropDB(testDBName);
     }
 
+    /**
+     * Trip 1
+     * Distance: 2.51km
+     * Time: 8 minutes
+     * Speed: 18.825 kph
+     */
     @Test
     public void tripTravelingAtNormalSpeedWithAllStopTimesIsErrorFree() {
         checkFeedIsErrorFree(TRAVEL_TOO_FAST, "1");
         checkFeedIsErrorFree(TRAVEL_TOO_SLOW, "1");
     }
 
+    /**
+     * Trip 2
+     * Distance: 1.21km
+     * Time: 3 minutes
+     * Speed: 24.4 kph
+     */
     @Test
     public void tripTravelingAtNormalSpeedWithMissingStopTimesIsErrorFree() {
         checkFeedIsErrorFree(TRAVEL_TOO_FAST, "2");
         checkFeedIsErrorFree(TRAVEL_TOO_SLOW, "2");
     }
 
+    /**
+     * Trip 3
+     * Distance: 3km
+     * Time: 1 minute
+     * Speed: 180 kph
+     */
     @Test
     public void tripTravelingTooFastWithAllStopTimesHasError() {
         checkFeedHasError(TRAVEL_TOO_FAST, "3", 2);
     }
 
+    /**
+     * Trip 4
+     * Distance: 3km
+     * Time: 1 minute
+     * Speed: 180 kph
+     */
     @Test
     public void tripTravelingTooFastWithMissingStopTimesHasError() {
         checkFeedHasError(TRAVEL_TOO_FAST, "4", 4);
     }
 
+    /**
+     * Trip 5
+     * Distance: 6.69km
+     * Time: 23 hours, 59 minutes
+     * Speed: 0.27 kph
+     */
     @Test
     public void tripTravelingTooSlowWithAllStopTimesHasError() {
         checkFeedHasError(TRAVEL_TOO_SLOW, "5", 3);
     }
 
+    /**
+     * Trip 6
+     * Distance: 6.69km
+     * Time: 23 hours, 59 minutes
+     * Speed: 0.27 kph
+     */
     @Test
     public void tripTravelingTooSlowWithMissingStopTimesHasError() {
         checkFeedHasError(TRAVEL_TOO_SLOW, "6", 3);

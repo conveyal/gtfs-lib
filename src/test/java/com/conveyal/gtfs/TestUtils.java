@@ -172,7 +172,7 @@ public class TestUtils {
         // Encapsulate connection in try-with-resources to ensure it is closed and does not interfere with other tests.
         try (Connection connection = dataSource.getConnection()) {
             ResultSet resultSet = connection.prepareStatement(sql).executeQuery();
-            while (resultSet.next()) {
+            if (resultSet.next()) {
                 count = resultSet.getInt(1);
             }
         } catch (SQLException e) {
