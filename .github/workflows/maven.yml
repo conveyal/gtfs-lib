@@ -67,6 +67,8 @@ jobs:
           #
       # The git commands get the commit hash of the HEAD commit and the commit just before HEAD.
     - name: Run maven-semantic-release
+      env:
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
        semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev --skip-maven-deploy
        if [[ "$GITHUB_REF_SLUG" = "master" ]]; then
