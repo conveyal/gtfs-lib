@@ -13,8 +13,7 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 
 /**
- * A test suite for the GTFSMain class. These unit tests use the older JUnit 4 classes in order to implement the third
- * party ExpectedSystemExit rule which is not JUnit 5 compatible.
+ * A test suite for the GTFSMain class.
  */
 public class GTFSMainTest {
     private static String simpleGtfsZipFileName;
