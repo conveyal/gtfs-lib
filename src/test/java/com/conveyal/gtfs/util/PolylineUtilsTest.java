@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.util;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
@@ -12,9 +13,8 @@ import java.util.List;
 import static com.conveyal.gtfs.util.PolylineUtils.decode;
 import static com.conveyal.gtfs.util.PolylineUtils.encode;
 import static com.conveyal.gtfs.util.PolylineUtils.simplify;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Contains tests for {@link PolylineUtils}. This code is taken/derived from the mapbox-java project (MIT license):
@@ -45,7 +45,7 @@ public class PolylineUtilsTest {
         List<Point> latLngs = decode(TEST_LINE, PRECISION_5);
 
         int expectedLength = 21;
-        assertEquals("Wrong length.", expectedLength, latLngs.size());
+        assertEquals(expectedLength, latLngs.size(), "Wrong length.");
 
         Point lastPoint = latLngs.get(expectedLength - 1);
 //        expectNearNumber(37.76953, lastPoint.getY(), 1e-6);
@@ -109,6 +109,6 @@ public class PolylineUtilsTest {
         path.add(gf.createPoint(new Coordinate(0, 0)));
         path.add(gf.createPoint(new Coordinate(10, 0)));
         List<Point> simplifiedPath = simplify(path, PRECISION_6, true);
-        assertTrue("Returned list is different from input list", path == simplifiedPath);
+        Assertions.assertTrue(path == simplifiedPath, "Returned list is different from input list");
     }
 }

@@ -1,8 +1,8 @@
 package com.conveyal.gtfs;
 
+import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
-import org.junit.Test;
 
 import static com.conveyal.gtfs.Geometries.geometryFactory;
 import static com.conveyal.gtfs.Geometries.getNetherlandsWithoutTexel;

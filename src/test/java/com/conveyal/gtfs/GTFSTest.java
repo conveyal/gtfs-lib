@@ -20,8 +20,8 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.hamcrest.Matcher;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,9 +44,10 @@ import java.util.zip.ZipFile;
 import static com.conveyal.gtfs.graphql.GTFSGraphQLTest.testDBName;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.core.IsNull.nullValue;
-import static org.junit.Assert.assertThat;
+
 
 /**
  * A test suite for the {@link GTFS} Class.
@@ -57,7 +58,7 @@ public class GTFSTest {
     private static final Logger LOG = LoggerFactory.getLogger(GTFSTest.class);
 
     // setup a stream to capture the output from the program
-    @Before
+    @BeforeEach
     public void setUpStreams() {
         System.setOut(new PrintStream(outContent));
     }

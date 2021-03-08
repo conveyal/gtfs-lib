@@ -3,9 +3,9 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
 
@@ -25,7 +25,7 @@ public class SpeedTripValidatorTest {
     private static DataSource testDataSource;
     private static String testNamespace;
 
-    @BeforeClass
+    @BeforeAll
     public static void setUpClass() throws Exception {
         // create a new database
         testDBName = TestUtils.generateNewDB();
@@ -39,7 +39,7 @@ public class SpeedTripValidatorTest {
         validate(testNamespace, testDataSource);
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDownClass() {
         TestUtils.dropDB(testDBName);
     }
