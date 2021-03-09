@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.util;
 
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -15,6 +14,7 @@ import static com.conveyal.gtfs.util.PolylineUtils.encode;
 import static com.conveyal.gtfs.util.PolylineUtils.simplify;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Contains tests for {@link PolylineUtils}. This code is taken/derived from the mapbox-java project (MIT license):
@@ -109,6 +109,6 @@ public class PolylineUtilsTest {
         path.add(gf.createPoint(new Coordinate(0, 0)));
         path.add(gf.createPoint(new Coordinate(10, 0)));
         List<Point> simplifiedPath = simplify(path, PRECISION_6, true);
-        Assertions.assertTrue(path == simplifiedPath, "Returned list is different from input list");
+        assertTrue(path == simplifiedPath, "Returned list is different from input list");
     }
 }

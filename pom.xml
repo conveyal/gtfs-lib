@@ -240,12 +240,6 @@
     	<artifactId>jcommander</artifactId>
     	<version>1.30</version>
     </dependency>
-<!--    <dependency>-->
-<!--      <groupId>com.github.stefanbirkner</groupId>-->
-<!--      <artifactId>system-rules</artifactId>-->
-<!--      <version>1.19.0</version>-->
-<!--      <scope>test</scope>-->
-<!--    </dependency>-->
     <!-- This package allows you to run tests on code that call System.exit() -->
     <dependency>
       <groupId>com.ginsberg</groupId>
