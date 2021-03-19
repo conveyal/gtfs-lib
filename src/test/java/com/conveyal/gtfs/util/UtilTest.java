@@ -1,14 +1,14 @@
 package com.conveyal.gtfs.util;
 
 import org.hamcrest.core.IsInstanceOf;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 import static com.conveyal.gtfs.util.Util.human;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.fail;
 
 /**
  * A test suite to verify the functionality of methods in the Util class.
@@ -18,8 +18,8 @@ public class UtilTest {
     /**
      * Ensure locale (for {@link #canHumanize()}) is set correctly before doing anything else.
      */
-    @Before
-    public void before() {
+    @BeforeAll
+    public static void before() {
         java.util.Locale.setDefault(java.util.Locale.US);
     }
 
