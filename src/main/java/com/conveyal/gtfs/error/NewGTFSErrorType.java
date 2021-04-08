@@ -2,6 +2,10 @@ package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.validator.model.Priority;
 
+/**
+ * This enum defines the GTFS error types that can be encountered when validating GTFS table data. Each error type has a
+ * severity level and related error message.
+ */
 public enum NewGTFSErrorType {
     // Standard errors.
     BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
