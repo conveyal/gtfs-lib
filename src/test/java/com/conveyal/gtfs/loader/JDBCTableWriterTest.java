@@ -6,23 +6,24 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
-import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
-import com.conveyal.gtfs.model.ScheduleException;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
 import com.conveyal.gtfs.dto.RouteDTO;
+import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
 import com.conveyal.gtfs.dto.ShapePointDTO;
 import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,14 +39,13 @@ import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * This class contains CRUD tests for {@link JdbcTableWriter} (i.e., editing GTFS entities in the RDBMS). Set up
@@ -75,7 +75,7 @@ public class JDBCTableWriterTest {
         return new JdbcTableWriter(table, testDataSource, testNamespace);
     }
 
-    @BeforeClass
+    @BeforeAll
     public static void setUpClass() throws SQLException, IOException, InvalidNamespaceException {
         // Create a new database
         testDBName = TestUtils.generateNewDB();
@@ -106,7 +106,7 @@ public class JDBCTableWriterTest {
         testGtfsGLSnapshotNamespace = snapshotResult.uniqueIdentifier;
     }
 
-    @AfterClass
+    @AfterAll
     public static void tearDownClass() {
         TestUtils.dropDB(testDBName);
     }
@@ -519,12 +519,14 @@ public class JDBCTableWriterTest {
     /**
      * Test that a frequency trip entry CANNOT be added for a timetable-based pattern. Expects an exception to be thrown.
      */
-    @Test(expected = IllegalStateException.class)
-    public void cannotCreateFrequencyForTimetablePattern() throws InvalidNamespaceException, IOException, SQLException {
-        PatternDTO simplePattern = createRouteAndSimplePattern("900", "8", "The Loop");
-        TripDTO tripInput = constructFrequencyTrip(simplePattern.pattern_id, simplePattern.route_id, 6 * 60 * 60);
-        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
-        createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+    @Test
+    public void cannotCreateFrequencyForTimetablePattern() {
+        Assertions.assertThrows(IllegalStateException.class, () -> {
+            PatternDTO simplePattern = createRouteAndSimplePattern("900", "8", "The Loop");
+            TripDTO tripInput = constructFrequencyTrip(simplePattern.pattern_id, simplePattern.route_id, 6 * 60 * 60);
+            JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+            createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        });
     }
 
     /**

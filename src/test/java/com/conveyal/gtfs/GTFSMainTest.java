@@ -1,10 +1,9 @@
 package com.conveyal.gtfs;
 
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.contrib.java.lang.system.ExpectedSystemExit;
+import com.ginsberg.junit.exit.ExpectSystemExitWithStatus;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -14,18 +13,14 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 
 /**
- * A test suite for the GTFSMain class
+ * A test suite for the GTFSMain class.
  */
 public class GTFSMainTest {
     private static String simpleGtfsZipFileName;
     private static String badGtfsZipFileName;
     private final ByteArrayOutputStream outContent = new ByteArrayOutputStream();
 
-    // this is used so that it is possible to test code that calls System.exit()
-    @Rule
-    public final ExpectedSystemExit exit = ExpectedSystemExit.none();
-
-    @BeforeClass
+    @BeforeAll
     public static void setUpClass() {
         //executed only once, before the first test
         simpleGtfsZipFileName = null;
@@ -38,7 +33,7 @@ public class GTFSMainTest {
     }
 
     // setup a stream to capture the output from the program
-    @Before
+    @BeforeEach
     public void setUpStreams() {
         System.setOut(new PrintStream(outContent));
     }
@@ -61,8 +56,8 @@ public class GTFSMainTest {
      * @throws Exception
      */
     @Test
+    @ExpectSystemExitWithStatus(1)
     public void exitsIfNoArgumentsProvided() throws Exception {
-        exit.expectSystemExitWithStatus(1);
         String[] args = {};
         GTFSMain.main(args);
         assertThat(outContent.toString(), containsString("usage: java"));

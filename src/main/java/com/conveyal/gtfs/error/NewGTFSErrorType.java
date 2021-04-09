@@ -2,6 +2,10 @@ package com.conveyal.gtfs.error;
 
 import com.conveyal.gtfs.validator.model.Priority;
 
+/**
+ * This enum defines the GTFS error types that can be encountered when validating GTFS table data. Each error type has a
+ * severity level and related error message.
+ */
 public enum NewGTFSErrorType {
     // Standard errors.
     BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
@@ -41,7 +45,7 @@ public enum NewGTFSErrorType {
     ROUTE_LONG_NAME_CONTAINS_SHORT_NAME(Priority.LOW, "The long name of a route should complement the short name, not include it."),
     ROUTE_SHORT_AND_LONG_NAME_MISSING(Priority.MEDIUM, "A route has neither a long nor a short name."),
     ROUTE_SHORT_NAME_TOO_LONG(Priority.MEDIUM, "The short name of a route is too long for display in standard GTFS consumer applications."),
-    ROUTE_UNUSED(Priority.HIGH, "This route is defined but has no trips."),
+    ROUTE_UNUSED(Priority.MEDIUM, "This route is defined but has no trips."),
     SERVICE_NEVER_ACTIVE(Priority.MEDIUM, "A service code was defined, but is never active on any date."),
     SERVICE_UNUSED(Priority.MEDIUM, "A service code was defined, but is never referenced by any trips."),
     SERVICE_WITHOUT_DAYS_OF_WEEK(Priority.MEDIUM, "A service defined in calendar.txt should be active on at least one day of the week. Otherwise, it should be omitted from this file."),
@@ -49,8 +53,8 @@ public enum NewGTFSErrorType {
     SHAPE_MISSING_COORDINATE(Priority.MEDIUM, "???"),
     SHAPE_REVERSED(Priority.MEDIUM, "A shape appears to be intended for vehicles running the opposite direction on the route."),
     STOP_DESCRIPTION_SAME_AS_NAME(Priority.LOW, "The description of a stop is identical to its name, so does not add any information."),
-    STOP_GEOGRAPHIC_OUTLIER(Priority.HIGH, "This stop is located very far from the middle 90% of stops in this feed."),
-    STOP_LOW_POPULATION_DENSITY(Priority.HIGH, "A stop is located in a geographic area with very low human population density."),
+    STOP_GEOGRAPHIC_OUTLIER(Priority.MEDIUM, "This stop is located very far from the middle 90% of stops in this feed."),
+    STOP_LOW_POPULATION_DENSITY(Priority.MEDIUM, "A stop is located in a geographic area with very low human population density."),
     STOP_NAME_MISSING(Priority.MEDIUM, "A stop does not have a name."),
     STOP_TIME_UNUSED(Priority.LOW, "This stop time allows neither pickup nor drop off and is not a timepoint, so it serves no purpose and should be removed from trip."),
     STOP_UNUSED(Priority.MEDIUM, "This stop is not referenced by any trips."),
