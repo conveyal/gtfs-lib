@@ -46,9 +46,11 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_PARENT_STATION_CHECK;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_STOP_LAT_CHECK;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_STOP_LON_CHECK;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_STOP_NAME_CHECK;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -88,6 +90,8 @@ public class Table {
      * table uniqueness(e.g., transfers#to_stop_id).
      * */
     private boolean compoundKey;
+
+    public Set<ConditionallyRequired> conditionallyRequiredFields = new HashSet<>();
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -228,18 +232,24 @@ public class Table {
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
-        new StringField("stop_name",  REQUIRED),
+        new StringField("stop_name",  OPTIONAL),
         new StringField("stop_desc",  OPTIONAL),
-        new DoubleField("stop_lat", REQUIRED, -80, 80, 6),
-        new DoubleField("stop_lon", REQUIRED, -180, 180, 6),
-        new StringField("zone_id",  OPTIONAL),
+        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6),
+        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6),
+        new StringField("zone_id", OPTIONAL),
         new URLField("stop_url",  OPTIONAL),
         new ShortField("location_type", OPTIONAL, 2),
-        // FIXME: Need self-reference check during referential integrity check
-        new StringField("parent_station",  OPTIONAL), //.isReferenceToSelf()
+        new StringField("parent_station",  REQUIRED),
         new StringField("stop_timezone",  OPTIONAL),
-        new ShortField("wheelchair_boarding", OPTIONAL, 2)
-    ).restrictDelete().addPrimaryKey();
+        new ShortField("wheelchair_boarding", OPTIONAL, 2),
+        new StringField("platform_code", OPTIONAL)
+    )
+    .restrictDelete()
+    .addPrimaryKey()
+    .addConditionallyRequired(LOCATION_TYPE_STOP_NAME_CHECK, 0,2)
+    .addConditionallyRequired(LOCATION_TYPE_STOP_LAT_CHECK, 0,2)
+    .addConditionallyRequired(LOCATION_TYPE_STOP_LON_CHECK, 0,2)
+    .addConditionallyRequired(LOCATION_TYPE_PARENT_STATION_CHECK, 2,4);
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
@@ -995,5 +1005,10 @@ public class Table {
     public int getKeyFieldIndex(Field[] fields) {
         String keyField = getKeyFieldName();
         return Field.getFieldIndex(fields, keyField);
+    }
+
+    public Table addConditionallyRequired(ConditionallyRequiredCheck check, double minValue, double maxValue) {
+        this.conditionallyRequiredFields.add(new ConditionallyRequired(check, minValue, maxValue));
+        return this;
     }
 }

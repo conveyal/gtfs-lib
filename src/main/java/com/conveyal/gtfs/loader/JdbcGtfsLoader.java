@@ -3,6 +3,8 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import com.google.common.hash.HashCode;
@@ -278,6 +280,9 @@ public class JdbcGtfsLoader {
         try {
             tableLoadResult.rowCount = loadInternal(table);
             tableLoadResult.fileSize = getTableSize(table);
+            if (table.conditionallyRequiredFields.size() > 0) {
+                conditionallyRequiredChecks(table);
+            }
             LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);
@@ -570,5 +575,105 @@ public class JdbcGtfsLoader {
             if (errorStorage != null) errorStorage.storeError(NewGTFSError.forFeed(COLUMN_NAME_UNSAFE, string));
         }
         return clean;
+    }
+
+    /**
+     * Perform all conditionally required checks on the fields within the provided table.
+     */
+    private void conditionallyRequiredChecks(Table table) {
+        if (table.name.equals(Table.STOPS.name)) {
+            final TableReader<Stop> stopTableReader = new JDBCTableReader(table, dataSource, tablePrefix, EntityPopulator.STOP);
+            Iterable<Stop> stops = stopTableReader.getAllOrdered();
+            // Iterate through each stop and check each conditionally required field in turn.
+            for (Stop stop : stops) {
+                for (ConditionallyRequired condition : table.conditionallyRequiredFields) {
+                    switch(condition.check) {
+                        case LOCATION_TYPE_STOP_NAME_CHECK:
+                            //FIXME: location_type defaults to 0 if not provided. This needs to be INT_MISSING or similar
+                            // so these tests don't give false positives.
+                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
+                                stop.stop_name == null) {
+                                errorStorage.storeError(
+                                    NewGTFSError.forFeed(
+                                        CONDITIONALLY_REQUIRED,
+                                        String.format("stops.txt, stop_name is required for id %s.", stop.stop_id)
+                                    )
+                                );
+                            }
+                            break;
+                        case LOCATION_TYPE_STOP_LAT_CHECK:
+                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
+                                stop.stop_lat == Double.MIN_VALUE) {
+                                errorStorage.storeError(
+                                    NewGTFSError.forFeed(
+                                        CONDITIONALLY_REQUIRED,
+                                        String.format("stops.txt, stop_lat is required for id %s.", stop.stop_id)));
+                            }
+                            break;
+                        case LOCATION_TYPE_STOP_LON_CHECK:
+                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
+                                stop.stop_lon == Double.MIN_VALUE) {
+                                errorStorage.storeError(
+                                    NewGTFSError.forFeed(
+                                        CONDITIONALLY_REQUIRED,
+                                        String.format("stops.txt, stop_long is required for id %s.", stop.stop_id)
+                                    )
+                                );
+                            }
+                            break;
+                        case LOCATION_TYPE_PARENT_STATION_CHECK:
+                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
+                                stop.parent_station == null) {
+                                errorStorage.storeError(
+                                    NewGTFSError.forFeed(
+                                        CONDITIONALLY_REQUIRED,
+                                        String.format("stops.txt, parent_station is required for id %s.", stop.stop_id)
+                                    )
+                                );
+                            }
+                            break;
+                    }
+                }
+            }
+
+            // Because the fare rule table is produced before the stops table, the conditionally required checks have to
+            // be done in reverse. Instead of the fare rule table checking the zone id in the stops table, the stops table
+            // is responsible for iterating over the fare rule table to confirm required zone id references are available.
+            final TableReader<FareRule> fareRulesTableReader =
+                new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
+
+            // Get all zone ids referenced by the fare rule table.
+            Set<String> zoneIds = new HashSet<>();
+            for (FareRule rule : fareRulesTableReader.getAllOrdered()) {
+                if (rule.origin_id != null) {
+                    zoneIds.add(rule.origin_id);
+                } else if (rule.destination_id != null) {
+                    zoneIds.add(rule.destination_id);
+                } else if (rule.contains_id != null) {
+                    zoneIds.add(rule.contains_id);
+                }
+            }
+
+            // Make sure all zone id references are available, if not store an error.
+            if (zoneIds.size() > 0) {
+                for (String zoneId : zoneIds) {
+                    boolean match = false;
+                    for (Stop stop : stops) {
+                        if (zoneId.equals(stop.zone_id)) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (!match) {
+                        errorStorage.storeError(
+                            NewGTFSError.forFeed(
+                                CONDITIONALLY_REQUIRED,
+                                String.format("stops.txt, zone_id %s is required by fare_rules.txt.", zoneId)
+                            )
+                        );
+                    }
+                }
+            }
+        }
     }
 }
