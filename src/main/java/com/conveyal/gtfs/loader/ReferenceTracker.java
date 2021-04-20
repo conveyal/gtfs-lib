@@ -151,6 +151,7 @@ public class ReferenceTracker {
         for (ConditionallyRequiredField check : fieldsToCheck) {
             LineData refFieldLineData = fieldLineData.get(check.referenceFieldName);
             if (check.referenceCheck == FIELD_IN_RANGE &&
+                refFieldLineData != null &&
                 !referenceFieldInRange(refFieldLineData.fieldValue, check.minReferenceValue, check.maxReferenceValue)
             ) {
                 // reference field not within range, move to the next check.
@@ -159,6 +160,7 @@ public class ReferenceTracker {
 
             LineData conFieldLineData = fieldLineData.get(check.conditionalFieldName);
             if (check.conditionalCheck == FIELD_NOT_EMPTY &&
+                conFieldLineData != null &&
                 isEmpty(conFieldLineData.fieldValue)
             ) {
                 NewGTFSError conReqError = NewGTFSError
