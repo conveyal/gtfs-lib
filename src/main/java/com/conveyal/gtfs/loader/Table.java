@@ -47,10 +47,9 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_PARENT_STATION_CHECK;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_STOP_LAT_CHECK;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_STOP_LON_CHECK;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredCheck.LOCATION_TYPE_STOP_NAME_CHECK;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_IN_RANGE;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -91,7 +90,8 @@ public class Table {
      * */
     private boolean compoundKey;
 
-    public Set<ConditionallyRequired> conditionallyRequiredFields = new HashSet<>();
+    public Set<ConditionallyRequiredField> conditionallyRequiredFields = new HashSet<>();
+    public Set<ConditionallyRequiredForeignRefCheck> conditionallyRequiredForeignRefChecks = new HashSet<>();
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -232,24 +232,25 @@ public class Table {
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
-        new StringField("stop_name",  OPTIONAL),
+        new StringField("stop_name",  OPTIONAL).addConditionallyRequired(),
         new StringField("stop_desc",  OPTIONAL),
-        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6),
-        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6),
+        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).addConditionallyRequired(),
+        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).addConditionallyRequired(),
         new StringField("zone_id", OPTIONAL),
         new URLField("stop_url",  OPTIONAL),
-        new ShortField("location_type", OPTIONAL, 2),
-        new StringField("parent_station",  REQUIRED),
+        new ShortField("location_type", OPTIONAL, 2).addConditionallyRequired(),
+        new StringField("parent_station",  REQUIRED).addConditionallyRequired(),
         new StringField("stop_timezone",  OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 2),
-        new StringField("platform_code", OPTIONAL)
+        new StringField("platform_code", OPTIONAL).addConditionallyRequired()
     )
     .restrictDelete()
     .addPrimaryKey()
-    .addConditionallyRequired(LOCATION_TYPE_STOP_NAME_CHECK, 0,2)
-    .addConditionallyRequired(LOCATION_TYPE_STOP_LAT_CHECK, 0,2)
-    .addConditionallyRequired(LOCATION_TYPE_STOP_LON_CHECK, 0,2)
-    .addConditionallyRequired(LOCATION_TYPE_PARENT_STATION_CHECK, 2,4);
+    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_name", FIELD_NOT_EMPTY,0, 2)
+    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lat", FIELD_NOT_EMPTY,0, 2)
+    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lon", FIELD_NOT_EMPTY,0, 2)
+    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"parent_station", FIELD_NOT_EMPTY,2, 4)
+    .addConditionallyRequiredForeignRefCheck(STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK);
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
@@ -1007,8 +1008,40 @@ public class Table {
         return Field.getFieldIndex(fields, keyField);
     }
 
-    public Table addConditionallyRequired(ConditionallyRequiredCheck check, double minValue, double maxValue) {
-        this.conditionallyRequiredFields.add(new ConditionallyRequired(check, minValue, maxValue));
+    /**
+     * Adds a conditionally required field check to a table.
+     * @param referenceField The value of this field will determine if the conditional field is required.
+     * @param referenceCheck The type of check to be carried out on the reference field.
+     * @param conditionalField The field that maybe required if the reference checks are true.
+     * @param conditionalCheck The type of check to be carried out on the conditional field.
+     * @param minValue The minimum reference field value needed for conditionally required.
+     * @param maxValue The maximum reference field value needed for conditionally required.
+     */
+    public Table addConditionalRequiredCheck (
+        String referenceField,
+        ConditionallyRequiredFieldCheck referenceCheck,
+        String conditionalField,
+        ConditionallyRequiredFieldCheck conditionalCheck,
+        double minValue,
+        double maxValue
+    ) {
+        this.conditionallyRequiredFields.add(
+            new ConditionallyRequiredField(
+                referenceField,
+                referenceCheck,
+                conditionalField,
+                conditionalCheck,
+                minValue,
+                maxValue)
+        );
+        return this;
+    }
+
+    /**
+     * Adds a conditionally required foreign reference check to a table.
+     */
+    public Table addConditionallyRequiredForeignRefCheck(ConditionallyRequiredForeignRefCheck check) {
+        this.conditionallyRequiredForeignRefChecks.add(check);
         return this;
     }
 }

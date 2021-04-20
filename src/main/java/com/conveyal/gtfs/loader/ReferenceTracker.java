@@ -1,13 +1,18 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import org.apache.commons.lang3.math.NumberUtils;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_IN_RANGE;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_NOT_EMPTY;
 
 /**
  * This class is used while loading GTFS to track the unique keys that are encountered in a GTFS
@@ -135,5 +140,95 @@ public class ReferenceTracker {
             listOfUniqueIds.add(uniqueId);
         }
         return errors;
+    }
+
+    /**
+     * Work through each conditionally required check assigned to a table.
+     */
+    public Set<NewGTFSError> checkConditionallyRequiredFields(Table table, HashMap<String, LineData> fieldLineData) {
+        Set<NewGTFSError> errors = new HashSet<>();
+        Set<ConditionallyRequiredField> fieldsToCheck = table.conditionallyRequiredFields;
+        for (ConditionallyRequiredField check : fieldsToCheck) {
+            LineData refFieldLineData = fieldLineData.get(check.referenceFieldName);
+            if (check.referenceCheck == FIELD_IN_RANGE &&
+                !referenceFieldInRange(refFieldLineData.fieldValue, check.minReferenceValue, check.maxReferenceValue)
+            ) {
+                // reference field not within range, move to the next check.
+                continue;
+            }
+
+            LineData conFieldLineData = fieldLineData.get(check.conditionalFieldName);
+            if (check.conditionalCheck == FIELD_NOT_EMPTY &&
+                isEmpty(conFieldLineData.fieldValue)
+            ) {
+                NewGTFSError conReqError = NewGTFSError
+                    .forLine(table,
+                        conFieldLineData.lineNumber,
+                        CONDITIONALLY_REQUIRED,
+                        String.format("%s is conditionally required.", check.conditionalFieldName))
+                    .setEntityId(conFieldLineData.keyValue);
+                errors.add(conReqError);
+            }
+        }
+        return errors;
+    }
+
+    /**
+     * Check if the provided reference field value is within the min and max values. If the field value can not be converted
+     * to a number it is assumed that the value is not a number and will therefore never be within the min/max range.
+     */
+    private boolean referenceFieldInRange(String referenceFieldValue, double min, double max) {
+        try {
+            int fieldValue = Integer.parseInt(referenceFieldValue);
+            return fieldValue >= min || fieldValue <= max;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Checks if the provided field value is empty. If the value can be converted to either a double or int and these
+     * match the minimum value it is assumed these are empty.
+     */
+    private boolean isEmpty(String str) {
+        // Text values
+        if (str == null || str.isEmpty()) {
+            return true;
+        }
+
+        // Number values
+        if (NumberUtils.isParsable(str)) {
+            try {
+                double dValue = Double.parseDouble(str);
+                if (dValue == Double.MIN_VALUE) {
+                    return true;
+                }
+                int iValue = Integer.parseInt(str);
+                if (iValue == Integer.MIN_VALUE) {
+                    return true;
+                }
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Holds line data that will be used in relation to a conditionally required field.
+     */
+    public static class LineData {
+        /** The key associated with this line of data. */
+        public final String keyValue;
+        /** The line number. */
+        public final int lineNumber;
+        /** The string representation of the field value. */
+        public final String fieldValue;
+
+        public LineData(String keyValue, int lineNumber, String fieldValue) {
+            this.keyValue = keyValue;
+            this.lineNumber = lineNumber;
+            this.fieldValue = fieldValue;
+        }
     }
 }

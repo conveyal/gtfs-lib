@@ -24,6 +24,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 import static com.conveyal.gtfs.model.Entity.human;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
@@ -94,7 +95,9 @@ public class JdbcGtfsLoader {
         this.dataSource = dataSource;
     }
 
-    /** Get SQL string for creating the feed registry table (AKA, the "feeds" table). */
+    /**
+     * Get SQL string for creating the feed registry table (AKA, the "feeds" table).
+     */
     public static String getCreateFeedRegistrySQL() {
         return "create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
             "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
@@ -112,7 +115,7 @@ public class JdbcGtfsLoader {
     // SHA1 took 1072 msec,  9fb356af4be2750f20955203787ec6f95d32ef22
 
     // There appears to be no advantage to loading tables in parallel, as the whole loading process is I/O bound.
-    public FeedLoadResult loadTables () {
+    public FeedLoadResult loadTables() {
 
         // This result object will be returned to the caller to summarize the feed and report any critical errors.
         FeedLoadResult result = new FeedLoadResult();
@@ -137,7 +140,7 @@ public class JdbcGtfsLoader {
             this.tablePrefix = randomIdString();
             result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
-            
+
             // The order of the following four lines should not be changed because the schema needs to be in place
             // before the error storage can be constructed, which in turn needs to exist in case any errors are
             // encountered during the loading process.
@@ -182,15 +185,15 @@ public class JdbcGtfsLoader {
         }
         return result;
     }
-    
+
     /**
      * Creates a schema/namespace in the database WITHOUT committing the changes.
      * This does *not* setup any other tables or enter the schema name in a registry (@see #registerFeed).
-     * 
+     *
      * @param connection Connection to the database to create the schema on.
      * @param schemaName Name of the schema (i.e. table prefix). Should not include the dot suffix.
      */
-    static void createSchema (Connection connection, String schemaName) {
+    static void createSchema(Connection connection, String schemaName) {
         try {
             Statement statement = connection.createStatement();
             // FIXME do the following only on databases that support schemas.
@@ -207,13 +210,13 @@ public class JdbcGtfsLoader {
      * Add a line to the list of loaded feeds showing that this feed has been loaded.
      * We used to inspect feed_info here so we could make our table prefix based on feed ID and version.
      * Now we just load feed_info like any other table.
-     *         // Create a row in the table of loaded feeds for this feed
+     * // Create a row in the table of loaded feeds for this feed
      * Really this is not just making the table prefix - it's loading the feed_info and should also calculate hashes.
      *
      * Originally we were flattening all feed_info files into one root-level table, but that forces us to drop any
      * custom fields in feed_info.
      */
-    private void registerFeed (File gtfsFile) {
+    private void registerFeed(File gtfsFile) {
 
         // FIXME is this extra CSV reader used anymore? Check comment below.
         // First, inspect feed_info.txt to extract the ID and version.
@@ -245,7 +248,7 @@ public class JdbcGtfsLoader {
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
+                "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, md5Hex);
             insertStatement.setString(3, shaHex);
@@ -273,15 +276,15 @@ public class JdbcGtfsLoader {
     /**
      * This wraps the main internal table loader method to catch exceptions and figure out how many errors happened.
      */
-    private TableLoadResult load (Table table) {
+    private TableLoadResult load(Table table) {
         // This object will be returned to the caller to summarize the contents of the table and any errors.
         TableLoadResult tableLoadResult = new TableLoadResult();
         int initialErrorCount = errorStorage.getErrorCount();
         try {
             tableLoadResult.rowCount = loadInternal(table);
             tableLoadResult.fileSize = getTableSize(table);
-            if (table.conditionallyRequiredFields.size() > 0) {
-                conditionallyRequiredChecks(table);
+            if (table.conditionallyRequiredForeignRefChecks.size() > 0) {
+                conditionallyRequiredForeignRefChecks(table);
             }
             LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
@@ -316,9 +319,10 @@ public class JdbcGtfsLoader {
 
     /**
      * This function will throw any exception that occurs. Those exceptions will be handled by the outer load method.
+     *
      * @return number of rows that were loaded.
      */
-    private int loadInternal (Table table) throws Exception {
+    private int loadInternal(Table table) throws Exception {
         CsvReader csvReader = table.getCsvReader(zip, errorStorage);
         if (csvReader == null) {
             LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
@@ -394,6 +398,7 @@ public class JdbcGtfsLoader {
             // Maintain a separate columnIndex from for loop because some fields may be null and not included in the set
             // of fields for this table.
             int columnIndex = 0;
+            HashMap<String, ReferenceTracker.LineData> fieldLineData = new HashMap<>();
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 // If the field is null, it represents a duplicate header or ID field and must be skipped to maintain
@@ -408,10 +413,10 @@ public class JdbcGtfsLoader {
                 // error.
                 if (
                     table.name.equals("calendar_dates") &&
-                    "service_id".equals(field.name) &&
-                    "1".equals(csvReader.get(Field.getFieldIndex(fields, "exception_type")))
+                        "service_id".equals(field.name) &&
+                        "1".equals(csvReader.get(Field.getFieldIndex(fields, "exception_type")))
 
-                ){
+                ) {
                     for (NewGTFSError error : errors) {
                         if (NewGTFSErrorType.REFERENTIAL_INTEGRITY.equals(error.errorType)) {
                             // Do not record bad service_id reference errors for calendar date entries that add service
@@ -432,8 +437,17 @@ public class JdbcGtfsLoader {
                 }
                 // Add value for entry into table
                 setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
+                if (field.isConditionallyRequired()) {
+                    // Hold the field line data for use in checking conditionally required fields.
+                    fieldLineData.put(field.name, new ReferenceTracker.LineData(keyValue, lineNumber, string));
+                }
                 // Increment column index.
                 columnIndex += 1;
+            }
+            if (fieldLineData.size() > 0) {
+                errorStorage.storeErrors(
+                    referenceTracker.checkConditionallyRequiredFields(table, fieldLineData)
+                );
             }
             if (postgresText) {
                 // Print a new line in the standard postgres text format:
@@ -486,7 +500,7 @@ public class JdbcGtfsLoader {
         InputStream stream = new BufferedInputStream(new FileInputStream(file.getAbsolutePath()));
         // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
         CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-        copyManager.copyIn(copySql, stream, 1024*1024);
+        copyManager.copyIn(copySql, stream, 1024 * 1024);
         stream.close();
         // It is also possible to load from local file if this code is running on the database server.
         // statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
@@ -521,7 +535,7 @@ public class JdbcGtfsLoader {
                     ValidateFieldResult<String> result = field.validateAndConvert(string);
                     // If the result is null, use the null-setting method.
                     if (result.clean == null) setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
-                    // Otherwise, set the cleaned field according to its index.
+                        // Otherwise, set the cleaned field according to its index.
                     else transformedStrings[fieldIndex + 1] = result.clean;
                     errors = result.errors;
                 } else {
@@ -549,7 +563,7 @@ public class JdbcGtfsLoader {
      */
     private void setFieldToNull(boolean postgresText, String[] transformedStrings, int fieldIndex, Field field) {
         if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
-        // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
+            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
         else try {
             // LOG.info("setting {} index to null", fieldIndex + 2);
             field.setNull(insertStatement, fieldIndex + 2);
@@ -568,7 +582,7 @@ public class JdbcGtfsLoader {
      *
      * TODO add a test including SQL injection text (quote and semicolon)
      */
-    public static String sanitize (String string, SQLErrorStorage errorStorage) {
+    public static String sanitize(String string, SQLErrorStorage errorStorage) {
         String clean = string.replaceAll("[^\\p{Alnum}_]", "");
         if (!clean.equals(string)) {
             LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);
@@ -578,99 +592,55 @@ public class JdbcGtfsLoader {
     }
 
     /**
-     * Perform all conditionally required checks on the fields within the provided table.
+     * Perform all conditionally required foreign reference checks on the fields within the provided table.
      */
-    private void conditionallyRequiredChecks(Table table) {
+    private void conditionallyRequiredForeignRefChecks(Table table) {
+        final TableReader<Stop> stopTableReader = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
+        Iterable<Stop> stops = stopTableReader.getAllOrdered();
+
+        final TableReader<FareRule> fareRulesTableReader = new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
+        Iterable<FareRule> fareRules = fareRulesTableReader.getAllOrdered();
+
         if (table.name.equals(Table.STOPS.name)) {
-            final TableReader<Stop> stopTableReader = new JDBCTableReader(table, dataSource, tablePrefix, EntityPopulator.STOP);
-            Iterable<Stop> stops = stopTableReader.getAllOrdered();
-            // Iterate through each stop and check each conditionally required field in turn.
-            for (Stop stop : stops) {
-                for (ConditionallyRequired condition : table.conditionallyRequiredFields) {
-                    switch(condition.check) {
-                        case LOCATION_TYPE_STOP_NAME_CHECK:
-                            //FIXME: location_type defaults to 0 if not provided. This needs to be INT_MISSING or similar
-                            // so these tests don't give false positives.
-                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
-                                stop.stop_name == null) {
-                                errorStorage.storeError(
-                                    NewGTFSError.forFeed(
-                                        CONDITIONALLY_REQUIRED,
-                                        String.format("stops.txt, stop_name is required for id %s.", stop.stop_id)
-                                    )
-                                );
-                            }
-                            break;
-                        case LOCATION_TYPE_STOP_LAT_CHECK:
-                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
-                                stop.stop_lat == Double.MIN_VALUE) {
-                                errorStorage.storeError(
-                                    NewGTFSError.forFeed(
-                                        CONDITIONALLY_REQUIRED,
-                                        String.format("stops.txt, stop_lat is required for id %s.", stop.stop_id)));
-                            }
-                            break;
-                        case LOCATION_TYPE_STOP_LON_CHECK:
-                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
-                                stop.stop_lon == Double.MIN_VALUE) {
-                                errorStorage.storeError(
-                                    NewGTFSError.forFeed(
-                                        CONDITIONALLY_REQUIRED,
-                                        String.format("stops.txt, stop_long is required for id %s.", stop.stop_id)
-                                    )
-                                );
-                            }
-                            break;
-                        case LOCATION_TYPE_PARENT_STATION_CHECK:
-                            if ((stop.location_type >= condition.minValue || stop.location_type <= condition.maxValue) &&
-                                stop.parent_station == null) {
-                                errorStorage.storeError(
-                                    NewGTFSError.forFeed(
-                                        CONDITIONALLY_REQUIRED,
-                                        String.format("stops.txt, parent_station is required for id %s.", stop.stop_id)
-                                    )
-                                );
-                            }
-                            break;
-                    }
-                }
-            }
-
-            // Because the fare rule table is produced before the stops table, the conditionally required checks have to
-            // be done in reverse. Instead of the fare rule table checking the zone id in the stops table, the stops table
-            // is responsible for iterating over the fare rule table to confirm required zone id references are available.
-            final TableReader<FareRule> fareRulesTableReader =
-                new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
-
-            // Get all zone ids referenced by the fare rule table.
-            Set<String> zoneIds = new HashSet<>();
-            for (FareRule rule : fareRulesTableReader.getAllOrdered()) {
-                if (rule.origin_id != null) {
-                    zoneIds.add(rule.origin_id);
-                } else if (rule.destination_id != null) {
-                    zoneIds.add(rule.destination_id);
-                } else if (rule.contains_id != null) {
-                    zoneIds.add(rule.contains_id);
-                }
-            }
-
-            // Make sure all zone id references are available, if not store an error.
-            if (zoneIds.size() > 0) {
-                for (String zoneId : zoneIds) {
-                    boolean match = false;
-                    for (Stop stop : stops) {
-                        if (zoneId.equals(stop.zone_id)) {
-                            match = true;
-                            break;
+            for (ConditionallyRequiredForeignRefCheck check : table.conditionallyRequiredForeignRefChecks) {
+                // As the fare rule table is produced before the stops table, the conditionally required checks have to
+                // be done in reverse. Instead of the fare rule table checking the zone id in the stops table, the stops table
+                // is responsible for iterating over the fare rules table to confirm required zone id references are available.
+                if (check == STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK) {
+                    // Get a unique list of all zone ids referenced by the fare rule table.
+                    Set<String> zoneIds = new HashSet<>();
+                    for (FareRule rule : fareRules) {
+                        if (rule.origin_id != null) {
+                            zoneIds.add(rule.origin_id);
+                        } else if (rule.destination_id != null) {
+                            zoneIds.add(rule.destination_id);
+                        } else if (rule.contains_id != null) {
+                            zoneIds.add(rule.contains_id);
                         }
                     }
-                    if (!match) {
-                        errorStorage.storeError(
-                            NewGTFSError.forFeed(
-                                CONDITIONALLY_REQUIRED,
-                                String.format("stops.txt, zone_id %s is required by fare_rules.txt.", zoneId)
-                            )
-                        );
+
+                    // No zone_id references used in fare rules.
+                    if (zoneIds.isEmpty()) {
+                        continue;
+                    }
+
+                    // Make sure all zone id references are available, if not flag an error.
+                    for (String zoneId : zoneIds) {
+                        boolean match = false;
+                        for (Stop stop : stops) {
+                            if (zoneId.equals(stop.zone_id)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (!match) {
+                            errorStorage.storeError(
+                                NewGTFSError.forFeed(
+                                    CONDITIONALLY_REQUIRED,
+                                    String.format("zone_id %s is required by fare_rules within stops.", zoneId)
+                                )
+                            );
+                        }
                     }
                 }
             }

@@ -38,40 +38,55 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTableMissingConditionallyRequiredStopName() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "stops.txt, stop_name is required for id 4957.");
+        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","2", "4957","stop_name is conditionally required.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredParentStation() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "stops.txt, parent_station is required for id 691.");
+        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","3", "691","parent_station is conditionally required.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredStopLat() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "stops.txt, stop_lat is required for id 691.");
+        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","3", "691","stop_lat is conditionally required.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredStopLon() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "stops.txt, stop_long is required for id 692.");
+        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredZoneId() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "stops.txt, zone_id 1 is required by fare_rules.txt.");
+        checkFeedHasError(CONDITIONALLY_REQUIRED, "zone_id 1 is required by fare_rules within stops.");
     }
 
     /**
-     * Check that the test feed has exactly one error for the given type and badValue.
+     * Check that the test feed has exactly one error for the provided values.
      */
-    private void checkFeedHasError(NewGTFSErrorType type, String badValue) {
+    private void checkFeedHasError(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
         assertThatSqlCountQueryYieldsExpectedCount(
             testDataSource,
-            String.format("select count(*) from %s.errors where error_type = '%s' and bad_value = '%s'",
+            String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s' and entity_id = '%s' and bad_value = '%s'",
                 testNamespace,
-                type,
+                errorType,
+                entityType,
+                lineNumber,
+                entityId,
                 badValue),
             1);
     }
 
+    /**
+     * Check that the test feed has exactly one error for the given error type and badValue.
+     */
+    private void checkFeedHasError(NewGTFSErrorType errorType, String badValue) {
+        assertThatSqlCountQueryYieldsExpectedCount(
+            testDataSource,
+            String.format("select count(*) from %s.errors where error_type = '%s' and bad_value = '%s'",
+                testNamespace,
+                errorType,
+                badValue),
+            1);
+    }
 }

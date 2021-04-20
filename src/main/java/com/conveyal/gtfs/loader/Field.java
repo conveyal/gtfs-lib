@@ -49,6 +49,7 @@ public abstract class Field {
     public Table referenceTable = null;
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
+    private boolean isConditionallyRequired;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
@@ -181,10 +182,25 @@ public abstract class Field {
 
     /**
      * Get the expression used to select this column from the database based on the prefix.  The csvOutput parameter is
-     * needed in overriden method implementations that have special ways of outputting certain fields.  The prefix
+     * needed in overridden method implementations that have special ways of outputting certain fields.  The prefix
      * parameter is assumed to be either null or a string in the format: `schema.`
      */
     public String getColumnExpression(String prefix, boolean csvOutput) {
         return prefix != null ? String.format("%s%s", prefix, name) : name;
+    }
+
+    /**
+     * Flag this field as conditionally required.
+     */
+    public Field addConditionallyRequired() {
+        this.isConditionallyRequired = true;
+        return this;
+    }
+
+    /**
+     * Indicates that this field is conditionally required.
+     */
+    public boolean isConditionallyRequired() {
+        return isConditionallyRequired;
     }
 }
