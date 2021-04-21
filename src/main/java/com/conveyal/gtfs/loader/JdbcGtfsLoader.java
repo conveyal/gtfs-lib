@@ -3,8 +3,6 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
-import com.conveyal.gtfs.model.FareRule;
-import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import com.google.common.hash.HashCode;
@@ -20,13 +18,10 @@ import javax.sql.DataSource;
 import java.io.*;
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 import static com.conveyal.gtfs.model.Entity.human;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 

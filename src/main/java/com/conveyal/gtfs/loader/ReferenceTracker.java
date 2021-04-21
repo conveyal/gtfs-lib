@@ -18,7 +18,6 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_NOT_EMPTY;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 
 /**
  * This class is used while loading GTFS to track the unique keys that are encountered in a GTFS

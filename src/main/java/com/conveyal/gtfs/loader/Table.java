@@ -49,7 +49,6 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_NOT_EMPTY;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -238,8 +237,7 @@ public class Table {
     .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_name", FIELD_NOT_EMPTY,0, 2)
     .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lat", FIELD_NOT_EMPTY,0, 2)
     .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lon", FIELD_NOT_EMPTY,0, 2)
-    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"parent_station", FIELD_NOT_EMPTY,2, 4)
-    .addConditionallyRequiredForeignRefCheck(STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK);
+    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"parent_station", FIELD_NOT_EMPTY,2, 4);
 
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
         new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
