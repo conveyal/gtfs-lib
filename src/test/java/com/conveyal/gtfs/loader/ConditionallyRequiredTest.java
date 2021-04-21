@@ -43,7 +43,7 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTableMissingConditionallyRequiredParentStation() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","3", "691","parent_station is conditionally required.");
+        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required.");
     }
 
     @Test

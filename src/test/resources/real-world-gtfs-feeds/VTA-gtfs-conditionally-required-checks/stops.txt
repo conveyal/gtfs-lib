@@ -2,7 +2,7 @@ stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,locatio
 4957,64957,,Southbound,37.40048600,-122.10892700,,,0,1,1,,
 691,60691,San Antonio & El Camino,Northbound,,-122.11319800,,,0,,1,,
 692,60692,San Antonio & Miller,Northbound,37.40462900,,,,0,,1,,
-1266,61266,San Antonio & California,Northbound,37.40607000,-122.11050500,,,0,,1,,
+1266,61266,San Antonio & California,Northbound,37.40607000,-122.11050500,,,3,,1,,
 1267,61267,San Antonio & Nita,Northbound,37.41186000,-122.10592500,,,0,,1,,
 1268,61268,San Antonio & Nita,Northbound,37.41461600,-122.10392500,,,0,,1,,
 1542,61542,Middlefield & Montrose,Northbound,37.41752400,-122.10575900,,,0,,1,,

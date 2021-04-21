@@ -1,11 +1,16 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.model.FareRule;
+import com.conveyal.gtfs.model.Stop;
 import org.apache.commons.lang3.math.NumberUtils;
 
+import javax.sql.DataSource;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
@@ -13,6 +18,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 
 /**
  * This class is used while loading GTFS to track the unique keys that are encountered in a GTFS
@@ -143,36 +149,114 @@ public class ReferenceTracker {
     }
 
     /**
-     * Work through each conditionally required check assigned to a table.
+     * Perform all conditionally required foreign reference checks on the fields within the provided table.
      */
-    public Set<NewGTFSError> checkConditionallyRequiredFields(Table table, HashMap<String, LineData> fieldLineData) {
+    public Set<NewGTFSError> conditionallyRequiredForeignRefChecks(Table table, DataSource dataSource, String tablePrefix) {
         Set<NewGTFSError> errors = new HashSet<>();
-        Set<ConditionallyRequiredField> fieldsToCheck = table.conditionallyRequiredFields;
-        for (ConditionallyRequiredField check : fieldsToCheck) {
-            LineData refFieldLineData = fieldLineData.get(check.referenceFieldName);
-            if (check.referenceCheck == FIELD_IN_RANGE &&
-                refFieldLineData != null &&
-                !referenceFieldInRange(refFieldLineData.fieldValue, check.minReferenceValue, check.maxReferenceValue)
-            ) {
-                // reference field not within range, move to the next check.
-                continue;
-            }
+        final TableReader<Stop> stopTableReader = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
+        Iterable<Stop> stops = stopTableReader.getAllOrdered();
 
-            LineData conFieldLineData = fieldLineData.get(check.conditionalFieldName);
-            if (check.conditionalCheck == FIELD_NOT_EMPTY &&
-                conFieldLineData != null &&
-                isEmpty(conFieldLineData.fieldValue)
-            ) {
-                NewGTFSError conReqError = NewGTFSError
-                    .forLine(table,
-                        conFieldLineData.lineNumber,
-                        CONDITIONALLY_REQUIRED,
-                        String.format("%s is conditionally required.", check.conditionalFieldName))
-                    .setEntityId(conFieldLineData.keyValue);
-                errors.add(conReqError);
+        final TableReader<FareRule> fareRulesTableReader = new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
+        Iterable<FareRule> fareRules = fareRulesTableReader.getAllOrdered();
+
+        if (table.name.equals(Table.STOPS.name)) {
+            for (ConditionallyRequiredForeignRefCheck check : table.conditionallyRequiredForeignRefChecks) {
+                // As the fare rule table is produced before the stops table, the conditionally required checks have to
+                // be done in reverse. Instead of the fare rule table checking the zone id in the stops table, the stops table
+                // is responsible for iterating over the fare rules table to confirm required zone id references are available.
+                if (check == STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK) {
+                    // Get a unique list of all zone ids referenced by the fare rule table.
+                    Set<String> zoneIds = new HashSet<>();
+                    for (FareRule rule : fareRules) {
+                        if (rule.origin_id != null) {
+                            zoneIds.add(rule.origin_id);
+                        } else if (rule.destination_id != null) {
+                            zoneIds.add(rule.destination_id);
+                        } else if (rule.contains_id != null) {
+                            zoneIds.add(rule.contains_id);
+                        }
+                    }
+
+                    // No zone_id references used in fare rules.
+                    if (zoneIds.isEmpty()) {
+                        continue;
+                    }
+
+                    // Make sure all zone id references are available, if not flag an error.
+                    for (String zoneId : zoneIds) {
+                        boolean match = false;
+                        for (Stop stop : stops) {
+                            if (zoneId.equals(stop.zone_id)) {
+                                match = true;
+                                break;
+                            }
+                        }
+                        if (!match) {
+                            errors.add (
+                                NewGTFSError.forFeed (
+                                    CONDITIONALLY_REQUIRED,
+                                    String.format("zone_id %s is required by fare_rules within stops.", zoneId)
+                                )
+                            );
+                        }
+                    }
+                }
             }
         }
         return errors;
+    }
+
+
+    /**
+     * Work through each conditionally required check assigned to a table. First check the reference field to confirm
+     * if it meets the conditions whereby the conditional field is required. If the conditional field is required confirm
+     * that a value has been provided, if not, log a an error.
+     */
+    public Set<NewGTFSError> checkConditionallyRequiredFields(Table table, List<LineData> fieldLineData) {
+        Set<NewGTFSError> errors = new HashSet<>();
+        Set<ConditionallyRequiredField> fieldsToCheck = table.conditionallyRequiredFields;
+        for (ConditionallyRequiredField check : fieldsToCheck) {
+            LineData refFieldLineData = getFieldLineData(table.name, check.referenceFieldName, fieldLineData);
+            if (
+                check.referenceCheck == FIELD_IN_RANGE &&
+                refFieldLineData != null &&
+                referenceFieldInRange(refFieldLineData.fieldValue, check.minReferenceValue, check.maxReferenceValue)
+            ) {
+                // reference field within range, perform check on conditional field.
+                LineData conFieldLineData = getFieldLineData(table.name, check.conditionalFieldName, fieldLineData);
+                if (
+                    check.conditionalCheck == FIELD_NOT_EMPTY &&
+                    conFieldLineData != null &&
+                    isEmpty(conFieldLineData.fieldValue)
+                ) {
+                    errors.add(
+                        NewGTFSError
+                            .forLine(
+                                table,
+                                conFieldLineData.lineNumber,
+                                CONDITIONALLY_REQUIRED,
+                                String.format("%s is conditionally required.", check.conditionalFieldName)
+                            ).setEntityId(conFieldLineData.keyValue)
+                    );
+                }
+            }
+
+        }
+        return errors;
+    }
+
+    /**
+     * Return the line data that matches the table and field provided.
+     */
+    private LineData getFieldLineData(String tableName, String fieldName, List<LineData> fieldLineData) {
+        Optional<LineData> match = fieldLineData
+            .stream()
+            .filter(
+                lineData -> lineData.table.name.equals(tableName) &&
+                    lineData.field.name.equals(fieldName)
+            )
+            .findFirst();
+        return match.orElse(null);
     }
 
     /**
@@ -182,7 +266,7 @@ public class ReferenceTracker {
     private boolean referenceFieldInRange(String referenceFieldValue, double min, double max) {
         try {
             int fieldValue = Integer.parseInt(referenceFieldValue);
-            return fieldValue >= min || fieldValue <= max;
+            return fieldValue >= min && fieldValue <= max;
         } catch (NumberFormatException e) {
             return false;
         }
@@ -209,6 +293,10 @@ public class ReferenceTracker {
                 if (iValue == Integer.MIN_VALUE) {
                     return true;
                 }
+                int sValue = Short.parseShort(str);
+                if (sValue == Short.MIN_VALUE) {
+                    return true;
+                }
             } catch (NumberFormatException e) {
                 return false;
             }
@@ -220,6 +308,10 @@ public class ReferenceTracker {
      * Holds line data that will be used in relation to a conditionally required field.
      */
     public static class LineData {
+        /** The table associated with this line of data. */
+        public final Table table;
+        /** The field associated with this line of data. */
+        public final Field field;
         /** The key associated with this line of data. */
         public final String keyValue;
         /** The line number. */
@@ -227,7 +319,9 @@ public class ReferenceTracker {
         /** The string representation of the field value. */
         public final String fieldValue;
 
-        public LineData(String keyValue, int lineNumber, String fieldValue) {
+        public LineData(Table table, Field field, String keyValue, int lineNumber, String fieldValue) {
+            this.table = table;
+            this.field = field;
             this.keyValue = keyValue;
             this.lineNumber = lineNumber;
             this.fieldValue = fieldValue;
