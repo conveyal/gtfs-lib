@@ -162,10 +162,10 @@ public class JdbcGtfsLoader {
             result.calendarDates = load(Table.CALENDAR_DATES);
             result.routes = load(Table.ROUTES);
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
-            result.fareRules = load(Table.FARE_RULES);
             result.feedInfo = load(Table.FEED_INFO);
             result.shapes = load(Table.SHAPES);
             result.stops = load(Table.STOPS);
+            result.fareRules = load(Table.FARE_RULES);
             result.transfers = load(Table.TRANSFERS);
             result.trips = load(Table.TRIPS); // refs routes
             result.frequencies = load(Table.FREQUENCIES); // refs trips
@@ -285,11 +285,6 @@ public class JdbcGtfsLoader {
         try {
             tableLoadResult.rowCount = loadInternal(table);
             tableLoadResult.fileSize = getTableSize(table);
-            if (table.conditionallyRequiredForeignRefChecks.size() > 0) {
-                errorStorage.storeErrors(
-                    referenceTracker.conditionallyRequiredForeignRefChecks(table,dataSource, tablePrefix)
-                );
-            }
             LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);

@@ -148,64 +148,6 @@ public class ReferenceTracker {
         return errors;
     }
 
-    /**
-     * Perform all conditionally required foreign reference checks on the fields within the provided table.
-     */
-    public Set<NewGTFSError> conditionallyRequiredForeignRefChecks(Table table, DataSource dataSource, String tablePrefix) {
-        Set<NewGTFSError> errors = new HashSet<>();
-        final TableReader<Stop> stopTableReader = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
-        Iterable<Stop> stops = stopTableReader.getAllOrdered();
-
-        final TableReader<FareRule> fareRulesTableReader = new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
-        Iterable<FareRule> fareRules = fareRulesTableReader.getAllOrdered();
-
-        if (table.name.equals(Table.STOPS.name)) {
-            for (ConditionallyRequiredForeignRefCheck check : table.conditionallyRequiredForeignRefChecks) {
-                // As the fare rule table is produced before the stops table, the conditionally required checks have to
-                // be done in reverse. Instead of the fare rule table checking the zone id in the stops table, the stops table
-                // is responsible for iterating over the fare rules table to confirm required zone id references are available.
-                if (check == STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK) {
-                    // Get a unique list of all zone ids referenced by the fare rule table.
-                    Set<String> zoneIds = new HashSet<>();
-                    for (FareRule rule : fareRules) {
-                        if (rule.origin_id != null) {
-                            zoneIds.add(rule.origin_id);
-                        } else if (rule.destination_id != null) {
-                            zoneIds.add(rule.destination_id);
-                        } else if (rule.contains_id != null) {
-                            zoneIds.add(rule.contains_id);
-                        }
-                    }
-
-                    // No zone_id references used in fare rules.
-                    if (zoneIds.isEmpty()) {
-                        continue;
-                    }
-
-                    // Make sure all zone id references are available, if not flag an error.
-                    for (String zoneId : zoneIds) {
-                        boolean match = false;
-                        for (Stop stop : stops) {
-                            if (zoneId.equals(stop.zone_id)) {
-                                match = true;
-                                break;
-                            }
-                        }
-                        if (!match) {
-                            errors.add (
-                                NewGTFSError.forFeed (
-                                    CONDITIONALLY_REQUIRED,
-                                    String.format("zone_id %s is required by fare_rules within stops.", zoneId)
-                                )
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        return errors;
-    }
-
 
     /**
      * Work through each conditionally required check assigned to a table. First check the reference field to confirm

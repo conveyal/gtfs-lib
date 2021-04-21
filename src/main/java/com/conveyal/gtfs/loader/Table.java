@@ -195,16 +195,6 @@ public class Table {
         new ShortField("status", EDITOR,  2)
     ).addPrimaryKey();
 
-    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
-            new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
-            new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
-            // FIXME: referential integrity check for zone_id for below three fields?
-            new StringField("origin_id", OPTIONAL),
-            new StringField("destination_id", OPTIONAL),
-            new StringField("contains_id", OPTIONAL))
-            .withParentTable(FARE_ATTRIBUTES)
-            .addPrimaryKey().keyFieldIsNotUnique();
-
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
             new IntegerField("shape_pt_sequence", REQUIRED),
@@ -250,6 +240,16 @@ public class Table {
     .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lon", FIELD_NOT_EMPTY,0, 2)
     .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"parent_station", FIELD_NOT_EMPTY,2, 4)
     .addConditionallyRequiredForeignRefCheck(STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK);
+
+    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
+        new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
+        new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
+        // FIXME: referential integrity check for zone_id for below three fields?
+        new StringField("origin_id", OPTIONAL).isReferenceTo(STOPS),
+        new StringField("destination_id", OPTIONAL).isReferenceTo(STOPS),
+        new StringField("contains_id", OPTIONAL).isReferenceTo(STOPS))
+        .withParentTable(FARE_ATTRIBUTES)
+        .addPrimaryKey().keyFieldIsNotUnique();
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
@@ -325,22 +325,22 @@ public class Table {
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
-            AGENCY,
-            CALENDAR,
-            SCHEDULE_EXCEPTIONS,
-            CALENDAR_DATES,
-            FARE_ATTRIBUTES,
-            FEED_INFO,
-            ROUTES,
-            FARE_RULES,
-            PATTERNS,
-            SHAPES,
-            STOPS,
-            PATTERN_STOP,
-            TRANSFERS,
-            TRIPS,
-            STOP_TIMES,
-            FREQUENCIES
+        AGENCY,
+        CALENDAR,
+        SCHEDULE_EXCEPTIONS,
+        CALENDAR_DATES,
+        FARE_ATTRIBUTES,
+        FEED_INFO,
+        ROUTES,
+        PATTERNS,
+        SHAPES,
+        STOPS,
+        FARE_RULES,
+        PATTERN_STOP,
+        TRANSFERS,
+        TRIPS,
+        STOP_TIMES,
+        FREQUENCIES
     };
 
     /**
