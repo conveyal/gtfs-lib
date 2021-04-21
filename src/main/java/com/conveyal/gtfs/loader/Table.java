@@ -90,7 +90,6 @@ public class Table {
     private boolean compoundKey;
 
     public Set<ConditionallyRequiredField> conditionallyRequiredFields = new HashSet<>();
-    public Set<ConditionallyRequiredForeignRefCheck> conditionallyRequiredForeignRefChecks = new HashSet<>();
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -1031,14 +1030,6 @@ public class Table {
                 minValue,
                 maxValue)
         );
-        return this;
-    }
-
-    /**
-     * Adds a conditionally required foreign reference check to a table.
-     */
-    public Table addConditionallyRequiredForeignRefCheck(ConditionallyRequiredForeignRefCheck check) {
-        this.conditionallyRequiredForeignRefChecks.add(check);
         return this;
     }
 }
