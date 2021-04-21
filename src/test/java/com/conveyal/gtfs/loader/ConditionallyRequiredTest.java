@@ -39,22 +39,22 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTableMissingConditionallyRequiredStopName() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","2", "4957","stop_name is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","2", "4957","stop_name is conditionally required when location_type value is between 0 and 2.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredParentStation() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required when location_type value is between 0 and 4.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredStopLat() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","3", "691","stop_lat is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","3", "691","stop_lat is conditionally required when location_type value is between 0 and 2.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredStopLon() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required when location_type value is between 0 and 2.");
     }
 
     @Test

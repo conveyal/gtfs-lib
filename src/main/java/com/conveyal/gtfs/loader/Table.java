@@ -38,8 +38,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -47,8 +49,8 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_IN_RANGE;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredFieldCheck.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -88,8 +90,6 @@ public class Table {
      * table uniqueness(e.g., transfers#to_stop_id).
      * */
     private boolean compoundKey;
-
-    public Set<ConditionallyRequiredField> conditionallyRequiredFields = new HashSet<>();
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -220,23 +220,24 @@ public class Table {
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
-        new StringField("stop_name",  OPTIONAL).conditionallyRequired(),
+        new StringField("stop_name",  OPTIONAL).requireConditions(),
         new StringField("stop_desc",  OPTIONAL),
-        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).conditionallyRequired(),
-        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).conditionallyRequired(),
+        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).requireConditions(),
+        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).requireConditions(),
         new StringField("zone_id", OPTIONAL),
         new URLField("stop_url",  OPTIONAL),
-        new ShortField("location_type", OPTIONAL, 2).conditionallyRequired(),
-        new StringField("parent_station",  OPTIONAL).conditionallyRequired(),
+        new ShortField("location_type", OPTIONAL, 4).requireConditions(
+            new ConditionalRequirement( 0, 2, "stop_name", FIELD_NOT_EMPTY),
+            new ConditionalRequirement( 0, 2, "stop_lat", FIELD_NOT_EMPTY),
+            new ConditionalRequirement( 0, 2, "stop_lon", FIELD_NOT_EMPTY),
+            new ConditionalRequirement( 2, 4, "parent_station", FIELD_NOT_EMPTY)
+        ),
+        new StringField("parent_station",  OPTIONAL).requireConditions(),
         new StringField("stop_timezone",  OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 2)
     )
     .restrictDelete()
-    .addPrimaryKey()
-    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_name", FIELD_NOT_EMPTY,0, 2)
-    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lat", FIELD_NOT_EMPTY,0, 2)
-    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"stop_lon", FIELD_NOT_EMPTY,0, 2)
-    .addConditionalRequiredCheck("location_type", FIELD_IN_RANGE,"parent_station", FIELD_NOT_EMPTY,2, 4);
+    .addPrimaryKey();
 
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
         new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
@@ -1004,32 +1005,17 @@ public class Table {
         return Field.getFieldIndex(fields, keyField);
     }
 
-    /**
-     * Adds a conditionally required field check to a table.
-     * @param referenceField The value of this field will determine if the conditional field is required.
-     * @param referenceCheck The type of check to be carried out on the reference field.
-     * @param conditionalField The field that maybe required if the reference checks are true.
-     * @param conditionalCheck The type of check to be carried out on the conditional field.
-     * @param minValue The minimum reference field value needed for conditionally required.
-     * @param maxValue The maximum reference field value needed for conditionally required.
-     */
-    public Table addConditionalRequiredCheck (
-        String referenceField,
-        ConditionallyRequiredFieldCheck referenceCheck,
-        String conditionalField,
-        ConditionallyRequiredFieldCheck conditionalCheck,
-        double minValue,
-        double maxValue
-    ) {
-        this.conditionallyRequiredFields.add(
-            new ConditionallyRequiredField(
-                referenceField,
-                referenceCheck,
-                conditionalField,
-                conditionalCheck,
-                minValue,
-                maxValue)
-        );
-        return this;
+    public boolean hasConditionalRequirements() {
+        return !getConditionalRequirements().isEmpty();
+    }
+
+    public Map<Field, ConditionalRequirement[]> getConditionalRequirements() {
+        Map<Field, ConditionalRequirement[]> fieldsWithConditions = new HashMap<>();
+        for (Field field : fields) {
+            if (field.isConditionallyRequired()) {
+                fieldsWithConditions.put(field, field.conditions);
+            }
+        }
+        return fieldsWithConditions;
     }
 }
