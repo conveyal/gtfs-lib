@@ -192,7 +192,7 @@ public abstract class Field {
     /**
      * Flag this field as conditionally required.
      */
-    public Field addConditionallyRequired() {
+    public Field conditionallyRequired() {
         this.isConditionallyRequired = true;
         return this;
     }

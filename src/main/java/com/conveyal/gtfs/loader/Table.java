@@ -232,17 +232,16 @@ public class Table {
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id",  REQUIRED),
         new StringField("stop_code",  OPTIONAL),
-        new StringField("stop_name",  OPTIONAL).addConditionallyRequired(),
+        new StringField("stop_name",  OPTIONAL).conditionallyRequired(),
         new StringField("stop_desc",  OPTIONAL),
-        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).addConditionallyRequired(),
-        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).addConditionallyRequired(),
+        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).conditionallyRequired(),
+        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).conditionallyRequired(),
         new StringField("zone_id", OPTIONAL),
         new URLField("stop_url",  OPTIONAL),
-        new ShortField("location_type", OPTIONAL, 2).addConditionallyRequired(),
-        new StringField("parent_station",  REQUIRED).addConditionallyRequired(),
+        new ShortField("location_type", OPTIONAL, 2).conditionallyRequired(),
+        new StringField("parent_station",  OPTIONAL).conditionallyRequired(),
         new StringField("stop_timezone",  OPTIONAL),
-        new ShortField("wheelchair_boarding", OPTIONAL, 2),
-        new StringField("platform_code", OPTIONAL).addConditionallyRequired()
+        new ShortField("wheelchair_boarding", OPTIONAL, 2)
     )
     .restrictDelete()
     .addPrimaryKey()
