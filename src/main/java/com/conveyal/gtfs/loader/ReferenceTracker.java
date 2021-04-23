@@ -149,7 +149,7 @@ public class ReferenceTracker {
     /**
      * Work through each conditionally required check assigned to a table. First check the reference field to confirm
      * if it meets the conditions whereby the conditional field is required. If the conditional field is required confirm
-     * that a value has been provided, if not, log a an error.
+     * that a value has been provided, if not, log an error.
      */
     public Set<NewGTFSError> checkConditionallyRequiredFields(Table table, Field[] fields, String[] rowData, int lineNumber) {
         Set<NewGTFSError> errors = new HashSet<>();
@@ -164,9 +164,9 @@ public class ReferenceTracker {
                     !POSTGRES_NULL_TEXT.equals(refFieldData) &&
                     // TODO use pre-existing method in ShortField?
                     isValueInRange(refFieldData, check.minReferenceValue, check.maxReferenceValue);
-                // If ref value does not meet the range condition, there is no need to check the conditional value for
-                // (e.g.) an empty value.
-                if (!referenceValueMeetsRangeCondition) return errors;
+                // If ref value does not meet the range condition, there is no need to check this conditional value for
+                // (e.g.) an empty value. Continue to the next check.
+                if (!referenceValueMeetsRangeCondition) continue;
                 int conditionalFieldIndex = Field.getFieldIndex(fields, check.conditionalFieldName);
                 String conditionalFieldData = getValueForRow(rowData, conditionalFieldIndex);
                 boolean conditionallyRequiredValueIsEmpty = check.conditionalCheck == FIELD_NOT_EMPTY &&

@@ -44,7 +44,7 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTableMissingConditionallyRequiredParentStation() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required when location_type value is between 0 and 4.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required when location_type value is between 2 and 4.");
     }
 
     @Test
