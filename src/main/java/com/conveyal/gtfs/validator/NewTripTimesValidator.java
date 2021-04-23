@@ -135,6 +135,8 @@ public class NewTripTimesValidator extends FeedValidator {
             // This error should already have been caught TODO verify.
             return;
         }
+        boolean hasContinuousBehavior = false;
+
         // Our code should only call this method with non-null stopTimes.
         if (stopTimes.size() < 2) {
             registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
@@ -146,6 +148,9 @@ public class NewTripTimesValidator extends FeedValidator {
         List<Stop> stops = new ArrayList<>();
         for (Iterator<StopTime> it = stopTimes.iterator(); it.hasNext(); ) {
             StopTime stopTime = it.next();
+            if (stopTime.continuous == 0,2,3) {
+                hasContinuousBehavior = true;
+            }
             Stop stop = stopById.get(stopTime.stop_id);
             if (stop == null) {
                 // All bad references should have been recorded at import, we can just remove them from the trips.

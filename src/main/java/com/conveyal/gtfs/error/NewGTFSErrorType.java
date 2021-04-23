@@ -8,6 +8,7 @@ import com.conveyal.gtfs.validator.model.Priority;
  */
 public enum NewGTFSErrorType {
     // Standard errors.
+    AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD(Priority.HIGH, "For GTFS feeds with more than one agency, agency_id is required."),
     BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
     COLOR_FORMAT(Priority.MEDIUM, "A color should be specified with six-characters (three two-digit hexadecimal numbers)."),
     COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),

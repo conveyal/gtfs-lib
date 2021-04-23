@@ -160,6 +160,13 @@ public class ReferenceTracker {
             for (ConditionalRequirement check : conditionalRequirements) {
                 int refFieldIndex = Field.getFieldIndex(fields, referenceField.name);
                 String refFieldData = getValueForRow(rowData, refFieldIndex);
+                if (check.referenceCheck == ROW_COUNT_GREATER_THAN_ONE) {
+                    if (table.name.equals("agency") && lineNumber == 1) {
+                        // don't do check
+                    } else if (transitIds.contains("agency_id:*") > 1 && POSTGRES_NULL_TEXT.equals(refFieldData)) {
+                        // ERROR.
+                    }
+                }
                 boolean referenceValueMeetsRangeCondition = check.referenceCheck == FIELD_IN_RANGE &&
                     !POSTGRES_NULL_TEXT.equals(refFieldData) &&
                     // TODO use pre-existing method in ShortField?
