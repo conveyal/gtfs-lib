@@ -13,6 +13,7 @@ import java.io.IOException;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 public class ConditionallyRequiredTest {
     private static String testDBName;
@@ -38,33 +39,33 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTableMissingConditionallyRequiredStopName() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","2", "4957","stop_name is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","2", "4957","stop_name is conditionally required when location_type value is between 0 and 2.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredParentStation() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required when location_type value is between 2 and 4.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredStopLat() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","3", "691","stop_lat is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","3", "691","stop_lat is conditionally required when location_type value is between 0 and 2.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredStopLon() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required when location_type value is between 0 and 2.");
     }
 
     @Test
     public void stopTableMissingConditionallyRequiredZoneId() {
-        checkFeedHasError(CONDITIONALLY_REQUIRED, "zone_id 1 is required by fare_rules within stops.");
+        checkFeedHasOneError(REFERENTIAL_INTEGRITY, "stop_id:1");
     }
 
     /**
      * Check that the test feed has exactly one error for the provided values.
      */
-    private void checkFeedHasError(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
+    private void checkFeedHasOneError(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
         assertThatSqlCountQueryYieldsExpectedCount(
             testDataSource,
             String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s' and entity_id = '%s' and bad_value = '%s'",
@@ -80,7 +81,7 @@ public class ConditionallyRequiredTest {
     /**
      * Check that the test feed has exactly one error for the given error type and badValue.
      */
-    private void checkFeedHasError(NewGTFSErrorType errorType, String badValue) {
+    private void checkFeedHasOneError(NewGTFSErrorType errorType, String badValue) {
         assertThatSqlCountQueryYieldsExpectedCount(
             testDataSource,
             String.format("select count(*) from %s.errors where error_type = '%s' and bad_value = '%s'",

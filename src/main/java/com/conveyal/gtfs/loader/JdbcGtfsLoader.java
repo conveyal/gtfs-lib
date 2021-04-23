@@ -3,8 +3,6 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
-import com.conveyal.gtfs.model.FareRule;
-import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
 import com.google.common.hash.HashCode;
@@ -20,13 +18,10 @@ import javax.sql.DataSource;
 import java.io.*;
 import java.sql.*;
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
-import static com.conveyal.gtfs.loader.ConditionallyRequiredForeignRefCheck.STOPS_ZONE_ID_FARE_RULES_FOREIGN_REF_CHECK;
 import static com.conveyal.gtfs.model.Entity.human;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 
@@ -72,7 +67,7 @@ public class JdbcGtfsLoader {
 
     public static final long INSERT_BATCH_SIZE = 500;
     // Represents null in Postgres text format
-    private static final String POSTGRES_NULL_TEXT = "\\N";
+    public static final String POSTGRES_NULL_TEXT = "\\N";
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
 
     private String gtfsFilePath;
@@ -162,10 +157,10 @@ public class JdbcGtfsLoader {
             result.calendarDates = load(Table.CALENDAR_DATES);
             result.routes = load(Table.ROUTES);
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
-            result.fareRules = load(Table.FARE_RULES);
             result.feedInfo = load(Table.FEED_INFO);
             result.shapes = load(Table.SHAPES);
             result.stops = load(Table.STOPS);
+            result.fareRules = load(Table.FARE_RULES);
             result.transfers = load(Table.TRANSFERS);
             result.trips = load(Table.TRIPS); // refs routes
             result.frequencies = load(Table.FREQUENCIES); // refs trips
@@ -285,11 +280,6 @@ public class JdbcGtfsLoader {
         try {
             tableLoadResult.rowCount = loadInternal(table);
             tableLoadResult.fileSize = getTableSize(table);
-            if (table.conditionallyRequiredForeignRefChecks.size() > 0) {
-                errorStorage.storeErrors(
-                    referenceTracker.conditionallyRequiredForeignRefChecks(table,dataSource, tablePrefix)
-                );
-            }
             LOG.info(String.format("loaded in %d %s records", tableLoadResult.rowCount, table.name));
         } catch (Exception ex) {
             LOG.error("Fatal error loading table", ex);
@@ -376,7 +366,7 @@ public class JdbcGtfsLoader {
         // When outputting text, accumulate transformed strings to allow skipping rows when errors are encountered.
         // One extra position in the array for the CSV line number.
         String[] transformedStrings = new String[cleanFields.length + 1];
-
+        boolean tableHasConditions = table.hasConditionalRequirements();
         // Iterate over each record and prepare the record for storage in the table either through batch insert
         // statements or postgres text copy operation.
         while (csvReader.readRecord()) {
@@ -402,7 +392,6 @@ public class JdbcGtfsLoader {
             // Maintain a separate columnIndex from for loop because some fields may be null and not included in the set
             // of fields for this table.
             int columnIndex = 0;
-            List<ReferenceTracker.LineData> fieldLineData = new ArrayList<>();
             for (int f = 0; f < fields.length; f++) {
                 Field field = fields[f];
                 // If the field is null, it represents a duplicate header or ID field and must be skipped to maintain
@@ -441,16 +430,12 @@ public class JdbcGtfsLoader {
                 }
                 // Add value for entry into table
                 setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
-                if (field.isConditionallyRequired()) {
-                    // Hold the field line data for use in checking conditionally required fields.
-                    fieldLineData.add(new ReferenceTracker.LineData(table, field, keyValue, lineNumber, string));
-                }
                 // Increment column index.
                 columnIndex += 1;
             }
-            if (fieldLineData.size() > 0) {
+            if (tableHasConditions) {
                 errorStorage.storeErrors(
-                    referenceTracker.checkConditionallyRequiredFields(table, fieldLineData)
+                    referenceTracker.checkConditionallyRequiredFields(table, fields, transformedStrings, lineNumber)
                 );
             }
             if (postgresText) {

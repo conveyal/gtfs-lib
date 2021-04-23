@@ -7,7 +7,6 @@ import com.google.common.collect.ImmutableSet;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLType;
-import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -50,6 +49,7 @@ public abstract class Field {
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
     private boolean isConditionallyRequired;
+    public ConditionalRequirement[] conditions;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
@@ -192,8 +192,9 @@ public abstract class Field {
     /**
      * Flag this field as conditionally required.
      */
-    public Field conditionallyRequired() {
+    public Field requireConditions(ConditionalRequirement...conditions) {
         this.isConditionallyRequired = true;
+        this.conditions = conditions;
         return this;
     }
 
