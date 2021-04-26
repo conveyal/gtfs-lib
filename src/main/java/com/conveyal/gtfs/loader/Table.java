@@ -49,8 +49,8 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -100,7 +100,9 @@ public class Table {
     }
 
     public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
-        new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
+        new StringField("agency_id",  OPTIONAL).requireConditions(
+            new ConditionalRequirement("agency_id")
+        ),
         new StringField("agency_name",  REQUIRED),
         new URLField("agency_url",  REQUIRED),
         new StringField("agency_timezone",  REQUIRED), // FIXME new field type for time zones?
@@ -149,7 +151,9 @@ public class Table {
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
-        new StringField("agency_id", OPTIONAL), // FIXME? only required if there are more than one
+        new StringField("agency_id", OPTIONAL).requireConditions(
+            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY)
+        ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
@@ -173,7 +177,9 @@ public class Table {
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
-        new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY),
+        new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
+            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY)
+        ),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
         new StringField("route_desc",  OPTIONAL),
@@ -190,7 +196,9 @@ public class Table {
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
-        new ShortField("status", EDITOR,  2)
+        new ShortField("status", EDITOR,  2),
+        new ShortField("continuous_pickup", OPTIONAL, 3),
+        new ShortField("continuous_drop_off", OPTIONAL, 3)
     ).addPrimaryKey();
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
@@ -303,6 +311,8 @@ public class Table {
             new StringField("stop_headsign", OPTIONAL),
             new ShortField("pickup_type", OPTIONAL, 3),
             new ShortField("drop_off_type", OPTIONAL, 3),
+            new ShortField("continuous_pickup", OPTIONAL, 3),
+            new ShortField("continuous_drop_off", OPTIONAL, 3),
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension

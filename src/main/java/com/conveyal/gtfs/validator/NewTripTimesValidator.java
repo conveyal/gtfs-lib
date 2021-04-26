@@ -114,6 +114,8 @@ public class NewTripTimesValidator extends FeedValidator {
             registerError(stopTime, MISSING_ARRIVAL_OR_DEPARTURE);
             fixMissingTimes(stopTime);
             if (missingEitherTime(stopTime)) {
+                //TODO: Is this even needed? Already covered by MISSING_ARRIVAL_OR_DEPARTURE.
+                registerError(stopTime, CONDITIONALLY_REQUIRED, "First and last stop times are conditionally required to have both an arrival and departure time.");
                 return true;
             }
         }
@@ -135,20 +137,27 @@ public class NewTripTimesValidator extends FeedValidator {
             // This error should already have been caught TODO verify.
             return;
         }
-        boolean hasContinuousBehavior = false;
 
         // Our code should only call this method with non-null stopTimes.
         if (stopTimes.size() < 2) {
             registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
             return;
         }
+        boolean hasContinuousBehavior = false;
         // Make a parallel list of stops based on the stop_times for this trip.
         // We will remove any stop_times for stops that don't exist in the feed.
         // We could ask the SQL server to do the join between stop_times and stops, but we want to check references.
         List<Stop> stops = new ArrayList<>();
         for (Iterator<StopTime> it = stopTimes.iterator(); it.hasNext(); ) {
             StopTime stopTime = it.next();
-            if (stopTime.continuous == 0,2,3) {
+            if (
+                stopTime.continuous_drop_off == 0 ||
+                stopTime.continuous_drop_off == 2 ||
+                stopTime.continuous_drop_off == 3 ||
+                stopTime.continuous_pickup == 0 ||
+                stopTime.continuous_pickup == 2 ||
+                stopTime.continuous_pickup == 3
+            ) {
                 hasContinuousBehavior = true;
             }
             Stop stop = stopById.get(stopTime.stop_id);
@@ -171,6 +180,19 @@ public class NewTripTimesValidator extends FeedValidator {
         // All bad references should have been recorded at import and null trip check is handled above, we can just
         // ignore nulls.
         Route route = routeById.get(trip.route_id);
+        if (route != null &&
+            (route.continuous_drop_off == 0 ||
+            route.continuous_drop_off == 2 ||
+            route.continuous_drop_off == 3 ||
+            route.continuous_pickup == 0 ||
+            route.continuous_pickup == 2 ||
+            route.continuous_pickup == 3)
+        ) {
+            hasContinuousBehavior = true;
+        }
+        if (hasContinuousBehavior && trip.shape_id == null) {
+            registerError(trip, CONDITIONALLY_REQUIRED, "shape_id is conditionally required when a trip has continuous behavior defined.");
+        }
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
     }
@@ -185,5 +207,4 @@ public class NewTripTimesValidator extends FeedValidator {
             LOG.info("{} finished", tripValidator.getClass().getSimpleName());
         }
     }
-
 }

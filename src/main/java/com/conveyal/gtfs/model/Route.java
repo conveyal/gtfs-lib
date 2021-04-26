@@ -34,6 +34,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public String route_text_color;
     public URL route_branding_url;
     public String feed_id;
+    public int continuous_pickup = INT_MISSING;
+    public int continuous_drop_off = INT_MISSING;
 
     @Override
     public String getId () {
@@ -64,6 +66,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
         // route_sort_order
         setIntParameter(statement, oneBasedIndex++, route_sort_order);
         setIntParameter(statement, oneBasedIndex++, 0);
+        setIntParameter(statement, oneBasedIndex++, continuous_pickup);
+        setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
     }
 
     public static class Loader extends Entity.Loader<Route> {
@@ -104,6 +108,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_color = getStringField("route_color", false);
             r.route_text_color = getStringField("route_text_color", false);
             r.route_branding_url = getUrlField("route_branding_url", false);
+            r.continuous_pickup = getIntField("continuous_pickup", true, 0, 3);
+            r.continuous_pickup = getIntField("continuous_drop_off", true, 0, 3);
             r.feed = feed;
             r.feed_id = feed.feedId;
             // Attempting to put a null key or value will cause an NPE in BTreeMap
@@ -130,6 +136,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             writeStringField("route_text_color");
             writeStringField("route_branding_url");
             writeStringField("route_sort_order");
+            writeStringField("continuous_pickup");
+            writeStringField("continuous_drop_off");
             endRecord();
         }
 
@@ -146,6 +154,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             writeStringField(r.route_text_color);
             writeUrlField(r.route_branding_url);
             writeIntField(r.route_sort_order);
+            writeIntField(r.continuous_pickup);
+            writeIntField(r.continuous_drop_off);
             endRecord();
         }
 

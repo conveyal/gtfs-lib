@@ -1,2 +1,2 @@
-fare_id,price,currency_type,payment_method,transfers,transfer_duration
-1,2.50000000,USD,0,0,
+fare_id,price,currency_type,payment_method,transfers,agency_id,transfer_duration
+1,2.50000000,USD,0,,,

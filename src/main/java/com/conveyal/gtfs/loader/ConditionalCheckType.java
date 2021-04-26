@@ -6,5 +6,6 @@ package com.conveyal.gtfs.loader;
  */
 public enum ConditionalCheckType {
     FIELD_NOT_EMPTY,
-    FIELD_IN_RANGE
+    FIELD_IN_RANGE,
+    ROW_COUNT_GREATER_THAN_ONE
 }

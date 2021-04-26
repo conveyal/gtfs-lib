@@ -1,2 +1,2 @@
-route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,route_sort_order,ext_route_type
-21,VTA,21,Stanford Shopping Center - Santa Clara Transit Center,,3,https://www.vta.org/go/routes/21,29588c,FFFFFF,21,704
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,route_sort_order,ext_route_type,continuous_pickup,continuous_drop_off
+21,,21,Stanford Shopping Center - Santa Clara Transit Center,,3,https://www.vta.org/go/routes/21,29588c,FFFFFF,21,704,,

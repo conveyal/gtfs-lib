@@ -15,6 +15,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
 
 /**
@@ -161,35 +162,59 @@ public class ReferenceTracker {
                 int refFieldIndex = Field.getFieldIndex(fields, referenceField.name);
                 String refFieldData = getValueForRow(rowData, refFieldIndex);
                 if (check.referenceCheck == ROW_COUNT_GREATER_THAN_ONE) {
-                    if (table.name.equals("agency") && lineNumber == 1) {
-                        // don't do check
-                    } else if (transitIds.contains("agency_id:*") > 1 && POSTGRES_NULL_TEXT.equals(refFieldData)) {
-                        // ERROR.
+                    int conditionalFieldIndex = Field.getFieldIndex(fields, check.conditionalFieldName);
+                    String conditionalFieldData = getValueForRow(rowData, conditionalFieldIndex);
+                    if (table.name.equals("agency") &&
+                        lineNumber > 2 &&
+                        transitIds.stream().filter(transitId -> transitId.contains("agency_id")).count() != lineNumber - 1
+                    ) {
+                        String message = String.format(
+                            "%s is conditionally required when there is more than one agency.",
+                            check.conditionalFieldName
+                        );
+                        errors.add(
+                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message)
+                        );
+                    } else if ((table.name.equals("routes")
+                        || table.name.equals("fare_attributes")) &&
+                        transitIds.stream().filter(transitId -> transitId.contains("agency_id")).count() > 1 &&
+                        check.conditionalCheck == FIELD_NOT_EMPTY &&
+                        POSTGRES_NULL_TEXT.equals(conditionalFieldData)) {
+                        // FIXME: This doesn't work if only one agency_id is defined in the agency table.
+                        String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
+                        String message = String.format(
+                            "%s is conditionally required when there is more than one agency.",
+                            check.conditionalFieldName
+                        );
+                        errors.add(
+                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
+                        );
                     }
-                }
-                boolean referenceValueMeetsRangeCondition = check.referenceCheck == FIELD_IN_RANGE &&
-                    !POSTGRES_NULL_TEXT.equals(refFieldData) &&
-                    // TODO use pre-existing method in ShortField?
-                    isValueInRange(refFieldData, check.minReferenceValue, check.maxReferenceValue);
-                // If ref value does not meet the range condition, there is no need to check this conditional value for
-                // (e.g.) an empty value. Continue to the next check.
-                if (!referenceValueMeetsRangeCondition) continue;
-                int conditionalFieldIndex = Field.getFieldIndex(fields, check.conditionalFieldName);
-                String conditionalFieldData = getValueForRow(rowData, conditionalFieldIndex);
-                boolean conditionallyRequiredValueIsEmpty = check.conditionalCheck == FIELD_NOT_EMPTY &&
-                    POSTGRES_NULL_TEXT.equals(conditionalFieldData);
-                if (conditionallyRequiredValueIsEmpty) {
-                    String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
-                    String message = String.format(
-                        "%s is conditionally required when %s value is between %d and %d.",
-                        check.conditionalFieldName,
-                        referenceField.name,
-                        check.minReferenceValue,
-                        check.maxReferenceValue
-                    );
-                    errors.add(
-                        NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
-                    );
+                } else if (check.referenceCheck == FIELD_IN_RANGE) {
+                    boolean referenceValueMeetsRangeCondition =
+                        !POSTGRES_NULL_TEXT.equals(refFieldData) &&
+                        // TODO use pre-existing method in ShortField?
+                        isValueInRange(refFieldData, check.minReferenceValue, check.maxReferenceValue);
+                    // If ref value does not meet the range condition, there is no need to check this conditional value for
+                    // (e.g.) an empty value. Continue to the next check.
+                    if (!referenceValueMeetsRangeCondition) continue;
+                    int conditionalFieldIndex = Field.getFieldIndex(fields, check.conditionalFieldName);
+                    String conditionalFieldData = getValueForRow(rowData, conditionalFieldIndex);
+                    boolean conditionallyRequiredValueIsEmpty = check.conditionalCheck == FIELD_NOT_EMPTY &&
+                        POSTGRES_NULL_TEXT.equals(conditionalFieldData);
+                    if (conditionallyRequiredValueIsEmpty) {
+                        String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
+                        String message = String.format(
+                            "%s is conditionally required when %s value is between %d and %d.",
+                            check.conditionalFieldName,
+                            referenceField.name,
+                            check.minReferenceValue,
+                            check.maxReferenceValue
+                        );
+                        errors.add(
+                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
+                        );
+                    }
                 }
             }
         }

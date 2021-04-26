@@ -26,6 +26,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
     public String stop_headsign;
     public int    pickup_type;
     public int    drop_off_type;
+    public int    continuous_pickup = INT_MISSING;
+    public int    continuous_drop_off = INT_MISSING;
     public double shape_dist_traveled = DOUBLE_MISSING;
     public int    timepoint = INT_MISSING;
 
@@ -55,6 +57,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         statement.setString(oneBasedIndex++, stop_headsign);
         setIntParameter(statement, oneBasedIndex++, pickup_type);
         setIntParameter(statement, oneBasedIndex++, drop_off_type);
+        setIntParameter(statement, oneBasedIndex++, continuous_pickup);
+        setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
         statement.setDouble(oneBasedIndex++, shape_dist_traveled);
         setIntParameter(statement, oneBasedIndex++, timepoint);
     }
@@ -84,6 +88,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.stop_headsign  = getStringField("stop_headsign", false);
             st.pickup_type    = getIntField("pickup_type", false, 0, 3); // TODO add ranges as parameters
             st.drop_off_type  = getIntField("drop_off_type", false, 0, 3);
+            st.continuous_pickup = getIntField("continuous_pickup", true, 0, 3);
+            st.continuous_pickup = getIntField("continuous_drop_off", true, 0, 3);
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
             st.feed           = null; // this could circular-serialize the whole feed
@@ -107,7 +113,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         @Override
         protected void writeHeaders() throws IOException {
             writer.writeRecord(new String[] {"trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence", "stop_headsign",
-                    "pickup_type", "drop_off_type", "shape_dist_traveled", "timepoint"});
+                    "pickup_type", "drop_off_type", "continuous_pickup", "continuous_drop_off", "shape_dist_traveled", "timepoint"});
         }
 
         @Override
@@ -120,6 +126,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             writeStringField(st.stop_headsign);
             writeIntField(st.pickup_type);
             writeIntField(st.drop_off_type);
+            writeIntField(st.continuous_pickup);
+            writeIntField(st.continuous_drop_off);
             writeDoubleField(st.shape_dist_traveled);
             writeIntField(st.timepoint);
             endRecord();
