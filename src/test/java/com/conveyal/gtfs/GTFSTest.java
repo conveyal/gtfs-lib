@@ -560,8 +560,8 @@ public class GTFSTest {
         ErrorExpectation[] errorExpectations,
         FeedValidatorCreator... customValidators
     ) {
-        String newDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = String.join("/", JDBC_URL, newDBName);
+        String testDBName = TestUtils.generateNewDB();
+        String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
         DataSource dataSource = TestUtils.createTestDataSource(dbConnectionUrl);
 
         String namespace;
