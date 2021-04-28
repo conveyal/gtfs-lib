@@ -7,14 +7,12 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import javax.sql.DataSource;
-
 import java.io.IOException;
 
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 public class ConditionallyRequiredTest {
     private static String testDBName;
@@ -61,7 +59,9 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTableMissingConditionallyRequiredZoneId() {
-        checkFeedHasOneError(REFERENTIAL_INTEGRITY, "stop_id:1");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "FareRule","3", "1", "zone_id 4 is conditionally required in stops when referenced by contains_id in fare_rules.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "FareRule","3", "1", "zone_id 3 is conditionally required in stops when referenced by destination_id in fare_rules.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "FareRule","3", "1", "zone_id 2 is conditionally required in stops when referenced by origin_id in fare_rules.");
     }
 
     @Test
@@ -116,19 +116,6 @@ public class ConditionallyRequiredTest {
                 errorType,
                 entityType,
                 lineNumber,
-                badValue),
-            1);
-    }
-
-    /**
-     * Check that the test feed has exactly one error for the given error type and badValue.
-     */
-    private void checkFeedHasOneError(NewGTFSErrorType errorType, String badValue) {
-        assertThatSqlCountQueryYieldsExpectedCount(
-            testDataSource,
-            String.format("select count(*) from %s.errors where error_type = '%s' and bad_value = '%s'",
-                testNamespace,
-                errorType,
                 badValue),
             1);
     }

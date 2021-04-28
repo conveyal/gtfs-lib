@@ -20,27 +20,32 @@ public class ConditionalRequirement {
         int minReferenceValue,
         int maxReferenceValue,
         String conditionalFieldName,
-        ConditionalCheckType conditionalCheck
+        ConditionalCheckType conditionalCheck,
+        ConditionalCheckType referenceCheck
 
     ) {
-        this.referenceCheck = ConditionalCheckType.FIELD_IN_RANGE;
         this.minReferenceValue = minReferenceValue;
         this.maxReferenceValue = maxReferenceValue;
         this.conditionalFieldName = conditionalFieldName;
         this.conditionalCheck = conditionalCheck;
+        this.referenceCheck = referenceCheck;
     }
 
-    public ConditionalRequirement(String conditionalFieldName) {
-        this.referenceCheck = ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
+    public ConditionalRequirement(
+        String conditionalFieldName,
+        ConditionalCheckType referenceCheck
+    ) {
+        this.referenceCheck = referenceCheck;
         this.conditionalFieldName = conditionalFieldName;
     }
 
     public ConditionalRequirement(
         String conditionalFieldName,
-        ConditionalCheckType conditionalCheck
+        ConditionalCheckType conditionalCheck,
+        ConditionalCheckType referenceCheck
     ) {
-        this.referenceCheck = ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
         this.conditionalFieldName = conditionalFieldName;
         this.conditionalCheck = conditionalCheck;
+        this.referenceCheck = referenceCheck;
     }
 }

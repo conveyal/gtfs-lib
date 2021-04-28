@@ -1,13 +1,10 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
-import org.apache.commons.lang3.math.NumberUtils;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
@@ -15,6 +12,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_FIELD_VALUE_MATCH;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
 
@@ -30,6 +28,7 @@ import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
  */
 public class ReferenceTracker {
     public final Set<String> transitIds = new HashSet<>();
+    public final Set<String> foreignFieldIds = new HashSet<>();
     public final Set<String> transitIdsWithSequence = new HashSet<>();
 
     /**
@@ -70,6 +69,11 @@ public class ReferenceTracker {
             // need to check for duplicates.
             : !table.hasUniqueKeyField ? null : keyField;
         String transitId = String.join(":", keyField, keyValue);
+
+        // Field value is required for referential integrity checks as part of conditionally required checks.
+        if (!"".equals(value) && field.isForeignFieldReference()) {
+            foreignFieldIds.add(String.join(":", field.name, value));
+        }
 
         // If the field is optional and there is no value present, skip check.
         if (!field.isRequired() && "".equals(value)) return Collections.emptySet();
@@ -180,7 +184,8 @@ public class ReferenceTracker {
                         transitIds.stream().filter(transitId -> transitId.contains("agency_id")).count() > 1 &&
                         check.conditionalCheck == FIELD_NOT_EMPTY &&
                         POSTGRES_NULL_TEXT.equals(conditionalFieldData)) {
-                        // FIXME: This doesn't work if only one agency_id is defined in the agency table.
+                        // FIXME: This doesn't work if only one agency_id is defined in the agency table. e.g. 2 rows of
+                        //  data, but the first doesn't define an agency_id.
                         String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
                         String message = String.format(
                             "%s is conditionally required when there is more than one agency.",
@@ -215,6 +220,24 @@ public class ReferenceTracker {
                             NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
                         );
                     }
+                } else if (check.referenceCheck == FOREIGN_FIELD_VALUE_MATCH) {
+                    String foreignFieldReference = String.join(":", check.conditionalFieldName, refFieldData);
+                    if (table.name.equals("fare_rules") &&
+                        !POSTGRES_NULL_TEXT.equals(refFieldData) &&
+                        foreignFieldIds.stream().noneMatch(id -> id.contains(foreignFieldReference))
+                    ) {
+                        String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
+                        String message = String.format(
+                            "%s %s is conditionally required in stops when referenced by %s in %s.",
+                            check.conditionalFieldName,
+                            refFieldData,
+                            referenceField.name,
+                            table.name
+                        );
+                        errors.add(
+                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
+                        );
+                    }
                 }
             }
         }
@@ -241,37 +264,5 @@ public class ReferenceTracker {
         } catch (NumberFormatException e) {
             return false;
         }
-    }
-
-    /**
-     * Checks if the provided field value is empty. If the value can be converted to either a double or int and these
-     * match the minimum value it is assumed these are empty.
-     */
-    private boolean isEmpty(String str) {
-        // Text values
-        if (str == null || str.isEmpty()) {
-            return true;
-        }
-
-        // Number values
-        if (NumberUtils.isParsable(str)) {
-            try {
-                double dValue = Double.parseDouble(str);
-                if (dValue == Double.MIN_VALUE) {
-                    return true;
-                }
-                int iValue = Integer.parseInt(str);
-                if (iValue == Integer.MIN_VALUE) {
-                    return true;
-                }
-                int sValue = Short.parseShort(str);
-                if (sValue == Short.MIN_VALUE) {
-                    return true;
-                }
-            } catch (NumberFormatException e) {
-                return false;
-            }
-        }
-        return false;
     }
 }

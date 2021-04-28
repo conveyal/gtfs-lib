@@ -49,7 +49,9 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_FIELD_VALUE_MATCH;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
@@ -101,7 +103,7 @@ public class Table {
 
     public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
         new StringField("agency_id",  OPTIONAL).requireConditions(
-            new ConditionalRequirement("agency_id")
+            new ConditionalRequirement("agency_id", ROW_COUNT_GREATER_THAN_ONE)
         ),
         new StringField("agency_name",  REQUIRED),
         new URLField("agency_url",  REQUIRED),
@@ -152,7 +154,7 @@ public class Table {
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
         new StringField("agency_id", OPTIONAL).requireConditions(
-            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY)
+            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
         ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
@@ -178,7 +180,7 @@ public class Table {
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
-            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY)
+            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
         ),
         new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name",  OPTIONAL),
@@ -232,13 +234,13 @@ public class Table {
         new StringField("stop_desc",  OPTIONAL),
         new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).requireConditions(),
         new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).requireConditions(),
-        new StringField("zone_id", OPTIONAL),
+        new StringField("zone_id", OPTIONAL).foreignFieldReference(),
         new URLField("stop_url",  OPTIONAL),
         new ShortField("location_type", OPTIONAL, 4).requireConditions(
-            new ConditionalRequirement( 0, 2, "stop_name", FIELD_NOT_EMPTY),
-            new ConditionalRequirement( 0, 2, "stop_lat", FIELD_NOT_EMPTY),
-            new ConditionalRequirement( 0, 2, "stop_lon", FIELD_NOT_EMPTY),
-            new ConditionalRequirement( 2, 4, "parent_station", FIELD_NOT_EMPTY)
+            new ConditionalRequirement( 0, 2, "stop_name", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new ConditionalRequirement( 0, 2, "stop_lat", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new ConditionalRequirement( 0, 2, "stop_lon", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new ConditionalRequirement( 2, 4, "parent_station", FIELD_NOT_EMPTY, FIELD_IN_RANGE)
         ),
         new StringField("parent_station",  OPTIONAL).requireConditions(),
         new StringField("stop_timezone",  OPTIONAL),
@@ -250,12 +252,18 @@ public class Table {
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
         new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
         new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
-        // FIXME: referential integrity check for zone_id for below three fields?
-        new StringField("origin_id", OPTIONAL).isReferenceTo(STOPS),
-        new StringField("destination_id", OPTIONAL).isReferenceTo(STOPS),
-        new StringField("contains_id", OPTIONAL).isReferenceTo(STOPS))
-        .withParentTable(FARE_ATTRIBUTES)
-        .addPrimaryKey().keyFieldIsNotUnique();
+        new StringField("origin_id", OPTIONAL).requireConditions(
+            new ConditionalRequirement( "zone_id", FOREIGN_FIELD_VALUE_MATCH)
+        ),
+        new StringField("destination_id", OPTIONAL).requireConditions(
+            new ConditionalRequirement( "zone_id", FOREIGN_FIELD_VALUE_MATCH)
+        ),
+        new StringField("contains_id", OPTIONAL).requireConditions(
+            new ConditionalRequirement( "zone_id", FOREIGN_FIELD_VALUE_MATCH)
+        )
+    )
+    .withParentTable(FARE_ATTRIBUTES)
+    .addPrimaryKey().keyFieldIsNotUnique();
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),

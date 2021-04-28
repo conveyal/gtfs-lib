@@ -49,6 +49,7 @@ public abstract class Field {
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
     private boolean isConditionallyRequired;
+    private boolean isForeignFieldReference;
     public ConditionalRequirement[] conditions;
 
     public Field(String name, Requirement requirement) {
@@ -203,5 +204,14 @@ public abstract class Field {
      */
     public boolean isConditionallyRequired() {
         return isConditionallyRequired;
+    }
+
+    public Field foreignFieldReference() {
+        isForeignFieldReference = true;
+        return this;
+    }
+
+    public boolean isForeignFieldReference() {
+        return isForeignFieldReference;
     }
 }

@@ -1,5 +1,5 @@
 stop_id,stop_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,wheelchair_boarding,platform_code,sign_dest
-4957,64957,,Southbound,37.40048600,-122.10892700,,,0,1,1,,
+4957,64957,,Southbound,37.40048600,-122.10892700,1,,0,1,1,,
 691,60691,San Antonio & El Camino,Northbound,,-122.11319800,,,0,,1,,
 692,60692,San Antonio & Miller,Northbound,37.40462900,,,,0,,1,,
 1266,61266,San Antonio & California,Northbound,37.40607000,-122.11050500,,,3,,1,,
