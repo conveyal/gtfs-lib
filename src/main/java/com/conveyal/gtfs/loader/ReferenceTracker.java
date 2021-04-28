@@ -7,6 +7,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
@@ -192,7 +193,7 @@ public class ReferenceTracker {
                             check.conditionalFieldName
                         );
                         errors.add(
-                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
+                            NewGTFSError.forLine(table, lineNumber, AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, message).setEntityId(entityId)
                         );
                     }
                 } else if (check.referenceCheck == FIELD_IN_RANGE) {
