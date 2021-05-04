@@ -523,9 +523,12 @@ public class JdbcGtfsLoader {
                 if (postgresText) {
                     ValidateFieldResult<String> result = field.validateAndConvert(string);
                     // If the result is null, use the null-setting method.
-                    if (result.clean == null) setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+                    if (result.clean == null) {
+                        setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+                    } else {
                         // Otherwise, set the cleaned field according to its index.
-                    else transformedStrings[fieldIndex + 1] = result.clean;
+                        transformedStrings[fieldIndex + 1] = result.clean;
+                    }
                     errors = result.errors;
                 } else {
                     errors = field.setParameter(insertStatement, fieldIndex + 2, string);
@@ -551,15 +554,18 @@ public class JdbcGtfsLoader {
      * Sets field to null in statement or string array depending on whether postgres is being used.
      */
     private void setFieldToNull(boolean postgresText, String[] transformedStrings, int fieldIndex, Field field) {
-        if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
+        if (postgresText) {
+            transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
+        } else {
             // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
-        else try {
-            // LOG.info("setting {} index to null", fieldIndex + 2);
-            field.setNull(insertStatement, fieldIndex + 2);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
-            // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
+            try {
+                // LOG.info("setting {} index to null", fieldIndex + 2);
+                field.setNull(insertStatement, fieldIndex + 2);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
+                // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
+            }
         }
     }
 

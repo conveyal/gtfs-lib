@@ -7,15 +7,8 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_FIELD_VALUE_MATCH;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
-import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
 
 /**
  * This class is used while loading GTFS to track the unique keys that are encountered in a GTFS
@@ -72,7 +65,7 @@ public class ReferenceTracker {
         String transitId = String.join(":", keyField, keyValue);
 
         // Field value is required for referential integrity checks as part of conditionally required checks.
-        if (!"".equals(value) && field.isForeignFieldReference()) {
+        if (!"".equals(value) && field.isForeign()) {
             foreignFieldIds.add(String.join(":", field.name, value));
         }
 
@@ -153,92 +146,82 @@ public class ReferenceTracker {
 
 
     /**
-     * Work through each conditionally required check assigned to a table. First check the reference field to confirm
-     * if it meets the conditions whereby the conditional field is required. If the conditional field is required confirm
-     * that a value has been provided, if not, log an error.
+     * Work through each conditionally required check assigned to fields within a table. First check the reference field
+     * to confirm if it meets the conditions whereby the conditional field is required. If the conditional field is
+     * required confirm that a value has been provided, if not, log an error.
      */
-    public Set<NewGTFSError> checkConditionallyRequiredFields(Table table, Field[] fields, String[] rowData, int lineNumber) {
+    public Set<NewGTFSError> checkConditionallyRequiredFields(
+        Table table,
+        Field[] fields,
+        String[] rowData,
+        int lineNumber
+    ) {
         Set<NewGTFSError> errors = new HashSet<>();
         Map<Field, ConditionalRequirement[]> fieldsToCheck = table.getConditionalRequirements();
+
+        // Work through each field that has been assigned a conditional requirement.
         for (Map.Entry<Field, ConditionalRequirement[]> entry : fieldsToCheck.entrySet()) {
             Field referenceField = entry.getKey();
+            // Extract reference field value from the row currently being processed.
+            String referenceFieldValue =
+                getValueForRow(
+                    rowData,
+                    Field.getFieldIndex(fields, referenceField.name)
+                );
+            String entityId =
+                getValueForRow(
+                    rowData,
+                    table.getKeyFieldIndex(fields)
+                );
             ConditionalRequirement[] conditionalRequirements = entry.getValue();
+
+            // Work through each field's conditional requirements.
             for (ConditionalRequirement check : conditionalRequirements) {
-                int refFieldIndex = Field.getFieldIndex(fields, referenceField.name);
-                String refFieldData = getValueForRow(rowData, refFieldIndex);
-                if (check.referenceCheck == ROW_COUNT_GREATER_THAN_ONE) {
-                    int conditionalFieldIndex = Field.getFieldIndex(fields, check.conditionalFieldName);
-                    String conditionalFieldData = getValueForRow(rowData, conditionalFieldIndex);
-                    if (table.name.equals("agency") &&
-                        lineNumber > 2 &&
-                        transitIds.stream().filter(transitId -> transitId.contains("agency_id")).count() != lineNumber - 1
-                    ) {
-                        String message = String.format(
-                            "%s is conditionally required when there is more than one agency.",
-                            check.conditionalFieldName
+                // Extract conditional field value from the row currently being processed.
+                String conditionalFieldValue =
+                    getValueForRow(
+                        rowData,
+                        Field.getFieldIndex(fields, check.conditionalFieldName)
+                    );
+                switch(check.referenceCheck) {
+                    case ROW_COUNT_GREATER_THAN_ONE:
+                        errors.addAll(
+                            ConditionalRequirement.checkRowCountGreaterThanOne(
+                                table,
+                                lineNumber,
+                                foreignFieldIds,
+                                check,
+                                conditionalFieldValue,
+                                entityId
+                            )
                         );
-                        errors.add(
-                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message)
+                        break;
+                    case FIELD_IN_RANGE:
+                        errors.addAll(
+                            ConditionalRequirement.checkFieldInRange(
+                                table,
+                                lineNumber,
+                                referenceField,
+                                check,
+                                referenceFieldValue,
+                                conditionalFieldValue,
+                                entityId
+                            )
                         );
-                    } else if ((table.name.equals("routes")
-                        || table.name.equals("fare_attributes")) &&
-                        transitIds.stream().filter(transitId -> transitId.contains("agency_id")).count() > 1 &&
-                        check.conditionalCheck == FIELD_NOT_EMPTY &&
-                        POSTGRES_NULL_TEXT.equals(conditionalFieldData)) {
-                        // FIXME: This doesn't work if only one agency_id is defined in the agency table. e.g. 2 rows of
-                        //  data, but the first doesn't define an agency_id.
-                        String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
-                        String message = String.format(
-                            "%s is conditionally required when there is more than one agency.",
-                            check.conditionalFieldName
+                        break;
+                    case FOREIGN_FIELD_VALUE_MATCH:
+                        errors.addAll(
+                            ConditionalRequirement.checkForeignFieldValueMatch(
+                                table,
+                                lineNumber,
+                                referenceField,
+                                check,
+                                referenceFieldValue,
+                                foreignFieldIds,
+                                entityId
+                            )
                         );
-                        errors.add(
-                            NewGTFSError.forLine(table, lineNumber, AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, message).setEntityId(entityId)
-                        );
-                    }
-                } else if (check.referenceCheck == FIELD_IN_RANGE) {
-                    boolean referenceValueMeetsRangeCondition =
-                        !POSTGRES_NULL_TEXT.equals(refFieldData) &&
-                        // TODO use pre-existing method in ShortField?
-                        isValueInRange(refFieldData, check.minReferenceValue, check.maxReferenceValue);
-                    // If ref value does not meet the range condition, there is no need to check this conditional value for
-                    // (e.g.) an empty value. Continue to the next check.
-                    if (!referenceValueMeetsRangeCondition) continue;
-                    int conditionalFieldIndex = Field.getFieldIndex(fields, check.conditionalFieldName);
-                    String conditionalFieldData = getValueForRow(rowData, conditionalFieldIndex);
-                    boolean conditionallyRequiredValueIsEmpty = check.conditionalCheck == FIELD_NOT_EMPTY &&
-                        POSTGRES_NULL_TEXT.equals(conditionalFieldData);
-                    if (conditionallyRequiredValueIsEmpty) {
-                        String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
-                        String message = String.format(
-                            "%s is conditionally required when %s value is between %d and %d.",
-                            check.conditionalFieldName,
-                            referenceField.name,
-                            check.minReferenceValue,
-                            check.maxReferenceValue
-                        );
-                        errors.add(
-                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
-                        );
-                    }
-                } else if (check.referenceCheck == FOREIGN_FIELD_VALUE_MATCH) {
-                    String foreignFieldReference = String.join(":", check.conditionalFieldName, refFieldData);
-                    if (table.name.equals("fare_rules") &&
-                        !POSTGRES_NULL_TEXT.equals(refFieldData) &&
-                        foreignFieldIds.stream().noneMatch(id -> id.contains(foreignFieldReference))
-                    ) {
-                        String entityId = getValueForRow(rowData, table.getKeyFieldIndex(fields));
-                        String message = String.format(
-                            "%s %s is conditionally required in stops when referenced by %s in %s.",
-                            check.conditionalFieldName,
-                            refFieldData,
-                            referenceField.name,
-                            table.name
-                        );
-                        errors.add(
-                            NewGTFSError.forLine(table, lineNumber, CONDITIONALLY_REQUIRED, message).setEntityId(entityId)
-                        );
-                    }
+                        break;
                 }
             }
         }
@@ -252,18 +235,5 @@ public class ReferenceTracker {
      */
     private String getValueForRow(String[] rowData, int columnIndex) {
         return rowData[columnIndex + 1];
-    }
-
-    /**
-     * Check if the provided value is within the min and max values. If the field value can not be converted
-     * to a number it is assumed that the value is not a number and will therefore never be within the min/max range.
-     */
-    private boolean isValueInRange(String referenceFieldValue, int min, int max) {
-        try {
-            int fieldValue = Integer.parseInt(referenceFieldValue);
-            return fieldValue >= min && fieldValue <= max;
-        } catch (NumberFormatException e) {
-            return false;
-        }
     }
 }

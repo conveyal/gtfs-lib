@@ -4,18 +4,21 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.MultimapBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.MISSING_ARRIVAL_OR_DEPARTURE;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRIP_TOO_FEW_STOP_TIMES;
 
 /**
  * Check that the travel times between adjacent stops in trips are reasonable.
@@ -150,14 +153,7 @@ public class NewTripTimesValidator extends FeedValidator {
         List<Stop> stops = new ArrayList<>();
         for (Iterator<StopTime> it = stopTimes.iterator(); it.hasNext(); ) {
             StopTime stopTime = it.next();
-            if (
-                stopTime.continuous_drop_off == 0 ||
-                stopTime.continuous_drop_off == 2 ||
-                stopTime.continuous_drop_off == 3 ||
-                stopTime.continuous_pickup == 0 ||
-                stopTime.continuous_pickup == 2 ||
-                stopTime.continuous_pickup == 3
-            ) {
+            if (hasContinuousBehavior(stopTime.continuous_drop_off, stopTime.continuous_pickup)) {
                 hasContinuousBehavior = true;
             }
             Stop stop = stopById.get(stopTime.stop_id);
@@ -181,17 +177,16 @@ public class NewTripTimesValidator extends FeedValidator {
         // ignore nulls.
         Route route = routeById.get(trip.route_id);
         if (route != null &&
-            (route.continuous_drop_off == 0 ||
-            route.continuous_drop_off == 2 ||
-            route.continuous_drop_off == 3 ||
-            route.continuous_pickup == 0 ||
-            route.continuous_pickup == 2 ||
-            route.continuous_pickup == 3)
-        ) {
+            hasContinuousBehavior(route.continuous_drop_off, route.continuous_pickup)) {
             hasContinuousBehavior = true;
         }
-        if (hasContinuousBehavior && trip.shape_id == null) {
-            registerError(trip, CONDITIONALLY_REQUIRED, "shape_id is conditionally required when a trip has continuous behavior defined.");
+
+        if (trip.shape_id == null && hasContinuousBehavior) {
+            registerError(
+                trip,
+                CONDITIONALLY_REQUIRED,
+                "shape_id is conditionally required when a trip has continuous behavior defined."
+            );
         }
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
@@ -206,5 +201,19 @@ public class NewTripTimesValidator extends FeedValidator {
             tripValidator.complete(validationResult);
             LOG.info("{} finished", tripValidator.getClass().getSimpleName());
         }
+    }
+
+    /**
+     * Determine if a trip has continuous behaviour by checking the values that have been defined for continuous drop
+     * off and pickup.
+     */
+    private boolean hasContinuousBehavior(int continuousDropOff, int continuousPickup) {
+        return
+            continuousDropOff == 0 ||
+            continuousDropOff == 2 ||
+            continuousDropOff == 3 ||
+            continuousPickup == 0 ||
+            continuousPickup == 2 ||
+            continuousPickup == 3;
     }
 }

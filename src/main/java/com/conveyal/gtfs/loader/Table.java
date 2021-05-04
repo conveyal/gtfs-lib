@@ -103,16 +103,18 @@ public class Table {
 
     public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
         new StringField("agency_id",  OPTIONAL).requireConditions(
+            // If there is more than one agency, the agency_id must be provided
+            // https://developers.google.com/transit/gtfs/reference#agencytxt
             new ConditionalRequirement("agency_id", ROW_COUNT_GREATER_THAN_ONE)
-        ),
-        new StringField("agency_name",  REQUIRED),
-        new URLField("agency_url",  REQUIRED),
-        new StringField("agency_timezone",  REQUIRED), // FIXME new field type for time zones?
+        ).foreign(),
+        new StringField("agency_name", REQUIRED),
+        new URLField("agency_url", REQUIRED),
+        new StringField("agency_timezone", REQUIRED), // FIXME new field type for time zones?
         new StringField("agency_lang", OPTIONAL), // FIXME new field type for languages?
-        new StringField("agency_phone",  OPTIONAL),
-        new URLField("agency_branding_url",  OPTIONAL),
-        new URLField("agency_fare_url",  OPTIONAL),
-        new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
+        new StringField("agency_phone", OPTIONAL),
+        new URLField("agency_branding_url", OPTIONAL),
+        new URLField("agency_fare_url", OPTIONAL),
+        new StringField("agency_email", OPTIONAL) // FIXME new field type for emails?
     ).restrictDelete().addPrimaryKey();
 
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
@@ -154,7 +156,9 @@ public class Table {
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
         new StringField("agency_id", OPTIONAL).requireConditions(
-            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
+            // If there is more than one agency, this agency_id is required.
+            // https://developers.google.com/transit/gtfs/reference#fare_attributestxt
+            new ConditionalRequirement("agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
         ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
@@ -180,27 +184,29 @@ public class Table {
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
         new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
-            new ConditionalRequirement( "agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
+            // If there is more than one agency, this agency_id is required.
+            // https://developers.google.com/transit/gtfs/reference#routestxt
+            new ConditionalRequirement("agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
         ),
-        new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
-        new StringField("route_long_name",  OPTIONAL),
-        new StringField("route_desc",  OPTIONAL),
+        new StringField("route_short_name", OPTIONAL), // one of short or long must be provided
+        new StringField("route_long_name", OPTIONAL),
+        new StringField("route_desc", OPTIONAL),
         // Max route type according to the GTFS spec is 7; however, there is a GTFS proposal that could see this 
         // max value grow to around 1800: https://groups.google.com/forum/#!msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J
         new IntegerField("route_type", REQUIRED, 1800),
-        new URLField("route_url",  OPTIONAL),
-        new URLField("route_branding_url",  OPTIONAL),
-        new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
-        new ColorField("route_text_color",  OPTIONAL),
+        new URLField("route_url", OPTIONAL),
+        new URLField("route_branding_url", OPTIONAL),
+        new ColorField("route_color", OPTIONAL), // really this is an int in hex notation
+        new ColorField("route_text_color", OPTIONAL),
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
         // wheelchair_accessible is an exemplar field applied to all trips on a route.
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
-        new ShortField("status", EDITOR,  2),
-        new ShortField("continuous_pickup", OPTIONAL, 3),
-        new ShortField("continuous_drop_off", OPTIONAL, 3)
+        new ShortField("status", EDITOR, 2),
+        new ShortField("continuous_pickup", OPTIONAL,3),
+        new ShortField("continuous_drop_off", OPTIONAL,3)
     ).addPrimaryKey();
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
@@ -228,22 +234,24 @@ public class Table {
     ).addPrimaryKey();
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
-        new StringField("stop_id",  REQUIRED),
-        new StringField("stop_code",  OPTIONAL),
-        new StringField("stop_name",  OPTIONAL).requireConditions(),
-        new StringField("stop_desc",  OPTIONAL),
+        new StringField("stop_id", REQUIRED),
+        new StringField("stop_code", OPTIONAL),
+        new StringField("stop_name", OPTIONAL).requireConditions(),
+        new StringField("stop_desc", OPTIONAL),
         new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).requireConditions(),
         new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).requireConditions(),
-        new StringField("zone_id", OPTIONAL).foreignFieldReference(),
-        new URLField("stop_url",  OPTIONAL),
+        new StringField("zone_id", OPTIONAL).foreign(),
+        new URLField("stop_url", OPTIONAL),
         new ShortField("location_type", OPTIONAL, 4).requireConditions(
-            new ConditionalRequirement( 0, 2, "stop_name", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
-            new ConditionalRequirement( 0, 2, "stop_lat", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
-            new ConditionalRequirement( 0, 2, "stop_lon", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
-            new ConditionalRequirement( 2, 4, "parent_station", FIELD_NOT_EMPTY, FIELD_IN_RANGE)
+            // If the location type is defined and within range, the conditional fields are required.
+            // https://developers.google.com/transit/gtfs/reference#stopstxt
+            new ConditionalRequirement(0, 2, "stop_name", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new ConditionalRequirement(0, 2, "stop_lat", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new ConditionalRequirement(0, 2, "stop_lon", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new ConditionalRequirement(2, 4, "parent_station", FIELD_NOT_EMPTY, FIELD_IN_RANGE)
         ),
-        new StringField("parent_station",  OPTIONAL).requireConditions(),
-        new StringField("stop_timezone",  OPTIONAL),
+        new StringField("parent_station", OPTIONAL).requireConditions(),
+        new StringField("stop_timezone", OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 2)
     )
     .restrictDelete()
@@ -253,13 +261,19 @@ public class Table {
         new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
         new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
         new StringField("origin_id", OPTIONAL).requireConditions(
-            new ConditionalRequirement( "zone_id", FOREIGN_FIELD_VALUE_MATCH)
+            // If the origin id is defined, the matching zone_id must be defined in stops.
+            // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
+            new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
         ),
         new StringField("destination_id", OPTIONAL).requireConditions(
-            new ConditionalRequirement( "zone_id", FOREIGN_FIELD_VALUE_MATCH)
+            // If the destination id is defined, the matching zone_id must be defined in stops.
+            // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
+            new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
         ),
         new StringField("contains_id", OPTIONAL).requireConditions(
-            new ConditionalRequirement( "zone_id", FOREIGN_FIELD_VALUE_MATCH)
+            // If the contains id is defined, the matching zone_id must be defined in stops.
+            // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
+            new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
         )
     )
     .withParentTable(FARE_ATTRIBUTES)
@@ -290,16 +304,16 @@ public class Table {
             .hasCompoundKey();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
-        new StringField("trip_id",  REQUIRED),
-        new StringField("route_id",  REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
+        new StringField("trip_id", REQUIRED),
+        new StringField("route_id", REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
         // FIXME: Should this also optionally reference CALENDAR_DATES?
         // FIXME: Do we need an index on service_id
-        new StringField("service_id",  REQUIRED).isReferenceTo(CALENDAR),
-        new StringField("trip_headsign",  OPTIONAL),
-        new StringField("trip_short_name",  OPTIONAL),
+        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR),
+        new StringField("trip_headsign", OPTIONAL),
+        new StringField("trip_short_name", OPTIONAL),
         new ShortField("direction_id", OPTIONAL, 1),
-        new StringField("block_id",  OPTIONAL),
-        new StringField("shape_id",  OPTIONAL).isReferenceTo(SHAPES),
+        new StringField("block_id", OPTIONAL),
+        new StringField("shape_id", OPTIONAL).isReferenceTo(SHAPES),
         new ShortField("wheelchair_accessible", OPTIONAL, 2),
         new ShortField("bikes_allowed", OPTIONAL, 2),
         // Editor-specific fields below.

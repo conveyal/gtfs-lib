@@ -5,9 +5,13 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
@@ -58,12 +62,20 @@ public class ConditionallyRequiredTest {
         checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required when location_type value is between 0 and 2.");
     }
 
-    @Test
-    public void stopTableMissingConditionallyRequiredZoneId() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "FareRule","3", "1", "zone_id 4 is conditionally required in stops when referenced by contains_id in fare_rules.");
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "FareRule","3", "1", "zone_id 3 is conditionally required in stops when referenced by destination_id in fare_rules.");
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "FareRule","3", "1", "zone_id 2 is conditionally required in stops when referenced by origin_id in fare_rules.");
+    @ParameterizedTest
+    @MethodSource("createZoneIdDependencies")
+    public void stopTableMissingConditionallyRequiredZoneId(String entityType, String lineNumber, String entityId, String badValue) {
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, entityType, lineNumber, entityId, badValue);
     }
+
+    private static Stream<Arguments> createZoneIdDependencies() {
+        return Stream.of(
+            Arguments.of("FareRule", "3", "1", "zone_id 4 is conditionally required in stops when referenced by contains_id in fare_rules."),
+            Arguments.of("FareRule", "3", "1", "zone_id 3 is conditionally required in stops when referenced by destination_id in fare_rules."),
+            Arguments.of("FareRule", "3", "1", "zone_id 2 is conditionally required in stops when referenced by origin_id in fare_rules.")
+        );
+    }
+
 
     @Test
     public void agencyTableMissingConditionallyRequiredAgencyId() {

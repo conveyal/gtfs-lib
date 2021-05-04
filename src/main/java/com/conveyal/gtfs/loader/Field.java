@@ -49,7 +49,7 @@ public abstract class Field {
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
     private boolean isConditionallyRequired;
-    private boolean isForeignFieldReference;
+    private boolean isForeign;
     public ConditionalRequirement[] conditions;
 
     public Field(String name, Requirement requirement) {
@@ -191,7 +191,7 @@ public abstract class Field {
     }
 
     /**
-     * Flag this field as conditionally required.
+     * Flag this field as conditionally required.  If needed an optional list of conditions can be provided.
      */
     public Field requireConditions(ConditionalRequirement...conditions) {
         this.isConditionallyRequired = true;
@@ -206,12 +206,19 @@ public abstract class Field {
         return isConditionallyRequired;
     }
 
-    public Field foreignFieldReference() {
-        isForeignFieldReference = true;
+    /**
+     * Flag this field as a foreign reference. If flagged the field value is added to
+     * {@link ReferenceTracker#foreignFieldIds} to be used as a look-up for reference matches.
+     */
+    public Field foreign() {
+        isForeign = true;
         return this;
     }
 
-    public boolean isForeignFieldReference() {
-        return isForeignFieldReference;
+    /**
+     * Indicates that this field is required as a foreign reference.
+     */
+    public boolean isForeign() {
+        return isForeign;
     }
 }
