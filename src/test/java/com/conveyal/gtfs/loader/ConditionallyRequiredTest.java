@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 
 public class ConditionallyRequiredTest {
@@ -94,12 +94,12 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, "Route","2", "21","agency_id is conditionally required when there is more than one agency.");
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Route","2", "21","agency_id is conditionally required when there is more than one agency.");
     }
 
     @Test
     public void fareAttributeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, "FareAttribute","2", "1","agency_id is conditionally required when there is more than one agency.");
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "FareAttribute","2", "1","agency_id is conditionally required when there is more than one agency.");
     }
 
     /**

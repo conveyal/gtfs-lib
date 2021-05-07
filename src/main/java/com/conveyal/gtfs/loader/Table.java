@@ -51,8 +51,8 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_FIELD_VALUE_MATCH;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_REF_EXISTS;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.HAS_MULTIPLE_ROWS;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -105,8 +105,8 @@ public class Table {
         new StringField("agency_id",  OPTIONAL).requireConditions(
             // If there is more than one agency, the agency_id must be provided
             // https://developers.google.com/transit/gtfs/reference#agencytxt
-            new ConditionalRequirement("agency_id", ROW_COUNT_GREATER_THAN_ONE)
-        ).foreign(),
+            new ConditionalRequirement("agency_id", HAS_MULTIPLE_ROWS)
+        ).hasForeignReferences(),
         new StringField("agency_name", REQUIRED),
         new URLField("agency_url", REQUIRED),
         new StringField("agency_timezone", REQUIRED), // FIXME new field type for time zones?
@@ -158,7 +158,7 @@ public class Table {
         new StringField("agency_id", OPTIONAL).requireConditions(
             // If there is more than one agency, this agency_id is required.
             // https://developers.google.com/transit/gtfs/reference#fare_attributestxt
-            new ConditionalRequirement("agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
+            new ConditionalRequirement("agency_id", HAS_MULTIPLE_ROWS, FIELD_NOT_EMPTY)
         ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
@@ -186,7 +186,7 @@ public class Table {
         new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
             // If there is more than one agency, this agency_id is required.
             // https://developers.google.com/transit/gtfs/reference#routestxt
-            new ConditionalRequirement("agency_id", FIELD_NOT_EMPTY, ROW_COUNT_GREATER_THAN_ONE)
+            new ConditionalRequirement("agency_id", HAS_MULTIPLE_ROWS, FIELD_NOT_EMPTY)
         ),
         new StringField("route_short_name", OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name", OPTIONAL),
@@ -240,7 +240,7 @@ public class Table {
         new StringField("stop_desc", OPTIONAL),
         new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).requireConditions(),
         new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).requireConditions(),
-        new StringField("zone_id", OPTIONAL).foreign(),
+        new StringField("zone_id", OPTIONAL).hasForeignReferences(),
         new URLField("stop_url", OPTIONAL),
         new ShortField("location_type", OPTIONAL, 4).requireConditions(
             // If the location type is defined and within range, the conditional fields are required.
@@ -261,19 +261,19 @@ public class Table {
         new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
         new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
         new StringField("origin_id", OPTIONAL).requireConditions(
-            // If the origin id is defined, the matching zone_id must be defined in stops.
+            // If the origin_id is defined, its value must exist as a zone_id in stops.txt.
             // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
-            new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
+            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS)
         ),
         new StringField("destination_id", OPTIONAL).requireConditions(
-            // If the destination id is defined, the matching zone_id must be defined in stops.
+            // If the destination_id is defined, its value must exist as a zone_id in stops.txt.
             // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
-            new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
+            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS)
         ),
         new StringField("contains_id", OPTIONAL).requireConditions(
-            // If the contains id is defined, the matching zone_id must be defined in stops.
+            // If the contains_id is defined, its value must exist as a zone_id in stops.txt.
             // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
-            new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
+            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS)
         )
     )
     .withParentTable(FARE_ATTRIBUTES)
