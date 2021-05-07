@@ -23,5 +23,14 @@ public enum ConditionalCheckType {
      * If the reference table row count is greater than one, the conditionally required field values must not be empty.
      * This is used in conjunction with {@link ConditionalCheckType#FIELD_NOT_EMPTY}.
      */
-    ROW_COUNT_GREATER_THAN_ONE
+    ROW_COUNT_GREATER_THAN_ONE,
+    /**
+     * If the conditionally required field value is empty, the reference field value must be provided.
+     */
+    FIELD_IS_EMPTY,
+    /**
+     * If the conditionally required field value is not empty and matches an expected value, the reference field
+     * value must not be empty.
+     */
+    FIELD_NOT_EMPTY_AND_MATCHES_VALUE
 }

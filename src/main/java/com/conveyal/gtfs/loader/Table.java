@@ -3,6 +3,7 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.Attribution;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
@@ -18,6 +19,7 @@ import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Translation;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
@@ -50,7 +52,9 @@ import java.util.zip.ZipFile;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IS_EMPTY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY_AND_MATCHES_VALUE;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_FIELD_VALUE_MATCH;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.ROW_COUNT_GREATER_THAN_ONE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
@@ -168,7 +172,7 @@ public class Table {
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         // feed_id is not the first field because that would label it as the key field, which we do not want because the
-        // key field cannot be optional.
+        // key field cannot be optional. feed_id is not part of the GTFS spec, but is required by OTP.
         new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
@@ -178,7 +182,10 @@ public class Table {
         // Editor-specific field that represents default route values for use in editing.
         new ColorField("default_route_color", EDITOR),
         // FIXME: Should the route type max value be equivalent to GTFS spec's max?
-        new IntegerField("default_route_type", EDITOR, 999)
+        new IntegerField("default_route_type", EDITOR, 999),
+        new LanguageField("default_lang", OPTIONAL),
+        new StringField("feed_contact_email", OPTIONAL),
+        new URLField("feed_contact_url", OPTIONAL)
     ).keyFieldIsNotUnique();
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
@@ -252,27 +259,26 @@ public class Table {
         ),
         new StringField("parent_station", OPTIONAL).requireConditions(),
         new StringField("stop_timezone", OPTIONAL),
-        new ShortField("wheelchair_boarding", OPTIONAL, 2)
+        new ShortField("wheelchair_boarding", OPTIONAL, 2),
+        new StringField("platform_code", OPTIONAL)
     )
     .restrictDelete()
     .addPrimaryKey();
 
+    // GTFS reference: https://developers.google.com/transit/gtfs/reference#fare_rulestxt
     public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
         new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
         new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
         new StringField("origin_id", OPTIONAL).requireConditions(
             // If the origin id is defined, the matching zone_id must be defined in stops.
-            // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
             new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
         ),
         new StringField("destination_id", OPTIONAL).requireConditions(
             // If the destination id is defined, the matching zone_id must be defined in stops.
-            // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
             new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
         ),
         new StringField("contains_id", OPTIONAL).requireConditions(
             // If the contains id is defined, the matching zone_id must be defined in stops.
-            // https://developers.google.com/transit/gtfs/reference#fare_rulestxt
             new ConditionalRequirement("zone_id", FOREIGN_FIELD_VALUE_MATCH)
         )
     )
@@ -353,6 +359,43 @@ public class Table {
             .withParentTable(TRIPS)
             .keyFieldIsNotUnique();
 
+    // GTFS reference: https://developers.google.com/transit/gtfs/reference#attributionstxt
+    public static final Table TRANSLATIONS = new Table("translations", Translation.class, OPTIONAL,
+            new StringField("table_name", REQUIRED),
+            new StringField("field_name", REQUIRED),
+            new LanguageField("language", REQUIRED),
+            new StringField("translation", REQUIRED),
+            new StringField("record_id", OPTIONAL).requireConditions(
+                // If the field_value is empty the record_id is required.
+                new ConditionalRequirement("field_value", FIELD_IS_EMPTY)
+            ),
+            new StringField("record_sub_id", OPTIONAL).requireConditions(
+                // If the record_id is not empty and the value is stop_times the record_sub_id is required.
+                new ConditionalRequirement(
+                    "record_id",
+                    "stop_times",
+                    FIELD_NOT_EMPTY_AND_MATCHES_VALUE
+                )
+            ),
+            new StringField("field_value", OPTIONAL).requireConditions(
+                // If the record_id is empty the field_value is required.
+                new ConditionalRequirement("record_id", FIELD_IS_EMPTY)
+            ))
+            .keyFieldIsNotUnique();
+
+    public static final Table ATTRIBUTIONS = new Table("attributions", Attribution.class, OPTIONAL,
+            new StringField("attribution_id", OPTIONAL),
+            new StringField("agency_id", OPTIONAL).isReferenceTo(AGENCY),
+            new LanguageField("route_id", OPTIONAL).isReferenceTo(ROUTES),
+            new StringField("trip_id", OPTIONAL).isReferenceTo(TRIPS),
+            new StringField("organization_name", REQUIRED),
+            new ShortField("is_producer", OPTIONAL, 1),
+            new ShortField("is_operator", OPTIONAL, 1),
+            new ShortField("is_authority", OPTIONAL, 1),
+            new URLField("attribution_url", OPTIONAL),
+            new StringField("attribution_email", OPTIONAL),
+            new StringField("attribution_phone", OPTIONAL));
+
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
         AGENCY,
@@ -370,7 +413,9 @@ public class Table {
         TRANSFERS,
         TRIPS,
         STOP_TIMES,
-        FREQUENCIES
+        FREQUENCIES,
+        TRANSLATIONS,
+        ATTRIBUTIONS
     };
 
     /**
@@ -1050,4 +1095,5 @@ public class Table {
         }
         return fieldsWithConditions;
     }
+
 }
