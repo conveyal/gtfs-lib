@@ -50,20 +50,19 @@ public class ConditionallyRequiredTest {
 
     @ParameterizedTest
     @MethodSource("createStopTableChecks")
-    public void stopTableConditionallyRequiredTests(String entityType, String lineNumber, String entityId, String badValue) {
-      // TODO: REFERENTIAL_INTEGRITY for last three tests.
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, entityType, lineNumber, entityId, badValue);
+    public void stopTableConditionallyRequiredTests(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
+        checkFeedHasOneError(errorType, entityType, lineNumber, entityId, badValue);
     }
 
     private static Stream<Arguments> createStopTableChecks() {
         return Stream.of(
-            Arguments.of("Stop", "2", "4957", "stop_name is conditionally required when location_type value is between 0 and 2."),
-            Arguments.of("Stop", "5", "1266", "parent_station is conditionally required when location_type value is between 2 and 4."),
-            Arguments.of("Stop", "3", "691", "stop_lat is conditionally required when location_type value is between 0 and 2."),
-            Arguments.of("Stop", "4", "692", "stop_lon is conditionally required when location_type value is between 0 and 2."),
-            Arguments.of("FareRule", "3", "1", "contains_id:zone_id:4"),
-            Arguments.of("FareRule", "3", "1", "destination_id:zone_id:3"),
-            Arguments.of("FareRule", "3", "1", "origin_id:zone_id:2")
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "2", "4957", "stop_name is conditionally required when location_type value is between 0 and 2."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "5", "1266", "parent_station is conditionally required when location_type value is between 2 and 4."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "3", "691", "stop_lat is conditionally required when location_type value is between 0 and 2."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "4", "692", "stop_lon is conditionally required when location_type value is between 0 and 2."),
+            Arguments.of(REFERENTIAL_INTEGRITY, "FareRule", "3", "1", "contains_id:zone_id:4"),
+            Arguments.of(REFERENTIAL_INTEGRITY, "FareRule", "3", "1", "destination_id:zone_id:3"),
+            Arguments.of(REFERENTIAL_INTEGRITY, "FareRule", "3", "1", "origin_id:zone_id:2")
         );
     }
 
@@ -81,7 +80,6 @@ public class ConditionallyRequiredTest {
         );
     }
 
-
     @Test
     public void agencyTableMissingConditionallyRequiredAgencyId() {
         checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Agency","2", null, "agency_id");
@@ -91,7 +89,6 @@ public class ConditionallyRequiredTest {
     public void tripTableMissingConditionallyRequiredShapeId() {
         checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Trip","2", "1","shape_id is conditionally required when a trip has continuous behavior defined.");
     }
-
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {
