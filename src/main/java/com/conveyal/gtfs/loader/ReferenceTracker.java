@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.google.common.collect.TreeMultimap;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -22,7 +23,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
  */
 public class ReferenceTracker {
     public final Set<String> transitIds = new HashSet<>();
-    public final Set<String> foreignFieldIds = new HashSet<>();
+    public final TreeMultimap<String, String> uniqueValuesForFields = TreeMultimap.create();
     public final Set<String> transitIdsWithSequence = new HashSet<>();
 
     /**
@@ -64,9 +65,11 @@ public class ReferenceTracker {
             : !table.hasUniqueKeyField ? null : keyField;
         String transitId = String.join(":", keyField, keyValue);
 
-        // Field value is required for referential integrity checks as part of conditionally required checks.
-        if (!"".equals(value) && field.isForeign()) {
-            foreignFieldIds.add(String.join(":", field.name, value));
+        // Unique key values are needed for referential integrity checks as part of checks for fields that have
+        // conditional requirements. This also tracks "special" foreign keys like stop#zone_id that are not primary keys
+        // of the table they exist in.
+        if ((field.name.equals(keyField) && keyField.equals(uniqueKeyField)) || field.isForeign()) {
+            uniqueValuesForFields.put(field.name, value);
         }
 
         // If the field is optional and there is no value present, skip check.
@@ -150,75 +153,39 @@ public class ReferenceTracker {
      * to confirm if it meets the conditions whereby the conditional field is required. If the conditional field is
      * required confirm that a value has been provided, if not, log an error.
      */
-    public Set<NewGTFSError> checkConditionallyRequiredFields(
-        Table table,
-        Field[] fields,
-        String[] rowData,
-        int lineNumber
-    ) {
+    public Set<NewGTFSError> checkConditionallyRequiredFields(LineContext lineContext) {
         Set<NewGTFSError> errors = new HashSet<>();
-        Map<Field, ConditionalRequirement[]> fieldsToCheck = table.getConditionalRequirements();
+        Map<Field, ConditionalRequirement[]> fieldsToCheck = lineContext.table.getConditionalRequirements();
 
         // Work through each field that has been assigned a conditional requirement.
         for (Map.Entry<Field, ConditionalRequirement[]> entry : fieldsToCheck.entrySet()) {
             Field referenceField = entry.getKey();
-            // Extract reference field value from the row currently being processed.
-            String referenceFieldValue =
-                getValueForRow(
-                    rowData,
-                    Field.getFieldIndex(fields, referenceField.name)
-                );
-            String entityId =
-                getValueForRow(
-                    rowData,
-                    table.getKeyFieldIndex(fields)
-                );
             ConditionalRequirement[] conditionalRequirements = entry.getValue();
-
             // Work through each field's conditional requirements.
             for (ConditionalRequirement check : conditionalRequirements) {
-                // Extract conditional field value from the row currently being processed.
-                String conditionalFieldValue =
-                    getValueForRow(
-                        rowData,
-                        Field.getFieldIndex(fields, check.conditionalFieldName)
-                    );
-                switch(check.referenceCheck) {
-                    case ROW_COUNT_GREATER_THAN_ONE:
+                switch(check.referenceFieldCheck) {
+                    case HAS_MULTIPLE_ROWS:
                         errors.addAll(
-                            ConditionalRequirement.checkRowCountGreaterThanOne(
-                                table,
-                                lineNumber,
-                                foreignFieldIds,
-                                check,
-                                conditionalFieldValue,
-                                entityId
-                            )
+                            ConditionalRequirement.checkHasMultipleRows(lineContext, uniqueValuesForFields, check)
+                        );
+                        break;
+                    case FIELD_NOT_EMPTY:
+                        errors.addAll(
+                            ConditionalRequirement.checkFieldEmpty(lineContext, referenceField, uniqueValuesForFields, check)
                         );
                         break;
                     case FIELD_IN_RANGE:
                         errors.addAll(
-                            ConditionalRequirement.checkFieldInRange(
-                                table,
-                                lineNumber,
-                                referenceField,
-                                check,
-                                referenceFieldValue,
-                                conditionalFieldValue,
-                                entityId
-                            )
+                            ConditionalRequirement.checkFieldInRange(lineContext, referenceField, check)
                         );
                         break;
-                    case FOREIGN_FIELD_VALUE_MATCH:
+                    case FOREIGN_REF_EXISTS:
                         errors.addAll(
-                            ConditionalRequirement.checkForeignFieldValueMatch(
-                                table,
-                                lineNumber,
+                            ConditionalRequirement.checkForeignRefExists(
+                                lineContext,
                                 referenceField,
                                 check,
-                                referenceFieldValue,
-                                foreignFieldIds,
-                                entityId
+                                uniqueValuesForFields
                             )
                         );
                         break;
@@ -252,14 +219,5 @@ public class ReferenceTracker {
             }
         }
         return errors;
-    }
-
-    /**
-     * Get value for a particular column index from a set of row data. Note: the row data here has one extra value at
-     * the beginning of the array that represents the line number (hence the +1). This is because the data is formatted
-     * for batch insertion into a postgres table.
-     */
-    private String getValueForRow(String[] rowData, int columnIndex) {
-        return rowData[columnIndex + 1];
     }
 }

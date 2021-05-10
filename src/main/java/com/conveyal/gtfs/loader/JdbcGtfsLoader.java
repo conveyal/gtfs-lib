@@ -378,6 +378,7 @@ public class JdbcGtfsLoader {
                 errorStorage.storeError(NewGTFSError.forTable(table, TABLE_TOO_LONG));
                 break;
             }
+            // Line 1 is considered the header row, so the first actual row of data will be line 2.
             int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
             if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
             if (csvReader.getColumnCount() != fields.length) {
@@ -436,8 +437,9 @@ public class JdbcGtfsLoader {
                 columnIndex += 1;
             }
             if (tableHasConditions) {
+                LineContext lineContext = new LineContext(table, fields, transformedStrings, lineNumber);
                 errorStorage.storeErrors(
-                    referenceTracker.checkConditionallyRequiredFields(table, fields, transformedStrings, lineNumber)
+                    referenceTracker.checkConditionallyRequiredFields(lineContext)
                 );
             }
             if (postgresText) {

@@ -141,6 +141,25 @@ public abstract class Field {
     }
 
     /**
+     * Fluent method to flag field as having foreign references. If flagged, the field value is added to
+     * {@link ReferenceTracker#uniqueValuesForFields} to be used as a look-up for reference matches. Note: this is intended only for
+     * special cases (e.g., zone_id) where the field being referenced does not exist as the primary key of a table.
+     */
+    Field hasForeignReferences() {
+        isForeign = true;
+        return this;
+    }
+
+    /**
+     * Indicates that this field has foreign references. Note: this is intentionally distinct from
+     * {@link #isForeignReference()} and is intended only for special cases (e.g., zone_id) where the field being
+     * referenced does not exist as the primary key of a table.
+     */
+    public boolean isForeign() {
+        return isForeign;
+    }
+
+    /**
      * Fluent method that indicates that a newly constructed field should be indexed after the table is loaded.
      * FIXME: should shouldBeIndexed be determined based on presence of referenceTable?
      * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
@@ -155,7 +174,8 @@ public abstract class Field {
     }
 
     /**
-     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument.
+     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument (i.e., it
+     * is a foreign reference).
      * @param table
      * @return this same Field instance
      */
@@ -204,21 +224,5 @@ public abstract class Field {
      */
     public boolean isConditionallyRequired() {
         return isConditionallyRequired;
-    }
-
-    /**
-     * Flag this field as a foreign reference. If flagged the field value is added to
-     * {@link ReferenceTracker#foreignFieldIds} to be used as a look-up for reference matches.
-     */
-    public Field foreign() {
-        isForeign = true;
-        return this;
-    }
-
-    /**
-     * Indicates that this field is required as a foreign reference.
-     */
-    public boolean isForeign() {
-        return isForeign;
     }
 }

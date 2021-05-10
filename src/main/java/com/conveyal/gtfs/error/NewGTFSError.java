@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.loader.LineContext;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Entity;
 import org.slf4j.Logger;
@@ -78,6 +79,14 @@ public class NewGTFSError {
     public static NewGTFSError forLine (Table table, int lineNumber, NewGTFSErrorType errorType, String badValue) {
         NewGTFSError error = new NewGTFSError(table.getEntityClass(), errorType);
         error.lineNumber = lineNumber;
+        error.badValue = badValue;
+        return error;
+    }
+
+    // Factory Builder for cases where an entity has not yet been constructed, but we know the line number.
+    public static NewGTFSError forLine (LineContext lineContext, NewGTFSErrorType errorType, String badValue) {
+        NewGTFSError error = new NewGTFSError(lineContext.table.getEntityClass(), errorType);
+        error.lineNumber = lineContext.lineNumber;
         error.badValue = badValue;
         return error;
     }
