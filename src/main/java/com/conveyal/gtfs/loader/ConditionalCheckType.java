@@ -23,5 +23,14 @@ public enum ConditionalCheckType {
      * Check that the reference table has multiple records. This is sometimes used in conjunction with
      * {@link ConditionalCheckType#FIELD_NOT_EMPTY} (e.g., to check that multiple agencies exist).
      */
-    HAS_MULTIPLE_ROWS
+    HAS_MULTIPLE_ROWS,
+    /**
+     * If the conditionally required field value is empty, the reference field value must be provided.
+     */
+    FIELD_IS_EMPTY,
+    /**
+     * If the conditionally required field value is not empty and matches an expected value, the reference field
+     * value must not be empty.
+     */
+    FIELD_NOT_EMPTY_AND_MATCHES_VALUE
 }

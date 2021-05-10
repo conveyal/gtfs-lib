@@ -44,36 +44,40 @@ public class ConditionallyRequiredTest {
     }
 
     @Test
-    public void stopTableMissingConditionallyRequiredStopName() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","2", "4957","stop_name is conditionally required when location_type value is between 0 and 2.");
-    }
-
-    @Test
-    public void stopTableMissingConditionallyRequiredParentStation() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","5", "1266","parent_station is conditionally required when location_type value is between 2 and 4.");
-    }
-
-    @Test
-    public void stopTableMissingConditionallyRequiredStopLat() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","3", "691","stop_lat is conditionally required when location_type value is between 0 and 2.");
-    }
-
-    @Test
-    public void stopTableMissingConditionallyRequiredStopLon() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Stop","4", "692","stop_lon is conditionally required when location_type value is between 0 and 2.");
+    public void stopTimeTableMissingConditionallyRequiredArrivalDepartureTimes() {
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "StopTime","10", "1","First and last stop times are conditionally required to have both an arrival and departure time.");
     }
 
     @ParameterizedTest
-    @MethodSource("createZoneIdDependencies")
-    public void stopTableMissingConditionallyRequiredZoneId(String entityType, String lineNumber, String entityId, String badValue) {
-        checkFeedHasOneError(REFERENTIAL_INTEGRITY, entityType, lineNumber, entityId, badValue);
+    @MethodSource("createStopTableChecks")
+    public void stopTableConditionallyRequiredTests(String entityType, String lineNumber, String entityId, String badValue) {
+      // TODO: REFERENTIAL_INTEGRITY for last three tests.
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, entityType, lineNumber, entityId, badValue);
     }
 
-    private static Stream<Arguments> createZoneIdDependencies() {
+    private static Stream<Arguments> createStopTableChecks() {
         return Stream.of(
+            Arguments.of("Stop", "2", "4957", "stop_name is conditionally required when location_type value is between 0 and 2."),
+            Arguments.of("Stop", "5", "1266", "parent_station is conditionally required when location_type value is between 2 and 4."),
+            Arguments.of("Stop", "3", "691", "stop_lat is conditionally required when location_type value is between 0 and 2."),
+            Arguments.of("Stop", "4", "692", "stop_lon is conditionally required when location_type value is between 0 and 2."),
             Arguments.of("FareRule", "3", "1", "contains_id:zone_id:4"),
             Arguments.of("FareRule", "3", "1", "destination_id:zone_id:3"),
             Arguments.of("FareRule", "3", "1", "origin_id:zone_id:2")
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("createTranslationTableChecks")
+    public void translationTableConditionallyRequiredTests(String entityType, String lineNumber, String entityId, String badValue) {
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, entityType, lineNumber, entityId, badValue);
+    }
+
+    private static Stream<Arguments> createTranslationTableChecks() {
+        return Stream.of(
+            Arguments.of("Translation", "2", "stops", "record_id is conditionally required when field_value is empty."),
+            Arguments.of("Translation", "3", "stops", "field_value is conditionally required when record_id is empty."),
+            Arguments.of("Translation", "4", "stops", "record_sub_id is conditionally required when record_id is provided and matches stop_times.")
         );
     }
 
@@ -88,10 +92,6 @@ public class ConditionallyRequiredTest {
         checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Trip","2", "1","shape_id is conditionally required when a trip has continuous behavior defined.");
     }
 
-    @Test
-    public void stopTimeTableMissingConditionallyRequiredArrivalDepartureTimes() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "StopTime","10", "1","First and last stop times are conditionally required to have both an arrival and departure time.");
-    }
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {

@@ -14,7 +14,6 @@ import com.google.common.util.concurrent.ExecutionError;
 import org.locationtech.jts.algorithm.ConvexHull;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.index.strtree.STRtree;
-import org.locationtech.jts.simplify.DouglasPeuckerSimplifier;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -66,6 +65,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Stop> stops;
     public final Map<String, Transfer> transfers;
     public final BTreeMap<String, Trip> trips;
+    public final Map<String, Translation> translations;
+    public final Map<String, Attribution> attributions;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -636,6 +637,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         fares = db.getTreeMap("fares");
         services = db.getTreeMap("services");
         shape_points = db.getTreeMap("shape_points");
+        translations = db.getTreeMap("translations");
+        attributions = db.getTreeMap("attributions");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();

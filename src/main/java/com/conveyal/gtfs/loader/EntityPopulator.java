@@ -168,7 +168,8 @@ public interface EntityPopulator<T> {
         stop.stop_timezone  = getStringIfPresent(result, "stop_timezone",  columnForName);
         stop.stop_url       = getUrlIfPresent   (result, "stop_url",       columnForName);
         stop.location_type  = getIntIfPresent   (result, "location_type",  columnForName);
-        stop.wheelchair_boarding = Integer.toString(getIntIfPresent(result, "wheelchair_boarding", columnForName));
+        stop.wheelchair_boarding = getIntIfPresent(result, "wheelchair_boarding", columnForName);
+        stop.platform_code  = getStringIfPresent(result, "platform_code",  columnForName);
         return stop;
     };
 

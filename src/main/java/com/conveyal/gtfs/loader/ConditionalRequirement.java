@@ -34,6 +34,8 @@ public class ConditionalRequirement {
     /** The name of the dependent field, which is a field that requires a specific value if the reference and
      * (in some cases) dependent field checks meet certain conditions.*/
     public String dependentFieldName;
+    /** The expected conditional field value. */
+    public String conditionalFieldValue;
 
     public ConditionalRequirement(
         int minReferenceValue,
@@ -41,6 +43,8 @@ public class ConditionalRequirement {
         String dependentFieldName,
         ConditionalCheckType dependentFieldCheck,
         ConditionalCheckType referenceFieldCheck
+        String conditionalFieldValue,
+        ConditionalCheckType referenceCheck
 
     ) {
         this.minReferenceValue = minReferenceValue;
@@ -55,6 +59,28 @@ public class ConditionalRequirement {
         ConditionalCheckType referenceFieldCheck
     ) {
         this(0,0, dependentFieldName, null, referenceFieldCheck);
+        this.conditionalFieldName = conditionalFieldName;
+        this.conditionalFieldValue = conditionalFieldValue;
+        this.conditionalCheck = conditionalCheck;
+        this.referenceCheck = referenceCheck;
+    }
+
+    public ConditionalRequirement(
+        int minReferenceValue,
+        int maxReferenceValue,
+        String conditionalFieldName,
+        ConditionalCheckType conditionalCheck,
+        ConditionalCheckType referenceCheck
+
+    ) {
+        this(minReferenceValue,maxReferenceValue, conditionalFieldName, null, conditionalCheck, referenceCheck);
+    }
+
+    public ConditionalRequirement(
+        String conditionalFieldName,
+        ConditionalCheckType referenceCheck
+    ) {
+        this(0,0, conditionalFieldName, null, null, referenceCheck);
     }
 
     public ConditionalRequirement(
@@ -62,8 +88,17 @@ public class ConditionalRequirement {
         ConditionalCheckType dependentFieldCheck,
         ConditionalCheckType referenceFieldCheck
     ) {
-        this(0,0, dependentFieldName, dependentFieldCheck, referenceFieldCheck);
+        this(0,0, dependentFieldName, null, dependentFieldCheck, referenceFieldCheck);
     }
+
+    public ConditionalRequirement(
+        String conditionalFieldName,
+        String conditionalFieldValue,
+        ConditionalCheckType referenceCheck
+    ) {
+        this(0,0, conditionalFieldName, conditionalFieldValue, null, referenceCheck);
+    }
+
 
     /**
      * Flag an error if there are multiple rows (designed for agency.txt) and the agency_id is missing for any rows.
@@ -208,6 +243,77 @@ public class ConditionalRequirement {
                     String.join(":", referenceField.name, foreignFieldReference)
                 ).setEntityId(lineContext.getEntityId())
             );
+        }
+        return errors;
+    }
+
+    /**
+     * Check the conditional field value, if it is empty the reference field value must be provided.
+     */
+    public static Set<NewGTFSError> checkFieldIsEmpty(
+        Table table,
+        int lineNumber,
+        Field referenceField,
+        ConditionalRequirement check,
+        String referenceFieldValue,
+        String conditionalFieldValue,
+        String entityId
+    ) {
+        Set<NewGTFSError> errors = new HashSet<>();
+        if (
+            POSTGRES_NULL_TEXT.equals(conditionalFieldValue) &&
+            POSTGRES_NULL_TEXT.equals(referenceFieldValue)
+        ) {
+            // The reference field is required when the conditional field is empty.
+            String message = String.format(
+                "%s is conditionally required when %s is empty.",
+                referenceField.name,
+                check.conditionalFieldName
+            );
+            errors.add(
+                NewGTFSError.forLine(
+                    table,
+                    lineNumber,
+                    CONDITIONALLY_REQUIRED,
+                    message).setEntityId(entityId)
+            );
+
+        }
+        return errors;
+    }
+
+    /**
+     * Check the conditional field value is not empty and matches the expected value.
+     */
+    public static Set<NewGTFSError> checkFieldNotEmptyAndMatchesValue(
+        Table table,
+        int lineNumber,
+        Field referenceField,
+        ConditionalRequirement check,
+        String referenceFieldValue,
+        String conditionalFieldValue,
+        String entityId
+    ) {
+        Set<NewGTFSError> errors = new HashSet<>();
+        if (
+            !POSTGRES_NULL_TEXT.equals(conditionalFieldValue) &&
+            conditionalFieldValue.equals(check.conditionalFieldValue) &&
+            POSTGRES_NULL_TEXT.equals(referenceFieldValue)
+        ) {
+            String message = String.format(
+                "%s is conditionally required when %s is provided and matches %s.",
+                referenceField.name,
+                check.conditionalFieldName,
+                check.conditionalFieldValue
+            );
+            errors.add(
+                NewGTFSError.forLine(
+                    table,
+                    lineNumber,
+                    CONDITIONALLY_REQUIRED,
+                    message).setEntityId(entityId)
+            );
+
         }
         return errors;
     }

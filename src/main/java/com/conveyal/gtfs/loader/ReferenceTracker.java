@@ -189,6 +189,32 @@ public class ReferenceTracker {
                             )
                         );
                         break;
+                    case FIELD_IS_EMPTY:
+                        errors.addAll(
+                            ConditionalRequirement.checkFieldIsEmpty(
+                                table,
+                                lineNumber,
+                                referenceField,
+                                check,
+                                referenceFieldValue,
+                                conditionalFieldValue,
+                                entityId
+                            )
+                        );
+                        break;
+                    case FIELD_NOT_EMPTY_AND_MATCHES_VALUE:
+                        errors.addAll(
+                            ConditionalRequirement.checkFieldNotEmptyAndMatchesValue(
+                                table,
+                                lineNumber,
+                                referenceField,
+                                check,
+                                referenceFieldValue,
+                                conditionalFieldValue,
+                                entityId
+                            )
+                        );
+                        break;
                 }
             }
         }
