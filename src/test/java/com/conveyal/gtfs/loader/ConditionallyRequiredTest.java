@@ -18,6 +18,7 @@ import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 public class ConditionallyRequiredTest {
     private static String testDBName;
@@ -65,21 +66,21 @@ public class ConditionallyRequiredTest {
     @ParameterizedTest
     @MethodSource("createZoneIdDependencies")
     public void stopTableMissingConditionallyRequiredZoneId(String entityType, String lineNumber, String entityId, String badValue) {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, entityType, lineNumber, entityId, badValue);
+        checkFeedHasOneError(REFERENTIAL_INTEGRITY, entityType, lineNumber, entityId, badValue);
     }
 
     private static Stream<Arguments> createZoneIdDependencies() {
         return Stream.of(
-            Arguments.of("FareRule", "3", "1", "zone_id 4 is conditionally required in stops when referenced by contains_id in fare_rules."),
-            Arguments.of("FareRule", "3", "1", "zone_id 3 is conditionally required in stops when referenced by destination_id in fare_rules."),
-            Arguments.of("FareRule", "3", "1", "zone_id 2 is conditionally required in stops when referenced by origin_id in fare_rules.")
+            Arguments.of("FareRule", "3", "1", "contains_id:zone_id:4"),
+            Arguments.of("FareRule", "3", "1", "destination_id:zone_id:3"),
+            Arguments.of("FareRule", "3", "1", "origin_id:zone_id:2")
         );
     }
 
 
     @Test
     public void agencyTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Agency","3", "agency_id is conditionally required when there is more than one agency.");
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Agency","2", null, "agency_id");
     }
 
     @Test
@@ -94,42 +95,27 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Route","2", "21","agency_id is conditionally required when there is more than one agency.");
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Route","2", "21", null);
     }
 
     @Test
     public void fareAttributeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "FareAttribute","2", "1","agency_id is conditionally required when there is more than one agency.");
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "FareAttribute","2", "1", null);
     }
 
     /**
      * Check that the test feed has exactly one error for the provided values.
      */
     private void checkFeedHasOneError(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
-        assertThatSqlCountQueryYieldsExpectedCount(
-            testDataSource,
-            String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s' and entity_id = '%s' and bad_value = '%s'",
-                testNamespace,
-                errorType,
-                entityType,
-                lineNumber,
-                entityId,
-                badValue),
-            1);
-    }
+        String sql = String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s'",
+            testNamespace,
+            errorType,
+            entityType,
+            lineNumber);
 
-    /**
-     * Check that the test feed has exactly one error for the provided values.
-     */
-    private void checkFeedHasOneError(NewGTFSErrorType errorType, String entityType, String lineNumber, String badValue) {
-        assertThatSqlCountQueryYieldsExpectedCount(
-            testDataSource,
-            String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s' and bad_value = '%s'",
-                testNamespace,
-                errorType,
-                entityType,
-                lineNumber,
-                badValue),
-            1);
+        if (entityId != null) sql += String.format(" and entity_id = '%s'", entityId);
+        if (badValue != null) sql += String.format(" and bad_value = '%s'", badValue);
+
+        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, sql,1);
     }
 }
