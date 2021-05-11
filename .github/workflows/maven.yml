@@ -48,10 +48,6 @@ jobs:
         key: maven-local-repo
     - name: Build with Maven
       run: mvn --no-transfer-progress package
-    - name: Codecov
-      # this first codecov run will upload a report associated with the commit set through CI environment variables
-      uses: codecov/codecov-action@v1.2.0
-      continue-on-error: true
     - name: Clear contents of the target directory
       # Avoids issues where maven-semantic-release attempts to upload
       # multiple versions/builds (and fails due to the pre-existence of the version on maven central).
@@ -71,7 +67,3 @@ jobs:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
        semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev --skip-maven-deploy
-       if [[ "$GITHUB_REF_SLUG" = "master" ]]; then
-         bash <(curl -s https://codecov.io/bash) -C "$(git rev-parse HEAD)"
-         bash <(curl -s https://codecov.io/bash) -C "$(git rev-parse HEAD^)"
-       fi
