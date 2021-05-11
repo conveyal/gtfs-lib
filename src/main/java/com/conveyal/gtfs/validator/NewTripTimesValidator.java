@@ -118,7 +118,7 @@ public class NewTripTimesValidator extends FeedValidator {
             fixMissingTimes(stopTime);
             if (missingEitherTime(stopTime)) {
                 //TODO: Is this even needed? Already covered by MISSING_ARRIVAL_OR_DEPARTURE.
-                registerError(stopTime, CONDITIONALLY_REQUIRED, "First and last stop times are conditionally required to have both an arrival and departure time.");
+                registerError(stopTime, CONDITIONALLY_REQUIRED, "First and last stop times are required to have both an arrival and departure time.");
                 return true;
             }
         }
@@ -185,7 +185,7 @@ public class NewTripTimesValidator extends FeedValidator {
             registerError(
                 trip,
                 CONDITIONALLY_REQUIRED,
-                "shape_id is conditionally required when a trip has continuous behavior defined."
+                "shape_id is required when a trip has continuous behavior defined."
             );
         }
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.

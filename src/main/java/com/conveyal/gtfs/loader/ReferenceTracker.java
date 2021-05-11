@@ -160,18 +160,22 @@ public class ReferenceTracker {
         // Work through each field that has been assigned a conditional requirement.
         for (Map.Entry<Field, ConditionalRequirement[]> entry : fieldsToCheck.entrySet()) {
             Field referenceField = entry.getKey();
-            ConditionalRequirement[] conditionalRequirements = entry.getValue();
             // Work through each field's conditional requirements.
-            for (ConditionalRequirement check : conditionalRequirements) {
+            for (ConditionalRequirement check : entry.getValue()) {
                 switch(check.referenceFieldCheck) {
                     case HAS_MULTIPLE_ROWS:
                         errors.addAll(
-                            ConditionalRequirement.checkHasMultipleRows(lineContext, uniqueValuesForFields, check)
+                            ConditionalRequirement.checkAgencyHasMultipleRows(lineContext, uniqueValuesForFields, check)
                         );
                         break;
                     case FIELD_NOT_EMPTY:
                         errors.addAll(
-                            ConditionalRequirement.checkFieldEmpty(lineContext, referenceField, uniqueValuesForFields, check)
+                            ConditionalRequirement.checkWhetherReferenceFieldShouldBeEmpty(
+                                lineContext,
+                                referenceField,
+                                uniqueValuesForFields,
+                                check
+                            )
                         );
                         break;
                     case FIELD_IN_RANGE:

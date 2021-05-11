@@ -7,13 +7,16 @@ package com.conveyal.gtfs.loader;
 public class LineContext {
     public final Table table;
     private final Field[] fields;
-    private final String[] rowData;
+    /**
+     * The row data has one extra value at the beginning of the array that represents the line number.
+     */
+    private final String[] rowDataWithLineNumber;
     public final int lineNumber;
 
-    public LineContext(Table table, Field[] fields, String[] rowData, int lineNumber) {
+    public LineContext(Table table, Field[] fields, String[] rowDataWithLineNumber, int lineNumber) {
         this.table = table;
         this.fields = fields;
-        this.rowData = rowData;
+        this.rowDataWithLineNumber = rowDataWithLineNumber;
         this.lineNumber = lineNumber;
     }
 
@@ -23,7 +26,7 @@ public class LineContext {
      * for batch insertion into a postgres table.
      */
     public String getValueForRow(int columnIndex) {
-        return rowData[columnIndex + 1];
+        return rowDataWithLineNumber[columnIndex + 1];
     }
 
     /**
@@ -31,7 +34,7 @@ public class LineContext {
      */
     public String getValueForRow(String fieldName) {
         int fieldIndex = Field.getFieldIndex(fields, fieldName);
-        return rowData[fieldIndex + 1];
+        return rowDataWithLineNumber[fieldIndex + 1];
     }
 
     /**

@@ -8,7 +8,6 @@ import com.conveyal.gtfs.validator.model.Priority;
  */
 public enum NewGTFSErrorType {
     // Standard errors.
-    AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS(Priority.HIGH, "For GTFS feeds with more than one agency, agency_id is required."),
     BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
     COLOR_FORMAT(Priority.MEDIUM, "A color should be specified with six-characters (three two-digit hexadecimal numbers)."),
     COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),
@@ -26,6 +25,7 @@ public enum NewGTFSErrorType {
     FEED_TRAVEL_TIMES_ROUNDED(Priority.LOW, "All travel times in the feed are rounded to the minute, which may cause unexpected results in routing applications where travel times are zero."),
     FLOATING_FORMAT(Priority.MEDIUM, "Incorrect floating point number format."),
     FREQUENCY_PERIOD_OVERLAP(Priority.MEDIUM, "A frequency for a trip overlaps with another frequency defined for the same trip."),
+    ID_REQUIRED_FOR_MULTI_FEEDS(Priority.HIGH, "For GTFS feeds with more than one row, the id is required."),
     ILLEGAL_FIELD_VALUE(Priority.MEDIUM, "Fields may not contain tabs, carriage returns or new lines."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),

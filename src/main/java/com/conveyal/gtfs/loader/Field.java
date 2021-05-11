@@ -141,7 +141,7 @@ public abstract class Field {
     }
 
     /**
-     * Fluent method to flag field as having foreign references. If flagged, the field value is added to
+     * Fluent method to mark a field as having foreign references. If flagged, the field value is added to
      * {@link ReferenceTracker#uniqueValuesForFields} to be used as a look-up for reference matches. Note: this is intended only for
      * special cases (e.g., zone_id) where the field being referenced does not exist as the primary key of a table.
      */
@@ -174,8 +174,8 @@ public abstract class Field {
     }
 
     /**
-     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument (i.e., it
-     * is a foreign reference).
+     * Fluent method that indicates that this field is a reference to an entry in the table provided as an argument
+     * (i.e. it is a foreign reference).
      * @param table
      * @return this same Field instance
      */
@@ -211,7 +211,7 @@ public abstract class Field {
     }
 
     /**
-     * Flag this field as conditionally required.  If needed an optional list of conditions can be provided.
+     * Mark this field as conditionally required. If needed an optional list of conditions can be provided.
      */
     public Field requireConditions(ConditionalRequirement...conditions) {
         this.isConditionallyRequired = true;

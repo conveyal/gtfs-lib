@@ -7,8 +7,8 @@ import java.util.HashSet;
 import java.util.NavigableSet;
 import java.util.Set;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.ID_REQUIRED_FOR_MULTI_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.HAS_MULTIPLE_ROWS;
@@ -23,7 +23,7 @@ public class ConditionalRequirement {
     private static final int FIRST_ROW = 2;
     private static final int SECOND_ROW = 3;
     /** The type of check to be performed on a reference field. A reference field value is used to determine which check
-     * (e.g., {@link #checkHasMultipleRows}) should be applied to the field. */
+     * (e.g., {@link #checkAgencyHasMultipleRows}) should be applied to the field. */
     public ConditionalCheckType referenceFieldCheck;
     /** The minimum reference field value if a range check is being performed. */
     public int minReferenceValue;
@@ -36,6 +36,8 @@ public class ConditionalRequirement {
     public String dependentFieldName;
     /** The expected dependent field value. */
     public String dependentFieldValue;
+    /** The reference table name required for checking foreign references. */
+    String referenceTableName;
 
     public ConditionalRequirement(
         int minReferenceValue,
@@ -43,8 +45,8 @@ public class ConditionalRequirement {
         String dependentFieldName,
         ConditionalCheckType dependentFieldCheck,
         ConditionalCheckType referenceFieldCheck,
-        String dependentFieldValue
-
+        String dependentFieldValue,
+        String referenceTableName
     ) {
         this.minReferenceValue = minReferenceValue;
         this.maxReferenceValue = maxReferenceValue;
@@ -52,13 +54,22 @@ public class ConditionalRequirement {
         this.dependentFieldCheck = dependentFieldCheck;
         this.referenceFieldCheck = referenceFieldCheck;
         this.dependentFieldValue = dependentFieldValue;
+        this.referenceTableName = referenceTableName;
     }
 
     public ConditionalRequirement(
         String dependentFieldName,
         ConditionalCheckType referenceFieldCheck
     ) {
-        this(0,0, dependentFieldName, null, referenceFieldCheck, null);
+        this(0, 0, dependentFieldName, null, referenceFieldCheck, null, null);
+    }
+
+    public ConditionalRequirement(
+        String dependentFieldName,
+        ConditionalCheckType referenceFieldCheck,
+        String referenceTableName
+    ) {
+        this(0, 0, dependentFieldName, null, referenceFieldCheck, null, referenceTableName);
     }
 
     public ConditionalRequirement(
@@ -69,7 +80,7 @@ public class ConditionalRequirement {
         ConditionalCheckType referenceFieldCheck
 
     ) {
-        this(minReferenceValue,maxReferenceValue, dependentFieldName, dependentFieldCheck, referenceFieldCheck, null);
+        this(minReferenceValue, maxReferenceValue, dependentFieldName, dependentFieldCheck, referenceFieldCheck, null, null);
     }
 
     public ConditionalRequirement(
@@ -77,7 +88,7 @@ public class ConditionalRequirement {
         ConditionalCheckType dependentFieldCheck,
         ConditionalCheckType referenceFieldCheck
     ) {
-        this(0,0, dependentFieldName, dependentFieldCheck, referenceFieldCheck, null);
+        this(0, 0, dependentFieldName, dependentFieldCheck, referenceFieldCheck, null, null);
     }
 
     public ConditionalRequirement(
@@ -85,14 +96,14 @@ public class ConditionalRequirement {
         String dependentFieldValue,
         ConditionalCheckType referenceFieldCheck
     ) {
-        this(0,0, dependentFieldName, null, referenceFieldCheck, dependentFieldValue);
+        this(0, 0, dependentFieldName, null, referenceFieldCheck, dependentFieldValue, null);
     }
 
 
     /**
      * Flag an error if there are multiple rows (designed for agency.txt) and the agency_id is missing for any rows.
      */
-    public static Set<NewGTFSError> checkHasMultipleRows(
+    public static Set<NewGTFSError> checkAgencyHasMultipleRows(
         LineContext lineContext,
         TreeMultimap<String, String> uniqueValuesForFields,
         ConditionalRequirement check
@@ -106,7 +117,7 @@ public class ConditionalRequirement {
         boolean secondRowMissingId = firstOrSecondMissingId && currentRowMissingId;
         if (firstOrSecondMissingId || (lineContext.lineNumber > SECOND_ROW && currentRowMissingId)) {
             // The check on the agency table is carried out whilst the agency table is being loaded so it
-            // is possible to compare the number of transitIds added against the number of rows loaded to
+            // is possible to compare the number of agencyIdValues added against the number of rows loaded to
             // accurately determine missing agency_id values.
             int lineNumber = secondRowMissingId
                 ? SECOND_ROW
@@ -117,7 +128,7 @@ public class ConditionalRequirement {
                 NewGTFSError.forLine(
                     lineContext.table,
                     lineNumber,
-                    AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
+                    ID_REQUIRED_FOR_MULTI_FEEDS,
                     check.dependentFieldName
                 )
             );
@@ -129,7 +140,7 @@ public class ConditionalRequirement {
      * Checks that the reference field is not empty when the dependent field/table has multiple rows. This is
      * principally designed for checking that routes#agency_id is filled when multiple agencies exist.
      */
-    public static Set<NewGTFSError> checkFieldEmpty(
+    public static Set<NewGTFSError> checkWhetherReferenceFieldShouldBeEmpty(
         LineContext lineContext,
         Field referenceField,
         TreeMultimap<String, String> uniqueValuesForFields,
@@ -146,7 +157,7 @@ public class ConditionalRequirement {
                 errors.add(
                     NewGTFSError.forLine(
                         lineContext,
-                        AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
+                        ID_REQUIRED_FOR_MULTI_FEEDS,
                         null
                     ).setEntityId(lineContext.getEntityId())
                 );
@@ -184,7 +195,7 @@ public class ConditionalRequirement {
         if (conditionallyRequiredValueIsEmpty) {
             // Reference value in range and conditionally required field is empty.
             String message = String.format(
-                "%s is conditionally required when %s value is between %d and %d.",
+                "%s is required when %s value is between %d and %d.",
                 check.dependentFieldName,
                 referenceField.name,
                 check.minReferenceValue,
@@ -203,7 +214,8 @@ public class ConditionalRequirement {
     /**
      * Check that an expected foreign field value matches a conditional field value. Selected foreign field values are
      * added to {@link ReferenceTracker#uniqueValuesForFields} as part of the load process and are used here to check
-     * conditional fields which have a dependency on them.
+     * conditional fields which have a dependency on them. e.g. stop#zone_id does not exist in stops table, but is
+     * required by fare_rules records (e.g. origin_id).
      */
     public static Set<NewGTFSError> checkForeignRefExists(
         LineContext lineContext,
@@ -220,11 +232,10 @@ public class ConditionalRequirement {
                 check.dependentFieldName,
                 referenceFieldValue
             );
-        if (lineContext.table.name.equals("fare_rules") &&
+        if (lineContext.table.name.equals(check.referenceTableName) &&
             !POSTGRES_NULL_TEXT.equals(referenceFieldValue) &&
             !uniqueValuesForFields.get(check.dependentFieldName).contains(foreignFieldReference)
         ) {
-            // stop#zone_id does not exist in stops table, but is required by fare_rules records (e.g., origin_id).
             errors.add(
                 NewGTFSError.forLine(
                     lineContext,
@@ -253,7 +264,7 @@ public class ConditionalRequirement {
         ) {
             // The reference field is required when the dependent field is empty.
             String message = String.format(
-                "%s is conditionally required when %s is empty.",
+                "%s is required when %s is empty.",
                 referenceField.name,
                 check.dependentFieldName
             );
@@ -285,10 +296,10 @@ public class ConditionalRequirement {
             POSTGRES_NULL_TEXT.equals(referenceFieldValue)
         ) {
             String message = String.format(
-                "%s is conditionally required when %s is provided and matches %s.",
+                "%s is required and must match %s when %s is provided.",
                 referenceField.name,
-                check.dependentFieldName,
-                check.dependentFieldValue
+                check.dependentFieldValue,
+                check.dependentFieldName
             );
             errors.add(
                 NewGTFSError.forLine(

@@ -16,8 +16,8 @@ import java.util.stream.Stream;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.ID_REQUIRED_FOR_MULTI_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 public class ConditionallyRequiredTest {
@@ -45,7 +45,7 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTimeTableMissingConditionallyRequiredArrivalDepartureTimes() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "StopTime","10", "1","First and last stop times are conditionally required to have both an arrival and departure time.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "StopTime","10", "1","First and last stop times are required to have both an arrival and departure time.");
     }
 
     @ParameterizedTest
@@ -56,10 +56,10 @@ public class ConditionallyRequiredTest {
 
     private static Stream<Arguments> createStopTableChecks() {
         return Stream.of(
-            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "2", "4957", "stop_name is conditionally required when location_type value is between 0 and 2."),
-            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "5", "1266", "parent_station is conditionally required when location_type value is between 2 and 4."),
-            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "3", "691", "stop_lat is conditionally required when location_type value is between 0 and 2."),
-            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "4", "692", "stop_lon is conditionally required when location_type value is between 0 and 2."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "2", "4957", "stop_name is required when location_type value is between 0 and 2."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "5", "1266", "parent_station is required when location_type value is between 2 and 4."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "3", "691", "stop_lat is required when location_type value is between 0 and 2."),
+            Arguments.of(CONDITIONALLY_REQUIRED, "Stop", "4", "692", "stop_lon is required when location_type value is between 0 and 2."),
             Arguments.of(REFERENTIAL_INTEGRITY, "FareRule", "3", "1", "contains_id:zone_id:4"),
             Arguments.of(REFERENTIAL_INTEGRITY, "FareRule", "3", "1", "destination_id:zone_id:3"),
             Arguments.of(REFERENTIAL_INTEGRITY, "FareRule", "3", "1", "origin_id:zone_id:2")
@@ -74,30 +74,30 @@ public class ConditionallyRequiredTest {
 
     private static Stream<Arguments> createTranslationTableChecks() {
         return Stream.of(
-            Arguments.of("Translation", "2", "stops", "record_id is conditionally required when field_value is empty."),
-            Arguments.of("Translation", "3", "stops", "field_value is conditionally required when record_id is empty."),
-            Arguments.of("Translation", "4", "stops", "record_sub_id is conditionally required when record_id is provided and matches stop_times.")
+            Arguments.of("Translation", "2", "stops", "record_id is required when field_value is empty."),
+            Arguments.of("Translation", "3", "stops", "field_value is required when record_id is empty."),
+            Arguments.of("Translation", "4", "stops", "record_sub_id is required and must match stop_times when record_id is provided.")
         );
     }
 
     @Test
     public void agencyTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Agency","2", null, "agency_id");
+        checkFeedHasOneError(ID_REQUIRED_FOR_MULTI_FEEDS, "Agency","2", null, "agency_id");
     }
 
     @Test
     public void tripTableMissingConditionallyRequiredShapeId() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Trip","2", "1","shape_id is conditionally required when a trip has continuous behavior defined.");
+        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Trip","2", "1","shape_id is required when a trip has continuous behavior defined.");
     }
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Route","2", "21", null);
+        checkFeedHasOneError(ID_REQUIRED_FOR_MULTI_FEEDS, "Route","2", "21", null);
     }
 
     @Test
     public void fareAttributeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "FareAttribute","2", "1", null);
+        checkFeedHasOneError(ID_REQUIRED_FOR_MULTI_FEEDS, "FareAttribute","2", "1", null);
     }
 
     /**

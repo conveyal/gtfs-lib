@@ -271,15 +271,15 @@ public class Table {
         new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
         new StringField("origin_id", OPTIONAL).requireConditions(
             // If the origin_id is defined, its value must exist as a zone_id in stops.txt.
-            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS)
+            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
         ),
         new StringField("destination_id", OPTIONAL).requireConditions(
             // If the destination_id is defined, its value must exist as a zone_id in stops.txt.
-            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS)
+            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
         ),
         new StringField("contains_id", OPTIONAL).requireConditions(
             // If the contains_id is defined, its value must exist as a zone_id in stops.txt.
-            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS)
+            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
         )
     )
     .withParentTable(FARE_ATTRIBUTES)
