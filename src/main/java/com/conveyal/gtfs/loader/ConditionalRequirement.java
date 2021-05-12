@@ -7,8 +7,8 @@ import java.util.HashSet;
 import java.util.NavigableSet;
 import java.util.Set;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.ID_REQUIRED_FOR_MULTI_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
 import static com.conveyal.gtfs.loader.ConditionalCheckType.HAS_MULTIPLE_ROWS;
@@ -128,7 +128,7 @@ public class ConditionalRequirement {
                 NewGTFSError.forLine(
                     lineContext.table,
                     lineNumber,
-                    ID_REQUIRED_FOR_MULTI_FEEDS,
+                    AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD,
                     check.dependentFieldName
                 )
             );
@@ -157,7 +157,7 @@ public class ConditionalRequirement {
                 errors.add(
                     NewGTFSError.forLine(
                         lineContext,
-                        ID_REQUIRED_FOR_MULTI_FEEDS,
+                        AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD,
                         null
                     ).setEntityId(lineContext.getEntityId())
                 );

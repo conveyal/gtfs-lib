@@ -17,8 +17,8 @@ import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.ID_REQUIRED_FOR_MULTI_FEEDS;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD;
 
 public class ConditionallyRequiredTest {
     private static String testDBName;
@@ -82,7 +82,7 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void agencyTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(ID_REQUIRED_FOR_MULTI_FEEDS, "Agency","2", null, "agency_id");
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, "Agency","2", null, "agency_id");
     }
 
     @Test
@@ -92,12 +92,12 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(ID_REQUIRED_FOR_MULTI_FEEDS, "Route","2", "21", null);
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, "Route","2", "21", null);
     }
 
     @Test
     public void fareAttributeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(ID_REQUIRED_FOR_MULTI_FEEDS, "FareAttribute","2", "1", null);
+        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_TABLES_WITH_MORE_THAN_ONE_RECORD, "FareAttribute","2", "1", null);
     }
 
     /**

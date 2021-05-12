@@ -160,8 +160,9 @@ public class ReferenceTracker {
         // Work through each field that has been assigned a conditional requirement.
         for (Map.Entry<Field, ConditionalRequirement[]> entry : fieldsToCheck.entrySet()) {
             Field referenceField = entry.getKey();
+            ConditionalRequirement[] conditionalRequirements = entry.getValue();
             // Work through each field's conditional requirements.
-            for (ConditionalRequirement check : entry.getValue()) {
+            for (ConditionalRequirement check : conditionalRequirements) {
                 switch(check.referenceFieldCheck) {
                     case HAS_MULTIPLE_ROWS:
                         errors.addAll(
