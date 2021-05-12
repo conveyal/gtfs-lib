@@ -101,7 +101,7 @@ public class ConditionalRequirement {
 
 
     /**
-     * Flag an error if there are multiple rows (designed for agency.txt) and the agency_id is missing for any rows.
+     * Flag an error if there are multiple rows in agency.txt and the agency_id is missing for any rows.
      */
     public static Set<NewGTFSError> checkAgencyHasMultipleRows(
         LineContext lineContext,
