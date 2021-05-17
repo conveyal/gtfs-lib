@@ -368,7 +368,7 @@ public class JdbcGtfsLoader {
         // When outputting text, accumulate transformed strings to allow skipping rows when errors are encountered.
         // One extra position in the array for the CSV line number.
         String[] transformedStrings = new String[cleanFields.length + 1];
-        boolean tableHasConditions = table.hasConditionalRequirements();
+        boolean tableHasConditionalRequirements = table.hasConditionalRequirements();
         // Iterate over each record and prepare the record for storage in the table either through batch insert
         // statements or postgres text copy operation.
         while (csvReader.readRecord()) {
@@ -436,7 +436,7 @@ public class JdbcGtfsLoader {
                 // Increment column index.
                 columnIndex += 1;
             }
-            if (tableHasConditions) {
+            if (tableHasConditionalRequirements) {
                 LineContext lineContext = new LineContext(table, fields, transformedStrings, lineNumber);
                 errorStorage.storeErrors(
                     referenceTracker.checkConditionallyRequiredFields(lineContext)

@@ -1,7 +1,8 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
-import com.google.common.collect.TreeMultimap;
+import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
+import com.google.common.collect.HashMultimap;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -23,7 +24,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
  */
 public class ReferenceTracker {
     public final Set<String> transitIds = new HashSet<>();
-    public final TreeMultimap<String, String> uniqueValuesForFields = TreeMultimap.create();
+    public final HashMultimap<String, String> uniqueValuesForFields = HashMultimap.create();
     public final Set<String> transitIdsWithSequence = new HashSet<>();
 
     /**
@@ -162,49 +163,10 @@ public class ReferenceTracker {
             Field referenceField = entry.getKey();
             ConditionalRequirement[] conditionalRequirements = entry.getValue();
             // Work through each field's conditional requirements.
-            for (ConditionalRequirement check : conditionalRequirements) {
-                switch(check.referenceFieldCheck) {
-                    case HAS_MULTIPLE_ROWS:
-                        errors.addAll(
-                            ConditionalRequirement.checkAgencyHasMultipleRows(lineContext, uniqueValuesForFields, check)
-                        );
-                        break;
-                    case FIELD_NOT_EMPTY:
-                        errors.addAll(
-                            ConditionalRequirement.checkWhetherReferenceFieldShouldBeEmpty(
-                                lineContext,
-                                referenceField,
-                                uniqueValuesForFields,
-                                check
-                            )
-                        );
-                        break;
-                    case FIELD_IN_RANGE:
-                        errors.addAll(
-                            ConditionalRequirement.checkFieldInRange(lineContext, referenceField, check)
-                        );
-                        break;
-                    case FOREIGN_REF_EXISTS:
-                        errors.addAll(
-                            ConditionalRequirement.checkForeignRefExists(
-                                lineContext,
-                                referenceField,
-                                check,
-                                uniqueValuesForFields
-                            )
-                        );
-                        break;
-                    case FIELD_IS_EMPTY:
-                        errors.addAll(
-                            ConditionalRequirement.checkFieldIsEmpty(lineContext, referenceField, check)
-                        );
-                        break;
-                    case FIELD_NOT_EMPTY_AND_MATCHES_VALUE:
-                        errors.addAll(
-                            ConditionalRequirement.checkFieldNotEmptyAndMatchesValue(lineContext, referenceField, check)
-                        );
-                        break;
-                }
+            for (ConditionalRequirement conditionalRequirement : conditionalRequirements) {
+                errors.addAll(
+                    conditionalRequirement.check(lineContext, referenceField, uniqueValuesForFields)
+                );
             }
         }
         return errors;

@@ -2,6 +2,13 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
+import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
+import com.conveyal.gtfs.loader.conditions.FieldInRangeCheck;
+import com.conveyal.gtfs.loader.conditions.FieldIsEmptyCheck;
+import com.conveyal.gtfs.loader.conditions.FieldNotEmptyAndMatchesValueCheck;
+import com.conveyal.gtfs.loader.conditions.ForeignRefExistsCheck;
+import com.conveyal.gtfs.loader.conditions.ReferenceFieldShouldBeProvidedCheck;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Attribution;
 import com.conveyal.gtfs.model.Calendar;
@@ -51,12 +58,12 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IN_RANGE;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_IS_EMPTY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FOREIGN_REF_EXISTS;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.HAS_MULTIPLE_ROWS;
-import static com.conveyal.gtfs.loader.ConditionalCheckType.FIELD_NOT_EMPTY_AND_MATCHES_VALUE;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_IN_RANGE;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_IS_EMPTY;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_NOT_EMPTY;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FOREIGN_REF_EXISTS;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.HAS_MULTIPLE_ROWS;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_NOT_EMPTY_AND_MATCHES_VALUE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -109,7 +116,7 @@ public class Table {
         new StringField("agency_id",  OPTIONAL).requireConditions(
             // If there is more than one agency, the agency_id must be provided
             // https://developers.google.com/transit/gtfs/reference#agencytxt
-            new ConditionalRequirement("agency_id", HAS_MULTIPLE_ROWS)
+            new AgencyHasMultipleRowsCheck("agency_id", HAS_MULTIPLE_ROWS)
         ).hasForeignReferences(),
         new StringField("agency_name", REQUIRED),
         new URLField("agency_url", REQUIRED),
@@ -162,7 +169,7 @@ public class Table {
         new StringField("agency_id", OPTIONAL).requireConditions(
             // If there is more than one agency, this agency_id is required.
             // https://developers.google.com/transit/gtfs/reference#fare_attributestxt
-            new ConditionalRequirement("agency_id", HAS_MULTIPLE_ROWS, FIELD_NOT_EMPTY)
+            new ReferenceFieldShouldBeProvidedCheck("agency_id", HAS_MULTIPLE_ROWS, FIELD_NOT_EMPTY)
         ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
@@ -172,7 +179,7 @@ public class Table {
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         // feed_id is not the first field because that would label it as the key field, which we do not want because the
-        // key field cannot be optional. feed_id is not part of the GTFS spec, but is required by OTP.
+        // key field cannot be optional. feed_id is not part of the GTFS spec, but is useful to OTP.
         new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
@@ -193,7 +200,7 @@ public class Table {
         new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
             // If there is more than one agency, this agency_id is required.
             // https://developers.google.com/transit/gtfs/reference#routestxt
-            new ConditionalRequirement("agency_id", HAS_MULTIPLE_ROWS, FIELD_NOT_EMPTY)
+            new ReferenceFieldShouldBeProvidedCheck("agency_id", HAS_MULTIPLE_ROWS, FIELD_NOT_EMPTY)
         ),
         new StringField("route_short_name", OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name", OPTIONAL),
@@ -250,12 +257,12 @@ public class Table {
         new StringField("zone_id", OPTIONAL).hasForeignReferences(),
         new URLField("stop_url", OPTIONAL),
         new ShortField("location_type", OPTIONAL, 4).requireConditions(
-            // If the location type is defined and within range, the conditional fields are required.
+            // If the location type is defined and within range, the dependent fields are required.
             // https://developers.google.com/transit/gtfs/reference#stopstxt
-            new ConditionalRequirement(0, 2, "stop_name", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
-            new ConditionalRequirement(0, 2, "stop_lat", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
-            new ConditionalRequirement(0, 2, "stop_lon", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
-            new ConditionalRequirement(2, 4, "parent_station", FIELD_NOT_EMPTY, FIELD_IN_RANGE)
+            new FieldInRangeCheck(0, 2, "stop_name", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new FieldInRangeCheck(0, 2, "stop_lat", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new FieldInRangeCheck(0, 2, "stop_lon", FIELD_NOT_EMPTY, FIELD_IN_RANGE),
+            new FieldInRangeCheck(2, 4, "parent_station", FIELD_NOT_EMPTY, FIELD_IN_RANGE)
         ),
         new StringField("parent_station", OPTIONAL).requireConditions(),
         new StringField("stop_timezone", OPTIONAL),
@@ -271,15 +278,15 @@ public class Table {
         new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
         new StringField("origin_id", OPTIONAL).requireConditions(
             // If the origin_id is defined, its value must exist as a zone_id in stops.txt.
-            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
+            new ForeignRefExistsCheck("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
         ),
         new StringField("destination_id", OPTIONAL).requireConditions(
             // If the destination_id is defined, its value must exist as a zone_id in stops.txt.
-            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
+            new ForeignRefExistsCheck("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
         ),
         new StringField("contains_id", OPTIONAL).requireConditions(
             // If the contains_id is defined, its value must exist as a zone_id in stops.txt.
-            new ConditionalRequirement("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
+            new ForeignRefExistsCheck("zone_id", FOREIGN_REF_EXISTS, "fare_rules")
         )
     )
     .withParentTable(FARE_ATTRIBUTES)
@@ -367,11 +374,11 @@ public class Table {
             new StringField("translation", REQUIRED),
             new StringField("record_id", OPTIONAL).requireConditions(
                 // If the field_value is empty the record_id is required.
-                new ConditionalRequirement("field_value", FIELD_IS_EMPTY)
+                new FieldIsEmptyCheck("field_value", FIELD_IS_EMPTY)
             ),
             new StringField("record_sub_id", OPTIONAL).requireConditions(
                 // If the record_id is not empty and the value is stop_times the record_sub_id is required.
-                new ConditionalRequirement(
+                new FieldNotEmptyAndMatchesValueCheck(
                     "record_id",
                     "stop_times",
                     FIELD_NOT_EMPTY_AND_MATCHES_VALUE
@@ -379,7 +386,7 @@ public class Table {
             ),
             new StringField("field_value", OPTIONAL).requireConditions(
                 // If the record_id is empty the field_value is required.
-                new ConditionalRequirement("record_id", FIELD_IS_EMPTY)
+                new FieldIsEmptyCheck("record_id", FIELD_IS_EMPTY)
             ))
             .keyFieldIsNotUnique();
 

@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.loader;
+package com.conveyal.gtfs.loader.conditions;
 
 /**
  * These are the conditionally required checks to be carried out inline with the values provided in

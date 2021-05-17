@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
 import com.google.common.collect.ImmutableSet;
 
 import java.sql.PreparedStatement;
