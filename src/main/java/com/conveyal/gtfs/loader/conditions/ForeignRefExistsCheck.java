@@ -16,14 +16,11 @@ import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
  * Conditional requirement to check that an expected foreign field value matches a conditional field value.
  */
 public class ForeignRefExistsCheck extends ConditionalRequirement {
+    /** The reference table name. */
+    private String referenceTableName;
 
-    public ForeignRefExistsCheck(
-        String dependentFieldName,
-        ConditionalCheckType referenceFieldCheck,
-        String referenceTableName
-    ) {
+    public ForeignRefExistsCheck(String dependentFieldName, String referenceTableName) {
         this.dependentFieldName = dependentFieldName;
-        this.referenceFieldCheck = referenceFieldCheck;
         this.referenceTableName = referenceTableName;
     }
 

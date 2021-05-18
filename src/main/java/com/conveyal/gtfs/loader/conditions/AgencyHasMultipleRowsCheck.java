@@ -10,6 +10,7 @@ import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
+import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.HAS_MULTIPLE_ROWS;
 
 /**
  * Conditional requirement to check that an agency_id has been provided if more than one row exists in agency.txt.
@@ -19,12 +20,9 @@ public class AgencyHasMultipleRowsCheck extends ConditionalRequirement {
     private final int FIRST_ROW = 2;
     private final int SECOND_ROW = 3;
 
-    public AgencyHasMultipleRowsCheck(
-        String dependentFieldName,
-        ConditionalCheckType dependentFieldCheck
-    ) {
-        this.dependentFieldName = dependentFieldName;
-        this.dependentFieldCheck = dependentFieldCheck;
+    public AgencyHasMultipleRowsCheck() {
+        this.dependentFieldName = "agency_id";
+        this.dependentFieldCheck = HAS_MULTIPLE_ROWS;
     }
 
     /**
