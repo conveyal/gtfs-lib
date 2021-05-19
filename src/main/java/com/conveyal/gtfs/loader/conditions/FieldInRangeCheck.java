@@ -17,19 +17,21 @@ import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_NOT
  * value has not be defined.
  */
 public class FieldInRangeCheck extends ConditionalRequirement {
+    /** The minimum reference field value if a range check is being performed. */
+    protected int minReferenceValue;
+    /** The maximum reference field value if a range check is being performed. */
+    protected int maxReferenceValue;
 
     public FieldInRangeCheck(
         int minReferenceValue,
         int maxReferenceValue,
         String dependentFieldName,
-        ConditionalCheckType dependentFieldCheck,
-        ConditionalCheckType referenceFieldCheck
+        ConditionalCheckType dependentFieldCheck
     ) {
         this.minReferenceValue = minReferenceValue;
         this.maxReferenceValue = maxReferenceValue;
         this.dependentFieldName = dependentFieldName;
         this.dependentFieldCheck = dependentFieldCheck;
-        this.referenceFieldCheck = referenceFieldCheck;
     }
 
     /**

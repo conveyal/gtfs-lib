@@ -16,13 +16,8 @@ import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
  */
 public class FieldIsEmptyCheck extends ConditionalRequirement {
 
-    public FieldIsEmptyCheck(
-        String dependentFieldName,
-        ConditionalCheckType referenceFieldCheck
-
-    ) {
+    public FieldIsEmptyCheck(String dependentFieldName) {
         this.dependentFieldName = dependentFieldName;
-        this.referenceFieldCheck = referenceFieldCheck;
     }
 
     /**

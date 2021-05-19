@@ -15,15 +15,15 @@ import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
  * Conditional requirement to check that a dependent field value is not empty and matches an expected value.
  */
 public class FieldNotEmptyAndMatchesValueCheck extends ConditionalRequirement {
+    /** The expected dependent field value. */
+    private String requiredDependentFieldValue;
 
     public FieldNotEmptyAndMatchesValueCheck(
         String dependentFieldName,
-        String dependentFieldValue,
-        ConditionalCheckType referenceFieldCheck
+        String requiredDependentFieldValue
     ) {
         this.dependentFieldName = dependentFieldName;
-        this.dependentFieldValue = dependentFieldValue;
-        this.referenceFieldCheck = referenceFieldCheck;
+        this.requiredDependentFieldValue = requiredDependentFieldValue;
     }
 
     /**
@@ -39,13 +39,13 @@ public class FieldNotEmptyAndMatchesValueCheck extends ConditionalRequirement {
         String referenceFieldValue = lineContext.getValueForRow(referenceField.name);
         if (
             !POSTGRES_NULL_TEXT.equals(dependentFieldValue) &&
-                dependentFieldValue.equals(dependentFieldValue) &&
+                dependentFieldValue.equals(requiredDependentFieldValue) &&
                 POSTGRES_NULL_TEXT.equals(referenceFieldValue)
         ) {
             String message = String.format(
                 "%s is required and must match %s when %s is provided.",
                 referenceField.name,
-                dependentFieldValue,
+                requiredDependentFieldValue,
                 dependentFieldName
             );
             errors.add(

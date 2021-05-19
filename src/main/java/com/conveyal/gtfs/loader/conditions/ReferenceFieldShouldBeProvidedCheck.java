@@ -20,12 +20,10 @@ public class ReferenceFieldShouldBeProvidedCheck extends ConditionalRequirement 
 
     public ReferenceFieldShouldBeProvidedCheck(
         String dependentFieldName,
-        ConditionalCheckType dependentFieldCheck,
-        ConditionalCheckType referenceFieldCheck
+        ConditionalCheckType dependentFieldCheck
     ) {
         this.dependentFieldName = dependentFieldName;
         this.dependentFieldCheck = dependentFieldCheck;
-        this.referenceFieldCheck = referenceFieldCheck;
     }
 
     /**
