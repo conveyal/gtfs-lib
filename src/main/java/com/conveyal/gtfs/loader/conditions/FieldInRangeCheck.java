@@ -10,7 +10,6 @@ import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_NOT_EMPTY;
 
 /**
  * Conditional requirement to check that a reference field value is within a defined range and the conditional field
@@ -25,13 +24,11 @@ public class FieldInRangeCheck extends ConditionalRequirement {
     public FieldInRangeCheck(
         int minReferenceValue,
         int maxReferenceValue,
-        String dependentFieldName,
-        ConditionalCheckType dependentFieldCheck
+        String dependentFieldName
     ) {
         this.minReferenceValue = minReferenceValue;
         this.maxReferenceValue = maxReferenceValue;
         this.dependentFieldName = dependentFieldName;
-        this.dependentFieldCheck = dependentFieldCheck;
     }
 
     /**
@@ -56,11 +53,8 @@ public class FieldInRangeCheck extends ConditionalRequirement {
             // value for (e.g.) an empty value. Continue to the next check.
             return errors;
         }
-        boolean conditionallyRequiredValueIsEmpty =
-            dependentFieldCheck == FIELD_NOT_EMPTY &&
-                POSTGRES_NULL_TEXT.equals(conditionalFieldValue);
 
-        if (conditionallyRequiredValueIsEmpty) {
+        if (POSTGRES_NULL_TEXT.equals(conditionalFieldValue)) {
             // Reference value in range and conditionally required field is empty.
             String message = String.format(
                 "%s is required when %s value is between %d and %d.",

@@ -58,12 +58,6 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_IN_RANGE;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_IS_EMPTY;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_NOT_EMPTY;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FOREIGN_REF_EXISTS;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.HAS_MULTIPLE_ROWS;
-import static com.conveyal.gtfs.loader.conditions.ConditionalCheckType.FIELD_NOT_EMPTY_AND_MATCHES_VALUE;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
 import static com.conveyal.gtfs.loader.Requirement.EXTENSION;
@@ -169,7 +163,7 @@ public class Table {
         new StringField("agency_id", OPTIONAL).requireConditions(
             // If there is more than one agency, this agency_id is required.
             // https://developers.google.com/transit/gtfs/reference#fare_attributestxt
-            new ReferenceFieldShouldBeProvidedCheck("agency_id", HAS_MULTIPLE_ROWS)
+            new ReferenceFieldShouldBeProvidedCheck("agency_id")
         ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
@@ -200,7 +194,7 @@ public class Table {
         new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
             // If there is more than one agency, this agency_id is required.
             // https://developers.google.com/transit/gtfs/reference#routestxt
-            new ReferenceFieldShouldBeProvidedCheck("agency_id", HAS_MULTIPLE_ROWS)
+            new ReferenceFieldShouldBeProvidedCheck("agency_id")
         ),
         new StringField("route_short_name", OPTIONAL), // one of short or long must be provided
         new StringField("route_long_name", OPTIONAL),
@@ -250,20 +244,24 @@ public class Table {
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id", REQUIRED),
         new StringField("stop_code", OPTIONAL),
+        // The actual conditions that will be acted upon are within the location_type field.
         new StringField("stop_name", OPTIONAL).requireConditions(),
         new StringField("stop_desc", OPTIONAL),
+        // The actual conditions that will be acted upon are within the location_type field.
         new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).requireConditions(),
+        // The actual conditions that will be acted upon are within the location_type field.
         new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).requireConditions(),
         new StringField("zone_id", OPTIONAL).hasForeignReferences(),
         new URLField("stop_url", OPTIONAL),
         new ShortField("location_type", OPTIONAL, 4).requireConditions(
             // If the location type is defined and within range, the dependent fields are required.
             // https://developers.google.com/transit/gtfs/reference#stopstxt
-            new FieldInRangeCheck(0, 2, "stop_name", FIELD_NOT_EMPTY),
-            new FieldInRangeCheck(0, 2, "stop_lat", FIELD_NOT_EMPTY),
-            new FieldInRangeCheck(0, 2, "stop_lon", FIELD_NOT_EMPTY),
-            new FieldInRangeCheck(2, 4, "parent_station", FIELD_NOT_EMPTY)
+            new FieldInRangeCheck(0, 2, "stop_name"),
+            new FieldInRangeCheck(0, 2, "stop_lat"),
+            new FieldInRangeCheck(0, 2, "stop_lon"),
+            new FieldInRangeCheck(2, 4, "parent_station")
         ),
+        // The actual conditions that will be acted upon are within the location_type field.
         new StringField("parent_station", OPTIONAL).requireConditions(),
         new StringField("stop_timezone", OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 2),
