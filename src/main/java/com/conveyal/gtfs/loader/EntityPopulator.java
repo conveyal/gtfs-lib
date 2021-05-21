@@ -64,6 +64,8 @@ public interface EntityPopulator<T> {
         patternStop.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
         patternStop.timepoint = getIntIfPresent(result, "timepoint", columnForName);
         patternStop.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
+        patternStop.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
+        patternStop.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
         return patternStop;
     };
 

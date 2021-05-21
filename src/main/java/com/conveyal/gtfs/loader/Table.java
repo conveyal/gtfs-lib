@@ -301,7 +301,9 @@ public class Table {
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
             new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, -1),
-            new ShortField("timepoint", EDITOR, 1)
+            new ShortField("timepoint", EDITOR, 1),
+            new ShortField("continuous_pickup", OPTIONAL,3),
+            new ShortField("continuous_drop_off", OPTIONAL,3)
     ).withParentTable(PATTERNS);
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,

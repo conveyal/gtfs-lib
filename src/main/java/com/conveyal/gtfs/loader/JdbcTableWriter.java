@@ -1146,6 +1146,8 @@ public class JdbcTableWriter implements TableWriter {
             stopTime.pickup_type = patternStop.pickup_type;
             stopTime.timepoint = patternStop.timepoint;
             stopTime.shape_dist_traveled = patternStop.shape_dist_traveled;
+            stopTime.continuous_drop_off = patternStop.continuous_drop_off;
+            stopTime.continuous_pickup = patternStop.continuous_pickup;
             stopTime.stop_sequence = i;
             // Update stop time with each trip ID and add to batch.
             for (String tripId : tripIds) {

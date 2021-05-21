@@ -32,7 +32,9 @@ public class ConditionallyRequiredTest {
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         // load feed into db
-        String zipFileName = TestUtils.zipFolderFiles("real-world-gtfs-feeds/VTA-gtfs-conditionally-required-checks", true);
+        String zipFileName = TestUtils.zipFolderFiles(
+            "real-world-gtfs-feeds/VTA-gtfs-conditionally-required-checks",
+            true);
         FeedLoadResult feedLoadResult = load(zipFileName, testDataSource);
         testNamespace = feedLoadResult.uniqueIdentifier;
         validate(testNamespace, testDataSource);
@@ -45,12 +47,24 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void stopTimeTableMissingConditionallyRequiredArrivalDepartureTimes() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "StopTime","10", "1","First and last stop times are required to have both an arrival and departure time.");
+        checkFeedHasOneError(
+            CONDITIONALLY_REQUIRED,
+            "StopTime",
+            "10",
+            "1",
+            "First and last stop times are required to have both an arrival and departure time."
+        );
     }
 
     @ParameterizedTest
     @MethodSource("createStopTableChecks")
-    public void stopTableConditionallyRequiredTests(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
+    public void stopTableConditionallyRequiredTests(
+        NewGTFSErrorType errorType,
+        String entityType,
+        String lineNumber,
+        String entityId,
+        String badValue
+    ) {
         checkFeedHasOneError(errorType, entityType, lineNumber, entityId, badValue);
     }
 
@@ -68,7 +82,12 @@ public class ConditionallyRequiredTest {
 
     @ParameterizedTest
     @MethodSource("createTranslationTableChecks")
-    public void translationTableConditionallyRequiredTests(String entityType, String lineNumber, String entityId, String badValue) {
+    public void translationTableConditionallyRequiredTests(
+        String entityType,
+        String lineNumber,
+        String entityId,
+        String badValue
+    ) {
         checkFeedHasOneError(CONDITIONALLY_REQUIRED, entityType, lineNumber, entityId, badValue);
     }
 
@@ -82,22 +101,45 @@ public class ConditionallyRequiredTest {
 
     @Test
     public void agencyTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Agency","2", null, "agency_id");
+        checkFeedHasOneError(
+            AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
+            "Agency",
+            "2",
+            null,
+            "agency_id");
     }
 
     @Test
     public void tripTableMissingConditionallyRequiredShapeId() {
-        checkFeedHasOneError(CONDITIONALLY_REQUIRED, "Trip","2", "1","shape_id is required when a trip has continuous behavior defined.");
+        checkFeedHasOneError(
+            CONDITIONALLY_REQUIRED,
+            "Trip",
+            "2",
+            "1",
+            "shape_id is required when a trip has continuous behavior defined."
+        );
     }
 
     @Test
     public void routeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "Route","2", "21", null);
+        checkFeedHasOneError(
+            AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
+            "Route",
+            "2",
+            "21",
+            null
+        );
     }
 
     @Test
     public void fareAttributeTableMissingConditionallyRequiredAgencyId() {
-        checkFeedHasOneError(AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS, "FareAttribute","2", "1", null);
+        checkFeedHasOneError(
+            AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
+            "FareAttribute",
+            "2",
+            "1",
+            null
+        );
     }
 
     /**
