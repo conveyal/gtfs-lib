@@ -173,7 +173,7 @@ public class Table {
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         // feed_id is not the first field because that would label it as the key field, which we do not want because the
-        // key field cannot be optional. feed_id is not part of the GTFS spec, but is useful to OTP.
+        // key field cannot be optional. feed_id is not part of the GTFS spec, but is required by OTP to associate static GTFS with GTFS-rt feeds.
         new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),

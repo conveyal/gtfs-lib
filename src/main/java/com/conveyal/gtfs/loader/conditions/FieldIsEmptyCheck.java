@@ -12,7 +12,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
 
 /**
- * Conditional requirement to check that if a dependent field value is empty the reference field value is provided.
+ * Conditional requirement to check that if a dependent field value is empty then the reference field value is provided.
  */
 public class FieldIsEmptyCheck extends ConditionalRequirement {
 
@@ -21,7 +21,7 @@ public class FieldIsEmptyCheck extends ConditionalRequirement {
     }
 
     /**
-     * Check the dependent field value, if it is empty the reference field value must be provided.
+     * Check the dependent field value. If it is empty, the reference field value must be provided.
      */
     public Set<NewGTFSError> check(
         LineContext lineContext,
