@@ -21,7 +21,7 @@ public class FieldIsEmptyCheck extends ConditionalRequirement {
     }
 
     /**
-     * Check the dependent field value, if it is empty the reference field value must be provided.
+     * Check the dependent field value. If it is empty, the reference field value must be provided.
      */
     public Set<NewGTFSError> check(
         LineContext lineContext,
