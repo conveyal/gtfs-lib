@@ -144,9 +144,12 @@ public class GraphQLGtfsSchema {
             .description("A GTFS feed_info object")
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("feed_id"))
+            .field(MapFetcher.field("feed_contact_email"))
+            .field(MapFetcher.field("feed_contact_url"))
             .field(MapFetcher.field("feed_publisher_name"))
             .field(MapFetcher.field("feed_publisher_url"))
             .field(MapFetcher.field("feed_lang"))
+            .field(MapFetcher.field("default_lang"))
             .field(MapFetcher.field("feed_start_date"))
             .field(MapFetcher.field("feed_end_date"))
             .field(MapFetcher.field("feed_version"))
@@ -257,7 +260,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("timepoint", GraphQLInt))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
-            // Editor-specific fields
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .build();
 
@@ -272,7 +276,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("route_desc"))
             .field(MapFetcher.field("route_url"))
             .field(MapFetcher.field("route_branding_url"))
-            // TODO route_type as enum or int
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("route_type", GraphQLInt))
             .field(MapFetcher.field("route_color"))
             .field(MapFetcher.field("route_text_color"))
@@ -341,6 +346,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("stop_url"))
             .field(MapFetcher.field("stop_timezone"))
             .field(MapFetcher.field("parent_station"))
+            .field(MapFetcher.field("platform_code"))
             .field(MapFetcher.field("location_type", GraphQLInt))
             .field(MapFetcher.field("wheelchair_boarding", GraphQLInt))
             // Returns all stops that reference parent stop's stop_id
@@ -403,6 +409,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
             // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
