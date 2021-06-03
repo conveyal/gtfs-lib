@@ -20,9 +20,12 @@ gtfs-lib can be used as a Java library or run via the command line.  If using th
 
 ### Library (maven)
 
+**Note:** gtfs-lib builds are hosted on [jitpack](https://jitpack.io/#conveyal/gtfs-lib). 
+
+[Release versions](https://github.com/conveyal/gtfs-lib/releases) are available by default. Branch- or commit-specific snapshot builds can be triggered by clicking `Get` for the build of your choice on jitpack's website. 
 ```xml
 <dependency>
-  <groupId>com.conveyal</groupId>
+  <groupId>com.github.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
   <version>${choose-a-version}</version>
 </dependency>
