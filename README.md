@@ -19,10 +19,7 @@ A gtfs-lib GTFSFeed object should faithfully represent the contents of a single 
 gtfs-lib can be used as a Java library or run via the command line.  If using this library with PostgreSQL for persistence, you must use at least version 9.6 of PostgreSQL.
 
 ### Library (maven)
-
-**Note:** gtfs-lib builds are hosted on [jitpack](https://jitpack.io/#conveyal/gtfs-lib). 
-
-[Release versions](https://github.com/conveyal/gtfs-lib/releases) are available by default. Branch- or commit-specific snapshot builds can be triggered by clicking `Get` for the build of your choice on jitpack's website. 
+Include gtfs-lib as a library in your project with the following dependency in your `pom.xml`.
 ```xml
 <dependency>
   <groupId>com.github.conveyal</groupId>
@@ -30,6 +27,14 @@ gtfs-lib can be used as a Java library or run via the command line.  If using th
   <version>${choose-a-version}</version>
 </dependency>
 ```
+
+#### Jitpack
+
+gtfs-lib builds are hosted on [jitpack](https://jitpack.io/#conveyal/gtfs-lib). 
+
+[Release versions](https://github.com/conveyal/gtfs-lib/releases) are available by default.
+
+Branch- (e.g. `dev-SNAPSHOT`) or commit-specific (using a 10 character commit ID like `a04294e420`) snapshot builds can be triggered by clicking `Get` for the build of your choice on jitpack's website or visiting https://jitpack.io/#conveyal/gtfs-lib/YOUR_VERSION.
 
 ### Command line
 
