@@ -280,7 +280,7 @@ public class GraphQLGtfsSchema {
         .field(MapFetcher.field("attribution_phone"))
         .build();
 
-    // Represents rows from attributions.txt
+    // Represents rows from translations.txt
     public static final GraphQLObjectType translationsType = newObject().name("translations")
         .field(MapFetcher.field("table_name"))
         .field(MapFetcher.field("field_name"))
