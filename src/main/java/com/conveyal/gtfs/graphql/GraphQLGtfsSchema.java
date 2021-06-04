@@ -265,6 +265,32 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .build();
 
+    // Represents rows from attributions.txt
+    public static final GraphQLObjectType attributionsType = newObject().name("attributions")
+        .field(MapFetcher.field("attribution_id"))
+        .field(MapFetcher.field("agency_id"))
+        .field(MapFetcher.field("route_id"))
+        .field(MapFetcher.field("trip_id"))
+        .field(MapFetcher.field("organization_name"))
+        .field(MapFetcher.field("is_producer", GraphQLInt))
+        .field(MapFetcher.field("is_operator", GraphQLInt))
+        .field(MapFetcher.field("is_authority", GraphQLInt))
+        .field(MapFetcher.field("attribution_url"))
+        .field(MapFetcher.field("attribution_email"))
+        .field(MapFetcher.field("attribution_phone"))
+        .build();
+
+    // Represents rows from attributions.txt
+    public static final GraphQLObjectType translationsType = newObject().name("translations")
+        .field(MapFetcher.field("table_name"))
+        .field(MapFetcher.field("field_name"))
+        .field(MapFetcher.field("language"))
+        .field(MapFetcher.field("translation"))
+        .field(MapFetcher.field("record_id"))
+        .field(MapFetcher.field("record_sub_id"))
+        .field(MapFetcher.field("field_value"))
+        .build();
+
     // Represents rows from routes.txt
     public static final GraphQLObjectType routeType = newObject().name("route")
             .description("A line from a GTFS routes.txt table")
@@ -770,6 +796,26 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("services"))
                     .build()
+            )
+            .field(newFieldDefinition()
+                .name("attributions")
+                .type(new GraphQLList(GraphQLGtfsSchema.attributionsType))
+                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .dataFetcher(new JDBCFetcher("attributions"))
+                .build()
+            )
+            .field(newFieldDefinition()
+                .name("translations")
+                .type(new GraphQLList(GraphQLGtfsSchema.translationsType))
+                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .dataFetcher(new JDBCFetcher("translations"))
+                .build()
             )
             .build();
 
