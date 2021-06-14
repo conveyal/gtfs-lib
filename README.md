@@ -22,6 +22,7 @@ gtfs-lib can be used as a Java library or run via the command line.  If using th
 Include gtfs-lib as a library in your project with the following dependency in your `pom.xml`.
 ```xml
 <dependency>
+  <!-- Note: to use a local version development version, the groupId should be changed to com.conveyal -->
   <groupId>com.github.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
   <version>${choose-a-version}</version>
