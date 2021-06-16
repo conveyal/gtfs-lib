@@ -33,7 +33,7 @@ public class FieldIsEmptyCheck extends ConditionalRequirement {
         String referenceFieldValue = lineContext.getValueForRow(referenceField.name);
         if (
             POSTGRES_NULL_TEXT.equals(dependentFieldValue) &&
-                POSTGRES_NULL_TEXT.equals(referenceFieldValue)
+            POSTGRES_NULL_TEXT.equals(referenceFieldValue)
         ) {
             // The reference field is required when the dependent field is empty.
             String message = String.format(

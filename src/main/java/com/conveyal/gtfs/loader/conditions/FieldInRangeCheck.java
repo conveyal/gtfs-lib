@@ -32,7 +32,7 @@ public class FieldInRangeCheck extends ConditionalRequirement {
     }
 
     /**
-     * If the reference field value is within a defined range and the conditional field value has not be defined, flag
+     * If the reference field value is within a defined range and the conditional field value has not been defined, flag
      * an error.
      */
     public Set<NewGTFSError> check(

@@ -13,7 +13,8 @@ import java.util.Set;
  */
 public abstract class ConditionalRequirement {
     /** The name of the dependent field, which is a field that requires a specific value if the reference and
-     * (in some cases) dependent field checks meet certain conditions.*/
+     * (in some cases) dependent field checks meet certain conditions.
+     */
     protected String dependentFieldName;
 
     /**
