@@ -9,6 +9,7 @@ import java.io.Serializable;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Objects;
 
 /**
  * Represents a GTFS StopTime. Note that once created and saved in a feed, stop times are by convention immutable
@@ -148,5 +149,38 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        StopTime stopTime = (StopTime) o;
+        return arrival_time == stopTime.arrival_time &&
+            departure_time == stopTime.departure_time &&
+            stop_sequence == stopTime.stop_sequence &&
+            pickup_type == stopTime.pickup_type &&
+            drop_off_type == stopTime.drop_off_type &&
+            Double.compare(stopTime.shape_dist_traveled, shape_dist_traveled) == 0 &&
+            timepoint == stopTime.timepoint &&
+            Objects.equals(trip_id, stopTime.trip_id) &&
+            Objects.equals(stop_id, stopTime.stop_id) &&
+            Objects.equals(stop_headsign, stopTime.stop_headsign);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+            trip_id,
+            arrival_time,
+            departure_time,
+            stop_id,
+            stop_sequence,
+            stop_headsign,
+            pickup_type,
+            drop_off_type,
+            shape_dist_traveled,
+            timepoint
+        );
     }
 }
