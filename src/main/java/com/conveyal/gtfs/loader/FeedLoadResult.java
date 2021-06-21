@@ -34,6 +34,8 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult stopTimes;
     public TableLoadResult transfers;
     public TableLoadResult trips;
+    public TableLoadResult translations;
+    public TableLoadResult attributions;
 
     public long loadTimeMillis;
     public long completionTime;
@@ -59,5 +61,7 @@ public class FeedLoadResult implements Serializable {
         stopTimes = new TableLoadResult();
         transfers = new TableLoadResult();
         trips = new TableLoadResult();
+        translations = new TableLoadResult();
+        attributions = new TableLoadResult();
     }
 }

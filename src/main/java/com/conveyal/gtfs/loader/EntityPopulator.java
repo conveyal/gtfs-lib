@@ -64,6 +64,8 @@ public interface EntityPopulator<T> {
         patternStop.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
         patternStop.timepoint = getIntIfPresent(result, "timepoint", columnForName);
         patternStop.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
+        patternStop.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
+        patternStop.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
         return patternStop;
     };
 
@@ -139,17 +141,19 @@ public interface EntityPopulator<T> {
     };
 
     EntityPopulator<Route> ROUTE = (result, columnForName) -> {
-        Route route              = new Route();
-        route.route_id           = getStringIfPresent(result, "route_id",           columnForName);
-        route.agency_id          = getStringIfPresent(result, "agency_id",          columnForName);
-        route.route_short_name   = getStringIfPresent(result, "route_short_name",   columnForName);
-        route.route_long_name    = getStringIfPresent(result, "route_long_name",    columnForName);
-        route.route_desc         = getStringIfPresent(result, "route_desc",         columnForName);
-        route.route_type         = getIntIfPresent   (result, "route_type",         columnForName);
-        route.route_color        = getStringIfPresent(result, "route_color",        columnForName);
-        route.route_text_color   = getStringIfPresent(result, "route_text_color",   columnForName);
-        route.route_url          = getUrlIfPresent   (result, "route_url",          columnForName);
-        route.route_branding_url = getUrlIfPresent   (result, "route_branding_url", columnForName);
+        Route route               = new Route();
+        route.route_id            = getStringIfPresent(result, "route_id",            columnForName);
+        route.agency_id           = getStringIfPresent(result, "agency_id",           columnForName);
+        route.route_short_name    = getStringIfPresent(result, "route_short_name",    columnForName);
+        route.route_long_name     = getStringIfPresent(result, "route_long_name",     columnForName);
+        route.route_desc          = getStringIfPresent(result, "route_desc",          columnForName);
+        route.route_type          = getIntIfPresent   (result, "route_type",          columnForName);
+        route.route_color         = getStringIfPresent(result, "route_color",         columnForName);
+        route.route_text_color    = getStringIfPresent(result, "route_text_color",    columnForName);
+        route.route_url           = getUrlIfPresent   (result, "route_url",           columnForName);
+        route.route_branding_url  = getUrlIfPresent   (result, "route_branding_url",  columnForName);
+        route.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
+        route.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
         return route;
     };
 
@@ -166,7 +170,8 @@ public interface EntityPopulator<T> {
         stop.stop_timezone  = getStringIfPresent(result, "stop_timezone",  columnForName);
         stop.stop_url       = getUrlIfPresent   (result, "stop_url",       columnForName);
         stop.location_type  = getIntIfPresent   (result, "location_type",  columnForName);
-        stop.wheelchair_boarding = Integer.toString(getIntIfPresent(result, "wheelchair_boarding", columnForName));
+        stop.wheelchair_boarding = getIntIfPresent(result, "wheelchair_boarding", columnForName);
+        stop.platform_code  = getStringIfPresent(result, "platform_code",  columnForName);
         return stop;
     };
 
@@ -205,6 +210,8 @@ public interface EntityPopulator<T> {
         stopTime.stop_headsign       = getStringIfPresent(result, "stop_headsign", columnForName);
         stopTime.pickup_type         = getIntIfPresent   (result, "pickup_type", columnForName);
         stopTime.drop_off_type       = getIntIfPresent   (result, "drop_off_type", columnForName);
+        stopTime.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup", columnForName);
+        stopTime.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
         stopTime.timepoint           = getIntIfPresent   (result, "timepoint", columnForName);
         stopTime.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
         return stopTime;

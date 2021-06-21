@@ -1,0 +1,16 @@
+{
+  "data" : {
+    "feed" : {
+      "translations" : [ {
+        "table_name" : "stops",
+        "field_name" : "stop_desc",
+        "language" : "FR",
+        "translation" : "en direction du nord",
+        "record_id" : "4u6g",
+        "record_sub_id" : null,
+        "field_value" : null
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}

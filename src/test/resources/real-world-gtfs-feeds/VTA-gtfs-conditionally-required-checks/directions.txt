@@ -1,0 +1,5 @@
+route_id,direction_id,direction
+21,0,East
+21,1,West
+22,0,East
+22,1,West

@@ -22,9 +22,9 @@ public class Stop extends Entity {
     public int    location_type;
     public String parent_station;
     public String stop_timezone;
-    // TODO should be int
-    public String wheelchair_boarding;
+    public int wheelchair_boarding;
     public String feed_id;
+    public String platform_code;
 
     @Override
     public String getId () {
@@ -39,12 +39,6 @@ public class Stop extends Entity {
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
         int oneBasedIndex = 1;
         if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
-        int wheelchairBoarding = 0;
-        try {
-             wheelchairBoarding = Integer.parseInt(wheelchair_boarding);
-        } catch (NumberFormatException e) {
-            // Do nothing, wheelchairBoarding will remain zero.
-        }
         statement.setString(oneBasedIndex++, stop_id);
         statement.setString(oneBasedIndex++, stop_code);
         statement.setString(oneBasedIndex++, stop_name);
@@ -56,8 +50,8 @@ public class Stop extends Entity {
         setIntParameter(statement, oneBasedIndex++, location_type);
         statement.setString(oneBasedIndex++, parent_station);
         statement.setString(oneBasedIndex++, stop_timezone);
-        // FIXME: For some reason wheelchair boarding type is String
-        setIntParameter(statement, oneBasedIndex++, wheelchairBoarding);
+        setIntParameter(statement, oneBasedIndex++, wheelchair_boarding);
+        statement.setString(oneBasedIndex++, platform_code);
     }
 
     public static class Loader extends Entity.Loader<Stop> {
@@ -86,9 +80,10 @@ public class Stop extends Entity {
             s.location_type  = getIntField("location_type", false, 0, 1);
             s.parent_station = getStringField("parent_station", false);
             s.stop_timezone  = getStringField("stop_timezone", false);
-            s.wheelchair_boarding = getStringField("wheelchair_boarding", false);
+            s.wheelchair_boarding = getIntField("wheelchair_boarding", false, 0, 2);
             s.feed = feed;
             s.feed_id = feed.feedId;
+            s.platform_code = getStringField("platform_code", false);
             /* TODO check ref integrity later, this table self-references via parent_station */
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (s.stop_id != null) feed.stops.put(s.stop_id, s);
@@ -104,7 +99,7 @@ public class Stop extends Entity {
         @Override
         public void writeHeaders() throws IOException {
             writer.writeRecord(new String[] {"stop_id", "stop_code", "stop_name", "stop_desc", "stop_lat", "stop_lon", "zone_id",					
-                    "stop_url", "location_type", "parent_station", "stop_timezone", "wheelchair_boarding"});
+                    "stop_url", "location_type", "parent_station", "stop_timezone", "wheelchair_boarding", "platform_code"});
         }
 
         @Override
@@ -120,7 +115,8 @@ public class Stop extends Entity {
             writeIntField(s.location_type);
             writeStringField(s.parent_station);
             writeStringField(s.stop_timezone);
-            writeStringField(s.wheelchair_boarding);
+            writeIntField(s.wheelchair_boarding);
+            writeStringField(s.platform_code);
             endRecord();
         }
 

@@ -23,6 +23,8 @@ public class PatternStop extends Entity {
     public int pickup_type;
     public int drop_off_type;
     public int timepoint;
+    public int continuous_pickup = INT_MISSING;
+    public int continuous_drop_off = INT_MISSING;
 
     public PatternStop () {}
 

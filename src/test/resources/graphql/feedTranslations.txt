@@ -1,0 +1,14 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    translations {
+      table_name
+      field_name
+      language
+      translation
+      record_id
+      record_sub_id
+      field_value
+    }
+  }
+}

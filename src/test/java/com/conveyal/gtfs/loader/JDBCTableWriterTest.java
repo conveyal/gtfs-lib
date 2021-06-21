@@ -183,8 +183,14 @@ public class JDBCTableWriterTest {
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
+        feedInfoInput.feed_start_date = "07052021";
+        feedInfoInput.feed_end_date = "09052021";
+        feedInfoInput.feed_lang = "en";
         feedInfoInput.default_route_color = "1c8edb";
         feedInfoInput.default_route_type = "3";
+        feedInfoInput.default_lang = "en";
+        feedInfoInput.feed_contact_email = "a@b.com";
+        feedInfoInput.feed_contact_url = "example.com";
 
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(Table.FEED_INFO);

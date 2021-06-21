@@ -1,0 +1,20 @@
+{
+  "data" : {
+    "feed" : {
+      "attributions" : [ {
+        "attribution_id" : 1,
+        "agency_id" : "1",
+        "route_id" : null,
+        "trip_id" : null,
+        "organization_name" : "Fake Transit",
+        "is_producer" : 1,
+        "is_operator" : null,
+        "is_authority" : null,
+        "attribution_url" : "https://www.faketransit.org",
+        "attribution_email" : "customer.service@faketransit.org",
+        "attribution_phone" : null
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}

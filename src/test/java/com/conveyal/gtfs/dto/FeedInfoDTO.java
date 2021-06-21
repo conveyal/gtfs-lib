@@ -14,4 +14,7 @@ public class FeedInfoDTO {
     public String feed_version;
     public String default_route_color;
     public String default_route_type;
+    public String default_lang;
+    public String feed_contact_email;
+    public String feed_contact_url;
 }

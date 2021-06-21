@@ -1,0 +1,2 @@
+table_name,field_name,language,translation,record_id,record_sub_id,field_value
+stops,stop_desc,FR,en direction du nord,4u6g,,

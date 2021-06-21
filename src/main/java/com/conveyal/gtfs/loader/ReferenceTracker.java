@@ -1,9 +1,12 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
+import com.google.common.collect.HashMultimap;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
@@ -21,6 +24,7 @@ import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
  */
 public class ReferenceTracker {
     public final Set<String> transitIds = new HashSet<>();
+    public final HashMultimap<String, String> uniqueValuesForFields = HashMultimap.create();
     public final Set<String> transitIdsWithSequence = new HashSet<>();
 
     /**
@@ -61,6 +65,13 @@ public class ReferenceTracker {
             // need to check for duplicates.
             : !table.hasUniqueKeyField ? null : keyField;
         String transitId = String.join(":", keyField, keyValue);
+
+        // Unique key values are needed for referential integrity checks as part of checks for fields that have
+        // conditional requirements. This also tracks "special" foreign keys like stop#zone_id that are not primary keys
+        // of the table they exist in.
+        if ((field.name.equals(keyField) && keyField.equals(uniqueKeyField)) || field.isForeign()) {
+            uniqueValuesForFields.put(field.name, value);
+        }
 
         // If the field is optional and there is no value present, skip check.
         if (!field.isRequired() && "".equals(value)) return Collections.emptySet();
@@ -133,6 +144,30 @@ public class ReferenceTracker {
             // check the referential integrity of trips#shape_id, we know that the shape_id
             // exists in the shapes table. It also handles tracking calendar_dates#service_id values.
             listOfUniqueIds.add(uniqueId);
+        }
+        return errors;
+    }
+
+
+    /**
+     * Work through each conditionally required check assigned to fields within a table. First check the reference field
+     * to confirm if it meets the conditions whereby the conditional field is required. If the conditional field is
+     * required confirm that a value has been provided, if not, log an error.
+     */
+    public Set<NewGTFSError> checkConditionallyRequiredFields(LineContext lineContext) {
+        Set<NewGTFSError> errors = new HashSet<>();
+        Map<Field, ConditionalRequirement[]> fieldsToCheck = lineContext.table.getConditionalRequirements();
+
+        // Work through each field that has been assigned a conditional requirement.
+        for (Map.Entry<Field, ConditionalRequirement[]> entry : fieldsToCheck.entrySet()) {
+            Field referenceField = entry.getKey();
+            ConditionalRequirement[] conditionalRequirements = entry.getValue();
+            // Work through each field's conditional requirements.
+            for (ConditionalRequirement conditionalRequirement : conditionalRequirements) {
+                errors.addAll(
+                    conditionalRequirement.check(lineContext, referenceField, uniqueValuesForFields)
+                );
+            }
         }
         return errors;
     }

@@ -11,6 +11,8 @@ public class PatternStopDTO {
     public Integer pickup_type;
     public Integer stop_sequence;
     public Integer timepoint;
+    public Integer continuous_pickup;
+    public Integer continuous_drop_off;
 
     /** Empty constructor for deserialization */
     public PatternStopDTO() {}

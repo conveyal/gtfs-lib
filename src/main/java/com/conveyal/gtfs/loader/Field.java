@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
 import com.google.common.collect.ImmutableSet;
 
 import java.sql.PreparedStatement;
@@ -48,6 +49,9 @@ public abstract class Field {
     public Table referenceTable = null;
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
+    private boolean isConditionallyRequired;
+    private boolean isForeign;
+    public ConditionalRequirement[] conditions;
 
     public Field(String name, Requirement requirement) {
         this.name = name;
@@ -138,6 +142,25 @@ public abstract class Field {
     }
 
     /**
+     * Fluent method to mark a field as having foreign references. If flagged, the field value is added to
+     * {@link ReferenceTracker#uniqueValuesForFields} to be used as a look-up for reference matches. Note: this is intended only for
+     * special cases (e.g., zone_id) where the field being referenced does not exist as the primary key of a table.
+     */
+    Field hasForeignReferences() {
+        isForeign = true;
+        return this;
+    }
+
+    /**
+     * Indicates that this field has foreign references. Note: this is intentionally distinct from
+     * {@link #isForeignReference()} and is intended only for special cases (e.g., zone_id) where the field being
+     * referenced does not exist as the primary key of a table.
+     */
+    public boolean isForeign() {
+        return isForeign;
+    }
+
+    /**
      * Fluent method that indicates that a newly constructed field should be indexed after the table is loaded.
      * FIXME: should shouldBeIndexed be determined based on presence of referenceTable?
      * @return this same Field instance, which allows constructing and assigning the instance in the same statement.
@@ -152,7 +175,8 @@ public abstract class Field {
     }
 
     /**
-     * Fluent method indicates that this field is a reference to an entry in the table provided as an argument.
+     * Fluent method that indicates that this field is a reference to an entry in the table provided as an argument
+     * (i.e. it is a foreign reference).
      * @param table
      * @return this same Field instance
      */
@@ -180,10 +204,26 @@ public abstract class Field {
 
     /**
      * Get the expression used to select this column from the database based on the prefix.  The csvOutput parameter is
-     * needed in overriden method implementations that have special ways of outputting certain fields.  The prefix
+     * needed in overridden method implementations that have special ways of outputting certain fields.  The prefix
      * parameter is assumed to be either null or a string in the format: `schema.`
      */
     public String getColumnExpression(String prefix, boolean csvOutput) {
         return prefix != null ? String.format("%s%s", prefix, name) : name;
+    }
+
+    /**
+     * Mark this field as conditionally required. If needed an optional list of conditions can be provided.
+     */
+    public Field requireConditions(ConditionalRequirement...conditions) {
+        this.isConditionallyRequired = true;
+        this.conditions = conditions;
+        return this;
+    }
+
+    /**
+     * Indicates that this field is conditionally required.
+     */
+    public boolean isConditionallyRequired() {
+        return isConditionallyRequired;
     }
 }

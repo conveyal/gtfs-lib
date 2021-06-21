@@ -14,4 +14,5 @@ public class StopDTO {
     public String parent_station;
     public Integer location_type;
     public Integer wheelchair_boarding;
+    public String platform_code;
 }
