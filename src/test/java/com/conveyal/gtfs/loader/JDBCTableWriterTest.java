@@ -422,11 +422,11 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * This test verifies that stop_times#shape_dist_traveled (and other "linked fields") are updated when a pattern
+     * This test verifies that stop_times#shape_dist_traveled and other linked fields are updated when a pattern
      * is updated.
      */
     @Test
-    public void shouldUpdateStopTimeShapeDistTraveledOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
+    public void shouldUpdateStopTimeOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
         final String[] STOP_TIMES_LINKED_FIELDS = new String[] {
             "shape_dist_traveled",
             "timepoint",
@@ -481,10 +481,8 @@ public class JDBCTableWriterTest {
         ResultSet resultSet = statement.executeQuery();
         while (resultSet.next()) {
             // First stop_time shape_dist_traveled should be zero.
-            assertThat(resultSet.getInt(1), equalTo(0));
-
-            // Other linked fields should be interpreted as zero.
-            for (int i = 2; i <= STOP_TIMES_LINKED_FIELDS.length; i++) {
+            // Other linked fields should be interpreted as zero too.
+            for (int i = 1; i <= STOP_TIMES_LINKED_FIELDS.length; i++) {
                 assertThat(resultSet.getInt(i), equalTo(0));
             }
         }
