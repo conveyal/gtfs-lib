@@ -634,6 +634,8 @@ public class JdbcTableWriter implements TableWriter {
                     "timepoint",
                     "drop_off_type",
                     "pickup_type",
+                    "continuous_pickup",
+                    "continuous_drop_off",
                     "shape_dist_traveled"
                 );
             }
