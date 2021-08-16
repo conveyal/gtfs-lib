@@ -144,9 +144,12 @@ public class GraphQLGtfsSchema {
             .description("A GTFS feed_info object")
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("feed_id"))
+            .field(MapFetcher.field("feed_contact_email"))
+            .field(MapFetcher.field("feed_contact_url"))
             .field(MapFetcher.field("feed_publisher_name"))
             .field(MapFetcher.field("feed_publisher_url"))
             .field(MapFetcher.field("feed_lang"))
+            .field(MapFetcher.field("default_lang"))
             .field(MapFetcher.field("feed_start_date"))
             .field(MapFetcher.field("feed_end_date"))
             .field(MapFetcher.field("feed_version"))
@@ -257,9 +260,36 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("timepoint", GraphQLInt))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
-            // Editor-specific fields
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .build();
+
+    // Represents rows from attributions.txt
+    public static final GraphQLObjectType attributionsType = newObject().name("attributions")
+        .field(MapFetcher.field("attribution_id"))
+        .field(MapFetcher.field("agency_id"))
+        .field(MapFetcher.field("route_id"))
+        .field(MapFetcher.field("trip_id"))
+        .field(MapFetcher.field("organization_name"))
+        .field(MapFetcher.field("is_producer", GraphQLInt))
+        .field(MapFetcher.field("is_operator", GraphQLInt))
+        .field(MapFetcher.field("is_authority", GraphQLInt))
+        .field(MapFetcher.field("attribution_url"))
+        .field(MapFetcher.field("attribution_email"))
+        .field(MapFetcher.field("attribution_phone"))
+        .build();
+
+    // Represents rows from translations.txt
+    public static final GraphQLObjectType translationsType = newObject().name("translations")
+        .field(MapFetcher.field("table_name"))
+        .field(MapFetcher.field("field_name"))
+        .field(MapFetcher.field("language"))
+        .field(MapFetcher.field("translation"))
+        .field(MapFetcher.field("record_id"))
+        .field(MapFetcher.field("record_sub_id"))
+        .field(MapFetcher.field("field_value"))
+        .build();
 
     // Represents rows from routes.txt
     public static final GraphQLObjectType routeType = newObject().name("route")
@@ -272,7 +302,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("route_desc"))
             .field(MapFetcher.field("route_url"))
             .field(MapFetcher.field("route_branding_url"))
-            // TODO route_type as enum or int
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("route_type", GraphQLInt))
             .field(MapFetcher.field("route_color"))
             .field(MapFetcher.field("route_text_color"))
@@ -341,6 +372,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("stop_url"))
             .field(MapFetcher.field("stop_timezone"))
             .field(MapFetcher.field("parent_station"))
+            .field(MapFetcher.field("platform_code"))
             .field(MapFetcher.field("location_type", GraphQLInt))
             .field(MapFetcher.field("wheelchair_boarding", GraphQLInt))
             // Returns all stops that reference parent stop's stop_id
@@ -403,6 +435,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
             // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
@@ -762,6 +796,26 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("services"))
                     .build()
+            )
+            .field(newFieldDefinition()
+                .name("attributions")
+                .type(new GraphQLList(GraphQLGtfsSchema.attributionsType))
+                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .dataFetcher(new JDBCFetcher("attributions"))
+                .build()
+            )
+            .field(newFieldDefinition()
+                .name("translations")
+                .type(new GraphQLList(GraphQLGtfsSchema.translationsType))
+                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .dataFetcher(new JDBCFetcher("translations"))
+                .build()
             )
             .build();
 

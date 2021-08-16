@@ -24,4 +24,6 @@ public class RouteDTO {
     /** This field is incorrectly set to String in order to test how empty string literals are persisted to the database. */
     public String route_sort_order;
     public Integer status;
+    public int continuous_pickup;
+    public int continuous_drop_off;
 }

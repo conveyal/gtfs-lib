@@ -112,6 +112,8 @@ public class JdbcGtfsSnapshotter {
             result.stopTimes = copy(Table.STOP_TIMES, true);
             result.transfers = copy(Table.TRANSFERS, true);
             result.trips = copy(Table.TRIPS, true);
+            result.attributions = copy(Table.ATTRIBUTIONS, true);
+            result.translations = copy(Table.TRANSLATIONS, true);
             result.completionTime = System.currentTimeMillis();
             result.loadTimeMillis = result.completionTime - startTime;
             LOG.info("Copying tables took {} sec", (result.loadTimeMillis) / 1000);
