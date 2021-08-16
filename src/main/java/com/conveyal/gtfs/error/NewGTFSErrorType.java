@@ -8,9 +8,11 @@ import com.conveyal.gtfs.validator.model.Priority;
  */
 public enum NewGTFSErrorType {
     // Standard errors.
+    AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS(Priority.HIGH, "For GTFS feeds with more than one agency, agency_id is required."),
     BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
     COLOR_FORMAT(Priority.MEDIUM, "A color should be specified with six-characters (three two-digit hexadecimal numbers)."),
     COLUMN_NAME_UNSAFE(Priority.HIGH, "Column header contains characters not safe in SQL, it was renamed."),
+    CONDITIONALLY_REQUIRED(Priority.HIGH, "A conditionally required field was missing in a particular row."),
     CURRENCY_UNKNOWN(Priority.MEDIUM, "The currency code was not recognized."),
     DATE_FORMAT(Priority.MEDIUM, "Date format should be YYYYMMDD."),
     DATE_NO_SERVICE(Priority.MEDIUM, "No service_ids were active on a date within the range of dates with defined service."),

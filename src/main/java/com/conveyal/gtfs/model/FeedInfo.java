@@ -23,6 +23,9 @@ public class FeedInfo extends Entity implements Cloneable {
     public LocalDate feed_start_date;
     public LocalDate feed_end_date;
     public String    feed_version;
+    public String default_lang;
+    public String feed_contact_email;
+    public URL feed_contact_url;
 
     public FeedInfo clone () {
         try {
@@ -50,6 +53,11 @@ public class FeedInfo extends Entity implements Cloneable {
         feedStartDateField.setParameter(statement, oneBasedIndex++, feed_start_date);
         feedEndDateField.setParameter(statement, oneBasedIndex++, feed_end_date);
         statement.setString(oneBasedIndex++, feed_version);
+        statement.setString(oneBasedIndex++, default_lang);
+        statement.setString(oneBasedIndex++, feed_contact_email);
+        String feedContactUrl = feed_contact_url != null ? feed_contact_url.toString() : null;
+        statement.setString(oneBasedIndex++, feedContactUrl);
+
     }
 
     public static class Loader extends Entity.Loader<FeedInfo> {
@@ -74,6 +82,9 @@ public class FeedInfo extends Entity implements Cloneable {
             fi.feed_start_date = getDateField("feed_start_date", false);
             fi.feed_end_date = getDateField("feed_end_date", false);
             fi.feed_version = getStringField("feed_version", false);
+            fi.default_lang = getStringField("default_lang", false);
+            fi.feed_contact_email = getStringField("feed_contact_email", false);
+            fi.feed_contact_url = getUrlField("feed_contact_url", false);
             fi.feed = feed;
             if (feed.feedInfo.isEmpty()) {
                 feed.feedInfo.put("NONE", fi);
@@ -93,7 +104,7 @@ public class FeedInfo extends Entity implements Cloneable {
         @Override
         public void writeHeaders() throws IOException {
             writer.writeRecord(new String[] {"feed_id", "feed_publisher_name", "feed_publisher_url", "feed_lang",
-                    "feed_start_date", "feed_end_date", "feed_version"});
+                    "feed_start_date", "feed_end_date", "feed_version", "default_lang", "feed_contact_email", "feed_contact_url"});
         }
 
         @Override
@@ -110,6 +121,9 @@ public class FeedInfo extends Entity implements Cloneable {
             else writeStringField("");
 
             writeStringField(i.feed_version);
+            writeStringField(i.default_lang);
+            writeStringField(i.feed_contact_email);
+            writeUrlField(i.feed_contact_url);
             endRecord();
         }
 

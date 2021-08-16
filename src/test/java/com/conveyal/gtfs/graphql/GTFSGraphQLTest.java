@@ -148,6 +148,14 @@ public class GTFSGraphQLTest {
         });
     }
 
+    /** Tests that the attributions of a feed can be fetched. */
+    @Test
+    public void canFetchATtributions() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedAttributions.txt"), matchesSnapshot());
+        });
+    }
+
     /** Tests that the calendars of a feed can be fetched. */
     @Test
     public void canFetchCalendars() {
@@ -193,6 +201,14 @@ public class GTFSGraphQLTest {
     public void canFetchTrips() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
             MatcherAssert.assertThat(queryGraphQL("feedTrips.txt"), matchesSnapshot());
+        });
+    }
+
+    /** Tests that the translations of a feed can be fetched. */
+    @Test
+    public void canFetchTranslations() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedTranslations.txt"), matchesSnapshot());
         });
     }
 

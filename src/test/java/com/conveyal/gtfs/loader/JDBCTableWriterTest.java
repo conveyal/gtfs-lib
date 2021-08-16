@@ -183,8 +183,14 @@ public class JDBCTableWriterTest {
         feedInfoInput.feed_publisher_name = publisherName;
         feedInfoInput.feed_publisher_url = "example.com";
         feedInfoInput.feed_lang = "en";
+        feedInfoInput.feed_start_date = "07052021";
+        feedInfoInput.feed_end_date = "09052021";
+        feedInfoInput.feed_lang = "en";
         feedInfoInput.default_route_color = "1c8edb";
         feedInfoInput.default_route_type = "3";
+        feedInfoInput.default_lang = "en";
+        feedInfoInput.feed_contact_email = "a@b.com";
+        feedInfoInput.feed_contact_url = "example.com";
 
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(Table.FEED_INFO);
@@ -416,11 +422,19 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * This test verifies that stop_times#shape_dist_traveled (and other "linked fields") are updated when a pattern
+     * This test verifies that stop_times#shape_dist_traveled and other linked fields are updated when a pattern
      * is updated.
      */
     @Test
-    public void shouldUpdateStopTimeShapeDistTraveledOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
+    public void shouldUpdateStopTimeOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
+        final String[] STOP_TIMES_LINKED_FIELDS = new String[] {
+            "shape_dist_traveled",
+            "timepoint",
+            "drop_off_type",
+            "pickup_type",
+            "continuous_pickup",
+            "continuous_drop_off"
+        };
         String routeId = newUUID();
         String patternId = newUUID();
         int startTime = 6 * 60 * 60; // 6 AM
@@ -453,10 +467,12 @@ public class JDBCTableWriterTest {
         assertNotNull(uuid);
         // Check that trip exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
-        // Check the stop_time's initial shape_dist_traveled value. TODO test that other linked fields are updated?
+
+        // Check the stop_time's initial shape_dist_traveled value and other linked fields.
         PreparedStatement statement = testDataSource.getConnection().prepareStatement(
             String.format(
-                "select shape_dist_traveled from %s.stop_times where stop_sequence=1 and trip_id='%s'",
+                "select %s from %s.stop_times where stop_sequence=1 and trip_id='%s'",
+                String.join(", ", STOP_TIMES_LINKED_FIELDS),
                 testNamespace,
                 createdTrip.trip_id
             )
@@ -465,11 +481,22 @@ public class JDBCTableWriterTest {
         ResultSet resultSet = statement.executeQuery();
         while (resultSet.next()) {
             // First stop_time shape_dist_traveled should be zero.
-            assertThat(resultSet.getInt(1), equalTo(0));
+            // Other linked fields should be interpreted as zero too.
+            for (int i = 1; i <= STOP_TIMES_LINKED_FIELDS.length; i++) {
+                assertThat(resultSet.getInt(i), equalTo(0));
+            }
         }
+
         // Update pattern_stop#shape_dist_traveled and check that the stop_time's shape_dist value is updated.
         final double updatedShapeDistTraveled = 45.5;
-        pattern.pattern_stops[1].shape_dist_traveled = updatedShapeDistTraveled;
+        PatternStopDTO pattern_stop = pattern.pattern_stops[1];
+        pattern_stop.shape_dist_traveled = updatedShapeDistTraveled;
+        // Assign an arbitrary value (the order of appearance in STOP_TIMES_LINKED_FIELDS) for the other linked fields.
+        pattern_stop.timepoint = 2;
+        pattern_stop.drop_off_type = 3;
+        pattern_stop.pickup_type = 4;
+        pattern_stop.continuous_pickup = 5;
+        pattern_stop.continuous_drop_off = 6;
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
         String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
         LOG.info("Updated pattern: {}", updatedPatternOutput);
@@ -477,6 +504,11 @@ public class JDBCTableWriterTest {
         while (resultSet2.next()) {
             // First stop_time shape_dist_traveled should be updated.
             assertThat(resultSet2.getDouble(1), equalTo(updatedShapeDistTraveled));
+
+            // Other linked fields should be as set above.
+            for (int i = 2; i <= STOP_TIMES_LINKED_FIELDS.length; i++) {
+                assertThat(resultSet2.getInt(i), equalTo(i));
+            }
         }
     }
 

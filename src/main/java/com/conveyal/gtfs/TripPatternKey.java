@@ -24,6 +24,8 @@ public class TripPatternKey {
     public TIntList arrivalTimes = new TIntArrayList();
     public TIntList departureTimes = new TIntArrayList();
     public TIntList timepoints = new TIntArrayList();
+    public TIntList continuous_pickup = new TIntArrayList();
+    public TIntList continuous_drop_off = new TIntArrayList();
     public TDoubleList shapeDistances = new TDoubleArrayList();
 
     public TripPatternKey (String routeId) {
@@ -39,6 +41,8 @@ public class TripPatternKey {
         departureTimes.add(st.departure_time);
         timepoints.add(st.timepoint);
         shapeDistances.add(st.shape_dist_traveled);
+        continuous_pickup.add(st.continuous_pickup);
+        continuous_drop_off.add(st.continuous_drop_off);
     }
 
     @Override

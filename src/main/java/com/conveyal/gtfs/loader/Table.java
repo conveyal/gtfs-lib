@@ -2,7 +2,15 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
+import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
+import com.conveyal.gtfs.loader.conditions.FieldInRangeCheck;
+import com.conveyal.gtfs.loader.conditions.FieldIsEmptyCheck;
+import com.conveyal.gtfs.loader.conditions.FieldNotEmptyAndMatchesValueCheck;
+import com.conveyal.gtfs.loader.conditions.ForeignRefExistsCheck;
+import com.conveyal.gtfs.loader.conditions.ReferenceFieldShouldBeProvidedCheck;
 import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.Attribution;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
@@ -18,6 +26,7 @@ import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Transfer;
+import com.conveyal.gtfs.model.Translation;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
 import com.csvreader.CsvReader;
@@ -38,16 +47,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
@@ -98,15 +107,19 @@ public class Table {
     }
 
     public static final Table AGENCY = new Table("agency", Agency.class, REQUIRED,
-        new StringField("agency_id",  OPTIONAL), // FIXME? only required if there are more than one
-        new StringField("agency_name",  REQUIRED),
-        new URLField("agency_url",  REQUIRED),
-        new StringField("agency_timezone",  REQUIRED), // FIXME new field type for time zones?
+        new StringField("agency_id",  OPTIONAL).requireConditions(
+            // If there is more than one agency, the agency_id must be provided
+            // https://developers.google.com/transit/gtfs/reference#agencytxt
+            new AgencyHasMultipleRowsCheck()
+        ).hasForeignReferences(),
+        new StringField("agency_name", REQUIRED),
+        new URLField("agency_url", REQUIRED),
+        new StringField("agency_timezone", REQUIRED), // FIXME new field type for time zones?
         new StringField("agency_lang", OPTIONAL), // FIXME new field type for languages?
-        new StringField("agency_phone",  OPTIONAL),
-        new URLField("agency_branding_url",  OPTIONAL),
-        new URLField("agency_fare_url",  OPTIONAL),
-        new StringField("agency_email",  OPTIONAL) // FIXME new field type for emails?
+        new StringField("agency_phone", OPTIONAL),
+        new URLField("agency_branding_url", OPTIONAL),
+        new URLField("agency_fare_url", OPTIONAL),
+        new StringField("agency_email", OPTIONAL) // FIXME new field type for emails?
     ).restrictDelete().addPrimaryKey();
 
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
@@ -147,7 +160,11 @@ public class Table {
         new CurrencyField("currency_type", REQUIRED),
         new ShortField("payment_method", REQUIRED, 1),
         new ShortField("transfers", REQUIRED, 2).permitEmptyValue(),
-        new StringField("agency_id", OPTIONAL), // FIXME? only required if there are more than one
+        new StringField("agency_id", OPTIONAL).requireConditions(
+            // If there is more than one agency, this agency_id is required.
+            // https://developers.google.com/transit/gtfs/reference#fare_attributestxt
+            new ReferenceFieldShouldBeProvidedCheck("agency_id")
+        ),
         new IntegerField("transfer_duration", OPTIONAL)
     ).addPrimaryKey();
 
@@ -156,7 +173,7 @@ public class Table {
     public static final Table FEED_INFO = new Table("feed_info", FeedInfo.class, OPTIONAL,
         new StringField("feed_publisher_name", REQUIRED),
         // feed_id is not the first field because that would label it as the key field, which we do not want because the
-        // key field cannot be optional.
+        // key field cannot be optional. feed_id is not part of the GTFS spec, but is required by OTP to associate static GTFS with GTFS-rt feeds.
         new StringField("feed_id", OPTIONAL),
         new URLField("feed_publisher_url", REQUIRED),
         new LanguageField("feed_lang", REQUIRED),
@@ -166,40 +183,39 @@ public class Table {
         // Editor-specific field that represents default route values for use in editing.
         new ColorField("default_route_color", EDITOR),
         // FIXME: Should the route type max value be equivalent to GTFS spec's max?
-        new IntegerField("default_route_type", EDITOR, 999)
+        new IntegerField("default_route_type", EDITOR, 999),
+        new LanguageField("default_lang", OPTIONAL),
+        new StringField("feed_contact_email", OPTIONAL),
+        new URLField("feed_contact_url", OPTIONAL)
     ).keyFieldIsNotUnique();
 
     public static final Table ROUTES = new Table("routes", Route.class, REQUIRED,
         new StringField("route_id",  REQUIRED),
-        new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY),
-        new StringField("route_short_name",  OPTIONAL), // one of short or long must be provided
-        new StringField("route_long_name",  OPTIONAL),
-        new StringField("route_desc",  OPTIONAL),
+        new StringField("agency_id",  OPTIONAL).isReferenceTo(AGENCY).requireConditions(
+            // If there is more than one agency, this agency_id is required.
+            // https://developers.google.com/transit/gtfs/reference#routestxt
+            new ReferenceFieldShouldBeProvidedCheck("agency_id")
+        ),
+        new StringField("route_short_name", OPTIONAL), // one of short or long must be provided
+        new StringField("route_long_name", OPTIONAL),
+        new StringField("route_desc", OPTIONAL),
         // Max route type according to the GTFS spec is 7; however, there is a GTFS proposal that could see this 
         // max value grow to around 1800: https://groups.google.com/forum/#!msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J
         new IntegerField("route_type", REQUIRED, 1800),
-        new URLField("route_url",  OPTIONAL),
-        new URLField("route_branding_url",  OPTIONAL),
-        new ColorField("route_color",  OPTIONAL), // really this is an int in hex notation
-        new ColorField("route_text_color",  OPTIONAL),
+        new URLField("route_url", OPTIONAL),
+        new URLField("route_branding_url", OPTIONAL),
+        new ColorField("route_color", OPTIONAL), // really this is an int in hex notation
+        new ColorField("route_text_color", OPTIONAL),
         // Editor fields below.
         new ShortField("publicly_visible", EDITOR, 1),
         // wheelchair_accessible is an exemplar field applied to all trips on a route.
         new ShortField("wheelchair_accessible", EDITOR, 2).permitEmptyValue(),
         new IntegerField("route_sort_order", OPTIONAL, 0, Integer.MAX_VALUE),
         // Status values are In progress (0), Pending approval (1), and Approved (2).
-        new ShortField("status", EDITOR,  2)
+        new ShortField("status", EDITOR, 2),
+        new ShortField("continuous_pickup", OPTIONAL,3),
+        new ShortField("continuous_drop_off", OPTIONAL,3)
     ).addPrimaryKey();
-
-    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
-            new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
-            new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
-            // FIXME: referential integrity check for zone_id for below three fields?
-            new StringField("origin_id", OPTIONAL),
-            new StringField("destination_id", OPTIONAL),
-            new StringField("contains_id", OPTIONAL))
-            .withParentTable(FARE_ATTRIBUTES)
-            .addPrimaryKey().keyFieldIsNotUnique();
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
@@ -226,20 +242,53 @@ public class Table {
     ).addPrimaryKey();
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
-        new StringField("stop_id",  REQUIRED),
-        new StringField("stop_code",  OPTIONAL),
-        new StringField("stop_name",  REQUIRED),
-        new StringField("stop_desc",  OPTIONAL),
-        new DoubleField("stop_lat", REQUIRED, -80, 80, 6),
-        new DoubleField("stop_lon", REQUIRED, -180, 180, 6),
-        new StringField("zone_id",  OPTIONAL),
-        new URLField("stop_url",  OPTIONAL),
-        new ShortField("location_type", OPTIONAL, 2),
-        // FIXME: Need self-reference check during referential integrity check
-        new StringField("parent_station",  OPTIONAL), //.isReferenceToSelf()
-        new StringField("stop_timezone",  OPTIONAL),
-        new ShortField("wheelchair_boarding", OPTIONAL, 2)
-    ).restrictDelete().addPrimaryKey();
+        new StringField("stop_id", REQUIRED),
+        new StringField("stop_code", OPTIONAL),
+        // The actual conditions that will be acted upon are within the location_type field.
+        new StringField("stop_name", OPTIONAL).requireConditions(),
+        new StringField("stop_desc", OPTIONAL),
+        // The actual conditions that will be acted upon are within the location_type field.
+        new DoubleField("stop_lat", OPTIONAL, -80, 80, 6).requireConditions(),
+        // The actual conditions that will be acted upon are within the location_type field.
+        new DoubleField("stop_lon", OPTIONAL, -180, 180, 6).requireConditions(),
+        new StringField("zone_id", OPTIONAL).hasForeignReferences(),
+        new URLField("stop_url", OPTIONAL),
+        new ShortField("location_type", OPTIONAL, 4).requireConditions(
+            // If the location type is defined and within range, the dependent fields are required.
+            // https://developers.google.com/transit/gtfs/reference#stopstxt
+            new FieldInRangeCheck(0, 2, "stop_name"),
+            new FieldInRangeCheck(0, 2, "stop_lat"),
+            new FieldInRangeCheck(0, 2, "stop_lon"),
+            new FieldInRangeCheck(2, 4, "parent_station")
+        ),
+        // The actual conditions that will be acted upon are within the location_type field.
+        new StringField("parent_station", OPTIONAL).requireConditions(),
+        new StringField("stop_timezone", OPTIONAL),
+        new ShortField("wheelchair_boarding", OPTIONAL, 2),
+        new StringField("platform_code", OPTIONAL)
+    )
+    .restrictDelete()
+    .addPrimaryKey();
+
+    // GTFS reference: https://developers.google.com/transit/gtfs/reference#fare_rulestxt
+    public static final Table FARE_RULES = new Table("fare_rules", FareRule.class, OPTIONAL,
+        new StringField("fare_id", REQUIRED).isReferenceTo(FARE_ATTRIBUTES),
+        new StringField("route_id", OPTIONAL).isReferenceTo(ROUTES),
+        new StringField("origin_id", OPTIONAL).requireConditions(
+            // If the origin_id is defined, its value must exist as a zone_id in stops.txt.
+            new ForeignRefExistsCheck("zone_id", "fare_rules")
+        ),
+        new StringField("destination_id", OPTIONAL).requireConditions(
+            // If the destination_id is defined, its value must exist as a zone_id in stops.txt.
+            new ForeignRefExistsCheck("zone_id", "fare_rules")
+        ),
+        new StringField("contains_id", OPTIONAL).requireConditions(
+            // If the contains_id is defined, its value must exist as a zone_id in stops.txt.
+            new ForeignRefExistsCheck("zone_id", "fare_rules")
+        )
+    )
+    .withParentTable(FARE_ATTRIBUTES)
+    .addPrimaryKey().keyFieldIsNotUnique();
 
     public static final Table PATTERN_STOP = new Table("pattern_stops", PatternStop.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
@@ -252,7 +301,9 @@ public class Table {
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
             new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, -1),
-            new ShortField("timepoint", EDITOR, 1)
+            new ShortField("timepoint", EDITOR, 1),
+            new ShortField("continuous_pickup", OPTIONAL,3),
+            new ShortField("continuous_drop_off", OPTIONAL,3)
     ).withParentTable(PATTERNS);
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
@@ -266,16 +317,16 @@ public class Table {
             .hasCompoundKey();
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
-        new StringField("trip_id",  REQUIRED),
-        new StringField("route_id",  REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
+        new StringField("trip_id", REQUIRED),
+        new StringField("route_id", REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
         // FIXME: Should this also optionally reference CALENDAR_DATES?
         // FIXME: Do we need an index on service_id
-        new StringField("service_id",  REQUIRED).isReferenceTo(CALENDAR),
-        new StringField("trip_headsign",  OPTIONAL),
-        new StringField("trip_short_name",  OPTIONAL),
+        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR),
+        new StringField("trip_headsign", OPTIONAL),
+        new StringField("trip_short_name", OPTIONAL),
         new ShortField("direction_id", OPTIONAL, 1),
-        new StringField("block_id",  OPTIONAL),
-        new StringField("shape_id",  OPTIONAL).isReferenceTo(SHAPES),
+        new StringField("block_id", OPTIONAL),
+        new StringField("shape_id", OPTIONAL).isReferenceTo(SHAPES),
         new ShortField("wheelchair_accessible", OPTIONAL, 2),
         new ShortField("bikes_allowed", OPTIONAL, 2),
         // Editor-specific fields below.
@@ -295,6 +346,8 @@ public class Table {
             new StringField("stop_headsign", OPTIONAL),
             new ShortField("pickup_type", OPTIONAL, 3),
             new ShortField("drop_off_type", OPTIONAL, 3),
+            new ShortField("continuous_pickup", OPTIONAL, 3),
+            new ShortField("continuous_drop_off", OPTIONAL, 3),
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
@@ -313,24 +366,59 @@ public class Table {
             .withParentTable(TRIPS)
             .keyFieldIsNotUnique();
 
+    // GTFS reference: https://developers.google.com/transit/gtfs/reference#attributionstxt
+    public static final Table TRANSLATIONS = new Table("translations", Translation.class, OPTIONAL,
+            new StringField("table_name", REQUIRED),
+            new StringField("field_name", REQUIRED),
+            new LanguageField("language", REQUIRED),
+            new StringField("translation", REQUIRED),
+            new StringField("record_id", OPTIONAL).requireConditions(
+                // If the field_value is empty the record_id is required.
+                new FieldIsEmptyCheck("field_value")
+            ),
+            new StringField("record_sub_id", OPTIONAL).requireConditions(
+                // If the record_id is not empty and the value is stop_times the record_sub_id is required.
+                new FieldNotEmptyAndMatchesValueCheck("record_id", "stop_times")
+            ),
+            new StringField("field_value", OPTIONAL).requireConditions(
+                // If the record_id is empty the field_value is required.
+                new FieldIsEmptyCheck("record_id")
+            ))
+            .keyFieldIsNotUnique();
+
+    public static final Table ATTRIBUTIONS = new Table("attributions", Attribution.class, OPTIONAL,
+            new StringField("attribution_id", OPTIONAL),
+            new StringField("agency_id", OPTIONAL).isReferenceTo(AGENCY),
+            new LanguageField("route_id", OPTIONAL).isReferenceTo(ROUTES),
+            new StringField("trip_id", OPTIONAL).isReferenceTo(TRIPS),
+            new StringField("organization_name", REQUIRED),
+            new ShortField("is_producer", OPTIONAL, 1),
+            new ShortField("is_operator", OPTIONAL, 1),
+            new ShortField("is_authority", OPTIONAL, 1),
+            new URLField("attribution_url", OPTIONAL),
+            new StringField("attribution_email", OPTIONAL),
+            new StringField("attribution_phone", OPTIONAL));
+
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
-            AGENCY,
-            CALENDAR,
-            SCHEDULE_EXCEPTIONS,
-            CALENDAR_DATES,
-            FARE_ATTRIBUTES,
-            FEED_INFO,
-            ROUTES,
-            FARE_RULES,
-            PATTERNS,
-            SHAPES,
-            STOPS,
-            PATTERN_STOP,
-            TRANSFERS,
-            TRIPS,
-            STOP_TIMES,
-            FREQUENCIES
+        AGENCY,
+        CALENDAR,
+        SCHEDULE_EXCEPTIONS,
+        CALENDAR_DATES,
+        FARE_ATTRIBUTES,
+        FEED_INFO,
+        ROUTES,
+        PATTERNS,
+        SHAPES,
+        STOPS,
+        FARE_RULES,
+        PATTERN_STOP,
+        TRANSFERS,
+        TRIPS,
+        STOP_TIMES,
+        FREQUENCIES,
+        TRANSLATIONS,
+        ATTRIBUTIONS
     };
 
     /**
@@ -996,4 +1084,19 @@ public class Table {
         String keyField = getKeyFieldName();
         return Field.getFieldIndex(fields, keyField);
     }
+
+    public boolean hasConditionalRequirements() {
+        return !getConditionalRequirements().isEmpty();
+    }
+
+    public Map<Field, ConditionalRequirement[]> getConditionalRequirements() {
+        Map<Field, ConditionalRequirement[]> fieldsWithConditions = new HashMap<>();
+        for (Field field : fields) {
+            if (field.isConditionallyRequired()) {
+                fieldsWithConditions.put(field, field.conditions);
+            }
+        }
+        return fieldsWithConditions;
+    }
+
 }
