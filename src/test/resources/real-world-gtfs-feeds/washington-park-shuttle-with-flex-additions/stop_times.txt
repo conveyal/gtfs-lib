@@ -1,0 +1,10 @@
+trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint,start_service_area_id,end_service_area_id,start_service_area_radius,end_service_area_radius,continuous_pickup,continuous_drop_off,pickup_booking_rule_id,drop_off_booking_rule_id,min_arrival_time,max_departure_time,mean_duration_factor,mean_duration_offset,safe_duration_factor,safe_duration_offset
+t_819605_b_29153_tn_frequencies_trip,09:30:00,09:30:00,815440,1,,0,0,0,1,,,,,1,2,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:32:00,09:32:00,815441,2,,0,0,318.820676708954,1,,,,,2,1,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:34:00,09:34:00,815442,3,,0,0,1000.71024531231,1,,,,,0,1,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,,,815446,4,,0,0,3968.97979463876,0,,,,,1,1,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:40:00,09:40:00,815447,5,,0,0,4443.55564952831,1,,,,,1,0,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:44:00,09:44:00,815448,6,,0,0,5041.13123807771,1,,,,,0,0,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:48:00,09:48:00,815449,7,,0,0,6527.26885012783,1,,,,,0,2,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:50:00,09:50:00,819989,8,,0,0,7644.97593655051,1,,,,,1,1,,,,,,,,
+t_819605_b_29153_tn_frequencies_trip,09:53:00,09:53:00,815440,9,,0,0,7968.75618992001,1,,,,,1,1,,,,,,,,

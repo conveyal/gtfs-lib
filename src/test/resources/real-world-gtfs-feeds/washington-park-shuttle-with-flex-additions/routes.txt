@@ -1,0 +1,2 @@
+agency_id,route_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,route_sort_order,min_headway_minutes,eligibility_restricted,continuous_pickup,continuous_drop_off
+501,3433,,Washington Park Shuttle,,3,https://explorewashingtonpark.org/getting-here/#,721b7d,ffffff,1,15,0,1,1
