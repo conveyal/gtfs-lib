@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.loader;
 
+import static com.conveyal.gtfs.loader.JdbcGtfsLoader.POSTGRES_NULL_TEXT;
+
 /**
  * Wrapper class that provides access to row values and line context (e.g., line number) for a particular row of GTFS
  * data.
@@ -31,10 +33,15 @@ public class LineContext {
 
     /**
      * Overloaded method to provide value for the current line for a particular field.
+     * @param fieldName The name of the GTFS field/column to retrieve
+     * @return The value for the field, if found, or POSTGRES_NULL_TEXT if the field is not found,
+     *         consistent with cases where the value is null in the postgres database.
      */
     public String getValueForRow(String fieldName) {
         int fieldIndex = Field.getFieldIndex(fields, fieldName);
-        return rowDataWithLineNumber[fieldIndex + 1];
+        return fieldIndex >= 0
+            ? rowDataWithLineNumber[fieldIndex + 1]
+            : POSTGRES_NULL_TEXT;
     }
 
     /**
