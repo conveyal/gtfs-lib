@@ -1,0 +1,2 @@
+route_id,agency_id,route_short_name,route_long_name,route_type,route_color,route_text_color,route_url
+"300",1,"300","Brentwood Park & Ride / Antioch BART",3,800080,FFFFFF,"http://12.155.17.20/RTT/Public/Schedule.aspx?RouteNo=300"
