@@ -15,34 +15,47 @@ import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
-import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
+import static com.conveyal.gtfs.TestUtils.checkFeedHasExpectedNumberOfErrors;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
 
 public class ConditionallyRequiredTest {
-    private static String testDBName;
-    private static DataSource testDataSource;
-    private static String testNamespace;
+    private static String VTADBName;
+    private static DataSource VTADataSource;
+    private static String VTANamespace;
+
+    private static String triDeltaDBName;
+    private static DataSource triDeltaDataSource;
+    private static String triDeltaNamespace;
 
     @BeforeAll
     public static void setUpClass() throws IOException {
-        // Create a new database
-        testDBName = TestUtils.generateNewDB();
-        String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
-        testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
-        // load feed into db
-        String zipFileName = TestUtils.zipFolderFiles(
-            "real-world-gtfs-feeds/VTA-gtfs-conditionally-required-checks",
-            true);
-        FeedLoadResult feedLoadResult = load(zipFileName, testDataSource);
-        testNamespace = feedLoadResult.uniqueIdentifier;
-        validate(testNamespace, testDataSource);
+        VTADBName = TestUtils.generateNewDB();
+        VTADataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", VTADBName));
+        VTANamespace = loadFeedAndValidate(VTADataSource, "real-world-gtfs-feeds/VTA-gtfs-conditionally-required-checks");
+
+        triDeltaDBName = TestUtils.generateNewDB();
+        triDeltaDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", triDeltaDBName));
+        triDeltaNamespace = loadFeedAndValidate(triDeltaDataSource, "real-world-gtfs-feeds/tri-delta-fare-rules");
+    }
+
+    /**
+     * Load feed from zip file into a database and validate.
+     */
+    private static String loadFeedAndValidate(DataSource dataSource, String zipFolderName) throws IOException {
+        String zipFileName = TestUtils.zipFolderFiles(zipFolderName,  true);
+        FeedLoadResult feedLoadResult = load(zipFileName, dataSource);
+        String namespace = feedLoadResult.uniqueIdentifier;
+        validate(namespace, dataSource);
+        // return name space.
+        return namespace;
     }
 
     @AfterAll
     public static void tearDownClass() {
-        TestUtils.dropDB(testDBName);
+        TestUtils.dropDB(VTADBName);
+        TestUtils.dropDB(triDeltaDBName);
     }
 
     @Test
@@ -142,19 +155,33 @@ public class ConditionallyRequiredTest {
         );
     }
 
+    @Test
+    void shouldNotTriggerRefIntegrityError() {
+        checkFeedHasExpectedNumberOfErrors(
+            triDeltaNamespace,
+            triDeltaDataSource,
+            REFERENTIAL_INTEGRITY,
+            "FareRule",
+            "2",
+            "1",
+            null,
+            0
+        );
+    }
+
     /**
-     * Check that the test feed has exactly one error for the provided values.
+     * Check that a test feed has exactly one error for the provided values.
      */
     private void checkFeedHasOneError(NewGTFSErrorType errorType, String entityType, String lineNumber, String entityId, String badValue) {
-        String sql = String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s'",
-            testNamespace,
+        checkFeedHasExpectedNumberOfErrors(
+            VTANamespace,
+            VTADataSource,
             errorType,
             entityType,
-            lineNumber);
-
-        if (entityId != null) sql += String.format(" and entity_id = '%s'", entityId);
-        if (badValue != null) sql += String.format(" and bad_value = '%s'", badValue);
-
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, sql,1);
+            lineNumber,
+            entityId,
+            badValue,
+            1
+        );
     }
 }
