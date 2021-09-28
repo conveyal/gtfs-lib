@@ -59,7 +59,7 @@ public class ConditionallyRequiredTest {
     }
 
     @Test
-    public void stopTimeTableMissingConditionallyRequiredArrivalDepartureTimes() {
+    void stopTimeTableMissingConditionallyRequiredArrivalDepartureTimes() {
         checkFeedHasOneError(
             CONDITIONALLY_REQUIRED,
             "StopTime",
@@ -71,7 +71,7 @@ public class ConditionallyRequiredTest {
 
     @ParameterizedTest
     @MethodSource("createStopTableChecks")
-    public void stopTableConditionallyRequiredTests(
+    void stopTableConditionallyRequiredTests(
         NewGTFSErrorType errorType,
         String entityType,
         String lineNumber,
@@ -95,7 +95,7 @@ public class ConditionallyRequiredTest {
 
     @ParameterizedTest
     @MethodSource("createTranslationTableChecks")
-    public void translationTableConditionallyRequiredTests(
+    void translationTableConditionallyRequiredTests(
         String entityType,
         String lineNumber,
         String entityId,
@@ -113,7 +113,7 @@ public class ConditionallyRequiredTest {
     }
 
     @Test
-    public void agencyTableMissingConditionallyRequiredAgencyId() {
+    void agencyTableMissingConditionallyRequiredAgencyId() {
         checkFeedHasOneError(
             AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
             "Agency",
@@ -123,7 +123,7 @@ public class ConditionallyRequiredTest {
     }
 
     @Test
-    public void tripTableMissingConditionallyRequiredShapeId() {
+    void tripTableMissingConditionallyRequiredShapeId() {
         checkFeedHasOneError(
             CONDITIONALLY_REQUIRED,
             "Trip",
@@ -133,8 +133,27 @@ public class ConditionallyRequiredTest {
         );
     }
 
+    /**
+     * If an optional column is missing from an imported GTFS feed
+     * (e.g. if the "contains_id" column is missing from the "fare_rules" table),
+     * then, referential integrity errors should not be triggered.
+     */
     @Test
-    public void routeTableMissingConditionallyRequiredAgencyId() {
+    void shouldNotTriggerRefIntegrityErrorForMissingOptionalColumn() {
+        checkFeedHasExpectedNumberOfErrors(
+            triDeltaNamespace,
+            triDeltaDataSource,
+            REFERENTIAL_INTEGRITY,
+            "FareRule",
+            "2",
+            "1",
+            null,
+            0
+        );
+    }
+
+    @Test
+    void routeTableMissingConditionallyRequiredAgencyId() {
         checkFeedHasOneError(
             AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
             "Route",
@@ -145,27 +164,13 @@ public class ConditionallyRequiredTest {
     }
 
     @Test
-    public void fareAttributeTableMissingConditionallyRequiredAgencyId() {
+    void fareAttributeTableMissingConditionallyRequiredAgencyId() {
         checkFeedHasOneError(
             AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS,
             "FareAttribute",
             "2",
             "1",
             null
-        );
-    }
-
-    @Test
-    void shouldNotTriggerRefIntegrityError() {
-        checkFeedHasExpectedNumberOfErrors(
-            triDeltaNamespace,
-            triDeltaDataSource,
-            REFERENTIAL_INTEGRITY,
-            "FareRule",
-            "2",
-            "1",
-            null,
-            0
         );
     }
 
