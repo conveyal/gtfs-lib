@@ -2,10 +2,13 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
@@ -35,48 +38,24 @@ public class GtfsFlexTest {
         validate(testNamespace, testDataSource);
     }
 
-    @Test
-    void canImportContinuousPickupAndDropoff() {
-        String cp_0 = generateStopTimeQuery(
-                testNamespace,
-                "continuous_pickup",
-                0);
-        String cp_1 = generateStopTimeQuery(
-                testNamespace,
-                "continuous_pickup",
-                1);
-        String cp_2 = generateStopTimeQuery(
-                testNamespace,
-                "continuous_pickup",
-                2);
-
-        String cd_0 = generateStopTimeQuery(
-                testNamespace,
-                "continuous_drop_off",
-                0);
-        String cd_1 = generateStopTimeQuery(
-                testNamespace,
-                "continuous_drop_off",
-                1);
-        String cd_2 = generateStopTimeQuery(
-                testNamespace,
-                "continuous_drop_off",
-                2);
-
-
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, cp_0, 3);
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, cp_1, 5);
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, cp_2, 1);
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, cd_0, 2);
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, cd_1, 5);
-        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, cd_2, 2);
-
-    }
-
-    private String generateStopTimeQuery(String namespace, String field, int value) {
-        return String.format("select count(*) from %s.stop_times where %s = '%s'",
-                testNamespace,
+    @ParameterizedTest
+    @MethodSource("createContinuousPickupAndDropOffChecks")
+    void continuousPickupAndDropOffTests(String namespace, String field, int value, int expectedCount) {
+        String query = String.format("select count(*) from %s.stop_times where %s = '%s'",
+                namespace,
                 field,
                 value);
+        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, query, expectedCount);
+    }
+
+    private static Stream<Arguments> createContinuousPickupAndDropOffChecks() {
+        return Stream.of(
+                Arguments.of(testNamespace, "continuous_pickup", 0, 3),
+                Arguments.of(testNamespace, "continuous_pickup", 1, 5),
+                Arguments.of(testNamespace, "continuous_pickup", 2, 1),
+                Arguments.of(testNamespace, "continuous_drop_off", 0, 2),
+                Arguments.of(testNamespace, "continuous_drop_off", 1, 5),
+                Arguments.of(testNamespace, "continuous_drop_off", 2, 2)
+        );
     }
 }
