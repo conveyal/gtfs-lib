@@ -1,5 +1,6 @@
 package com.conveyal.gtfs;
 
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,5 +185,31 @@ public class TestUtils {
             equalTo(expectedCount)
         );
     }
+
+    /**
+     * Check that the test feed has expected number of errors for the provided values.
+     */
+    public static void checkFeedHasExpectedNumberOfErrors(
+        String testNamespace,
+        DataSource testDataSource,
+        NewGTFSErrorType errorType,
+        String entityType,
+        String lineNumber,
+        String entityId,
+        String badValue,
+        int expectedNumberOfErrors
+    ) {
+        String sql = String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s'",
+            testNamespace,
+            errorType,
+            entityType,
+            lineNumber);
+
+        if (entityId != null) sql += String.format(" and entity_id = '%s'", entityId);
+        if (badValue != null) sql += String.format(" and bad_value = '%s'", badValue);
+
+        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, sql, expectedNumberOfErrors);
+    }
+
 
 }

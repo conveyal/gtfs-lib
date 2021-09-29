@@ -1,0 +1,2 @@
+﻿agency_id,agency_name,agency_url,agency_phone,agency_timezone,agency_lang
+1,"Tri Delta Transit","http://trideltatransit.com","(925) 754-4040","America/Los_Angeles","en"

@@ -1,0 +1,2 @@
+route_id,service_id,trip_id,trip_headsign,direction_id,block_id,shape_id
+"300",1,1720,"Eastbound Brentwood Park & Ride",0,167,27
