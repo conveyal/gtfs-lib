@@ -1,0 +1,2 @@
+agency_id,agency_url,agency_lang,agency_name,agency_phone,agency_timezone,agency_fare_url
+1000,http://www.caltrain.com,en,Caltrain,800-660-4287,America/Los_Angeles,
