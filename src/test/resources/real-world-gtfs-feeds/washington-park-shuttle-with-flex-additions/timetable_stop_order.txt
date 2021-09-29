@@ -1,0 +1,1 @@
+timetable_id,stop_id,stop_sequence,stop_name,connected_routes
