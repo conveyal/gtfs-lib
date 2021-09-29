@@ -1,0 +1,2 @@
+service_id,service_name,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
+c_17784_b_29153_d_127,March-September (All days of week),1,1,1,1,1,1,1,20210320,20210930

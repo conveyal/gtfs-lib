@@ -1,0 +1,2 @@
+runs_id,service_id,block_id,run_number,piece_number,start_trip_id,start_stop_id,end_trip_id,end_stop_id
+100000,c_17784_b_29153_d_127,109732,1,1,t_819605_b_29153_tn_frequencies_trip,815440,t_819605_b_29153_tn_frequencies_trip,815440
