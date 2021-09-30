@@ -1,0 +1,3 @@
+service_id,service_name,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
+c_21817_b_30633_d_96,Year Round starting 8/30/21 (Weekend),0,0,0,0,0,1,1,20210830,20220701
+c_21817_b_30633_d_31,Year Round starting 8/30/21 (Weekday),1,1,1,1,1,0,0,20210830,20220701

@@ -46,7 +46,7 @@ public class ForeignRefExistsCheck extends ConditionalRequirement {
             );
         if (lineContext.table.name.equals(referenceTableName) &&
             !POSTGRES_NULL_TEXT.equals(referenceFieldValue) &&
-            !uniqueValuesForFields.get(dependentFieldName).contains(foreignFieldReference)
+            !uniqueValuesForFields.get(dependentFieldName).contains(referenceFieldValue)
         ) {
             errors.add(
                 NewGTFSError.forLine(

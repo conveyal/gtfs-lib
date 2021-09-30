@@ -29,6 +29,10 @@ public class ConditionallyRequiredTest {
     private static DataSource triDeltaDataSource;
     private static String triDeltaNamespace;
 
+    private static String caltrainDBName;
+    private static DataSource caltrainDataSource;
+    private static String caltrainNamespace;
+
     @BeforeAll
     public static void setUpClass() throws IOException {
         VTADBName = TestUtils.generateNewDB();
@@ -38,6 +42,10 @@ public class ConditionallyRequiredTest {
         triDeltaDBName = TestUtils.generateNewDB();
         triDeltaDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", triDeltaDBName));
         triDeltaNamespace = loadFeedAndValidate(triDeltaDataSource, "real-world-gtfs-feeds/tri-delta-fare-rules");
+
+        caltrainDBName = TestUtils.generateNewDB();
+        caltrainDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", caltrainDBName));
+        caltrainNamespace = loadFeedAndValidate(caltrainDataSource, "real-world-gtfs-feeds/caltrain-fare-zones");
     }
 
     /**
@@ -56,6 +64,7 @@ public class ConditionallyRequiredTest {
     public static void tearDownClass() {
         TestUtils.dropDB(VTADBName);
         TestUtils.dropDB(triDeltaDBName);
+        TestUtils.dropDB(caltrainDBName);
     }
 
     @Test
@@ -147,6 +156,25 @@ public class ConditionallyRequiredTest {
             "FareRule",
             "2",
             "1",
+            null,
+            0
+        );
+    }
+
+    /**
+     * Valid foreign key references should not trigger referential integrity errors
+     * (e.g. if the "origin_id" or "destination_id" column from the "fare_rules" table
+     * actually point to a value referenced in the "stops" table).
+     */
+    @Test
+    void shouldNotTriggerRefIntegrityErrorForValidForeignReferences() {
+        checkFeedHasExpectedNumberOfErrors(
+            caltrainNamespace,
+            caltrainDataSource,
+            REFERENTIAL_INTEGRITY,
+            "FareRule",
+            "2",
+            "3526",
             null,
             0
         );
