@@ -1,0 +1,2 @@
+agency_id,route_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_color,route_text_color,route_sort_order,min_headway_minutes,eligibility_restricted,continuous_pickup,continuous_drop_off
+1000,19599,L3,LTD 3,,2,,fcedc7,000000,2,,0,1,1
