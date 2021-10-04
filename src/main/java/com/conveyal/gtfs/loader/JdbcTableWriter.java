@@ -390,6 +390,7 @@ public class JdbcTableWriter implements TableWriter {
     ) throws SQLException {
         // JDBC SQL statements use a one-based index for setting fields/parameters
         List<String> missingFieldNames = new ArrayList<>();
+        // One-based index for prepared statement.
         int index = 1;
         for (Field field : table.editorFields()) {
             if (!jsonObject.has(field.name)) {
@@ -407,6 +408,7 @@ public class JdbcTableWriter implements TableWriter {
             LOG.debug("{}={}", field.name, value);
             try {
                 if (value == null || value.isNull()) {
+                    // If there is a required field missing from the JSON object, an exception will be thrown below.
                     if (field.isRequired() && !field.isEmptyValuePermitted()) {
                         // Only register the field as missing if the value is null, the field is required, and empty
                         // values are not permitted. For example, a null value for fare_attributes#transfers should not
@@ -414,28 +416,34 @@ public class JdbcTableWriter implements TableWriter {
                         missingFieldNames.add(field.name);
                         continue;
                     }
-                    // Handle setting null value on statement
-                    field.setNull(preparedStatement, index);
+                    // Set value to null if empty value is OK and update JSON.
+                    setFieldToNullAndUpdateJson(preparedStatement, jsonObject, field, index);
                 } else {
-                    List<String> values = new ArrayList<>();
+                    // For fields that are not missing, handle setting different field types.
                     if (value.isArray()) {
+                        // Array field type expects comma-delimited values.
+                        List<String> values = new ArrayList<>();
                         for (JsonNode node : value) {
                             values.add(node.asText());
                         }
                         field.setParameter(preparedStatement, index, String.join(",", values));
                     } else {
                         String text = value.asText();
-                        // If the field is a ShortField and the string is empty, set value to null. Otherwise, set
-                        // parameter with string.
-                        if (field instanceof ShortField && text.isEmpty()) field.setNull(preparedStatement, index);
-                        else field.setParameter(preparedStatement, index, text);
+                        // If the string is empty, set value to null (for StringField, ShortField, etc.). Otherwise, set
+                        // parameter with string value.
+                        if (text.isEmpty()) {
+                            // Set field to null and update JSON.
+                            setFieldToNullAndUpdateJson(preparedStatement, jsonObject, field, index);
+                        } else {
+                            field.setParameter(preparedStatement, index, text);
+                        }
                     }
                 }
             } catch (StorageException e) {
                 LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
                 if (field.name.contains("_time")) {
                     // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
-                    // currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
+                    //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
                     try {
                         if (value == null || value.isNull()) {
                             if (field.isRequired()) {
@@ -461,10 +469,10 @@ public class JdbcTableWriter implements TableWriter {
                     throw e;
                 }
             }
+            // Increment index for next field.
             index += 1;
         }
         if (missingFieldNames.size() > 0) {
-//            String joinedFieldNames = missingFieldNames.stream().collect(Collectors.joining(", "));
             throw new SQLException(
                 String.format(
                     "The following field(s) are missing from JSON %s object: %s",
@@ -473,6 +481,23 @@ public class JdbcTableWriter implements TableWriter {
                 )
             );
         }
+    }
+
+    /**
+     * Set field to null in prepared statement and update JSON object that is ultimately returned (see return value of
+     * {@link #update}.) in response to reflect actual database value that will be persisted. This method should be
+     * used in cases where the jsonObject value is missing or detected to be an empty string.
+     */
+    private static void setFieldToNullAndUpdateJson(
+        PreparedStatement preparedStatement,
+        ObjectNode jsonObject,
+        Field field,
+        int oneBasedIndex
+    ) throws SQLException {
+        // Update the jsonObject so that the JSON that gets returned correctly reflects persisted value.
+        jsonObject.set(field.name, null);
+        // Set field to null in prepared statement.
+        field.setNull(preparedStatement, oneBasedIndex);
     }
 
     /**
@@ -609,6 +634,8 @@ public class JdbcTableWriter implements TableWriter {
                     "timepoint",
                     "drop_off_type",
                     "pickup_type",
+                    "continuous_pickup",
+                    "continuous_drop_off",
                     "shape_dist_traveled"
                 );
             }
@@ -1121,6 +1148,8 @@ public class JdbcTableWriter implements TableWriter {
             stopTime.pickup_type = patternStop.pickup_type;
             stopTime.timepoint = patternStop.timepoint;
             stopTime.shape_dist_traveled = patternStop.shape_dist_traveled;
+            stopTime.continuous_drop_off = patternStop.continuous_drop_off;
+            stopTime.continuous_pickup = patternStop.continuous_pickup;
             stopTime.stop_sequence = i;
             // Update stop time with each trip ID and add to batch.
             for (String tripId : tripIds) {
@@ -1280,21 +1309,26 @@ public class JdbcTableWriter implements TableWriter {
         final boolean isCreating = id == null;
         String keyField = table.getKeyFieldName();
         String tableName = String.join(".", namespace, table.name);
-        if (jsonObject.get(keyField) == null || jsonObject.get(keyField).isNull()) {
-            // FIXME: generate key field automatically for certain entities (e.g., trip ID). Maybe this should be
-            // generated for all entities if null?
+        JsonNode val = jsonObject.get(keyField);
+        if (val == null || val.isNull() || val.asText().isEmpty()) {
+            // Handle different cases where the value is missing.
             if ("trip_id".equals(keyField)) {
+                // Generate key field automatically for certain entities (e.g., trip ID).
+                // FIXME: Maybe this should be generated for all entities if null?
                 jsonObject.put(keyField, UUID.randomUUID().toString());
             } else if ("agency_id".equals(keyField)) {
+                // agency_id is not required if there is only one row in the agency table. Otherwise, it is required.
                 LOG.warn("agency_id field for agency id={} is null.", id);
                 int rowSize = getRowCount(tableName, connection);
                 if (rowSize > 1 || (isCreating && rowSize > 0)) {
                     throw new SQLException("agency_id must not be null if more than one agency exists.");
                 }
             } else {
+                // In all other cases where a key field is missing, throw an exception.
                 throw new SQLException(String.format("Key field %s must not be null", keyField));
             }
         }
+        // Re-get the string key value (in case trip_id was added to the JSON object above).
         String keyValue = jsonObject.get(keyField).asText();
         // If updating key field, check that there is no ID conflict on value (e.g., stop_id or route_id)
         TIntSet uniqueIds = getIdsForCondition(tableName, keyField, keyValue, connection);

@@ -1,0 +1,3 @@
+stop_id,stop_code,platform_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,position,direction,wheelchair_boarding
+70261,70261,,San Jose Diridon Caltrain,,37.329239,-121.903011,2272,,0,,America/Los_Angeles,,,1
+70281,70281,,Capitol Caltrain,,37.284102,-121.841955,2273,,0,,America/Los_Angeles,,,1

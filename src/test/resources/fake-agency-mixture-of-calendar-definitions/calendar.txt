@@ -1,0 +1,3 @@
+service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,start_date,end_date
+only-in-calendar-txt,1,1,1,1,1,1,1,20170915,20170917
+in-both-calendar-txt-and-calendar-dates,1,1,1,1,1,1,1,20170918,20170920

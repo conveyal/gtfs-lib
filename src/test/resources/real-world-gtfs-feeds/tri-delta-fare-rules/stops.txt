@@ -1,0 +1,6 @@
+stop_id,stop_code,stop_name,stop_lat,stop_lon,stop_url,zone_id
+33,813644,"Main St & Empire Ave",37.997839,-121.730492,"http://12.155.17.20/RTT/Public/RoutePositionET.aspx?PlatformTag=33",
+421,810930,"Brentwood Blvd & Village Dr",37.941524,-121.696341,"http://12.155.17.20/RTT/Public/RoutePositionET.aspx?PlatformTag=421",
+443,811043,"Main St & Norcross Ln",37.997716,-121.716376,"http://12.155.17.20/RTT/Public/RoutePositionET.aspx?PlatformTag=443",
+610,811425,"Brentwood Park n Ride",37.933838,-121.698755,"http://12.155.17.20/RTT/Public/RoutePositionET.aspx?PlatformTag=610",
+722,817754,"Antioch BART",37.995572,-121.778137,"http://12.155.17.20/RTT/Public/RoutePositionET.aspx?PlatformTag=722",

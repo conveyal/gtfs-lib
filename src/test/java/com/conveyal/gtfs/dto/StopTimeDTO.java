@@ -11,6 +11,8 @@ public class StopTimeDTO {
     public Integer drop_off_type;
     public Integer pickup_type;
     public Double shape_dist_traveled;
+    public int continuous_pickup;
+    public int continuous_drop_off;
 
     /**
      * Empty constructor for deserialization

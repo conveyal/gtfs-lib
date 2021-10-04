@@ -1,0 +1,3 @@
+trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,shape_dist_traveled,timepoint,start_service_area_id,end_service_area_id,start_service_area_radius,end_service_area_radius,continuous_pickup,continuous_drop_off,pickup_booking_rule_id,drop_off_booking_rule_id,start_pickup_dropoff_window,end_pickup_dropoff_window,mean_duration_factor,mean_duration_offset,safe_duration_factor,safe_duration_offset
+303,07:07:00,07:07:00,70281,1,,0,0,40330.9714799222,1,,,,,1,1,,,,,,,,
+303,07:23:00,07:23:00,70261,2,,0,0,48219.5593911282,1,,,,,1,1,,,,,,,,

@@ -1,0 +1,9 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    shapes_as_polylines {
+      shape_id
+      polyline
+    }
+  }
+}

@@ -8,7 +8,7 @@
 
   <groupId>com.conveyal</groupId>
   <artifactId>gtfs-lib</artifactId>
-  <version>5.0.8-SNAPSHOT</version>
+  <version>7.0.2</version>
   <packaging>jar</packaging>
 
   <licenses>
@@ -29,15 +29,15 @@
     </developer>
     <developer>
       <name>Landon Reed</name>
-      <email>lreed@conveyal.com</email>
-      <organization>Conveyal</organization>
-      <organizationUrl>http://conveyal.com/</organizationUrl>
+      <email>landon.reed@ibigroup.com</email>
+      <organization>IBI Group</organization>
+      <organizationUrl>https://ibigroup.com</organizationUrl>
     </developer>
     <developer>
-      <name>Matt Conway</name>
-      <email>mconway@conveyal.com</email>
-      <organization>Conveyal</organization>
-      <organizationUrl>http://conveyal.com/</organizationUrl>
+      <name>Evan Siroky</name>
+      <email>evan.siroky@ibigroup.com</email>
+      <organization>IBI Group</organization>
+      <organizationUrl>https://ibigroup.com</organizationUrl>
     </developer>
   </developers>
 
@@ -50,7 +50,6 @@
 
   <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
-    <geotools.version>14.0</geotools.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
@@ -125,22 +124,6 @@
         </executions>
       </plugin>
       <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.6</version>
-        <executions>
-          <execution>
-            <id>sign-artifacts</id>
-            <!-- We sign in the verify phase, which means it will happen for install and deploy but not package. -->
-            <phase>verify</phase>
-            <goals>
-              <goal>sign</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <plugin>
         <!-- Attach a version of the JAR that includes all dependencies -->
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -162,9 +145,6 @@
                     <Main-Class>com.conveyal.gtfs.GTFSMain</Main-Class>
                   </manifestEntries>
                 </transformer>
-                <!-- files overwrite each other and geotools does not function without this.
-                  http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
               </transformers>
               <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
               <filters>
@@ -201,19 +181,21 @@
           </execution>
         </executions>
       </plugin>
+      <!-- maven-surefire-plugin is needed to run unit tests. -->
+      <plugin>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.22.2</version>
+      </plugin>
     </plugins>
   </build>
 
   <repositories>
     <repository>
-      <id>conveyal</id>
-      <name>Conveyal Maven Repository</name>
-       <url>https://maven.conveyal.com/</url>
-    </repository>
-    <repository>
       <id>osgeo</id>
-      <name>Open Source Geospatial Foundation Repository</name>
-      <url>http://download.osgeo.org/webdav/geotools/</url>
+      <name>OSGeo Release Repository</name>
+      <url>https://repo.osgeo.org/repository/release/</url>
+      <snapshots><enabled>false</enabled></snapshots>
+      <releases><enabled>true</enabled></releases>
     </repository>
     <!--  used for importing java projects from github -->
     <repository>
@@ -229,11 +211,18 @@
       <artifactId>javacsv</artifactId>
       <version>2.0</version>
     </dependency>
-    <!-- JUnit is a Java testing framework. -->
+    <!-- Used for unit testing -->
     <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <version>4.12</version>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>5.7.0</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Used for parameterized tests -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <version>5.6.2</version>
       <scope>test</scope>
     </dependency>
     <!-- Parses command line arguments to main methods. -->
@@ -244,20 +233,20 @@
     </dependency>
     <!-- This package allows you to run tests on code that call System.exit() -->
     <dependency>
-      <groupId>com.github.stefanbirkner</groupId>
-      <artifactId>system-rules</artifactId>
-      <version>1.16.0</version>
+      <groupId>com.ginsberg</groupId>
+      <artifactId>junit5-system-exit</artifactId>
+      <version>1.1.1</version>
       <scope>test</scope>
     </dependency>
     <dependency>
     	<groupId>com.google.guava</groupId>
     	<artifactId>guava</artifactId>
-    	<version>18.0</version>
+    	<version>30.0-jre</version>
     </dependency>
     <dependency>
-    	<groupId>com.vividsolutions</groupId>
-    	<artifactId>jts</artifactId>
-    	<version>1.13</version>
+    	<groupId>org.locationtech.jts</groupId>
+    	<artifactId>jts-core</artifactId>
+    	<version>1.16.1</version>
     </dependency>
     <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
     <dependency>
@@ -294,23 +283,13 @@
     <dependency>
     	<groupId>commons-io</groupId>
     	<artifactId>commons-io</artifactId>
-    	<version>2.4</version>
+    	<version>2.7</version>
     </dependency>
     <!-- Commons DBUtils is a collection of utility methods that help avoid boilerplate when working with SQL. -->
     <dependency>
       <groupId>commons-dbutils</groupId>
       <artifactId>commons-dbutils</artifactId>
       <version>1.6</version>
-    </dependency>
-    <dependency>
-      <groupId>org.geotools</groupId>
-      <artifactId>gt-api</artifactId>
-      <version>${geotools.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.geotools</groupId>
-      <artifactId>gt-epsg-hsql</artifactId>
-      <version>11-beta</version>
     </dependency>
     <!-- For uploading / downloading things from Amazon S3.
          We should really eliminate this functionality, it's out of scope for this gtfs-lib library. -->
@@ -330,12 +309,6 @@
       <groupId>commons-cli</groupId>
       <artifactId>commons-cli</artifactId>
       <version>1.4</version>
-    </dependency>
-    <!-- We should really find a way to do this without forking Jackson -->
-    <dependency>
-      <groupId>com.conveyal</groupId>
-      <artifactId>jackson2-geojson</artifactId>
-      <version>0.8</version>
     </dependency>
     <!-- JDBC support for Postgres databases. More modules would need to be added to access H2, SQLite etc. -->
     <dependency>

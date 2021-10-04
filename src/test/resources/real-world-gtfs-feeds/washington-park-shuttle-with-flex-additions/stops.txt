@@ -1,0 +1,9 @@
+stop_id,stop_code,platform_code,stop_name,stop_desc,stop_lat,stop_lon,zone_id,stop_url,location_type,parent_station,stop_timezone,position,direction,wheelchair_boarding
+815440,1,,TriMet Washington Park MAX Station,"Oregon Zoo, Portland Children's Museum, World Forestry Center, 4T Trail",45.510506,-122.716546,,,0,,America/Los_Angeles,,,0
+815441,2,,Oregon Vietnam Veterans Memorial,"Vietnam Memorial, Hoyt Arboretum trails",45.51234,-122.716857,,,0,,America/Los_Angeles,,,0
+815442,3,,Hoyt Arboretum Visitor Center,"Hoyt Arboretum Visitor Center, Hoyt Arboretum trails",45.515604,-122.716053,,,0,,America/Los_Angeles,,,0
+815446,11,,Lewis & Clark,Pedestrian link to NW 23rd and downtown,45.5210803696698,-122.700742129279,,,0,,America/Los_Angeles,,,0
+815447,4,,Oregon Holocaust Memorial,"Holocaust Memorial, Restrooms, Coming of the White Man Statue",45.521694,-122.704581,,,0,,America/Los_Angeles,,,0
+815448,5,,International Rose Test Garden,,45.518375,-122.706183,,,0,,America/Los_Angeles,,,0
+815449,6,,Archery Range,"Archery Range, Wildwood Trail",45.514268,-122.709812,,,0,,America/Los_Angeles,,,0
+819989,7,,Oregon Vietnam Veterans Memorial,,45.512415,-122.716926,,,0,,America/Los_Angeles,,,0

@@ -1,7 +1,10 @@
 package com.conveyal.gtfs.error;
 
+import com.conveyal.gtfs.loader.LineContext;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Entity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -15,7 +18,7 @@ import java.util.Map;
  * We instead use an enum with final fields for severity and affected entity type.
  */
 public class NewGTFSError {
-
+    private static final Logger LOG = LoggerFactory.getLogger(NewGTFSError.class);
     /** The class of the table in which the error was encountered. */
     public Class<? extends Entity> entityType;
 
@@ -80,6 +83,14 @@ public class NewGTFSError {
         return error;
     }
 
+    // Factory Builder for cases where an entity has not yet been constructed, but we know the line number.
+    public static NewGTFSError forLine(LineContext lineContext, NewGTFSErrorType errorType, String badValue) {
+        NewGTFSError error = new NewGTFSError(lineContext.table.getEntityClass(), errorType);
+        error.lineNumber = lineContext.lineNumber;
+        error.badValue = badValue;
+        return error;
+    }
+
     // Factory Builder for cases where the entity has already been decoded and an error is discovered during validation
     public static NewGTFSError forEntity(Entity entity, NewGTFSErrorType errorType) {
         NewGTFSError error = new NewGTFSError(entity.getClass(), errorType);
@@ -111,15 +122,23 @@ public class NewGTFSError {
         return this;
     }
 
-    // Builder to add entity sequence info from string (values during load stage are passed in as strings from csv
-    // reader)
+    /**
+     * Builder to add entity sequence info from string (values during load stage are passed in as strings from csv
+     * reader).
+     */
     public NewGTFSError setSequence(String sequenceAsString) {
-        try {
-            // Parse int from string value found during load stage.
-            this.entitySequenceNumber = Integer.parseInt(sequenceAsString);
-        } catch (NumberFormatException e) {
-            e.printStackTrace();
+        if (sequenceAsString == null || sequenceAsString.isEmpty()) {
+            // Skip parsing of value if null or empty string literal.
             this.entitySequenceNumber = null;
+        } else {
+            // Otherwise, attempt to parse value.
+            try {
+                // Parse int from string value found during load stage.
+                this.entitySequenceNumber = Integer.parseInt(sequenceAsString);
+            } catch (NumberFormatException e) {
+                LOG.warn("Could not parse int for value: '{}'", sequenceAsString);
+                this.entitySequenceNumber = null;
+            }
         }
         return this;
     }

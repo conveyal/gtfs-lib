@@ -1,26 +1,32 @@
 package com.conveyal.gtfs;
 
-import org.apache.commons.io.FileUtils;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.sql.DataSource;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import static com.conveyal.gtfs.util.Util.randomIdString;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 
 public class TestUtils {
 
     private static final Logger LOG = LoggerFactory.getLogger(TestUtils.class);
-    private static String pgUrl = "jdbc:postgresql://localhost/postgres";
+    private static final String PG_URL = "jdbc:postgresql://localhost/postgres";
+    public static final String PG_TEST_USER = "postgres";
+    public static final String PG_TEST_PASSWORD = "postgres";
 
     /**
      * Forcefully drops a database even if other users are connected to it.
@@ -51,7 +57,9 @@ public class TestUtils {
     private static boolean executeAndClose(String statement) {
         Connection connection;
         try {
-            connection = DriverManager.getConnection(pgUrl);
+            // This connection must be established without GTFS#createDataSource because the "create database" command
+            // cannot run inside a transaction block.
+            connection = DriverManager.getConnection(PG_URL, PG_TEST_USER, PG_TEST_PASSWORD);
         } catch (SQLException e) {
             e.printStackTrace();
             LOG.error("Error connecting to database!");
@@ -75,6 +83,10 @@ public class TestUtils {
             LOG.error("Error closing connection!");
             return false;
         }
+    }
+
+    public static DataSource createTestDataSource (String dbUrl) {
+        return GTFS.createDataSource(dbUrl, PG_TEST_USER, PG_TEST_PASSWORD);
     }
 
     /**
@@ -148,4 +160,56 @@ public class TestUtils {
     public static String fileNameWithDir(String directory, String filename) {
         return String.join(File.separator, directory, filename);
     }
+
+    /**
+     * Asserts that the result of a SQL count statement is equal to an expected value
+     *
+     * @param sql A SQL statement in the form of `SELECT count(*) FROM ...`
+     * @param expectedCount The expected count that is returned from the result of the SQL statement.
+     */
+    public static void assertThatSqlCountQueryYieldsExpectedCount(DataSource dataSource, String sql, int expectedCount) {
+        int count = -1;
+        LOG.info(sql);
+        // Encapsulate connection in try-with-resources to ensure it is closed and does not interfere with other tests.
+        try (Connection connection = dataSource.getConnection()) {
+            ResultSet resultSet = connection.prepareStatement(sql).executeQuery();
+            if (resultSet.next()) {
+                count = resultSet.getInt(1);
+            }
+        } catch (SQLException e) {
+            LOG.error("SQL error encountered", e);
+        }
+        assertThat(
+            "Records matching query should equal expected count.",
+            count,
+            equalTo(expectedCount)
+        );
+    }
+
+    /**
+     * Check that the test feed has expected number of errors for the provided values.
+     */
+    public static void checkFeedHasExpectedNumberOfErrors(
+        String testNamespace,
+        DataSource testDataSource,
+        NewGTFSErrorType errorType,
+        String entityType,
+        String lineNumber,
+        String entityId,
+        String badValue,
+        int expectedNumberOfErrors
+    ) {
+        String sql = String.format("select count(*) from %s.errors where error_type = '%s' and entity_type = '%s' and line_number = '%s'",
+            testNamespace,
+            errorType,
+            entityType,
+            lineNumber);
+
+        if (entityId != null) sql += String.format(" and entity_id = '%s'", entityId);
+        if (badValue != null) sql += String.format(" and bad_value = '%s'", badValue);
+
+        assertThatSqlCountQueryYieldsExpectedCount(testDataSource, sql, expectedNumberOfErrors);
+    }
+
+
 }

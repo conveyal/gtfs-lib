@@ -1,0 +1,2 @@
+agency_id,fare_id,price,currency_type,payment_method,transfers,transfer_duration
+501,1552,0.00,USD,0,,

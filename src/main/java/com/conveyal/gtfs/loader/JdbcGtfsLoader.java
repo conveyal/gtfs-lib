@@ -67,7 +67,7 @@ public class JdbcGtfsLoader {
 
     public static final long INSERT_BATCH_SIZE = 500;
     // Represents null in Postgres text format
-    private static final String POSTGRES_NULL_TEXT = "\\N";
+    public static final String POSTGRES_NULL_TEXT = "\\N";
     private static final Logger LOG = LoggerFactory.getLogger(JdbcGtfsLoader.class);
 
     private String gtfsFilePath;
@@ -92,7 +92,9 @@ public class JdbcGtfsLoader {
         this.dataSource = dataSource;
     }
 
-    /** Get SQL string for creating the feed registry table (AKA, the "feeds" table). */
+    /**
+     * Get SQL string for creating the feed registry table (AKA, the "feeds" table).
+     */
     public static String getCreateFeedRegistrySQL() {
         return "create table if not exists feeds (namespace varchar primary key, md5 varchar, " +
             "sha1 varchar, feed_id varchar, feed_version varchar, filename varchar, loaded_date timestamp, " +
@@ -110,7 +112,7 @@ public class JdbcGtfsLoader {
     // SHA1 took 1072 msec,  9fb356af4be2750f20955203787ec6f95d32ef22
 
     // There appears to be no advantage to loading tables in parallel, as the whole loading process is I/O bound.
-    public FeedLoadResult loadTables () {
+    public FeedLoadResult loadTables() {
 
         // This result object will be returned to the caller to summarize the feed and report any critical errors.
         FeedLoadResult result = new FeedLoadResult();
@@ -135,7 +137,7 @@ public class JdbcGtfsLoader {
             this.tablePrefix = randomIdString();
             result.filename = gtfsFilePath;
             result.uniqueIdentifier = tablePrefix;
-            
+
             // The order of the following four lines should not be changed because the schema needs to be in place
             // before the error storage can be constructed, which in turn needs to exist in case any errors are
             // encountered during the loading process.
@@ -155,14 +157,16 @@ public class JdbcGtfsLoader {
             result.calendarDates = load(Table.CALENDAR_DATES);
             result.routes = load(Table.ROUTES);
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
-            result.fareRules = load(Table.FARE_RULES);
             result.feedInfo = load(Table.FEED_INFO);
             result.shapes = load(Table.SHAPES);
             result.stops = load(Table.STOPS);
+            result.fareRules = load(Table.FARE_RULES);
             result.transfers = load(Table.TRANSFERS);
             result.trips = load(Table.TRIPS); // refs routes
             result.frequencies = load(Table.FREQUENCIES); // refs trips
             result.stopTimes = load(Table.STOP_TIMES);
+            result.translations = load(Table.TRANSLATIONS);
+            result.attributions = load(Table.ATTRIBUTIONS);
             result.errorCount = errorStorage.getErrorCount();
             // This will commit and close the single connection that has been shared between all preceding load steps.
             errorStorage.commitAndClose();
@@ -180,15 +184,15 @@ public class JdbcGtfsLoader {
         }
         return result;
     }
-    
+
     /**
      * Creates a schema/namespace in the database WITHOUT committing the changes.
      * This does *not* setup any other tables or enter the schema name in a registry (@see #registerFeed).
-     * 
+     *
      * @param connection Connection to the database to create the schema on.
      * @param schemaName Name of the schema (i.e. table prefix). Should not include the dot suffix.
      */
-    static void createSchema (Connection connection, String schemaName) {
+    static void createSchema(Connection connection, String schemaName) {
         try {
             Statement statement = connection.createStatement();
             // FIXME do the following only on databases that support schemas.
@@ -205,13 +209,13 @@ public class JdbcGtfsLoader {
      * Add a line to the list of loaded feeds showing that this feed has been loaded.
      * We used to inspect feed_info here so we could make our table prefix based on feed ID and version.
      * Now we just load feed_info like any other table.
-     *         // Create a row in the table of loaded feeds for this feed
+     * // Create a row in the table of loaded feeds for this feed
      * Really this is not just making the table prefix - it's loading the feed_info and should also calculate hashes.
      *
      * Originally we were flattening all feed_info files into one root-level table, but that forces us to drop any
      * custom fields in feed_info.
      */
-    private void registerFeed (File gtfsFile) {
+    private void registerFeed(File gtfsFile) {
 
         // FIXME is this extra CSV reader used anymore? Check comment below.
         // First, inspect feed_info.txt to extract the ID and version.
@@ -243,7 +247,7 @@ public class JdbcGtfsLoader {
             // current_timestamp seems to be the only standard way to get the current time across all common databases.
             // Record total load processing time?
             PreparedStatement insertStatement = connection.prepareStatement(
-                    "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
+                "insert into feeds values (?, ?, ?, ?, ?, ?, current_timestamp, null, false)");
             insertStatement.setString(1, tablePrefix);
             insertStatement.setString(2, md5Hex);
             insertStatement.setString(3, shaHex);
@@ -271,7 +275,7 @@ public class JdbcGtfsLoader {
     /**
      * This wraps the main internal table loader method to catch exceptions and figure out how many errors happened.
      */
-    private TableLoadResult load (Table table) {
+    private TableLoadResult load(Table table) {
         // This object will be returned to the caller to summarize the contents of the table and any errors.
         TableLoadResult tableLoadResult = new TableLoadResult();
         int initialErrorCount = errorStorage.getErrorCount();
@@ -311,9 +315,10 @@ public class JdbcGtfsLoader {
 
     /**
      * This function will throw any exception that occurs. Those exceptions will be handled by the outer load method.
+     *
      * @return number of rows that were loaded.
      */
-    private int loadInternal (Table table) throws Exception {
+    private int loadInternal(Table table) throws Exception {
         CsvReader csvReader = table.getCsvReader(zip, errorStorage);
         if (csvReader == null) {
             LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
@@ -332,7 +337,7 @@ public class JdbcGtfsLoader {
         int keyFieldIndex = table.getKeyFieldIndex(fields);
         // Create separate fields array with filtered list that does not include null values (for duplicate headers or
         // ID field). This is solely used to construct the table and array of values to load.
-        Field[] cleanFields = Arrays.stream(fields).filter(field -> field != null).toArray(Field[]::new);
+        Field[] cleanFields = Arrays.stream(fields).filter(Objects::nonNull).toArray(Field[]::new);
         if (cleanFields.length == 0) {
             // Do not create the table if there are no valid fields.
             errorStorage.storeError(NewGTFSError.forTable(table, TABLE_MISSING_COLUMN_HEADERS));
@@ -363,7 +368,7 @@ public class JdbcGtfsLoader {
         // When outputting text, accumulate transformed strings to allow skipping rows when errors are encountered.
         // One extra position in the array for the CSV line number.
         String[] transformedStrings = new String[cleanFields.length + 1];
-
+        boolean tableHasConditionalRequirements = table.hasConditionalRequirements();
         // Iterate over each record and prepare the record for storage in the table either through batch insert
         // statements or postgres text copy operation.
         while (csvReader.readRecord()) {
@@ -373,6 +378,7 @@ public class JdbcGtfsLoader {
                 errorStorage.storeError(NewGTFSError.forTable(table, TABLE_TOO_LONG));
                 break;
             }
+            // Line 1 is considered the header row, so the first actual row of data will be line 2.
             int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
             if (lineNumber % 500_000 == 0) LOG.info("Processed {}", human(lineNumber));
             if (csvReader.getColumnCount() != fields.length) {
@@ -403,10 +409,10 @@ public class JdbcGtfsLoader {
                 // error.
                 if (
                     table.name.equals("calendar_dates") &&
-                    "service_id".equals(field.name) &&
-                    "1".equals(csvReader.get(Field.getFieldIndex(fields, "exception_type")))
+                        "service_id".equals(field.name) &&
+                        "1".equals(csvReader.get(Field.getFieldIndex(fields, "exception_type")))
 
-                ){
+                ) {
                     for (NewGTFSError error : errors) {
                         if (NewGTFSErrorType.REFERENTIAL_INTEGRITY.equals(error.errorType)) {
                             // Do not record bad service_id reference errors for calendar date entries that add service
@@ -429,6 +435,12 @@ public class JdbcGtfsLoader {
                 setValueForField(table, columnIndex, lineNumber, field, string, postgresText, transformedStrings);
                 // Increment column index.
                 columnIndex += 1;
+            }
+            if (tableHasConditionalRequirements) {
+                LineContext lineContext = new LineContext(table, fields, transformedStrings, lineNumber);
+                errorStorage.storeErrors(
+                    referenceTracker.checkConditionallyRequiredFields(lineContext)
+                );
             }
             if (postgresText) {
                 // Print a new line in the standard postgres text format:
@@ -481,7 +493,7 @@ public class JdbcGtfsLoader {
         InputStream stream = new BufferedInputStream(new FileInputStream(file.getAbsolutePath()));
         // Our connection pool wraps the Connection objects, so we need to unwrap the Postgres connection interface.
         CopyManager copyManager = new CopyManager(connection.unwrap(BaseConnection.class));
-        copyManager.copyIn(copySql, stream, 1024*1024);
+        copyManager.copyIn(copySql, stream, 1024 * 1024);
         stream.close();
         // It is also possible to load from local file if this code is running on the database server.
         // statement.execute(String.format("copy %s from '%s'", table.name, tempTextFile.getAbsolutePath()));
@@ -515,9 +527,12 @@ public class JdbcGtfsLoader {
                 if (postgresText) {
                     ValidateFieldResult<String> result = field.validateAndConvert(string);
                     // If the result is null, use the null-setting method.
-                    if (result.clean == null) setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
-                    // Otherwise, set the cleaned field according to its index.
-                    else transformedStrings[fieldIndex + 1] = result.clean;
+                    if (result.clean == null) {
+                        setFieldToNull(postgresText, transformedStrings, fieldIndex, field);
+                    } else {
+                        // Otherwise, set the cleaned field according to its index.
+                        transformedStrings[fieldIndex + 1] = result.clean;
+                    }
                     errors = result.errors;
                 } else {
                     errors = field.setParameter(insertStatement, fieldIndex + 2, string);
@@ -543,15 +558,18 @@ public class JdbcGtfsLoader {
      * Sets field to null in statement or string array depending on whether postgres is being used.
      */
     private void setFieldToNull(boolean postgresText, String[] transformedStrings, int fieldIndex, Field field) {
-        if (postgresText) transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
-        // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
-        else try {
-            // LOG.info("setting {} index to null", fieldIndex + 2);
-            field.setNull(insertStatement, fieldIndex + 2);
-        } catch (SQLException e) {
-            e.printStackTrace();
-            // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
-            // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
+        if (postgresText) {
+            transformedStrings[fieldIndex + 1] = POSTGRES_NULL_TEXT;
+        } else {
+            // Adjust parameter index by two: indexes are one-based and the first one is the CSV line number.
+            try {
+                // LOG.info("setting {} index to null", fieldIndex + 2);
+                field.setNull(insertStatement, fieldIndex + 2);
+            } catch (SQLException e) {
+                e.printStackTrace();
+                // FIXME: store error here? It appears that an exception should only be thrown if the type value is invalid,
+                // the connection is closed, or the index is out of bounds. So storing an error may be unnecessary.
+            }
         }
     }
 
@@ -563,7 +581,7 @@ public class JdbcGtfsLoader {
      *
      * TODO add a test including SQL injection text (quote and semicolon)
      */
-    public static String sanitize (String string, SQLErrorStorage errorStorage) {
+    public static String sanitize(String string, SQLErrorStorage errorStorage) {
         String clean = string.replaceAll("[^\\p{Alnum}_]", "");
         if (!clean.equals(string)) {
             LOG.warn("SQL identifier '{}' was sanitized to '{}'", string, clean);

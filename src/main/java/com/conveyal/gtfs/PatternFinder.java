@@ -11,10 +11,11 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.CoordinateList;
-import com.vividsolutions.jts.geom.LineString;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.CoordinateList;
+import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,6 +24,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -44,7 +46,7 @@ public class PatternFinder {
     private static final Logger LOG = LoggerFactory.getLogger(PatternFinder.class);
 
     // A multi-map that groups trips together by their sequence of stops
-    private Multimap<TripPatternKey, Trip> tripsForPattern = HashMultimap.create();
+    private Multimap<TripPatternKey, Trip> tripsForPattern = LinkedHashMultimap.create();
 
     private int nTripsProcessed = 0;
 
@@ -86,7 +88,8 @@ public class PatternFinder {
         // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
         int nextPatternId = 1;
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
-        Map<TripPatternKey, Pattern> patterns = new HashMap<>();
+        // Use a LinkedHashMap so we can retrieve the entrySets later in the order of insertion.
+        Map<TripPatternKey, Pattern> patterns = new LinkedHashMap<>();
         // TODO assign patterns sequential small integer IDs (may include route)
         for (TripPatternKey key : tripsForPattern.keySet()) {
             Collection<Trip> trips = tripsForPattern.get(key);

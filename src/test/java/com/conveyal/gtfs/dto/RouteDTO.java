@@ -21,6 +21,9 @@ public class RouteDTO {
     public String route_text_color;
     public Integer publicly_visible;
     public Integer wheelchair_accessible;
-    public Integer route_sort_order;
+    /** This field is incorrectly set to String in order to test how empty string literals are persisted to the database. */
+    public String route_sort_order;
     public Integer status;
+    public int continuous_pickup;
+    public int continuous_drop_off;
 }

@@ -4,18 +4,21 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.google.common.collect.ListMultimap;
-import com.google.common.collect.MultimapBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.MISSING_ARRIVAL_OR_DEPARTURE;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRIP_TOO_FEW_STOP_TIMES;
 
 /**
  * Check that the travel times between adjacent stops in trips are reasonable.
@@ -114,6 +117,8 @@ public class NewTripTimesValidator extends FeedValidator {
             registerError(stopTime, MISSING_ARRIVAL_OR_DEPARTURE);
             fixMissingTimes(stopTime);
             if (missingEitherTime(stopTime)) {
+                //TODO: Is this even needed? Already covered by MISSING_ARRIVAL_OR_DEPARTURE.
+                registerError(stopTime, CONDITIONALLY_REQUIRED, "First and last stop times are required to have both an arrival and departure time.");
                 return true;
             }
         }
@@ -135,17 +140,22 @@ public class NewTripTimesValidator extends FeedValidator {
             // This error should already have been caught TODO verify.
             return;
         }
+
         // Our code should only call this method with non-null stopTimes.
         if (stopTimes.size() < 2) {
             registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
             return;
         }
+        boolean hasContinuousBehavior = false;
         // Make a parallel list of stops based on the stop_times for this trip.
         // We will remove any stop_times for stops that don't exist in the feed.
         // We could ask the SQL server to do the join between stop_times and stops, but we want to check references.
         List<Stop> stops = new ArrayList<>();
         for (Iterator<StopTime> it = stopTimes.iterator(); it.hasNext(); ) {
             StopTime stopTime = it.next();
+            if (hasContinuousBehavior(stopTime.continuous_drop_off, stopTime.continuous_pickup)) {
+                hasContinuousBehavior = true;
+            }
             Stop stop = stopById.get(stopTime.stop_id);
             if (stop == null) {
                 // All bad references should have been recorded at import, we can just remove them from the trips.
@@ -166,6 +176,18 @@ public class NewTripTimesValidator extends FeedValidator {
         // All bad references should have been recorded at import and null trip check is handled above, we can just
         // ignore nulls.
         Route route = routeById.get(trip.route_id);
+        if (route != null &&
+            hasContinuousBehavior(route.continuous_drop_off, route.continuous_pickup)) {
+            hasContinuousBehavior = true;
+        }
+
+        if (trip.shape_id == null && hasContinuousBehavior) {
+            registerError(
+                trip,
+                CONDITIONALLY_REQUIRED,
+                "shape_id is required when a trip has continuous behavior defined."
+            );
+        }
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
         for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
     }
@@ -181,4 +203,17 @@ public class NewTripTimesValidator extends FeedValidator {
         }
     }
 
+    /**
+     * Determine if a trip has continuous behaviour by checking the values that have been defined for continuous drop
+     * off and pickup.
+     */
+    private boolean hasContinuousBehavior(int continuousDropOff, int continuousPickup) {
+        return
+            continuousDropOff == 0 ||
+            continuousDropOff == 2 ||
+            continuousDropOff == 3 ||
+            continuousPickup == 0 ||
+            continuousPickup == 2 ||
+            continuousPickup == 3;
+    }
 }

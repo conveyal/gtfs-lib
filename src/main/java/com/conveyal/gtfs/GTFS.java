@@ -7,6 +7,7 @@ import com.conveyal.gtfs.loader.JdbcGtfsLoader;
 import com.conveyal.gtfs.loader.JdbcGtfsSnapshotter;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.conveyal.gtfs.validator.FeedValidatorCreator;
 import com.conveyal.gtfs.validator.ValidationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.Files;
@@ -15,10 +16,10 @@ import org.apache.commons.dbcp2.ConnectionFactory;
 import org.apache.commons.dbcp2.DriverManagerConnectionFactory;
 import org.apache.commons.dbcp2.PoolableConnectionFactory;
 import org.apache.commons.dbcp2.PoolingDataSource;
-import org.apache.commons.dbutils.DbUtils;
 import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.IOException;
@@ -28,7 +29,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
@@ -81,22 +81,30 @@ public abstract class GTFS {
      *   1. The tables' id column has been modified to be auto-incrementing.
      *   2. Primary keys may be added to certain columns/tables.
      *   3. Additional editor-specific columns are added to certain tables.
-     * @param feedId        feed ID (schema namespace) to copy from
-     * @param dataSource    JDBC connection to existing database
-     * @return              FIXME should this be a separate SnapshotResult object?
+     * @param feedId                feed ID (schema namespace) to copy from
+     * @param dataSource            JDBC connection to existing database
+     * @param normalizeStopTimes    whether to normalize stop sequence values on snapshot
+     * @return the result of the snapshot
      */
-    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource) {
-        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource);
+    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource, boolean normalizeStopTimes) {
+        JdbcGtfsSnapshotter snapshotter = new JdbcGtfsSnapshotter(feedId, dataSource, normalizeStopTimes);
         SnapshotResult result = snapshotter.copyTables();
         return result;
     }
 
     /**
+     * Overloaded makeSnapshot method that defaults to normalize stop times.
+     */
+    public static SnapshotResult makeSnapshot (String feedId, DataSource dataSource) {
+        return makeSnapshot(feedId, dataSource, true);
+    }
+
+    /**
      * Once a feed has been loaded into the database, examine its contents looking for various problems and errors.
      */
-    public static ValidationResult validate (String feedId, DataSource dataSource) {
+    public static ValidationResult validate (String feedId, DataSource dataSource, FeedValidatorCreator... additionalValidators) {
         Feed feed = new Feed(dataSource, feedId);
-        ValidationResult result = feed.validate();
+        ValidationResult result = feed.validate(additionalValidators);
         return result;
     }
 
@@ -277,7 +285,7 @@ public abstract class GTFS {
             }
             if (namespaceToSnapshot != null) {
                 LOG.info("Snapshotting feed with unique identifier {}", namespaceToSnapshot);
-                FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource);
+                FeedLoadResult snapshotResult = makeSnapshot(namespaceToSnapshot, dataSource, false);
                 if (storeResults) {
                     File snapshotResultFile = new File(directory, String.format("%s-snapshot.json", snapshotResult.uniqueIdentifier));
                     LOG.info("Storing validation result at {}", snapshotResultFile.getAbsolutePath());

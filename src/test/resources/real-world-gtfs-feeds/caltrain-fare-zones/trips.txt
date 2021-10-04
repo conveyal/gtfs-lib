@@ -1,0 +1,2 @@
+route_id,service_id,trip_id,trip_short_name,trip_headsign,direction_id,block_id,shape_id,bikes_allowed,wheelchair_accessible,trip_type,drt_max_travel_time,drt_avg_travel_time,drt_advance_book_min,drt_pickup_message,drt_drop_off_message,continuous_pickup_message,continuous_drop_off_message
+19599,c_21817_b_30633_d_31,303,303,San Francisco,0,,p_1277282,,,,,,,,,,

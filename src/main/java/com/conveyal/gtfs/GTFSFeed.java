@@ -6,14 +6,14 @@ import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.Validator;
+import com.conveyal.gtfs.util.Util;
 import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.*;
 import com.google.common.eventbus.EventBus;
 import com.google.common.util.concurrent.ExecutionError;
-import com.vividsolutions.jts.algorithm.ConvexHull;
-import com.vividsolutions.jts.geom.*;
-import com.vividsolutions.jts.index.strtree.STRtree;
-import org.geotools.referencing.GeodeticCalculator;
+import org.locationtech.jts.algorithm.ConvexHull;
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.index.strtree.STRtree;
 import org.mapdb.BTreeMap;
 import org.mapdb.DB;
 import org.mapdb.DBMaker;
@@ -65,6 +65,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Stop> stops;
     public final Map<String, Transfer> transfers;
     public final BTreeMap<String, Trip> trips;
+    public final Map<String, Translation> translations;
+    public final Map<String, Attribution> attributions;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -75,17 +77,6 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Map from 2-tuples of (trip_id, stop_sequence) to stoptimes. */
     public final BTreeMap<Tuple2, StopTime> stop_times;
-
-//    public final ConcurrentMap<String, Long> stopCountByStopTime;
-
-    // TODO: Remove these indexes from GTFSFeed.
-//    /* Map from stop (stop_id) to stopTimes tuples (trip_id, stop_sequence) */
-//    public final NavigableSet<Tuple2<String, Tuple2>> stopStopTimeSet;
-//    public final ConcurrentMap<String, Long> stopCountByStopTime;
-//
-//    public final NavigableSet<Tuple2<String, String>> tripsPerService;
-//
-//    public final NavigableSet<Tuple2<String, String>> servicesPerDate;
 
     /* A fare is a fare_attribute and all fare_rules that reference that fare_attribute. */
     public final Map<String, Fare> fares;
@@ -421,14 +412,10 @@ public class GTFSFeed implements Cloneable, Closeable {
                 double totalLengthOfInterpolatedSection = 0;
                 double[] lengthOfInterpolatedSections = new double[nInterpolatedStops];
 
-                GeodeticCalculator calc = new GeodeticCalculator();
-
                 for (int stopTimeToInterpolate = startOfInterpolatedBlock, i = 0; stopTimeToInterpolate < stopTime; stopTimeToInterpolate++, i++) {
                     Stop start = stops.get(stopTimes[stopTimeToInterpolate - 1].stop_id);
                     Stop end = stops.get(stopTimes[stopTimeToInterpolate].stop_id);
-                    calc.setStartingGeographicPoint(start.stop_lon, start.stop_lat);
-                    calc.setDestinationGeographicPoint(end.stop_lon, end.stop_lat);
-                    double segLen = calc.getOrthodromicDistance();
+                    double segLen = Util.fastDistance(start.stop_lat, start.stop_lon, end.stop_lat, end.stop_lon);
                     totalLengthOfInterpolatedSection += segLen;
                     lengthOfInterpolatedSections[i] = segLen;
                 }
@@ -436,9 +423,7 @@ public class GTFSFeed implements Cloneable, Closeable {
                 // add the segment post-last-interpolated-stop
                 Stop start = stops.get(stopTimes[stopTime - 1].stop_id);
                 Stop end = stops.get(stopTimes[stopTime].stop_id);
-                calc.setStartingGeographicPoint(start.stop_lon, start.stop_lat);
-                calc.setDestinationGeographicPoint(end.stop_lon, end.stop_lat);
-                totalLengthOfInterpolatedSection += calc.getOrthodromicDistance();
+                totalLengthOfInterpolatedSection += Util.fastDistance(start.stop_lat, start.stop_lon, end.stop_lat, end.stop_lon);
 
                 int departureBeforeInterpolation = stopTimes[startOfInterpolatedBlock - 1].departure_time;
                 int arrivalAfterInterpolation = stopTimes[stopTime].arrival_time;
@@ -652,6 +637,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         fares = db.getTreeMap("fares");
         services = db.getTreeMap("services");
         shape_points = db.getTreeMap("shape_points");
+        translations = db.getTreeMap("translations");
+        attributions = db.getTreeMap("attributions");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();
