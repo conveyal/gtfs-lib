@@ -28,21 +28,21 @@ public class ParentStationValidator extends FeedValidator {
 
     @Override
     public void validate () {
-        Multimap<String, Stop> stopsForparentStations = HashMultimap.create();
+        Multimap<String, Stop> stopsForParentStations = HashMultimap.create();
         Set<String> stopIds = new HashSet<>();
         for (Stop stop : feed.stops) {
             // Collect all stop_ids found in feed.
             stopIds.add(stop.stop_id);
             // Collect all non-null parent_station values.
             if (stop.parent_station != null) {
-                stopsForparentStations.put(stop.parent_station, stop);
+                stopsForParentStations.put(stop.parent_station, stop);
             }
         }
         // Find parent_station values that do not reference a valid stop_id from feed.
-        Sets.SetView<String> badReferences = Sets.difference(stopsForparentStations.keySet(), stopIds);
+        Sets.SetView<String> badReferences = Sets.difference(stopsForParentStations.keySet(), stopIds);
         for (String parentStation : badReferences) {
             // For any bad parent_station ref (this could be more than one stop), add an error to the error storage.
-            Collection<Stop> stops = stopsForparentStations.get(parentStation);
+            Collection<Stop> stops = stopsForParentStations.get(parentStation);
             for (Stop stop : stops) {
                 registerError(
                     NewGTFSError
