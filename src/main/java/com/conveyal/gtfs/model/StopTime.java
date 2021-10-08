@@ -89,8 +89,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.stop_headsign  = getStringField("stop_headsign", false);
             st.pickup_type    = getIntField("pickup_type", false, 0, 3); // TODO add ranges as parameters
             st.drop_off_type  = getIntField("drop_off_type", false, 0, 3);
-            st.continuous_pickup = getIntField("continuous_pickup", true, 0, 3);
-            st.continuous_drop_off = getIntField("continuous_drop_off", true, 0, 3);
+            st.continuous_pickup = getIntField("continuous_pickup", false, 0, 3, INT_MISSING);
+            st.continuous_drop_off = getIntField("continuous_drop_off", false, 0, 3, INT_MISSING);
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
             st.feed           = null; // this could circular-serialize the whole feed
