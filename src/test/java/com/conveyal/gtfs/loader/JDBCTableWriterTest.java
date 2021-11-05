@@ -7,6 +7,7 @@ import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.dto.LocationGroupDTO;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
 import com.conveyal.gtfs.dto.RouteDTO;
@@ -15,6 +16,7 @@ import com.conveyal.gtfs.dto.ShapePointDTO;
 import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -416,6 +418,61 @@ public class JDBCTableWriterTest {
 
         // make sure route record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdBookingRule.id, bookingRuleTable));
+    }
+
+    @Test
+    public void canCreateUpdateAndDeleteLocationGroups() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table locationGroupsTable = Table.LOCATION_GROUPS;
+        final Class<LocationGroupDTO> locationGroupDTOClass = LocationGroupDTO.class;
+
+        // create new object to be saved
+        String locationGroupId = "4153";
+        LocationGroupDTO createdLocationGroup = createSimpleTestLocationGroup(locationGroupId);
+        // Set value to empty strings/null to later verify that it is set to null in the database.
+        createdLocationGroup.location_group_name = "";
+        // make sure saved data matches expected data
+        assertThat(createdLocationGroup.location_group_id, equalTo(locationGroupId));
+        // Check that booking rule exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationGroup.id, Table.LOCATION_GROUPS), 1);
+        // try to update record
+        String updatedLocationGroupId = "3514";
+        createdLocationGroup.location_group_id = updatedLocationGroupId;
+
+        // convert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(locationGroupsTable);
+        String updateOutput = updateTableWriter.update(
+            createdLocationGroup.id,
+                mapper.writeValueAsString(createdLocationGroup),
+                true
+        );
+        LOG.info("update {} output:", locationGroupsTable.name);
+        LOG.info(updateOutput);
+
+        LocationGroupDTO updatedLocationGroupDTO = mapper.readValue(updateOutput, locationGroupDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedLocationGroupDTO.location_group_id, equalTo(updatedLocationGroupId));
+        // Ensure message is null (not empty string).
+        LOG.info("location_group_name: {}", updatedLocationGroupDTO.location_group_name);
+        assertNull(updatedLocationGroupDTO.location_group_name);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedLocationGroupDTO.id, locationGroupsTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "location_group_id", equalTo(createdLocationGroup.location_group_id));
+            assertResultValue(resultSet, "location_id", equalTo(createdLocationGroup.location_id));
+            assertResultValue(resultSet, "location_group_name", Matchers.nullValue());
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationGroupsTable);
+        int deleteOutput = deleteTableWriter.delete(
+            createdLocationGroup.id,
+                true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, locationGroupsTable.name);
+
+        // make sure route record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocationGroup.id, locationGroupsTable));
     }
 
     /**
@@ -972,6 +1029,25 @@ public class JDBCTableWriterTest {
         LOG.info(output);
         // parse output
         return mapper.readValue(output, BookingRuleDTO.class);
+    }
+
+    /**
+     * Create and store a simple location group for testing.
+     */
+    private static LocationGroupDTO createSimpleTestLocationGroup(String locationGroupId)
+        throws InvalidNamespaceException, IOException, SQLException {
+
+        LocationGroupDTO locationGroup = new LocationGroupDTO();
+        locationGroup.location_group_id = locationGroupId;
+        locationGroup.location_id = "1";
+        locationGroup.location_group_name = "This is the location group name";
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.LOCATION_GROUPS);
+        String output = createTableWriter.create(mapper.writeValueAsString(locationGroup), true);
+        LOG.info("create {} output:", Table.LOCATION_GROUPS.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, LocationGroupDTO.class);
     }
 
     /**

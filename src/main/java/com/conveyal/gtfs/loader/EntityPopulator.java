@@ -7,6 +7,7 @@ import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -238,6 +239,14 @@ public interface EntityPopulator<T> {
         return bookingRule;
     };
 
+    EntityPopulator<LocationGroup> LOCATION_GROUP = (result, columnForName) -> {
+        LocationGroup locationGroup = new LocationGroup();
+        locationGroup.location_group_id = getStringIfPresent(result, "location_group_id", columnForName);
+        locationGroup.location_id = getStringIfPresent(result, "location_id", columnForName);
+        locationGroup.location_group_name = getStringIfPresent(result, "location_group_name", columnForName);
+        return locationGroup;
+    };
+    
     // The reason we're passing in the columnForName map is that resultSet.getX(columnName) throws an exception
     // when the column is not present.
     // Exceptions should only be used in exceptional circumstances (ones that should be logged as errors).

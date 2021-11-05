@@ -19,6 +19,7 @@ import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.gtfs.model.FareRule;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
@@ -402,7 +403,7 @@ public class Table {
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#gtfs-bookingrules
     public static final Table BOOKING_RULES = new Table("booking_rules", BookingRule.class, OPTIONAL,
-            new StringField("booking_rule_id", OPTIONAL),
+            new StringField("booking_rule_id", REQUIRED),
             new ShortField("booking_type", OPTIONAL, 2),
             new IntegerField("prior_notice_duration_min", OPTIONAL),
             new IntegerField("prior_notice_duration_max", OPTIONAL),
@@ -416,7 +417,16 @@ public class Table {
             new StringField("drop_off_message", OPTIONAL),
             new StringField("phone_number", OPTIONAL),
             new URLField("info_url", OPTIONAL),
-            new URLField("booking_url", OPTIONAL));
+            new URLField("booking_url", OPTIONAL)
+    );
+
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
+    public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
+            new StringField("location_group_id", REQUIRED),
+            //FIXME: location id 'isReferenceTo' STOPS and locations.geojson. Both is not an option.
+            new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
+            new StringField("location_group_name", OPTIONAL)
+    );
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
@@ -438,7 +448,8 @@ public class Table {
         FREQUENCIES,
         TRANSLATIONS,
         ATTRIBUTIONS,
-        BOOKING_RULES
+        BOOKING_RULES,
+        LOCATION_GROUPS
     };
 
     /**

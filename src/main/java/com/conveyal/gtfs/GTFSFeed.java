@@ -59,6 +59,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency> agency;
     public final Map<String, BookingRule> bookingRules;
+    public final Map<String, LocationGroup> locationGroup;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
@@ -646,6 +647,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         calenders = db.getTreeMap("calenders");
         // TODO: I think this needs to come after calenders for ref checks.
         bookingRules = db.getTreeMap("booking_rules");
+        locationGroup = db.getTreeMap("location_groups");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();

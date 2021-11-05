@@ -36,6 +36,7 @@ public class Feed {
     public final TableReader<CalendarDate>  calendarDates;
     public final TableReader<FareAttribute> fareAttributes;
     public final TableReader<Frequency>     frequencies;
+    public final TableReader<LocationGroup> locationGroups;
     public final TableReader<Route>         routes;
     public final TableReader<Stop>          stops;
     public final TableReader<Trip>          trips;
@@ -55,6 +56,7 @@ public class Feed {
         bookingRules = new JDBCTableReader(Table.BOOKING_RULES, dataSource, tablePrefix, EntityPopulator.BOOKING_RULE);
         fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, tablePrefix, EntityPopulator.FARE_ATTRIBUTE);
         frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, tablePrefix, EntityPopulator.FREQUENCY);
+        locationGroups = new JDBCTableReader(Table.LOCATION_GROUPS, dataSource, tablePrefix, EntityPopulator.LOCATION_GROUP);
         calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
         calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
