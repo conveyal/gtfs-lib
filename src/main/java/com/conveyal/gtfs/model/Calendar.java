@@ -110,6 +110,9 @@ public class Calendar extends Entity implements Serializable {
                 c.feed = feed;
                 c.feed_id = feed.feedId;
                 service.calendar = c;
+                // Attempting to put a null key or value will cause an NPE in BTreeMap
+                if (c.service_id != null) feed.calenders.put(c.service_id, c);
+
             }
 
         }    

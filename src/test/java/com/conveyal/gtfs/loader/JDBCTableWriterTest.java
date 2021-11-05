@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
+import com.conveyal.gtfs.dto.BookingRuleDTO;
 import com.conveyal.gtfs.dto.CalendarDTO;
 import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
@@ -316,8 +317,8 @@ public class JDBCTableWriterTest {
         createdRoute.route_sort_order = "";
         // make sure saved data matches expected data
         assertThat(createdRoute.route_id, equalTo(routeId));
-        // TODO: Verify with a SQL query that the database now contains the created data (we may need to use the same
-        //       db connection to do this successfully?)
+        // Check that route exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdRoute.id, Table.ROUTES), 1);
 
         // try to update record
         String updatedRouteId = "600";
@@ -358,6 +359,63 @@ public class JDBCTableWriterTest {
 
         // make sure route record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdRoute.id, routeTable));
+    }
+
+    @Test
+    public void canCreateUpdateAndDeleteBookingRules() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table bookingRuleTable = Table.BOOKING_RULES;
+        final Class<BookingRuleDTO> bookingRuleDTOClass = BookingRuleDTO.class;
+
+        // create new object to be saved
+        String bookingRuleId = "9471";
+        BookingRuleDTO createdBookingRule = createSimpleTestBookingRule(bookingRuleId);
+        // Set values to empty strings/null to later verify that they are set to null in the database.
+        createdBookingRule.message = "";
+        createdBookingRule.pickup_message = "";
+        // make sure saved data matches expected data
+        assertThat(createdBookingRule.booking_rule_id, equalTo(bookingRuleId));
+        // Check that booking rule exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdBookingRule.id, Table.BOOKING_RULES), 1);
+        // try to update record
+        String updatedBookingRuleId = "1749";
+        createdBookingRule.booking_rule_id = updatedBookingRuleId;
+
+        // convert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(bookingRuleTable);
+        String updateOutput = updateTableWriter.update(
+                createdBookingRule.id,
+                mapper.writeValueAsString(createdBookingRule),
+                true
+        );
+        LOG.info("update {} output:", bookingRuleTable.name);
+        LOG.info(updateOutput);
+
+        BookingRuleDTO updatedBookingRuleDTO = mapper.readValue(updateOutput, bookingRuleDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedBookingRuleDTO.booking_rule_id, equalTo(updatedBookingRuleId));
+        // Ensure message is null (not empty string).
+        LOG.info("message: {}", updatedBookingRuleDTO.message);
+        assertNull(updatedBookingRuleDTO.message);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedBookingRuleDTO.id, bookingRuleTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "booking_rule_id", equalTo(createdBookingRule.booking_rule_id));
+            assertResultValue(resultSet, "message", Matchers.nullValue());
+            assertResultValue(resultSet, "prior_notice_duration_min", equalTo(createdBookingRule.prior_notice_duration_min));
+            assertResultValue(resultSet, "prior_notice_duration_max", equalTo(createdBookingRule.prior_notice_duration_max));
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(bookingRuleTable);
+        int deleteOutput = deleteTableWriter.delete(
+                createdBookingRule.id,
+                true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, bookingRuleTable.name);
+
+        // make sure route record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdBookingRule.id, bookingRuleTable));
     }
 
     /**
@@ -894,6 +952,26 @@ public class JDBCTableWriterTest {
         LOG.info(output);
         // parse output
         return mapper.readValue(output, RouteDTO.class);
+    }
+
+    /**
+     * Create and store a simple booking rule for testing.
+     */
+    private static BookingRuleDTO createSimpleTestBookingRule(String bookingRuleId)
+        throws InvalidNamespaceException, IOException, SQLException {
+
+        BookingRuleDTO bookingRule = new BookingRuleDTO();
+        bookingRule.booking_rule_id = bookingRuleId;
+        bookingRule.booking_type = 1;
+        bookingRule.prior_notice_duration_min = 60;
+        bookingRule.prior_notice_duration_max = 120;
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.BOOKING_RULES);
+        String output = createTableWriter.create(mapper.writeValueAsString(bookingRule), true);
+        LOG.info("create {} output:", Table.BOOKING_RULES.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, BookingRuleDTO.class);
     }
 
     /**

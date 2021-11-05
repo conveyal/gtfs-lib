@@ -58,6 +58,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency> agency;
+    public final Map<String, BookingRule> bookingRules;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
@@ -67,6 +68,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final BTreeMap<String, Trip> trips;
     public final Map<String, Translation> translations;
     public final Map<String, Attribution> attributions;
+    public final Map<String, Calendar> calenders;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -152,6 +154,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         db.getAtomicString("feed_id").set(feedId);
 
         new Agency.Loader(this).loadTable(zip);
+        new BookingRule.Loader(this).loadTable(zip);
 
         // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
@@ -205,6 +208,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
 
             new Agency.Writer(this).writeTable(zip);
+            new BookingRule.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
             new FareAttribute.Writer(this).writeTable(zip);
@@ -639,6 +643,9 @@ public class GTFSFeed implements Cloneable, Closeable {
         shape_points = db.getTreeMap("shape_points");
         translations = db.getTreeMap("translations");
         attributions = db.getTreeMap("attributions");
+        calenders = db.getTreeMap("calenders");
+        // TODO: I think this needs to come after calenders for ref checks.
+        bookingRules = db.getTreeMap("booking_rules");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();

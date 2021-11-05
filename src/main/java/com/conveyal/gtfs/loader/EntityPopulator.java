@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Agency;
+import com.conveyal.gtfs.model.BookingRule;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
@@ -215,6 +216,26 @@ public interface EntityPopulator<T> {
         stopTime.timepoint           = getIntIfPresent   (result, "timepoint", columnForName);
         stopTime.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
         return stopTime;
+    };
+
+    EntityPopulator<BookingRule> BOOKING_RULE = (result, columnForName) -> {
+        BookingRule bookingRule = new BookingRule();
+        bookingRule.booking_rule_id = getStringIfPresent(result, "bookingRule", columnForName);
+        bookingRule.booking_type = getIntIfPresent(result, "booking_type", columnForName);
+        bookingRule.prior_notice_duration_min = getIntIfPresent(result, "prior_notice_duration_min", columnForName);
+        bookingRule.prior_notice_duration_max = getIntIfPresent(result, "prior_notice_duration_max", columnForName);
+        bookingRule.prior_notice_last_day = getIntIfPresent(result, "prior_notice_last_day", columnForName);
+        bookingRule.prior_notice_last_time = getIntIfPresent(result, "prior_notice_last_time", columnForName);
+        bookingRule.prior_notice_start_day = getIntIfPresent(result, "prior_notice_start_day", columnForName);
+        bookingRule.prior_notice_start_time = getIntIfPresent(result, "prior_notice_start_time", columnForName);
+        bookingRule.prior_notice_service_id = getStringIfPresent(result, "prior_notice_service_id", columnForName);
+        bookingRule.message = getStringIfPresent(result, "message", columnForName);
+        bookingRule.pickup_message = getStringIfPresent(result, "pickup_message", columnForName);
+        bookingRule.drop_off_message = getStringIfPresent(result, "drop_off_message", columnForName);
+        bookingRule.phone_number = getStringIfPresent(result, "phone_number", columnForName);
+        bookingRule.info_url = getUrlIfPresent(result, "info_url", columnForName);
+        bookingRule.booking_url = getUrlIfPresent(result, "booking_url", columnForName);
+        return bookingRule;
     };
 
     // The reason we're passing in the columnForName map is that resultSet.getX(columnName) throws an exception

@@ -107,6 +107,7 @@ public class JdbcGTFSFeedConverter {
 
             // Copy all tables (except for PATTERN_STOPS, which does not exist in GTFSFeed).
             copyEntityToSql(gtfsFeed.agency.values(), Table.AGENCY);
+            copyEntityToSql(gtfsFeed.bookingRules.values(), Table.BOOKING_RULES);
             copyEntityToSql(calendars, Table.CALENDAR);
             copyEntityToSql(calendarDates, Table.CALENDAR_DATES);
             copyEntityToSql(gtfsFeed.routes.values(), Table.ROUTES);

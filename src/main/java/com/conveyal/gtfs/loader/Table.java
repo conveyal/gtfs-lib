@@ -11,6 +11,7 @@ import com.conveyal.gtfs.loader.conditions.ForeignRefExistsCheck;
 import com.conveyal.gtfs.loader.conditions.ReferenceFieldShouldBeProvidedCheck;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Attribution;
+import com.conveyal.gtfs.model.BookingRule;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
@@ -399,6 +400,24 @@ public class Table {
             new StringField("attribution_email", OPTIONAL),
             new StringField("attribution_phone", OPTIONAL));
 
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#gtfs-bookingrules
+    public static final Table BOOKING_RULES = new Table("booking_rules", BookingRule.class, OPTIONAL,
+            new StringField("booking_rule_id", OPTIONAL),
+            new ShortField("booking_type", OPTIONAL, 2),
+            new IntegerField("prior_notice_duration_min", OPTIONAL),
+            new IntegerField("prior_notice_duration_max", OPTIONAL),
+            new IntegerField("prior_notice_last_day", OPTIONAL),
+            new TimeField("prior_notice_last_time", OPTIONAL),
+            new IntegerField("prior_notice_start_day", OPTIONAL),
+            new TimeField("prior_notice_start_time", OPTIONAL),
+            new StringField("prior_notice_service_id", OPTIONAL).isReferenceTo(CALENDAR),
+            new StringField("message", OPTIONAL),
+            new StringField("pickup_message", OPTIONAL),
+            new StringField("drop_off_message", OPTIONAL),
+            new StringField("phone_number", OPTIONAL),
+            new URLField("info_url", OPTIONAL),
+            new URLField("booking_url", OPTIONAL));
+
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
         AGENCY,
@@ -418,7 +437,8 @@ public class Table {
         STOP_TIMES,
         FREQUENCIES,
         TRANSLATIONS,
-        ATTRIBUTIONS
+        ATTRIBUTIONS,
+        BOOKING_RULES
     };
 
     /**

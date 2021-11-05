@@ -22,6 +22,7 @@ public class FeedLoadResult implements Serializable {
     public String fatalException;
 
     public TableLoadResult agency;
+    public TableLoadResult bookingRules;
     public TableLoadResult calendar;
     public TableLoadResult calendarDates;
     public TableLoadResult fareAttributes;
@@ -49,6 +50,7 @@ public class FeedLoadResult implements Serializable {
      */
     public FeedLoadResult (boolean constructTableResults) {
         agency = new TableLoadResult();
+        bookingRules = new TableLoadResult();
         calendar = new TableLoadResult();
         calendarDates = new TableLoadResult();
         fareAttributes = new TableLoadResult();
