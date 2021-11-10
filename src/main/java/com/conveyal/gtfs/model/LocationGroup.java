@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Objects;
 
 public class LocationGroup extends Entity {
 
@@ -36,7 +37,7 @@ public class LocationGroup extends Entity {
     public static class Loader extends Entity.Loader<LocationGroup> {
 
         public Loader(GTFSFeed feed) {
-            super(feed, "booking_rules");
+            super(feed, "location_groups");
         }
 
         @Override
@@ -51,12 +52,18 @@ public class LocationGroup extends Entity {
             locationGroup.location_group_id = getStringField("location_group_id", true);
             locationGroup.location_id = getStringField("location_id", false);
             locationGroup.location_group_name = getStringField("location_group_name", false);
+            // Attempting to put a null key or value will cause an NPE in BTreeMap
+            if (locationGroup.location_group_id != null) {
+                feed.locationGroup.put(locationGroup.location_group_id, locationGroup);
+            }
+
             /*
               Check referential integrity without storing references. BookingRule cannot directly reference Calenders
               because they would be serialized into the MapDB.
              */
-            //FIXME: The location_id can be either stops.stop_id OR id from locations.geojson. It can not be both.
-//            getRefField("location_id", true, feed.stops);
+            getRefField("location_id", true, feed.stops);
+            //FIXME: Add locations.geojson once created.
+//            getRefField("location_id", true, feed.locations);
         }
     }
 
@@ -82,5 +89,20 @@ public class LocationGroup extends Entity {
         public Iterator<LocationGroup> iterator() {
             return this.feed.locationGroup.values().iterator();
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        LocationGroup that = (LocationGroup) o;
+        return Objects.equals(location_group_id, that.location_group_id) &&
+            Objects.equals(location_id, that.location_id) &&
+            Objects.equals(location_group_name, that.location_group_name);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(location_group_id, location_id, location_group_name);
     }
 }

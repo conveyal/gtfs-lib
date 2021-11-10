@@ -441,9 +441,13 @@ public class JdbcTableWriter implements TableWriter {
                 }
             } catch (StorageException e) {
                 LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
-                if (field.name.contains("_time")) {
-                    // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
-                    //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
+                if (field.name.contains("_time") ||
+                    field.name.contains("start_pickup_dropoff_window") ||
+                    field.name.contains("end_pickup_dropoff_window")
+                ) {
+                    // FIXME: This is a hack to get time related fields into the right format. Because the UI
+                    //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS
+                    //  and where optional GTFS Flex fields are not defined i.e. the default value of zero is used.
                     try {
                         if (value == null || value.isNull()) {
                             if (field.isRequired()) {

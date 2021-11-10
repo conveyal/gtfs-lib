@@ -155,7 +155,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         db.getAtomicString("feed_id").set(feedId);
 
         new Agency.Loader(this).loadTable(zip);
-        new BookingRule.Loader(this).loadTable(zip);
+        new LocationGroup.Loader(this).loadTable(zip);
 
         // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
@@ -165,6 +165,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         new CalendarDate.Loader(this, serviceTable).loadTable(zip);
         this.services.putAll(serviceTable);
         serviceTable = null; // free memory
+        new BookingRule.Loader(this).loadTable(zip);
 
         // Same deal
         Map<String, Fare> fares = new HashMap<>();
@@ -215,6 +216,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             new FareAttribute.Writer(this).writeTable(zip);
             new FareRule.Writer(this).writeTable(zip);
             new Frequency.Writer(this).writeTable(zip);
+            new LocationGroup.Writer(this).writeTable(zip);
             new Route.Writer(this).writeTable(zip);
             new Stop.Writer(this).writeTable(zip);
             new ShapePoint.Writer(this).writeTable(zip);
@@ -661,5 +663,14 @@ public class GTFSFeed implements Cloneable, Closeable {
         tripPatternMap = db.getTreeMap("patternForTrip");
 
         errors = db.getTreeSet("errors");
+    }
+
+    /**
+     * If booking rules and location groups have been created, the assumption is that this is a GTFS Flex feed. Booking
+     * rules and location groups must be loaded before this can be referenced. At the moment StopTime references this
+     * and is loaded after the dependency tables.
+     */
+    public boolean isGTFSFlexFeed() {
+        return bookingRules != null && locationGroup != null;
     }
 }

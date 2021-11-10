@@ -352,7 +352,21 @@ public class Table {
             new ShortField("continuous_drop_off", OPTIONAL, 3),
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new ShortField("timepoint", OPTIONAL, 1),
-            new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
+            new IntegerField("fare_units_traveled", EXTENSION), // OpenOV NL extension
+
+            // Additional GTFS Flex booking rule fields.
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended-1
+            new StringField("pickup_booking_rule_id", OPTIONAL),
+            new StringField("drop_off_booking_rule_id", OPTIONAL),
+
+            // Additional GTFS Flex location groups and locations fields
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended
+            new TimeField("start_pickup_dropoff_window", OPTIONAL),
+            new TimeField("end_pickup_dropoff_window", OPTIONAL),
+            new DoubleField("mean_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("mean_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2)
     ).withParentTable(TRIPS);
 
     // Must come after TRIPS table to which it has a reference

@@ -7,6 +7,7 @@ import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.Objects;
 
 public class BookingRule extends Entity {
 
@@ -88,6 +89,12 @@ public class BookingRule extends Entity {
             bookingRule.phone_number = getStringField("phone_number", false);
             bookingRule.info_url = getUrlField("info_url", false);
             bookingRule.booking_url = getUrlField("booking_url", false);
+
+            // Attempting to put a null key or value will cause an NPE in BTreeMap
+            if (bookingRule.booking_rule_id != null) {
+                feed.bookingRules.put(bookingRule.booking_rule_id, bookingRule);
+            }
+
             /*
               Check referential integrity without storing references. BookingRule cannot directly reference Calenders
               because they would be serialized into the MapDB.
@@ -103,9 +110,9 @@ public class BookingRule extends Entity {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"booking_rule_id", "booking_type", "prior_notice_duration_min",
+            writer.writeRecord(new String[]{"booking_rule_id", "booking_type", "prior_notice_duration_min",
                 "prior_notice_duration_max", "prior_notice_last_day", "prior_notice_last_time", "prior_notice_start_day",
-                "prior_notice_start_time","prior_notice_service_id", "message", "pickup_message", "drop_off_message",
+                "prior_notice_start_time", "prior_notice_service_id", "message", "pickup_message", "drop_off_message",
                 "phone_number", "info_url", "booking_url"});
         }
 
@@ -132,5 +139,48 @@ public class BookingRule extends Entity {
         public Iterator<BookingRule> iterator() {
             return this.feed.bookingRules.values().iterator();
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BookingRule that = (BookingRule) o;
+        return booking_type == that.booking_type &&
+            prior_notice_duration_min == that.prior_notice_duration_min &&
+            prior_notice_duration_max == that.prior_notice_duration_max &&
+            prior_notice_last_day == that.prior_notice_last_day &&
+            prior_notice_last_time == that.prior_notice_last_time &&
+            prior_notice_start_day == that.prior_notice_start_day &&
+            prior_notice_start_time == that.prior_notice_start_time &&
+            Objects.equals(booking_rule_id, that.booking_rule_id) &&
+            Objects.equals(prior_notice_service_id, that.prior_notice_service_id) &&
+            Objects.equals(message, that.message) &&
+            Objects.equals(pickup_message, that.pickup_message) &&
+            Objects.equals(drop_off_message, that.drop_off_message) &&
+            Objects.equals(phone_number, that.phone_number) &&
+            Objects.equals(info_url, that.info_url) &&
+            Objects.equals(booking_url, that.booking_url);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(
+            booking_rule_id,
+            booking_type,
+            prior_notice_duration_min,
+            prior_notice_duration_max,
+            prior_notice_last_day,
+            prior_notice_last_time,
+            prior_notice_start_day,
+            prior_notice_start_time,
+            prior_notice_service_id,
+            message,
+            pickup_message,
+            drop_off_message,
+            phone_number,
+            info_url,
+            booking_url
+        );
     }
 }

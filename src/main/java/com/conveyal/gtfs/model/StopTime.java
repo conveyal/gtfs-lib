@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Objects;
 
@@ -31,6 +32,19 @@ public class StopTime extends Entity implements Cloneable, Serializable {
     public int    continuous_drop_off = INT_MISSING;
     public double shape_dist_traveled = DOUBLE_MISSING;
     public int    timepoint = INT_MISSING;
+
+    // Additional GTFS Flex booking rule fields.
+    public String pickup_booking_rule_id;
+    public String drop_off_booking_rule_id;
+
+    // Additional GTFS Flex location groups and locations fields
+    public int start_pickup_dropoff_window = INT_MISSING;
+    public int end_pickup_dropoff_window = INT_MISSING;
+    public double mean_duration_factor = DOUBLE_MISSING;
+    public double mean_duration_offset = DOUBLE_MISSING;
+    public double safe_duration_factor = DOUBLE_MISSING;
+    public double safe_duration_offset = DOUBLE_MISSING;
+
 
     @Override
     public String getId() {
@@ -62,6 +76,16 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
         statement.setDouble(oneBasedIndex++, shape_dist_traveled);
         setIntParameter(statement, oneBasedIndex++, timepoint);
+        if (feed.isGTFSFlexFeed()) {
+            statement.setString(oneBasedIndex++, pickup_booking_rule_id);
+            statement.setString(oneBasedIndex++, drop_off_booking_rule_id);
+            setIntParameter(statement, oneBasedIndex++, start_pickup_dropoff_window);
+            setIntParameter(statement, oneBasedIndex++, end_pickup_dropoff_window);
+            statement.setDouble(oneBasedIndex++, mean_duration_factor);
+            statement.setDouble(oneBasedIndex++, mean_duration_offset);
+            statement.setDouble(oneBasedIndex++, safe_duration_factor);
+            statement.setDouble(oneBasedIndex++, safe_duration_offset);
+        }
     }
 
     public static class Loader extends Entity.Loader<StopTime> {
@@ -93,6 +117,16 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.continuous_drop_off = getIntField("continuous_drop_off", true, 0, 3);
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
+            st.pickup_booking_rule_id = getStringField("pickup_booking_rule_id", false);
+            if (feed.isGTFSFlexFeed()) {
+                st.drop_off_booking_rule_id = getStringField("drop_off_booking_rule_id", false);
+                st.start_pickup_dropoff_window = getTimeField("start_pickup_dropoff_window", false);
+                st.end_pickup_dropoff_window = getTimeField("end_pickup_dropoff_window", false);
+                st.mean_duration_factor = getDoubleField("mean_duration_factor", false, 0D, Double.MAX_VALUE);
+                st.mean_duration_offset = getDoubleField("mean_duration_offset", false, 0D, Double.MAX_VALUE);
+                st.safe_duration_factor = getDoubleField("safe_duration_factor", false, 0D, Double.MAX_VALUE);
+                st.safe_duration_offset = getDoubleField("safe_duration_offset", false, 0D, Double.MAX_VALUE);
+            }
             st.feed           = null; // this could circular-serialize the whole feed
             feed.stop_times.put(new Fun.Tuple2(st.trip_id, st.stop_sequence), st);
 
@@ -111,10 +145,27 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             super(feed, "stop_times");
         }
 
+        /**
+         * This is the only table which has a mixture of original GTFS values and GTFS Flex values. If the feed does not
+         * include GTFS Flex data, the additional headers are not required.
+         */
         @Override
         protected void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"trip_id", "arrival_time", "departure_time", "stop_id", "stop_sequence", "stop_headsign",
-                    "pickup_type", "drop_off_type", "continuous_pickup", "continuous_drop_off", "shape_dist_traveled", "timepoint"});
+            String[] originalHeaders = new String[] {"trip_id", "arrival_time", "departure_time", "stop_id",
+                "stop_sequence", "stop_headsign", "pickup_type", "drop_off_type", "continuous_pickup",
+                "continuous_drop_off", "shape_dist_traveled", "timepoint"};
+
+            String[] flexHeaders = new String[] {"pickup_booking_rule_id", "drop_off_booking_rule_id",
+                "start_pickup_dropoff_window", "end_pickup_dropoff_window", "mean_duration_factor",
+                "mean_duration_offset", "safe_duration_factor", "safe_duration_offset"};
+
+            if (feed.isGTFSFlexFeed()) {
+                String[] headers = Arrays.copyOf(originalHeaders, originalHeaders.length + flexHeaders.length);
+                System.arraycopy(flexHeaders, 0, headers, originalHeaders.length, flexHeaders.length);
+                writer.writeRecord(headers);
+            } else {
+                writer.writeRecord(originalHeaders);
+            }
         }
 
         @Override
@@ -131,6 +182,17 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             writeIntField(st.continuous_drop_off);
             writeDoubleField(st.shape_dist_traveled);
             writeIntField(st.timepoint);
+            if (feed.isGTFSFlexFeed()) {
+                // Only include these fields if this is a GTFS Flex feed.
+                writeStringField(st.pickup_booking_rule_id);
+                writeStringField(st.drop_off_booking_rule_id);
+                writeTimeField(st.start_pickup_dropoff_window);
+                writeTimeField(st.end_pickup_dropoff_window);
+                writeDoubleField(st.mean_duration_factor);
+                writeDoubleField(st.mean_duration_offset);
+                writeDoubleField(st.safe_duration_factor);
+                writeDoubleField(st.safe_duration_offset);
+            }
             endRecord();
         }
 
@@ -161,11 +223,21 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             stop_sequence == stopTime.stop_sequence &&
             pickup_type == stopTime.pickup_type &&
             drop_off_type == stopTime.drop_off_type &&
+            continuous_pickup == stopTime.continuous_pickup &&
+            continuous_drop_off == stopTime.continuous_drop_off &&
             Double.compare(stopTime.shape_dist_traveled, shape_dist_traveled) == 0 &&
             timepoint == stopTime.timepoint &&
+            start_pickup_dropoff_window == stopTime.start_pickup_dropoff_window &&
+            end_pickup_dropoff_window == stopTime.end_pickup_dropoff_window &&
+            Double.compare(stopTime.mean_duration_factor, mean_duration_factor) == 0 &&
+            Double.compare(stopTime.mean_duration_offset, mean_duration_offset) == 0 &&
+            Double.compare(stopTime.safe_duration_factor, safe_duration_factor) == 0 &&
+            Double.compare(stopTime.safe_duration_offset, safe_duration_offset) == 0 &&
             Objects.equals(trip_id, stopTime.trip_id) &&
             Objects.equals(stop_id, stopTime.stop_id) &&
-            Objects.equals(stop_headsign, stopTime.stop_headsign);
+            Objects.equals(stop_headsign, stopTime.stop_headsign) &&
+            Objects.equals(pickup_booking_rule_id, stopTime.pickup_booking_rule_id) &&
+            Objects.equals(drop_off_booking_rule_id, stopTime.drop_off_booking_rule_id);
     }
 
     @Override
@@ -179,8 +251,18 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             stop_headsign,
             pickup_type,
             drop_off_type,
+            continuous_pickup,
+            continuous_drop_off,
             shape_dist_traveled,
-            timepoint
+            timepoint,
+            pickup_booking_rule_id,
+            drop_off_booking_rule_id,
+            start_pickup_dropoff_window,
+            end_pickup_dropoff_window,
+            mean_duration_factor,
+            mean_duration_offset,
+            safe_duration_factor,
+            safe_duration_offset
         );
     }
 }

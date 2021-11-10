@@ -98,6 +98,14 @@ public class GTFSFeedTest {
                 }
             ),
             new FileTestCase(
+                "location_groups.txt",
+                new DataExpectation[]{
+                    new DataExpectation("location_group_id", "1"),
+                    new DataExpectation("location_id", "222"),
+                    new DataExpectation("location_group_name", "This is the location group name")
+                }
+            ),
+            new FileTestCase(
                 "routes.txt",
                 new DataExpectation[]{
                     new DataExpectation("agency_id", "1"),
