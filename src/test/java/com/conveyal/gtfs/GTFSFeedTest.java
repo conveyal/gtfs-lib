@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -89,6 +89,15 @@ public class GTFSFeedTest {
                     new DataExpectation("agency_name", "Fake Transit")
                 }
             ),
+            // booking_rules.txt
+            new FileTestCase(
+                "booking_rules.txt",
+                new DataExpectation[]{
+                    new DataExpectation("booking_rule_id", "1"),
+                    new DataExpectation("booking_type", "1"),
+                    new DataExpectation("message", "This is a message")
+                }
+            ),
             new FileTestCase(
                 "calendar.txt",
                 new DataExpectation[]{
@@ -101,7 +110,7 @@ public class GTFSFeedTest {
                 "location_groups.txt",
                 new DataExpectation[]{
                     new DataExpectation("location_group_id", "1"),
-                    new DataExpectation("location_id", "222"),
+                    new DataExpectation("location_id", "123"),
                     new DataExpectation("location_group_name", "This is the location group name")
                 }
             ),
@@ -149,13 +158,13 @@ public class GTFSFeedTest {
             // create csv reader for file
             InputStream zis = zip.getInputStream(entry);
             InputStream bis = new BOMInputStream(zis);
-            CsvReader reader = new CsvReader(bis, ',', Charset.forName("UTF8"));
+            CsvReader reader = new CsvReader(bis, ',', StandardCharsets.UTF_8);
 
             // make sure the file has headers
             boolean hasHeaders = reader.readHeaders();
             assertThat(hasHeaders, is(true));
 
-            // make sure that the a record matching the expected row exists in this table
+            // make sure that the record matching the expected row exists in this table
             boolean recordFound = false;
             while (reader.readRecord() && !recordFound) {
                 boolean allExpectationsMetForThisRecord = true;

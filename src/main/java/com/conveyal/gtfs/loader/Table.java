@@ -437,8 +437,10 @@ public class Table {
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
     public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
             new StringField("location_group_id", REQUIRED),
-            //FIXME: location id 'isReferenceTo' STOPS and locations.geojson. Both is not an option.
-            new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
+            //FIXME: location id 'isReferenceTo' stops.stop_id or id from locations.geojson. Both is not an option.
+            // Consider addressing as part of conditional checks.
+//            new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
+            new StringField("location_id", OPTIONAL),
             new StringField("location_group_name", OPTIONAL)
     );
 
