@@ -339,5 +339,11 @@
       <artifactId>commons-text</artifactId>
       <version>1.6</version>
     </dependency>
+    <!-- Used for GeoJSON packing and unpacking (https://github.com/ngageoint/simple-features-geojson-java) -->
+    <dependency>
+      <groupId>mil.nga.sf</groupId>
+      <artifactId>sf-geojson</artifactId>
+      <version>2.0.5</version>
+    </dependency>
   </dependencies>
 </project>
