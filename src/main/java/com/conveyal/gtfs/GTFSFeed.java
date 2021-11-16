@@ -668,7 +668,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     /**
      * If booking rules and location groups have been created, the assumption is that this is a GTFS Flex feed. Booking
      * rules and location groups must be loaded before this can be referenced. At the moment StopTime references this
-     * and is loaded after the dependency tables.
+     * and is loaded after the check is made on these tables.
      */
     public boolean isGTFSFlexFeed() {
         return bookingRules != null && locationGroup != null;

@@ -170,6 +170,11 @@ public class JdbcGtfsLoader {
             result.bookingRules = load(Table.BOOKING_RULES);
             result.locationGroups = load(Table.LOCATION_GROUPS);
             result.errorCount = errorStorage.getErrorCount();
+
+            // TODO: Confirm this is adequate to determine a flex feed and add location meta data and location shapes
+            //  once available.
+            result.isGTFSFlex = result.bookingRules.rowCount > 0 && result.locationGroups.rowCount > 0;
+
             // This will commit and close the single connection that has been shared between all preceding load steps.
             errorStorage.commitAndClose();
             zip.close();

@@ -20,6 +20,7 @@ public class FeedLoadResult implements Serializable {
     public String uniqueIdentifier;
     public int errorCount;
     public String fatalException;
+    public boolean isGTFSFlex;
 
     public TableLoadResult agency;
     public TableLoadResult bookingRules;
