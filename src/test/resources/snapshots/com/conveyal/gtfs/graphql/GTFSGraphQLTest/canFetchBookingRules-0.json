@@ -1,0 +1,25 @@
+{
+  "data" : {
+    "feed" : {
+      "booking_rules" : [ {
+        "booking_rule_id" : "1",
+        "booking_type" : "1",
+        "booking_url" : "http://www.booking_url.com",
+        "drop_off_message" : "This is a drop off message",
+        "id" : 2,
+        "info_url" : "http://www.info_url.com",
+        "message" : "This is a message",
+        "phone_number" : "123456789",
+        "pickup_message" : "This is a pickup message",
+        "prior_notice_duration_max" : "60",
+        "prior_notice_duration_min" : "30",
+        "prior_notice_last_day" : null,
+        "prior_notice_last_time" : null,
+        "prior_notice_service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57",
+        "prior_notice_start_day" : null,
+        "prior_notice_start_time" : null
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}

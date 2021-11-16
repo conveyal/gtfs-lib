@@ -49,7 +49,7 @@ public class GTFSGraphQLTest {
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         // zip up test folder into temp zip file
-        String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
+        String zipFileName = TestUtils.zipFolderFiles("fake-agency-with-flex", true);
         // load feed into db
         FeedLoadResult feedLoadResult = load(zipFileName, testDataSource);
         testNamespace = feedLoadResult.uniqueIdentifier;
@@ -148,9 +148,17 @@ public class GTFSGraphQLTest {
         });
     }
 
+    /** Tests that the booking rules of a feed can be fetched. */
+    @Test
+    public void canFetchBookingRules() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedBookingRules.txt"), matchesSnapshot());
+        });
+    }
+
     /** Tests that the attributions of a feed can be fetched. */
     @Test
-    public void canFetchATtributions() {
+    public void canFetchAttributions() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
             MatcherAssert.assertThat(queryGraphQL("feedAttributions.txt"), matchesSnapshot());
         });

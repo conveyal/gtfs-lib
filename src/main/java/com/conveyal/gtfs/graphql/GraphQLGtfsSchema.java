@@ -72,6 +72,27 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("agency_timezone"))
             .build();
 
+    // Represents rows from booking_rules.txt
+    public static final GraphQLObjectType bookingRulesType = newObject().name("booking_rules")
+            .description("A GTFS booking rule object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("booking_rule_id"))
+            .field(MapFetcher.field("booking_type"))
+            .field(MapFetcher.field("prior_notice_duration_min"))
+            .field(MapFetcher.field("prior_notice_duration_max"))
+            .field(MapFetcher.field("prior_notice_last_day"))
+            .field(MapFetcher.field("prior_notice_last_time"))
+            .field(MapFetcher.field("prior_notice_start_day"))
+            .field(MapFetcher.field("prior_notice_start_time"))
+            .field(MapFetcher.field("prior_notice_service_id"))
+            .field(MapFetcher.field("message"))
+            .field(MapFetcher.field("pickup_message"))
+            .field(MapFetcher.field("drop_off_message"))
+            .field(MapFetcher.field("phone_number"))
+            .field(MapFetcher.field("info_url"))
+            .field(MapFetcher.field("booking_url"))
+            .build();
+
     // Represents rows from calendar.txt
     public static final GraphQLObjectType calendarType = newObject()
             .name("calendar")
@@ -701,6 +722,17 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("agency"))
+                    .build()
+            )
+            .field(newFieldDefinition()
+                    .name("booking_rules")
+                    .type(new GraphQLList(GraphQLGtfsSchema.bookingRulesType))
+                    .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                    .argument(multiStringArg("booking_rule_id"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    .dataFetcher(new JDBCFetcher("booking_rules"))
                     .build()
             )
             .field(newFieldDefinition()
