@@ -1,6 +1,7 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.loader.FeedLoadResult;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +18,8 @@ import java.sql.SQLException;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import static com.conveyal.gtfs.GTFS.load;
+import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.util.Util.randomIdString;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
@@ -42,7 +45,7 @@ public class TestUtils {
         ));
         // drop the db
         if(executeAndClose(String.format("DROP DATABASE %s", dbName))) {
-            LOG.error(String.format("Successfully dropped database: %s", dbName));
+            LOG.debug(String.format("Successfully dropped database: %s", dbName));
         } else {
             LOG.error(String.format("Failed to drop database: %s", dbName));
         }
@@ -211,5 +214,16 @@ public class TestUtils {
         assertThatSqlCountQueryYieldsExpectedCount(testDataSource, sql, expectedNumberOfErrors);
     }
 
+    /**
+     * Load feed from zip file into a database and validate.
+     */
+    public static String loadFeedAndValidate(DataSource dataSource, String zipFolderName) throws IOException {
+        String zipFileName = TestUtils.zipFolderFiles(zipFolderName,  true);
+        FeedLoadResult feedLoadResult = load(zipFileName, dataSource);
+        String namespace = feedLoadResult.uniqueIdentifier;
+        validate(namespace, dataSource);
+        // return name space.
+        return namespace;
+    }
 
 }
