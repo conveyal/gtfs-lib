@@ -20,7 +20,6 @@ public class FeedLoadResult implements Serializable {
     public String uniqueIdentifier;
     public int errorCount;
     public String fatalException;
-    public boolean isGTFSFlex;
 
     public TableLoadResult agency;
     public TableLoadResult bookingRules;
@@ -68,5 +67,18 @@ public class FeedLoadResult implements Serializable {
         trips = new TableLoadResult();
         translations = new TableLoadResult();
         attributions = new TableLoadResult();
+    }
+
+    /**
+     * Determine if the feed loaded has GTFS Flex enhancements.
+     */
+    // TODO: Confirm this is adequate to determine a flex feed and add location meta data and location shapes
+    //  once available.
+    public boolean isGTFSFlex() {
+        return
+            bookingRules != null &&
+            locationGroups != null &&
+            bookingRules.rowCount > 0 &&
+            locationGroups.rowCount > 0;
     }
 }
