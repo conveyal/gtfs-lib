@@ -172,6 +172,14 @@ public class GTFSGraphQLTest {
         });
     }
 
+    /** Tests that the location groups of a feed can be fetched. */
+    @Test
+    public void canFetchLocationGroups() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedLocationGroups.txt"), matchesSnapshot());
+        });
+    }
+
     /** Tests that the fares of a feed can be fetched. */
     @Test
     public void canFetchFares() {
@@ -227,6 +235,14 @@ public class GTFSGraphQLTest {
     public void canFetchStopTimes() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
             MatcherAssert.assertThat(queryGraphQL("feedStopTimes.txt"), matchesSnapshot());
+        });
+    }
+
+    /** Tests that the stop times with flex additions of a feed can be fetched. */
+    @Test
+    public void canFetchStopTimesWithFlexAdditions() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedStopTimesWithFlex.txt"), matchesSnapshot());
         });
     }
 

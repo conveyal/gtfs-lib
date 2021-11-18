@@ -1,0 +1,11 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    location_groups {
+      location_group_id;
+      location_id;
+      location_group_name;
+      id
+    }
+  }
+}

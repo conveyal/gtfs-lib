@@ -1,0 +1,25 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    stop_times {
+      arrival_time
+      departure_time
+      drop_off_type
+      pickup_type
+      shape_dist_traveled
+      stop_headsign
+      stop_id
+      stop_sequence
+      timepoint
+      trip_id
+      pickup_booking_rule_id
+      drop_off_booking_rule_id
+      start_pickup_dropoff_window
+      end_pickup_dropoff_window
+      mean_duration_factor
+      mean_duration_offset
+      safe_duration_factor
+      safe_duration_offset
+    }
+  }
+}

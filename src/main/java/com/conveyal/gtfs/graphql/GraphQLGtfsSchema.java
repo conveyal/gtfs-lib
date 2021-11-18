@@ -9,6 +9,7 @@ import com.conveyal.gtfs.graphql.fetchers.PolylineFetcher;
 import com.conveyal.gtfs.graphql.fetchers.RowCountFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SQLColumnFetcher;
 import com.conveyal.gtfs.graphql.fetchers.SourceObjectFetcher;
+import com.conveyal.gtfs.loader.Table;
 import graphql.schema.Coercing;
 import graphql.schema.GraphQLList;
 import graphql.schema.GraphQLObjectType;
@@ -47,7 +48,7 @@ public class GraphQLGtfsSchema {
     // The order:
     // Instantiate starting with leaf nodes (reverse topological sort of the dependency graph).
     // All forward references must use names and GraphQLTypeReference.
-    // Additionally the tree will be explored once top-down following explicit object references, and only
+    // Additionally, the tree will be explored once top-down following explicit object references, and only
     // objects reached that way will be available by name reference.
     // Another way to accomplish this would be to use name references in every definition except the top level,
     // and make a dummy declaration that will call them all to be pulled in by reference at once.
@@ -77,13 +78,13 @@ public class GraphQLGtfsSchema {
             .description("A GTFS booking rule object")
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("booking_rule_id"))
-            .field(MapFetcher.field("booking_type"))
-            .field(MapFetcher.field("prior_notice_duration_min"))
-            .field(MapFetcher.field("prior_notice_duration_max"))
-            .field(MapFetcher.field("prior_notice_last_day"))
-            .field(MapFetcher.field("prior_notice_last_time"))
-            .field(MapFetcher.field("prior_notice_start_day"))
-            .field(MapFetcher.field("prior_notice_start_time"))
+            .field(MapFetcher.field("booking_type", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_duration_min", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_duration_max", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_last_day", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_last_time", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_start_day", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_start_time", GraphQLInt))
             .field(MapFetcher.field("prior_notice_service_id"))
             .field(MapFetcher.field("message"))
             .field(MapFetcher.field("pickup_message"))
@@ -139,7 +140,7 @@ public class GraphQLGtfsSchema {
 
     // Represents rows from fare_attributes.txt
     public static final GraphQLObjectType fareType = newObject().name("fare_attributes")
-            .description("A GTFS agency object")
+            .description("A GTFS fare attributes object")
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("agency_id"))
             .field(MapFetcher.field("fare_id"))
@@ -177,6 +178,15 @@ public class GraphQLGtfsSchema {
             // Editor-specific fields
             .field(MapFetcher.field("default_route_color"))
             .field(MapFetcher.field("default_route_type"))
+            .build();
+
+    // Represents location_groups.txt
+    public static final GraphQLObjectType locationGroupType = newObject().name("location_groups")
+            .description("A GTFS location_group object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("location_group_id"))
+            .field(MapFetcher.field("location_id"))
+            .field(MapFetcher.field("location_group_name"))
             .build();
 
     // Represents rows from shapes.txt
@@ -273,17 +283,27 @@ public class GraphQLGtfsSchema {
     // Represents rows from stop_times.txt
     public static final GraphQLObjectType stopTimeType = newObject().name("stopTime")
             .field(MapFetcher.field("trip_id"))
-            .field(MapFetcher.field("stop_id"))
-            .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("arrival_time", GraphQLInt))
             .field(MapFetcher.field("departure_time", GraphQLInt))
+            .field(MapFetcher.field("stop_id"))
+            .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("stop_headsign"))
-            .field(MapFetcher.field("timepoint", GraphQLInt))
-            .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
             .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
+            .field(MapFetcher.field("timepoint", GraphQLInt))
+            // Additional GTFS Flex booking rule fields.
+            .field(MapFetcher.field("pickup_booking_rule_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+            // Additional GTFS Flex location groups and locations fields
+            .field(MapFetcher.field("start_pickup_dropoff_window", GraphQLInt))
+            .field(MapFetcher.field("end_pickup_dropoff_window", GraphQLInt))
+            .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
+            .field(MapFetcher.field("mean_duration_offset", GraphQLFloat))
+            .field(MapFetcher.field("safe_duration_factor", GraphQLFloat))
+            .field(MapFetcher.field("safe_duration_offset", GraphQLFloat))
             .build();
 
     // Represents rows from attributions.txt
@@ -732,7 +752,7 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(ID_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
-                    .dataFetcher(new JDBCFetcher("booking_rules"))
+                    .dataFetcher(new JDBCFetcher(Table.BOOKING_RULES.name))
                     .build()
             )
             .field(newFieldDefinition()
@@ -756,6 +776,17 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("fare_attributes"))
                     .build()
+            )
+            .field(newFieldDefinition()
+                .name("location_groups")
+                .type(new GraphQLList(GraphQLGtfsSchema.locationGroupType))
+                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                .argument(multiStringArg("location_group_id"))
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .dataFetcher(new JDBCFetcher(Table.LOCATION_GROUPS.name))
+                .build()
             )
             .field(newFieldDefinition()
                     .name("routes")
