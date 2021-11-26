@@ -54,7 +54,7 @@ public class LocationGroup extends Entity {
             locationGroup.location_group_name = getStringField("location_group_name", false);
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (locationGroup.location_group_id != null) {
-                feed.locationGroup.put(locationGroup.location_group_id, locationGroup);
+                feed.locationGroups.put(locationGroup.location_group_id, locationGroup);
             }
 
             /*
@@ -87,7 +87,7 @@ public class LocationGroup extends Entity {
 
         @Override
         public Iterator<LocationGroup> iterator() {
-            return this.feed.locationGroup.values().iterator();
+            return this.feed.locationGroups.values().iterator();
         }
     }
 

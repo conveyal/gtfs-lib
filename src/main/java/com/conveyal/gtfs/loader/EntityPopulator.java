@@ -8,6 +8,8 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.LocationGroup;
+import com.conveyal.gtfs.model.LocationMetaData;
+import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -246,7 +248,25 @@ public interface EntityPopulator<T> {
         locationGroup.location_group_name = getStringIfPresent(result, "location_group_name", columnForName);
         return locationGroup;
     };
-    
+
+    EntityPopulator<LocationMetaData> LOCATION_META_DATA = (result, columnForName) -> {
+        LocationMetaData locationMetaData = new LocationMetaData();
+        locationMetaData.location_meta_data_id = getStringIfPresent(result, "location_meta_data_id", columnForName);
+        locationMetaData.properties = getStringIfPresent(result, "properties", columnForName);
+        locationMetaData.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
+        return locationMetaData;
+    };
+
+    EntityPopulator<LocationShape> LOCATION_SHAPES = (result, columnForName) -> {
+        LocationShape locationShape = new LocationShape();
+        locationShape.shape_id = getStringIfPresent(result, "shape_id", columnForName);
+        locationShape.shape_pt_lat = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
+        locationShape.shape_pt_lon = getDoubleIfPresent(result, "shape_pt_lon", columnForName);
+        locationShape.shape_pt_sequence = getIntIfPresent(result, "shape_pt_sequence", columnForName);
+        locationShape.location_meta_data_id = getStringIfPresent(result, "location_meta_data_id", columnForName);
+        return locationShape;
+    };
+
     // The reason we're passing in the columnForName map is that resultSet.getX(columnName) throws an exception
     // when the column is not present.
     // Exceptions should only be used in exceptional circumstances (ones that should be logged as errors).

@@ -30,6 +30,8 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult feedInfo;
     public TableLoadResult frequencies;
     public TableLoadResult locationGroups;
+    public TableLoadResult locationMetaData;
+    public TableLoadResult locationShapes;
     public TableLoadResult routes;
     public TableLoadResult shapes;
     public TableLoadResult stops;
@@ -59,6 +61,8 @@ public class FeedLoadResult implements Serializable {
         feedInfo = new TableLoadResult();
         frequencies = new TableLoadResult();
         locationGroups = new TableLoadResult();
+        locationMetaData = new TableLoadResult();
+        locationShapes = new TableLoadResult();
         routes = new TableLoadResult();
         shapes = new TableLoadResult();
         stops = new TableLoadResult();
@@ -72,13 +76,16 @@ public class FeedLoadResult implements Serializable {
     /**
      * Determine if the feed loaded has GTFS Flex enhancements.
      */
-    // TODO: Confirm this is adequate to determine a flex feed and add location meta data and location shapes
-    //  once available.
+    // TODO: Confirm this is adequate to determine a flex feed.
     public boolean isGTFSFlex() {
         return
             bookingRules != null &&
             locationGroups != null &&
+            locationMetaData != null &&
+            locationShapes != null &&
             bookingRules.rowCount > 0 &&
-            locationGroups.rowCount > 0;
+            locationGroups.rowCount > 0 &&
+            locationMetaData.rowCount > 0 &&
+            locationShapes.rowCount > 0;
     }
 }

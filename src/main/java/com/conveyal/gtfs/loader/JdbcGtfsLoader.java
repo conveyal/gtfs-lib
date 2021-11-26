@@ -169,6 +169,8 @@ public class JdbcGtfsLoader {
             result.attributions = load(Table.ATTRIBUTIONS);
             result.bookingRules = load(Table.BOOKING_RULES);
             result.locationGroups = load(Table.LOCATION_GROUPS);
+            result.locationMetaData = load(Table.LOCATION_META_DATA);
+            result.locationShapes = load(Table.LOCATION_SHAPES);
             result.errorCount = errorStorage.getErrorCount();
 
             // This will commit and close the single connection that has been shared between all preceding load steps.

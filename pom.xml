@@ -51,6 +51,7 @@
   <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <jackson.version>2.12.1</jackson.version>
   </properties>
 
   <!-- Define where the artifacts produced by this build will be deployed -->
@@ -344,6 +345,18 @@
       <groupId>mil.nga.sf</groupId>
       <artifactId>sf-geojson</artifactId>
       <version>2.0.5</version>
+    </dependency>
+    <!-- Used to support GeoJSON -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-core</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <!-- Used to support GeoJSON -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
     </dependency>
   </dependencies>
 </project>

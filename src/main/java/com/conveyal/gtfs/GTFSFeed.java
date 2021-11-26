@@ -59,7 +59,9 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency> agency;
     public final Map<String, BookingRule> bookingRules;
-    public final Map<String, LocationGroup> locationGroup;
+    public final Map<String, LocationGroup> locationGroups;
+    public final Map<String, LocationMetaData> locationMetaData;
+    public final Map<String, LocationShape> locationShapes;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
@@ -649,7 +651,9 @@ public class GTFSFeed implements Cloneable, Closeable {
         calenders = db.getTreeMap("calenders");
         // TODO: I think this needs to come after calenders for ref checks.
         bookingRules = db.getTreeMap("booking_rules");
-        locationGroup = db.getTreeMap("location_groups");
+        locationGroups = db.getTreeMap("location_groups");
+        locationMetaData = db.getTreeMap("location_meta_data");
+        locationShapes = db.getTreeMap("location_shapes");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();
@@ -666,11 +670,15 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     * If booking rules and location groups have been created, the assumption is that this is a GTFS Flex feed. Booking
-     * rules and location groups must be loaded before this can be referenced. At the moment StopTime references this
-     * and is loaded after the check is made on these tables.
+     * If booking rules and location groups have been created and contain data, the assumption is that this is a GTFS
+     * Flex feed. Booking rules and location groups must be loaded before this can be referenced. At the moment StopTime
+     * references this and is loaded after the check is made on these tables.
      */
     public boolean isGTFSFlexFeed() {
-        return bookingRules != null && locationGroup != null;
+        return
+            bookingRules != null &&
+            locationGroups != null &&
+            !bookingRules.isEmpty() &&
+            !locationGroups.isEmpty();
     }
 }

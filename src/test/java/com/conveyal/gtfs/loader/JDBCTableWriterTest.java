@@ -8,6 +8,8 @@ import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
 import com.conveyal.gtfs.dto.FrequencyDTO;
 import com.conveyal.gtfs.dto.LocationGroupDTO;
+import com.conveyal.gtfs.dto.LocationMetaDataDTO;
+import com.conveyal.gtfs.dto.LocationShapeDTO;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
 import com.conveyal.gtfs.dto.RouteDTO;
@@ -16,6 +18,8 @@ import com.conveyal.gtfs.dto.ShapePointDTO;
 import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
+import com.conveyal.gtfs.model.LocationMetaData;
+import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -432,7 +436,7 @@ public class JDBCTableWriterTest {
         createdLocationGroup.location_group_name = "";
         // make sure saved data matches expected data
         assertThat(createdLocationGroup.location_group_id, equalTo(locationGroupId));
-        // Check that booking rule exists.
+        // Check that location group exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationGroup.id, Table.LOCATION_GROUPS), 1);
         // try to update record
         String updatedLocationGroupId = "3514";
@@ -472,6 +476,117 @@ public class JDBCTableWriterTest {
 
         // make sure route record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocationGroup.id, locationGroupsTable));
+    }
+
+    @Test
+    public void canCreateUpdateAndDeleteLocationMetaData() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table locationMetaDataTable = Table.LOCATION_META_DATA;
+        final Class<LocationMetaDataDTO> locationMetaDataDTOClass = LocationMetaDataDTO.class;
+
+        // create new object to be saved
+        String locationMetaDataId = "9274";
+        LocationMetaDataDTO createdLocationMetaData = createSimpleTestLocationMetaData(locationMetaDataId);
+        // Set value to empty strings/null to later verify that it is set to null in the database.
+        createdLocationMetaData.geometry_type = "";
+        // make sure saved data matches expected data
+        assertThat(createdLocationMetaData.location_meta_data_id, equalTo(locationMetaDataId));
+        // Check that location meta data exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationMetaData.id, Table.LOCATION_META_DATA), 1);
+        // try to update record
+        String updatedLocationMetaDataId = "4729";
+        createdLocationMetaData.location_meta_data_id = updatedLocationMetaDataId;
+
+        // convert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(locationMetaDataTable);
+        String updateOutput = updateTableWriter.update(
+            createdLocationMetaData.id,
+                mapper.writeValueAsString(createdLocationMetaData),
+                true
+        );
+        LOG.info("update {} output:", locationMetaDataTable.name);
+        LOG.info(updateOutput);
+
+        LocationMetaDataDTO updatedLocationMetaDataDTO = mapper.readValue(updateOutput, locationMetaDataDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedLocationMetaDataDTO.location_meta_data_id, equalTo(updatedLocationMetaDataId));
+        // Ensure message is null (not empty string).
+        LOG.info("geometry_type: {}", updatedLocationMetaDataDTO.geometry_type);
+        assertNull(updatedLocationMetaDataDTO.geometry_type);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedLocationMetaDataDTO.id, locationMetaDataTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "location_meta_data_id", equalTo(createdLocationMetaData.location_meta_data_id));
+            assertResultValue(resultSet, "properties", equalTo(createdLocationMetaData.properties));
+            assertResultValue(resultSet, "geometry_type", Matchers.nullValue());
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationMetaDataTable);
+        int deleteOutput = deleteTableWriter.delete(
+            createdLocationMetaData.id,
+                true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, locationMetaDataTable.name);
+
+        // make sure route record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocationMetaData.id, locationMetaDataTable));
+    }
+
+    @Test
+    public void canCreateUpdateAndDeleteLocationShapes() throws IOException, SQLException, InvalidNamespaceException {
+        // Store Table and Class values for use in test.
+        final Table locationShapeTable = Table.LOCATION_SHAPES;
+        final Class<LocationShapeDTO> locationShapeDTOClass = LocationShapeDTO.class;
+
+        // create new object to be saved
+        String shapeId = "2431";
+        LocationShapeDTO createdLocationShape = createSimpleTestLocationShape(shapeId);
+        // Set value to empty strings/null to later verify that it is set to null in the database.
+        createdLocationShape.location_meta_data_id = "";
+        // make sure saved data matches expected data
+        assertThat(createdLocationShape.shape_id, equalTo(shapeId));
+        // Check that location meta data exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationShape.id, Table.LOCATION_SHAPES), 1);
+        // try to update record
+        String updatedLocationShapeId = "1342";
+        createdLocationShape.shape_id = updatedLocationShapeId;
+
+        // convert object to json and save it
+        JdbcTableWriter updateTableWriter = createTestTableWriter(locationShapeTable);
+        String updateOutput = updateTableWriter.update(
+            createdLocationShape.id,
+                mapper.writeValueAsString(createdLocationShape),
+                true
+        );
+        LOG.info("update {} output:", locationShapeTable.name);
+        LOG.info(updateOutput);
+
+        LocationShapeDTO updatedLocationShapeDTO = mapper.readValue(updateOutput, locationShapeDTOClass);
+
+        // make sure saved data matches expected data
+        assertThat(updatedLocationShapeDTO.shape_id, equalTo(updatedLocationShapeId));
+        // Ensure message is null (not empty string).
+        LOG.info("location_meta_data_id: {}", updatedLocationShapeDTO.location_meta_data_id);
+        assertNull(updatedLocationShapeDTO.location_meta_data_id);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedLocationShapeDTO.id, locationShapeTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "shape_id", equalTo(createdLocationShape.shape_id));
+            assertResultValue(resultSet, "shape_pt_lat", equalTo(createdLocationShape.shape_pt_lat));
+            assertResultValue(resultSet, "shape_pt_lon", equalTo(createdLocationShape.shape_pt_lon));
+            assertResultValue(resultSet, "location_meta_data_id", Matchers.nullValue());
+        }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationShapeTable);
+        int deleteOutput = deleteTableWriter.delete(
+            createdLocationShape.id,
+                true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, locationShapeTable.name);
+
+        // make sure route record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocationShape.id, locationShapeTable));
     }
 
     @Test
@@ -1110,6 +1225,49 @@ public class JDBCTableWriterTest {
         LOG.info(output);
         // parse output
         return mapper.readValue(output, LocationGroupDTO.class);
+    }
+
+    /**
+     * Create and store a simple location meta data for testing.
+     */
+    private static LocationMetaDataDTO createSimpleTestLocationMetaData(String locationMetaDataId)
+        throws InvalidNamespaceException, IOException, SQLException {
+
+        LocationMetaDataDTO locationMetaData = new LocationMetaDataDTO();
+        locationMetaData.location_meta_data_id = locationMetaDataId;
+        locationMetaData.geometry_type = "Polygon";
+        locationMetaData.properties =
+            "\"stop_name\": \"Templeboy to Ballisodare\"," +
+            "\"stop_desc\": \"Templeboy to Ballisodare Door-to-door pickup area\""
+        ;
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.LOCATION_META_DATA);
+        String output = createTableWriter.create(mapper.writeValueAsString(locationMetaData), true);
+        LOG.info("create {} output:", Table.LOCATION_META_DATA.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, LocationMetaDataDTO.class);
+    }
+
+    /**
+     * Create and store a simple location shape for testing.
+     */
+    private static LocationShapeDTO createSimpleTestLocationShape(String shapeId)
+        throws InvalidNamespaceException, IOException, SQLException {
+
+        LocationShapeDTO locationShape = new LocationShapeDTO();
+        locationShape.shape_id = shapeId;
+        locationShape.shape_pt_lat = -8.516249659999971;
+        locationShape.shape_pt_lon = 54.212731200000064;
+        locationShape.shape_pt_sequence = 1;
+        locationShape.location_meta_data_id = "958362";
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.LOCATION_SHAPES);
+        String output = createTableWriter.create(mapper.writeValueAsString(locationShape), true);
+        LOG.info("create {} output:", Table.LOCATION_SHAPES.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, LocationShapeDTO.class);
     }
 
     /**

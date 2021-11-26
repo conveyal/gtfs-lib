@@ -1,13 +1,19 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import mil.nga.sf.geojson.Feature;
+import mil.nga.sf.geojson.FeatureCollection;
 
 import java.io.IOException;
 import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class LocationMetaData extends Entity {
 
@@ -24,7 +30,7 @@ public class LocationMetaData extends Entity {
 
     /**
      * Sets the parameters for a prepared statement following the parameter order defined in
-     * {@link com.conveyal.gtfs.loader.Table#BOOKING_RULES}. JDBC prepared statement parameters use a one-based index.
+     * {@link com.conveyal.gtfs.loader.Table#LOCATION_META_DATA}. JDBC prepared statement parameters use a one-based index.
      */
     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
@@ -32,7 +38,7 @@ public class LocationMetaData extends Entity {
         if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         statement.setString(oneBasedIndex++, location_meta_data_id);
         statement.setString(oneBasedIndex++, properties);
-        statement.setString(oneBasedIndex++, geometry_type);
+        statement.setString(oneBasedIndex, geometry_type);
     }
 
     public static class Loader extends Entity.Loader<LocationMetaData> {
@@ -56,37 +62,42 @@ public class LocationMetaData extends Entity {
 
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (locationMetaData.location_meta_data_id != null) {
-                //TODO: Add location meta data to feed
-//                feed.locationMetaData.put(locationMetaData.location_meta_data_id, locationMetaData);
+                feed.locationMetaData.put(locationMetaData.location_meta_data_id, locationMetaData);
             }
         }
     }
 
-    public static class Writer extends Entity.Writer<LocationMetaData> {
-        public Writer(GTFSFeed feed) {
-            super(feed, "location_meta_data");
-        }
-
-        @Override
-        public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[]{"location_meta_data_id", "properties", "geometry_type"});
-        }
-
-        @Override
-        public void writeOneRow(LocationMetaData locationMetaData) throws IOException {
-            writeStringField(locationMetaData.location_meta_data_id);
-            writeStringField(locationMetaData.properties);
-            writeStringField(locationMetaData.geometry_type);
-            endRecord();
-        }
-
-        @Override
-        public Iterator<LocationMetaData> iterator() {
-            //TODO: Add location meta data to feed
-//            return this.feed.locationMetaData.values().iterator();
-            return null;
-        }
+    public static String header() {
+        return "location_meta_data_id,properties,geometry_type\n";
     }
+
+    public String toCsvRow() {
+        return location_meta_data_id + "," + properties + "," + location_meta_data_id + "\n";
+    }
+
+//    public static class Writer extends Entity.Writer<LocationMetaData> {
+//        public Writer(GTFSFeed feed) {
+//            super(feed, "location_meta_data");
+//        }
+//
+//        @Override
+//        public void writeHeaders() throws IOException {
+//            writer.writeRecord(new String[]{"location_meta_data_id", "properties", "geometry_type"});
+//        }
+//
+//        @Override
+//        public void writeOneRow(LocationMetaData locationMetaData) throws IOException {
+//            writeStringField(locationMetaData.location_meta_data_id);
+//            writeStringField(locationMetaData.properties);
+//            writeStringField(locationMetaData.geometry_type);
+//            endRecord();
+//        }
+//
+//        @Override
+//        public Iterator<LocationMetaData> iterator() {
+//            return this.feed.locationMetaData.values().iterator();
+//        }
+//    }
 
     @Override
     public boolean equals(Object o) {
@@ -102,5 +113,14 @@ public class LocationMetaData extends Entity {
     @Override
     public int hashCode() {
         return Objects.hash(location_meta_data_id, properties, geometry_type);
+    }
+
+    @Override
+    public String toString() {
+        return "LocationMetaData{" +
+            "location_meta_data_id='" + location_meta_data_id + '\'' +
+            ", properties='" + properties + '\'' +
+            ", geometry_type='" + geometry_type + '\'' +
+            '}';
     }
 }
