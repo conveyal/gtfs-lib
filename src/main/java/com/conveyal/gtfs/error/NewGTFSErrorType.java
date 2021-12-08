@@ -26,6 +26,7 @@ public enum NewGTFSErrorType {
     FEED_TRAVEL_TIMES_ROUNDED(Priority.LOW, "All travel times in the feed are rounded to the minute, which may cause unexpected results in routing applications where travel times are zero."),
     FLOATING_FORMAT(Priority.MEDIUM, "Incorrect floating point number format."),
     FREQUENCY_PERIOD_OVERLAP(Priority.MEDIUM, "A frequency for a trip overlaps with another frequency defined for the same trip."),
+    GEO_JSON_PARSING(Priority.HIGH, "Unable to parse the locations.geojson file. Make sure the file conforms to the GeoJson standard and supported geometry types are used."),
     ILLEGAL_FIELD_VALUE(Priority.MEDIUM, "Fields may not contain tabs, carriage returns or new lines."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),

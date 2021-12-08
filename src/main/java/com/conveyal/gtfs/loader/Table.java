@@ -33,18 +33,17 @@ import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Translation;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.GeoJsonException;
 import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
-import mil.nga.sf.geojson.FeatureCollection;
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Reader;
-import java.io.StringReader;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -65,6 +64,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.GEO_JSON_PARSING;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
@@ -85,7 +85,7 @@ public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
 
-    public final String locationGeoJsonFileName = "locations.geojson";
+    public static final String locationGeoJsonFileName = "locations.geojson";
 
     public final String name;
 
@@ -462,6 +462,9 @@ public class Table {
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#locationsgeojson-file-added
     public static final Table LOCATION_SHAPES = new Table("location_shapes", LocationShape.class, OPTIONAL,
         new StringField("shape_id", REQUIRED),
+        new IntegerField("shape_polygon_id", REQUIRED, -1, Integer.MAX_VALUE),
+        new IntegerField("shape_ring_id", REQUIRED, -1, Integer.MAX_VALUE),
+        new IntegerField("shape_line_string_id", REQUIRED,  -1, Integer.MAX_VALUE),
         new DoubleField("shape_pt_lat", REQUIRED, -80, 80, 6),
         new DoubleField("shape_pt_lon", REQUIRED, -180, 180, 6),
         new IntegerField("shape_pt_sequence", REQUIRED),
@@ -659,8 +662,9 @@ public class Table {
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
         String tableFileName = this.name + ".txt";
-        if (this.name.equals(Table.LOCATION_META_DATA.name) || this.name.equals(Table.LOCATION_SHAPES.name)) {
+        if (name.equals(Table.LOCATION_META_DATA.name) || name.equals(Table.LOCATION_SHAPES.name)) {
             tableFileName = locationGeoJsonFileName;
+            LOG.info("Loading data for {}, into supporting table {}", tableFileName, name);
         }
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
@@ -677,58 +681,46 @@ public class Table {
         }
         if (entry == null) return null;
         try {
-            CsvReader csvReader;
-            if (tableFileName.equals(locationGeoJsonFileName)) {
-                StringBuilder csvContent = new StringBuilder();
-                FeatureCollection features = GeoJsonUtil.getLocations(zipFile, entry);
-                if (this.name.equals(Table.LOCATION_META_DATA.name)) {
-                    List<LocationMetaData> locationMetaData = GeoJsonUtil.getLocationMetaData(features);
-                    csvContent.append(LocationMetaData.header());
-                    locationMetaData.forEach(location -> csvContent.append(location.toCsvRow()));
-                } else if (this.name.equals(Table.LOCATION_SHAPES.name)) {
-                    List<LocationShape> locationShapes = GeoJsonUtil.getLocationShapes(features);
-                    csvContent.append(LocationShape.header());
-                    locationShapes.forEach(locationShape -> csvContent.append(locationShape.toCsvRow()));
-                }
-                csvReader = new CsvReader(new StringReader(csvContent.toString()));
-            } else {
-                InputStream zipInputStream = zipFile.getInputStream(entry);
-                // Skip any byte order mark that may be present. Files must be UTF-8,
-                // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
-                InputStream bomInputStream = new BOMInputStream(zipInputStream);
-                csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
-            }
+            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry);
             // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
             // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
             csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
-            LOG.error("Exception while opening zip entry: {}", e);
+            LOG.error("Exception while opening zip entry: {}", entry, e);
+            e.printStackTrace();
+            return null;
+        } catch (GeoJsonException e) {
+            if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, GEO_JSON_PARSING));
+            LOG.error("Exception while parsing GeoJson locations: {}", entry, e);
             e.printStackTrace();
             return null;
         }
     }
 
-    public ZipEntry getZipFileEntry(ZipFile zipFile, String tableFileName, SQLErrorStorage sqlErrorStorage) {
-//        final String tableFileName = "locations.geojson";
-        ZipEntry entry = zipFile.getEntry(tableFileName);
-        if (entry == null) {
-            // Table was not found, check if it is in a subdirectory.
-            Enumeration<? extends ZipEntry> entries = zipFile.entries();
-            while (entries.hasMoreElements()) {
-                ZipEntry e = entries.nextElement();
-                if (e.getName().endsWith(tableFileName)) {
-                    entry = e;
-                    //TODO: correct table name, should be lcoations.geojson.
-                    if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(Table.LOCATION_META_DATA, TABLE_IN_SUBDIRECTORY));
-                    break;
-                }
-            }
+    /**
+     * Create a CSV reader depending on the table to be loaded. If the table is "locations.geojson" unpack the GeoJson
+     * data first and load into a CSV reader, else, read the table contents directly into the CSV reader.
+     */
+    public static CsvReader getCsvReader(
+        String tableFileName,
+        String name,
+        ZipFile zipFile,
+        ZipEntry entry
+    ) throws IOException, GeoJsonException {
+        CsvReader csvReader;
+        if (tableFileName.equals(locationGeoJsonFileName)) {
+            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry);
+        } else {
+            InputStream zipInputStream = zipFile.getInputStream(entry);
+            // Skip any byte order mark that may be present. Files must be UTF-8,
+            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
+            InputStream bomInputStream = new BOMInputStream(zipInputStream);
+            csvReader = new CsvReader(bomInputStream, ',', StandardCharsets.UTF_8);
         }
-        return entry;
+        return csvReader;
     }
-
 
     /**
      * Join a list of fields with a comma + space separator.

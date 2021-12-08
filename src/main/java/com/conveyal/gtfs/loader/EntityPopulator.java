@@ -260,6 +260,9 @@ public interface EntityPopulator<T> {
     EntityPopulator<LocationShape> LOCATION_SHAPES = (result, columnForName) -> {
         LocationShape locationShape = new LocationShape();
         locationShape.shape_id = getStringIfPresent(result, "shape_id", columnForName);
+        locationShape.shape_polygon_id = getIntIfPresent(result, "shape_polygon_id", columnForName);
+        locationShape.shape_ring_id = getIntIfPresent(result, "shape_ring_id", columnForName);
+        locationShape.shape_line_string_id = getIntIfPresent(result, "shape_line_string_id", columnForName);
         locationShape.shape_pt_lat = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
         locationShape.shape_pt_lon = getDoubleIfPresent(result, "shape_pt_lon", columnForName);
         locationShape.shape_pt_sequence = getIntIfPresent(result, "shape_pt_sequence", columnForName);

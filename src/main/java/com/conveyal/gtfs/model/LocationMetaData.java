@@ -1,19 +1,12 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import mil.nga.sf.geojson.Feature;
 import mil.nga.sf.geojson.FeatureCollection;
 
 import java.io.IOException;
-import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 public class LocationMetaData extends Entity {
 
@@ -67,10 +60,18 @@ public class LocationMetaData extends Entity {
         }
     }
 
+    /**
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#unpackLocationMetaData(FeatureCollection)} as part of the
+     * unpacking of GeoJson data to CSV.
+     */
     public static String header() {
         return "location_meta_data_id,properties,geometry_type\n";
     }
 
+    /**
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#unpackLocationMetaData(FeatureCollection)} as part of the
+     * unpacking of GeoJson data to CSV.
+     */
     public String toCsvRow() {
         return location_meta_data_id + "," + properties + "," + location_meta_data_id + "\n";
     }

@@ -1257,6 +1257,9 @@ public class JDBCTableWriterTest {
 
         LocationShapeDTO locationShape = new LocationShapeDTO();
         locationShape.shape_id = shapeId;
+        locationShape.shape_polygon_id = 1;
+        locationShape.shape_ring_id = 2;
+        locationShape.shape_line_string_id = 3;
         locationShape.shape_pt_lat = -8.516249659999971;
         locationShape.shape_pt_lon = 54.212731200000064;
         locationShape.shape_pt_sequence = 1;

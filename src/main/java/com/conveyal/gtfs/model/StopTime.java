@@ -90,6 +90,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
 
     public static class Loader extends Entity.Loader<StopTime> {
 
+        private boolean isFlex = feed.isGTFSFlexFeed();
+
         public Loader(GTFSFeed feed) {
             super(feed, "stop_times");
         }
@@ -117,7 +119,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
             st.continuous_drop_off = getIntField("continuous_drop_off", true, 0, 3);
             st.shape_dist_traveled = getDoubleField("shape_dist_traveled", false, 0D, Double.MAX_VALUE); // FIXME using both 0 and NaN for "missing", define DOUBLE_MISSING
             st.timepoint      = getIntField("timepoint", false, 0, 1, INT_MISSING);
-            if (feed.isGTFSFlexFeed()) {
+            if (isFlex) {
                 st.pickup_booking_rule_id = getStringField("pickup_booking_rule_id", false);
                 st.drop_off_booking_rule_id = getStringField("drop_off_booking_rule_id", false);
                 st.start_pickup_dropoff_window = getTimeField("start_pickup_dropoff_window", false);

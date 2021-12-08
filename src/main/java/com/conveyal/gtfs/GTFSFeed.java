@@ -157,7 +157,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         db.getAtomicString("feed_id").set(feedId);
 
         new Agency.Loader(this).loadTable(zip);
-        new LocationGroup.Loader(this).loadTable(zip);
 
         // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
         // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
@@ -167,7 +166,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         new CalendarDate.Loader(this, serviceTable).loadTable(zip);
         this.services.putAll(serviceTable);
         serviceTable = null; // free memory
-        new BookingRule.Loader(this).loadTable(zip);
 
         // Same deal
         Map<String, Fare> fares = new HashMap<>();
@@ -176,6 +174,13 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.fares.putAll(fares);
         fares = null; // free memory
 
+        // Flex tables. These must be loaded before stop times. If any of these tables contain data it is assumed that
+        // we are working with a flex feed.
+        new BookingRule.Loader(this).loadTable(zip);
+        new LocationGroup.Loader(this).loadTable(zip);
+        new LocationMetaData.Loader(this).loadTable(zip);
+        new LocationShape.Loader(this).loadTable(zip);
+
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
@@ -183,6 +188,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
         new StopTime.Loader(this).loadTable(zip); // comment out this line for quick testing using NL feed
+
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
@@ -212,19 +218,20 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
 
             new Agency.Writer(this).writeTable(zip);
-            new BookingRule.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
             new FareAttribute.Writer(this).writeTable(zip);
             new FareRule.Writer(this).writeTable(zip);
             new Frequency.Writer(this).writeTable(zip);
-            new LocationGroup.Writer(this).writeTable(zip);
             new Route.Writer(this).writeTable(zip);
             new Stop.Writer(this).writeTable(zip);
             new ShapePoint.Writer(this).writeTable(zip);
             new Transfer.Writer(this).writeTable(zip);
             new Trip.Writer(this).writeTable(zip);
             new StopTime.Writer(this).writeTable(zip);
+
+            if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
+            if (!this.locationGroups.isEmpty()) new LocationGroup.Writer(this).writeTable(zip);
 
             zip.close();
 
@@ -649,7 +656,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         translations = db.getTreeMap("translations");
         attributions = db.getTreeMap("attributions");
         calenders = db.getTreeMap("calenders");
-        // TODO: I think this needs to come after calenders for ref checks.
+
+        // Flex tables.
         bookingRules = db.getTreeMap("booking_rules");
         locationGroups = db.getTreeMap("location_groups");
         locationMetaData = db.getTreeMap("location_meta_data");
@@ -670,15 +678,15 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     * If booking rules and location groups have been created and contain data, the assumption is that this is a GTFS
-     * Flex feed. Booking rules and location groups must be loaded before this can be referenced. At the moment StopTime
-     * references this and is loaded after the check is made on these tables.
+     * If any of the flex only tables contain data, the assumption is that this is a GTFS Flex feed. These tables must
+     * be loaded before this can be referenced. At the moment {@link StopTime} references this and is loaded after the
+     * check is made on these tables.
      */
     public boolean isGTFSFlexFeed() {
         return
-            bookingRules != null &&
-            locationGroups != null &&
-            !bookingRules.isEmpty() &&
-            !locationGroups.isEmpty();
+            !bookingRules.isEmpty() ||
+            !locationGroups.isEmpty() ||
+            !locationMetaData.isEmpty() ||
+            !locationShapes.isEmpty();
     }
 }

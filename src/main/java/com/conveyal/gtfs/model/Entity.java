@@ -5,6 +5,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.error.DateParseError;
 import com.conveyal.gtfs.error.EmptyFieldError;
 import com.conveyal.gtfs.error.EmptyTableError;
+import com.conveyal.gtfs.error.GeoJsonParseError;
 import com.conveyal.gtfs.error.MissingColumnError;
 import com.conveyal.gtfs.error.MissingTableError;
 import com.conveyal.gtfs.error.NumberParseError;
@@ -14,7 +15,10 @@ import com.conveyal.gtfs.error.TableInSubdirectoryError;
 import com.conveyal.gtfs.error.TimeParseError;
 import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.loader.DateField;
+import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.util.Deduplicator;
+import com.conveyal.gtfs.util.GeoJsonException;
+import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
 
@@ -30,6 +34,7 @@ import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -44,6 +49,8 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+
+import static com.conveyal.gtfs.loader.Table.locationGeoJsonFileName;
 
 /**
  * An abstract base class that represents a row in a GTFS table, e.g. a Stop, Trip, or Agency.
@@ -280,7 +287,12 @@ public abstract class Entity implements Serializable {
          * @param zip the zip file from which to read a table
          */
         public void loadTable(ZipFile zip) throws IOException {
-            ZipEntry entry = zip.getEntry(tableName + ".txt");
+            String tableFileName = tableName + ".txt";
+            if (tableName.equals(Table.LOCATION_META_DATA.name) || tableName.equals(Table.LOCATION_SHAPES.name)) {
+                tableFileName = locationGeoJsonFileName;
+                LOG.info("Loading data for {}, into supporting table {}", tableFileName, tableName);
+            }
+            ZipEntry entry = zip.getEntry(tableFileName);
             if (entry == null) {
                 Enumeration<? extends ZipEntry> entries = zip.entries();
                 // check if table is contained within sub-directory
@@ -288,7 +300,7 @@ public abstract class Entity implements Serializable {
                     ZipEntry e = entries.nextElement();
                     if (e.getName().endsWith(tableName + ".txt")) {
                         entry = e;
-                        feed.errors.add(new TableInSubdirectoryError(tableName, entry.getName().replace(tableName + ".txt", "")));
+                        feed.errors.add(new TableInSubdirectoryError(tableName, entry.getName().replace(tableFileName, "")));
                     }
                 }
                 /* This GTFS table did not exist in the zip. */
@@ -301,25 +313,25 @@ public abstract class Entity implements Serializable {
                 if (entry == null) return;
             }
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
-            InputStream zis = zip.getInputStream(entry);
-            // skip any byte order mark that may be present. Files must be UTF-8,
-            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable"
-            InputStream bis = new BOMInputStream(zis);
-            CsvReader reader = new CsvReader(bis, ',', Charset.forName("UTF8"));
-            this.reader = reader;
-            boolean hasHeaders = reader.readHeaders();
-            if (!hasHeaders) {
-                feed.errors.add(new EmptyTableError(tableName));
-            }
-            while (reader.readRecord()) {
-                // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
-                if (++row % 500000 == 0) {
-                    LOG.info("Record number {}", human(row));
+            try {
+                this.reader = Table.getCsvReader(tableFileName, tableName, zip, entry);
+                boolean hasHeaders = reader.readHeaders();
+                if (!hasHeaders) {
+                    feed.errors.add(new EmptyTableError(tableName));
                 }
-                loadOneRow(); // Call subclass method to produce an entity from the current row.
-            }
-            if (row == 0) {
-                feed.errors.add(new EmptyTableError(tableName));
+                while (reader.readRecord()) {
+                    // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
+                    if (++row % 500000 == 0) {
+                        LOG.info("Record number {}", human(row));
+                    }
+                    loadOneRow(); // Call subclass method to produce an entity from the current row.
+                }
+                if (row == 0) {
+                    feed.errors.add(new EmptyTableError(tableName));
+                }
+            } catch (GeoJsonException e) {
+                LOG.error("GeoJson parser error ", e);
+                feed.errors.add(new GeoJsonParseError(tableName, e.getMessage()));
             }
         }
 
