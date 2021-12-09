@@ -319,7 +319,7 @@ public class GeoJsonUtil {
     private static void setFeatureProps(LocationMetaData metaData, Feature feature) {
         feature.setId(metaData.location_meta_data_id);
         if (!metaData.properties.isEmpty()) {
-            String[] props = metaData.properties.split(PROP_KEY_VALUE_SEPARATOR);
+            String[] props = metaData.properties.split(PROP_SEPARATOR);
             Map<String, Object> properties = new HashMap<>();
             Arrays.stream(props).forEach(prop -> {
                 String key = prop.split(PROP_KEY_VALUE_SEPARATOR)[0];
