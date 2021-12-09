@@ -103,13 +103,13 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_long_name = getStringField("route_long_name", false);
             r.route_desc = getStringField("route_desc", false);
             r.route_type = getIntField("route_type", true, 0, 7);
-            r.route_sort_order = getIntField("route_type", false, 0, Integer.MAX_VALUE);
+            r.route_sort_order = getIntField("route_sort_order", false, 0, Integer.MAX_VALUE);
             r.route_url = getUrlField("route_url", false);
             r.route_color = getStringField("route_color", false);
             r.route_text_color = getStringField("route_text_color", false);
             r.route_branding_url = getUrlField("route_branding_url", false);
-            r.continuous_pickup = getIntField("continuous_pickup", true, 0, 3);
-            r.continuous_pickup = getIntField("continuous_drop_off", true, 0, 3);
+            r.continuous_pickup = getIntField("continuous_pickup", false, 0, 3, INT_MISSING);
+            r.continuous_drop_off = getIntField("continuous_drop_off", false, 0, 3, INT_MISSING);
             r.feed = feed;
             r.feed_id = feed.feedId;
             // Attempting to put a null key or value will cause an NPE in BTreeMap

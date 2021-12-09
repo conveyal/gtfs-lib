@@ -95,6 +95,7 @@ public class Feed {
         List<FeedValidator> feedValidators = Lists.newArrayList(
             new MisplacedStopValidator(this, errorStorage, validationResult),
             new DuplicateStopsValidator(this, errorStorage),
+            new ParentStationValidator(this, errorStorage),
             new FaresValidator(this, errorStorage),
             new FrequencyValidator(this, errorStorage),
             new TimeZoneValidator(this, errorStorage),
