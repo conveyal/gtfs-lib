@@ -480,31 +480,4 @@ public class GeoJsonUtil {
             )
             .collect(toList());
     }
-
-    public static void main(String[] args) throws IOException, GeoJsonException {
-        ZipFile zipFile = new ZipFile("C:\\projects\\JetBrains\\OTP\\gtfs-lib\\src\\test\\resources\\real-world-gtfs-feeds\\gtfs_GL.zip");
-        FeatureCollection features = getLocations(zipFile, zipFile.getEntry(Table.locationGeoJsonFileName));
-        List<LocationMetaData> locationMetaData = unpackLocationMetaData(features);
-        List<LocationShape> locationShapes = unpackLocationShapes(features);
-        String json = packLocations(locationMetaData, locationShapes);
-        System.out.println(json);
-
-
-//        assert features != null;
-//        System.out.println(features.numFeatures());
-//        List<LocationMetaData> locationMetaData = getLocationMetaData(features);
-//        locationMetaData.forEach(System.out::println);
-//        List<LocationShape> locationShapes = getLocationShapes(features);
-//        locationShapes.forEach(System.out::println);
-//        Reader reader = new StringReader("\"location_meta_data_id\", \"properties\", \"geometry_type\"\nv1,v2,v3");
-//        CsvReader csvReader = new CsvReader(reader);
-//        csvReader.setSkipEmptyRecords(false);
-//        csvReader.readHeaders();
-//        while (csvReader.readRecord()) {
-//            System.out.println(csvReader.getColumnCount());
-//            for (int f = 0; f < 3; f++) {
-//                System.out.println(csvReader.get(f));
-//            }
-//        }
-    }
 }
