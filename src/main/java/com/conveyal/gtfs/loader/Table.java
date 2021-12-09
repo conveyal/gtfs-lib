@@ -492,7 +492,9 @@ public class Table {
         TRANSLATIONS,
         ATTRIBUTIONS,
         BOOKING_RULES,
-        LOCATION_GROUPS
+        LOCATION_GROUPS,
+        LOCATION_META_DATA,
+        LOCATION_SHAPES
     };
 
     /**

@@ -435,9 +435,9 @@ public class JdbcGtfsExporter {
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {
             final TableReader<LocationMetaData> locationMetaDataIterator
-                = new JDBCTableReader(Table.LOCATION_META_DATA, dataSource, Table.LOCATION_META_DATA.name, EntityPopulator.LOCATION_META_DATA);
+                = new JDBCTableReader(Table.LOCATION_META_DATA, dataSource, feedIdToExport + ".", EntityPopulator.LOCATION_META_DATA);
             final TableReader<LocationShape> locationShapesIterator
-                = new JDBCTableReader(Table.LOCATION_SHAPES, dataSource, Table.LOCATION_SHAPES.name, EntityPopulator.LOCATION_SHAPES);
+                = new JDBCTableReader(Table.LOCATION_SHAPES, dataSource, feedIdToExport + ".", EntityPopulator.LOCATION_SHAPES);
             List<LocationMetaData> locationMetaData = Lists.newArrayList(locationMetaDataIterator);
             List<LocationShape> locationShapes = Lists.newArrayList(locationShapesIterator);
             if (locationMetaData.size() > 0) {
@@ -446,9 +446,10 @@ public class JdbcGtfsExporter {
                 String geoJson = GeoJsonUtil.packLocations(locationMetaData, locationShapes);
                 // Create entry for table.
                 zipOutputStream.putNextEntry(new ZipEntry(Table.locationGeoJsonFileName));
-                try (PrintWriter p = new PrintWriter(zipOutputStream)) {
-                    p.println(geoJson);
-                }
+                // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
+                PrintWriter p = new PrintWriter(zipOutputStream);
+                p.println(geoJson);
+                p.flush();
                 zipOutputStream.closeEntry();
                 LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, Table.locationGeoJsonFileName, System.currentTimeMillis() - startTime);
             } else {

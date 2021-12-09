@@ -45,10 +45,14 @@ public class GeoJsonUtil {
 
     private static final Logger LOG = LoggerFactory.getLogger(GeoJsonUtil.class);
 
-    /** If a particular reference id is not required when unpacking locations this value is used as a placeholder. This
+    /**
+     * If a particular reference id is not required when unpacking locations this value is used as a placeholder. This
      * is then referenced when packing locations to focus in on a particular geometry type.
      */
     private static final int NOT_REQUIRED = -1;
+
+    private static final String PROP_KEY_VALUE_SEPARATOR = "~";
+    private static final String PROP_SEPARATOR = "#";
 
     /**
      * Takes the content of a zip file entry and converts it into a {@link FeatureCollection} which is a class
@@ -83,10 +87,11 @@ public class GeoJsonUtil {
             location.location_meta_data_id = feature.getId();
             location.geometry_type = feature.getGeometryType().getName();
             Map<String, Object> props = feature.getProperties();
-            // To avoid any comma related issues when reading this data in, the ~ and | characters are used.
+            // To avoid any comma related issues when reading this data in, the PROP_KEY_VALUE_SEPARATOR
+            // and PROP_SEPARATOR characters are used.
             location.properties = props.keySet().stream()
-                .map(key -> key + "~" + props.get(key))
-                .collect(Collectors.joining("|"));
+                .map(key -> key + PROP_KEY_VALUE_SEPARATOR + props.get(key))
+                .collect(Collectors.joining(PROP_SEPARATOR));
             locationMetaData.add(location);
 
         }
@@ -314,11 +319,11 @@ public class GeoJsonUtil {
     private static void setFeatureProps(LocationMetaData metaData, Feature feature) {
         feature.setId(metaData.location_meta_data_id);
         if (!metaData.properties.isEmpty()) {
-            String[] props = metaData.properties.split("\\|");
+            String[] props = metaData.properties.split(PROP_KEY_VALUE_SEPARATOR);
             Map<String, Object> properties = new HashMap<>();
             Arrays.stream(props).forEach(prop -> {
-                String key = prop.split("~")[0];
-                String value = prop.split("~")[1];
+                String key = prop.split(PROP_KEY_VALUE_SEPARATOR)[0];
+                String value = prop.split(PROP_KEY_VALUE_SEPARATOR)[1];
                 properties.put(key, value);
             });
             feature.setProperties(properties);

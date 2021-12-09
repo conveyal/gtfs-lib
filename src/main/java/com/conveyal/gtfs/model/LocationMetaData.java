@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class LocationMetaData extends Entity {
 
@@ -61,44 +63,20 @@ public class LocationMetaData extends Entity {
     }
 
     /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#unpackLocationMetaData(FeatureCollection)} as part of the
-     * unpacking of GeoJson data to CSV.
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * of the unpacking of GeoJson data to CSV.
      */
     public static String header() {
         return "location_meta_data_id,properties,geometry_type\n";
     }
 
     /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#unpackLocationMetaData(FeatureCollection)} as part of the
-     * unpacking of GeoJson data to CSV.
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * of the unpacking of GeoJson data to CSV.
      */
     public String toCsvRow() {
-        return location_meta_data_id + "," + properties + "," + location_meta_data_id + "\n";
+        return location_meta_data_id + "," + properties + "," + geometry_type + "\n";
     }
-
-//    public static class Writer extends Entity.Writer<LocationMetaData> {
-//        public Writer(GTFSFeed feed) {
-//            super(feed, "location_meta_data");
-//        }
-//
-//        @Override
-//        public void writeHeaders() throws IOException {
-//            writer.writeRecord(new String[]{"location_meta_data_id", "properties", "geometry_type"});
-//        }
-//
-//        @Override
-//        public void writeOneRow(LocationMetaData locationMetaData) throws IOException {
-//            writeStringField(locationMetaData.location_meta_data_id);
-//            writeStringField(locationMetaData.properties);
-//            writeStringField(locationMetaData.geometry_type);
-//            endRecord();
-//        }
-//
-//        @Override
-//        public Iterator<LocationMetaData> iterator() {
-//            return this.feed.locationMetaData.values().iterator();
-//        }
-//    }
 
     @Override
     public boolean equals(Object o) {

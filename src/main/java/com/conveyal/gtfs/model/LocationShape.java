@@ -116,46 +116,25 @@ public class LocationShape extends Entity {
             location_meta_data_id + "\n";
     }
 
-    public static class Writer extends Entity.Writer<LocationShape> {
-        public Writer(GTFSFeed feed) {
-            super(feed, "location_shapes");
-        }
-
-        @Override
-        public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[]{"shape_id", "shape_polygon_id", "shape_ring_id", "shape_line_string_id", "shape_pt_lat", "shape_pt_lon", "shape_pt_sequence", "location_meta_data_id"});
-        }
-
-        @Override
-        public void writeOneRow(LocationShape locationShape) throws IOException {
-            writeStringField(locationShape.shape_id);
-            writeIntField(locationShape.shape_polygon_id);
-            writeIntField(locationShape.shape_ring_id);
-            writeIntField(locationShape.shape_line_string_id);
-            writeDoubleField(locationShape.shape_pt_lat);
-            writeDoubleField(locationShape.shape_pt_lon);
-            writeIntField(locationShape.shape_pt_sequence);
-            writeStringField(locationShape.location_meta_data_id);
-            endRecord();
-        }
-
-        @Override
-        public Iterator<LocationShape> iterator() {
-            return this.feed.locationShapes.values().iterator();
-        }
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         LocationShape that = (LocationShape) o;
-        return shape_polygon_id == that.shape_polygon_id && shape_ring_id == that.shape_ring_id && shape_line_string_id == that.shape_line_string_id && Double.compare(that.shape_pt_lat, shape_pt_lat) == 0 && Double.compare(that.shape_pt_lon, shape_pt_lon) == 0 && shape_pt_sequence == that.shape_pt_sequence && Objects.equals(shape_id, that.shape_id) && Objects.equals(location_meta_data_id, that.location_meta_data_id);
+        return shape_polygon_id == that.shape_polygon_id &&
+            shape_ring_id == that.shape_ring_id &&
+            shape_line_string_id == that.shape_line_string_id &&
+            Double.compare(that.shape_pt_lat, shape_pt_lat) == 0 &&
+            Double.compare(that.shape_pt_lon, shape_pt_lon) == 0 &&
+            shape_pt_sequence == that.shape_pt_sequence &&
+            Objects.equals(shape_id, that.shape_id) &&
+            Objects.equals(location_meta_data_id, that.location_meta_data_id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(shape_id, shape_polygon_id, shape_ring_id, shape_line_string_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, location_meta_data_id);
+        return Objects.hash(shape_id, shape_polygon_id, shape_ring_id, shape_line_string_id, shape_pt_lat, shape_pt_lon,
+            shape_pt_sequence, location_meta_data_id);
     }
 
     @Override
