@@ -18,14 +18,12 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
@@ -443,14 +441,7 @@ public class JdbcGtfsExporter {
             if (locationMetaData.size() > 0) {
                 // Only export if data is available.
                 tableLoadResult.rowCount = locationMetaData.size() + locationShapes.size();
-                String geoJson = GeoJsonUtil.packLocations(locationMetaData, locationShapes);
-                // Create entry for table.
-                zipOutputStream.putNextEntry(new ZipEntry(Table.locationGeoJsonFileName));
-                // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
-                PrintWriter p = new PrintWriter(zipOutputStream);
-                p.println(geoJson);
-                p.flush();
-                zipOutputStream.closeEntry();
+                writeLocationsToFile(zipOutputStream, locationMetaData, locationShapes);
                 LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, Table.locationGeoJsonFileName, System.currentTimeMillis() - startTime);
             } else {
                 LOG.warn("No locations exported to {} as the {} table is empty!", Table.locationGeoJsonFileName, Table.LOCATION_META_DATA.name);
@@ -460,5 +451,22 @@ public class JdbcGtfsExporter {
             LOG.error("Exception while exporting {}", Table.locationGeoJsonFileName, e);
         }
         return tableLoadResult;
+    }
+
+    /**
+     * Pack the locations data and write to zip file.
+     */
+    public static void writeLocationsToFile(
+        ZipOutputStream zipOutputStream,
+        List<LocationMetaData> locationMetaData,
+        List<LocationShape> locationShapes
+    ) throws IOException, GeoJsonException {
+        // Create entry for table.
+        zipOutputStream.putNextEntry(new ZipEntry(Table.locationGeoJsonFileName));
+        // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
+        PrintWriter p = new PrintWriter(zipOutputStream);
+        p.println(GeoJsonUtil.packLocations(locationMetaData, locationShapes));
+        p.flush();
+        zipOutputStream.closeEntry();
     }
 }

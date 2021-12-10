@@ -3,6 +3,7 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
+import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.validator.Validator;
@@ -232,9 +233,15 @@ public class GTFSFeed implements Cloneable, Closeable {
 
             if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
             if (!this.locationGroups.isEmpty()) new LocationGroup.Writer(this).writeTable(zip);
-
+            if (!this.locationMetaData.isEmpty()) {
+                // export locations
+                JdbcGtfsExporter.writeLocationsToFile(
+                    zip,
+                    new ArrayList<>(locationMetaData.values()),
+                    new ArrayList<>(locationShapes.values())
+                );
+            }
             zip.close();
-
             LOG.info("GTFS file written");
         } catch (Exception e) {
             LOG.error("Error saving GTFS: {}", e.getMessage());
