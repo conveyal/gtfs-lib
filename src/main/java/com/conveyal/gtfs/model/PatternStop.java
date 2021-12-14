@@ -26,6 +26,10 @@ public class PatternStop extends Entity {
     public int continuous_pickup = INT_MISSING;
     public int continuous_drop_off = INT_MISSING;
 
+    // Flex additions.
+    public String pickup_booking_rule_id;
+    public String drop_off_booking_rule_id;
+
     public PatternStop () {}
 
     /**

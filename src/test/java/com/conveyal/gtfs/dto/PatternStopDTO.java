@@ -14,6 +14,10 @@ public class PatternStopDTO {
     public Integer continuous_pickup;
     public Integer continuous_drop_off;
 
+    // Flex additions.
+    public String pickup_booking_rule_id;
+    public String drop_off_booking_rule_id;
+
     /** Empty constructor for deserialization */
     public PatternStopDTO() {}
 

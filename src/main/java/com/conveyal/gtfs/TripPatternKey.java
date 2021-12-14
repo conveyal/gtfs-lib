@@ -28,6 +28,10 @@ public class TripPatternKey {
     public TIntList continuous_drop_off = new TIntArrayList();
     public TDoubleList shapeDistances = new TDoubleArrayList();
 
+    // Flex additions
+    public List<String> pickup_booking_rule_id = new ArrayList<>();
+    public List<String> drop_off_booking_rule_id = new ArrayList<>();
+
     public TripPatternKey (String routeId) {
         this.routeId = routeId;
     }
@@ -43,6 +47,8 @@ public class TripPatternKey {
         shapeDistances.add(st.shape_dist_traveled);
         continuous_pickup.add(st.continuous_pickup);
         continuous_drop_off.add(st.continuous_drop_off);
+        pickup_booking_rule_id.add(st.pickup_booking_rule_id);
+        drop_off_booking_rule_id.add(st.drop_off_booking_rule_id);
     }
 
     @Override

@@ -503,7 +503,9 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
-            // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
+            .field(MapFetcher.field("pickup_booking_rule_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+        // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
             // Should this be modified to be an object, rather than a list?
             .field(newFieldDefinition()
                     .type(new GraphQLList(stopType))

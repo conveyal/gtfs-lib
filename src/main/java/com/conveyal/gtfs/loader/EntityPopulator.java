@@ -70,6 +70,8 @@ public interface EntityPopulator<T> {
         patternStop.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
         patternStop.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
         patternStop.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
+        patternStop.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
+        patternStop.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
         return patternStop;
     };
 
@@ -218,6 +220,14 @@ public interface EntityPopulator<T> {
         stopTime.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
         stopTime.timepoint           = getIntIfPresent   (result, "timepoint", columnForName);
         stopTime.shape_dist_traveled = getDoubleIfPresent(result, "shape_dist_traveled", columnForName);
+        stopTime.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
+        stopTime.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
+        stopTime.start_pickup_dropoff_window = getIntIfPresent(result, "start_pickup_dropoff_window", columnForName);
+        stopTime.end_pickup_dropoff_window = getIntIfPresent(result, "end_pickup_dropoff_window", columnForName);
+        stopTime.mean_duration_factor = getDoubleIfPresent(result, "mean_duration_factor", columnForName);
+        stopTime.mean_duration_offset = getDoubleIfPresent(result, "mean_duration_offset", columnForName);
+        stopTime.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
+        stopTime.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);
         return stopTime;
     };
 

@@ -160,6 +160,8 @@ public class PatternFinderValidator extends TripValidator {
                     setIntParameter(insertPatternStopStatement,9, key.timepoints.get(i));
                     setIntParameter(insertPatternStopStatement,10, key.continuous_pickup.get(i));
                     setIntParameter(insertPatternStopStatement,11, key.continuous_drop_off.get(i));
+                    insertPatternStopStatement.setString(12, key.pickup_booking_rule_id.get(i));
+                    insertPatternStopStatement.setString(13, key.drop_off_booking_rule_id.get(i));
                     patternStopTracker.addBatch();
                 }
                 // Finally, update all trips on this pattern to reference this pattern's ID.
