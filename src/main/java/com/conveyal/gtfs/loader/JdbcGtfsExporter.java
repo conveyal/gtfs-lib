@@ -8,7 +8,7 @@ import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.util.GeoJsonException;
-import com.conveyal.gtfs.util.GeoJsonUtil;
+//import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.google.common.collect.Lists;
 import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
@@ -92,6 +92,7 @@ public class JdbcGtfsExporter {
             result.agency = export(Table.AGENCY, connection);
             // TODO: No idea if booking rules and location groups need to have a 'fromEditor' option?
             result.bookingRules = export(Table.BOOKING_RULES, connection);
+            result.locations = export(Table.LOCATIONS, connection);
             result.locationGroups = export(Table.LOCATION_GROUPS, connection);
             if (fromEditor) {
                 // only export calendar entries that have at least one day of service set
@@ -465,7 +466,7 @@ public class JdbcGtfsExporter {
         zipOutputStream.putNextEntry(new ZipEntry(Table.locationGeoJsonFileName));
         // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
         PrintWriter p = new PrintWriter(zipOutputStream);
-        p.println(GeoJsonUtil.packLocations(locationMetaData, locationShapes));
+//        p.println(GeoJsonUtil.packLocations(locationMetaData, locationShapes));
         p.flush();
         zipOutputStream.closeEntry();
     }

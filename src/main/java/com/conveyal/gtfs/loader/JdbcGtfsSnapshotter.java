@@ -99,6 +99,7 @@ public class JdbcGtfsSnapshotter {
             result.fareRules = copy(Table.FARE_RULES, true);
             result.feedInfo = copy(Table.FEED_INFO, true);
             result.frequencies = copy(Table.FREQUENCIES, true);
+            result.locations = copy(Table.LOCATIONS, true);
             result.locationGroups = copy(Table.LOCATION_GROUPS, true);
             result.locationMetaData = copy(Table.LOCATION_META_DATA, true);
             result.locationShapes = copy(Table.LOCATION_SHAPES, true);

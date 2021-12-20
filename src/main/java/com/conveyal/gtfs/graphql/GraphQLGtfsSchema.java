@@ -202,14 +202,41 @@ public class GraphQLGtfsSchema {
     public static final GraphQLObjectType locationShapeType = newObject().name("location_shapes")
             .description("A GTFS location_shape object")
             .field(MapFetcher.field("id", GraphQLInt))
-            .field(MapFetcher.field("shape_id"))
-            .field(MapFetcher.field("shape_polygon_id"))
-            .field(MapFetcher.field("shape_ring_id"))
-            .field(MapFetcher.field("shape_line_string_id"))
-            .field(MapFetcher.field("shape_pt_lat"))
-            .field(MapFetcher.field("shape_pt_lon"))
-            .field(MapFetcher.field("shape_pt_sequence"))
-            .field(MapFetcher.field("location_meta_data_id"))
+            .field(MapFetcher.field("location_id"))
+            .field(MapFetcher.field("geometry_id"))
+            .field(MapFetcher.field("geometry_type"))
+            .field(MapFetcher.field("geometry_pt_lat", GraphQLFloat))
+            .field(MapFetcher.field("geometry_pt_lon", GraphQLFloat))
+
+//            .field(MapFetcher.field("shape_id"))
+//            .field(MapFetcher.field("shape_polygon_id"))
+//            .field(MapFetcher.field("shape_ring_id"))
+//            .field(MapFetcher.field("shape_line_string_id"))
+//            .field(MapFetcher.field("shape_pt_lat"))
+//            .field(MapFetcher.field("shape_pt_lon"))
+//            .field(MapFetcher.field("shape_pt_sequence"))
+//            .field(MapFetcher.field("location_meta_data_id"))
+            .build();
+
+    // Represents rows from locations.geoJSON (hack to allow saving for UI dev)
+    public static final GraphQLObjectType locationsType = newObject().name("locations")
+            .description("A GTFS locations object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("location_id"))
+            .field(MapFetcher.field("stop_name"))
+            .field(MapFetcher.field("stop_desc"))
+            .field(MapFetcher.field("zone_id"))
+            .field(MapFetcher.field("stop_url"))
+            .field(newFieldDefinition()
+                    .name("location_shapes")
+                    .type(new GraphQLList(locationShapeType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
+                    .dataFetcher(new JDBCFetcher("location_shapes", "location_id"))
+                    .build()
+            )
             .build();
 
     // Represents rows from shapes.txt
@@ -482,6 +509,8 @@ public class GraphQLGtfsSchema {
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("stop_times", "stop_id", "stop_sequence", false)))
+            // Flex locations location_group
+
             .build();
 
     /**
@@ -494,6 +523,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("pattern_id"))
             .field(MapFetcher.field("stop_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+            .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("default_travel_time", GraphQLInt))
             .field(MapFetcher.field("default_dwell_time", GraphQLInt))
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
@@ -778,6 +809,17 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher(Table.BOOKING_RULES.name))
+                    .build()
+            )
+            .field(newFieldDefinition()
+                    .name("locations")
+                    .type(new GraphQLList(GraphQLGtfsSchema.locationsType))
+                    .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                    .argument(multiStringArg("location_id"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    .dataFetcher(new JDBCFetcher(Table.LOCATIONS.name))
                     .build()
             )
             .field(newFieldDefinition()

@@ -29,6 +29,7 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult fareRules;
     public TableLoadResult feedInfo;
     public TableLoadResult frequencies;
+    public TableLoadResult locations;
     public TableLoadResult locationGroups;
     public TableLoadResult locationMetaData;
     public TableLoadResult locationShapes;
@@ -60,6 +61,7 @@ public class FeedLoadResult implements Serializable {
         fareRules = new TableLoadResult();
         feedInfo = new TableLoadResult();
         frequencies = new TableLoadResult();
+        locations = new TableLoadResult();
         locationGroups = new TableLoadResult();
         locationMetaData = new TableLoadResult();
         locationShapes = new TableLoadResult();

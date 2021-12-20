@@ -18,7 +18,7 @@ import com.conveyal.gtfs.loader.DateField;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.util.Deduplicator;
 import com.conveyal.gtfs.util.GeoJsonException;
-import com.conveyal.gtfs.util.GeoJsonUtil;
+//import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
 

@@ -22,12 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.JDBCType;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -603,75 +598,106 @@ public class JdbcTableWriter implements TableWriter {
             // Always override the key field (shape_id for shapes, pattern_id for patterns) regardless of the entity's
             // actual value.
             subEntity.put(keyField.name, keyValue);
-            // Check any references the sub entity might have. For example, this checks that stop_id values on
-            // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
-            // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
-            // field statement above.
-            for (Field field : subTable.specFields()) {
-                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-                    JsonNode refValueNode = subEntity.get(field.name);
-                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
-                    if (refValueNode.isNull() && !field.isRequired()) continue;
-                    String refValue = refValueNode.asText();
-                    referencesPerTable.put(field.referenceTable, refValue);
+
+            if ("location_shapes".equals(subTable.name)) {
+                ArrayNode coords = (ArrayNode) entityNode.get("geometry_coords");
+                subEntity.remove("geometry_coords");
+
+                for (JsonNode coord : coords) {
+                    // Copy id and geometry type fields
+                    ObjectNode locationSubEntity = subEntity.deepCopy();
+                    ArrayNode coordArray = (ArrayNode) coord;
+                    locationSubEntity.set("geometry_pt_lat", coordArray.get(0));
+                    locationSubEntity.set("geometry_pt_lon", coordArray.get(1));
+
+                    // Insert new sub-entity.
+                    // If handling first iteration, create the prepared statement (later iterations will add to batch).
+                    if (entityCount == 0) insertStatement = createPreparedUpdate(id, true, locationSubEntity, subTable, connection, true);
+
+                    setStatementParameters(locationSubEntity, subTable, insertStatement, connection);
+
+                    // Log statement on first iteration so that it is not logged for each item in the batch.
+                    if (entityCount == 0) LOG.info(insertStatement.toString());
+                    insertStatement.addBatch();
+
+                    // Prefix increment count and check whether to execute batched update.
+                    if (++entityCount % INSERT_BATCH_SIZE == 0) {
+                        LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
+                        int[] newIds = insertStatement.executeBatch();
+                        LOG.info("Updated {}", newIds.length);
+                    }
                 }
-            }
-            // Insert new sub-entity.
-            if (entityCount == 0) {
-                // If handling first iteration, create the prepared statement (later iterations will add to batch).
-                insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
-            }
-            // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
-            if ("pattern_stops".equals(subTable.name)) {
-                if (referencedPatternUsesFrequencies) {
-                    // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
-                    // Default travel and dwell time behave as "linked fields" for associated stop times. In other
-                    // words, frequency trips in the editor must match the pattern stop travel times.
-                    cumulativeTravelTime += updateStopTimesForPatternStop(subEntity, cumulativeTravelTime);
+            } else {
+                // Check any references the sub entity might have. For example, this checks that stop_id values on
+                // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
+                // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
+                // field statement above.
+                for (Field field : subTable.specFields()) {
+                    if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
+                        JsonNode refValueNode = subEntity.get(field.name);
+                        // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                        if (refValueNode.isNull() && !field.isRequired()) continue;
+                        String refValue = refValueNode.asText();
+                        referencesPerTable.put(field.referenceTable, refValue);
+                    }
                 }
-                // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
-                updateLinkedFields(
-                    subTable,
-                    subEntity,
-                    "stop_times",
-                    "pattern_id",
-                    "timepoint",
-                    "drop_off_type",
-                    "pickup_type",
-                    "continuous_pickup",
-                    "continuous_drop_off",
-                    "shape_dist_traveled"
-                );
-            }
-            setStatementParameters(subEntity, subTable, insertStatement, connection);
-            if (hasOrderField) {
-                // If the table has an order field, check that it is zero-based and incrementing for all sub entities.
-                // NOTE: Rather than coercing the order values to conform to the sequence in which they are found, we
-                // check the values here as a sanity check.
-                int orderValue = subEntity.get(orderFieldName).asInt();
-                boolean orderIsUnique = orderValues.add(orderValue);
-                boolean valuesAreIncrementing = ++previousOrder == orderValue;
-                if (!orderIsUnique || !valuesAreIncrementing) {
-                    throw new SQLException(
-                        String.format(
-                            "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
-                            subTable.name,
-                            orderFieldName,
-                            entityCount,
-                            previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
-                            orderValue
-                        )
+                // Insert new sub-entity.
+                if (entityCount == 0) {
+                    // If handling first iteration, create the prepared statement (later iterations will add to batch).
+                    insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
+                }
+                // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
+                if ("pattern_stops".equals(subTable.name)) {
+                    if (referencedPatternUsesFrequencies) {
+                        // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
+                        // Default travel and dwell time behave as "linked fields" for associated stop times. In other
+                        // words, frequency trips in the editor must match the pattern stop travel times.
+                        cumulativeTravelTime += updateStopTimesForPatternStop(subEntity, cumulativeTravelTime);
+                    }
+                    // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
+                    updateLinkedFields(
+                            subTable,
+                            subEntity,
+                            "stop_times",
+                            "pattern_id",
+                            "timepoint",
+                            "drop_off_type",
+                            "pickup_type",
+                            "continuous_pickup",
+                            "continuous_drop_off",
+                            "shape_dist_traveled"
                     );
                 }
-            }
-            // Log statement on first iteration so that it is not logged for each item in the batch.
-            if (entityCount == 0) LOG.info(insertStatement.toString());
-            insertStatement.addBatch();
-            // Prefix increment count and check whether to execute batched update.
-            if (++entityCount % INSERT_BATCH_SIZE == 0) {
-                LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
-                int[] newIds = insertStatement.executeBatch();
-                LOG.info("Updated {}", newIds.length);
+                setStatementParameters(subEntity, subTable, insertStatement, connection);
+                if (hasOrderField) {
+                    // If the table has an order field, check that it is zero-based and incrementing for all sub entities.
+                    // NOTE: Rather than coercing the order values to conform to the sequence in which they are found, we
+                    // check the values here as a sanity check.
+                    int orderValue = subEntity.get(orderFieldName).asInt();
+                    boolean orderIsUnique = orderValues.add(orderValue);
+                    boolean valuesAreIncrementing = ++previousOrder == orderValue;
+                    if (!orderIsUnique || !valuesAreIncrementing) {
+                        throw new SQLException(
+                                String.format(
+                                        "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
+                                        subTable.name,
+                                        orderFieldName,
+                                        entityCount,
+                                        previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
+                                        orderValue
+                                )
+                        );
+                    }
+                }
+                // Log statement on first iteration so that it is not logged for each item in the batch.
+                if (entityCount == 0) LOG.info(insertStatement.toString());
+                insertStatement.addBatch();
+                // Prefix increment count and check whether to execute batched update.
+                if (++entityCount % INSERT_BATCH_SIZE == 0) {
+                    LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
+                    int[] newIds = insertStatement.executeBatch();
+                    LOG.info("Updated {}", newIds.length);
+                }
             }
         }
         // Check that accumulated references all exist in reference tables.

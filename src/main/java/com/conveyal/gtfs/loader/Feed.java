@@ -36,6 +36,7 @@ public class Feed {
     public final TableReader<CalendarDate>  calendarDates;
     public final TableReader<FareAttribute> fareAttributes;
     public final TableReader<Frequency>     frequencies;
+    public final TableReader<Location>      locations;
     public final TableReader<LocationGroup> locationGroups;
     public final TableReader<LocationMetaData> locationMetaData;
     public final TableReader<LocationShape> locationShapes;
@@ -56,6 +57,7 @@ public class Feed {
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
         bookingRules = new JDBCTableReader(Table.BOOKING_RULES, dataSource, tablePrefix, EntityPopulator.BOOKING_RULE);
+        locations = new JDBCTableReader(Table.LOCATIONS, dataSource, tablePrefix, EntityPopulator.LOCATION);
         fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, tablePrefix, EntityPopulator.FARE_ATTRIBUTE);
         frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, tablePrefix, EntityPopulator.FREQUENCY);
         locationGroups = new JDBCTableReader(Table.LOCATION_GROUPS, dataSource, tablePrefix, EntityPopulator.LOCATION_GROUP);
