@@ -8,6 +8,8 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class Location extends Entity {
 
@@ -39,6 +41,23 @@ public class Location extends Entity {
         statement.setString(oneBasedIndex++, stop_url != null ? stop_url.toString() : null);
     }
 
+    /**
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * of the unpacking of GeoJson data to CSV.
+     */
+    public static String header() {
+        return "location_id,stop_name,stop_desc,zone_id,stop_url\n";
+    }
+
+
+    /**
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * of the unpacking of GeoJson data to CSV.
+     */
+    public String toCsvRow() {
+        return location_id + "," + stop_name + "," + stop_desc + "," + zone_id + "," + stop_url + "\n";
+    }
+
     public static class Loader extends Entity.Loader<Location> {
 
         public Loader(GTFSFeed feed) {
@@ -56,6 +75,7 @@ public class Location extends Entity {
 
             location.id = row + 1;
             location.stop_name = getStringField("stop_name", false);
+            location.stop_desc = getStringField("stop_desc", false);
             location.zone_id = getStringField("zone_id", false);
             location.stop_url = getUrlField("stop_url", false);
 
@@ -79,7 +99,7 @@ public class Location extends Entity {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[]{"location_id", "stop_name", "zone_id", "stop_url"});
+            writer.writeRecord(new String[]{"location_id", "stop_name", "stop_desc", "zone_id", "stop_url"});
         }
 
         @Override
@@ -87,6 +107,7 @@ public class Location extends Entity {
             writeStringField(locations.location_id);
             writeStringField(locations.zone_id);
             writeStringField(locations.stop_name);
+            writeStringField(locations.stop_desc);
             writeUrlField(locations.stop_url);
             endRecord();
         }
@@ -104,6 +125,7 @@ public class Location extends Entity {
         Location that = (Location) o;
         return stop_name == that.stop_name &&
                 zone_id == that.zone_id &&
+                stop_desc == that.stop_desc &&
                 Objects.equals(stop_url, that.stop_url) &&
                 Objects.equals(location_id, that.location_id);
     }
@@ -113,6 +135,7 @@ public class Location extends Entity {
         return Objects.hash(
                 location_id,
                 stop_name,
+                stop_desc,
                 stop_url,
                 zone_id
         );

@@ -41,6 +41,29 @@ public class LocationShape extends Entity{
         statement.setDouble(oneBasedIndex++, geometry_pt_lon);
     }
 
+    /**
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * of the unpacking of GeoJson data to CSV.
+     */
+    public static String header() {
+        return "location_id,geometry_id,geometry_type,geometry_pt_lat,geometry_pt_lon\n";
+    }
+
+    /**
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * of the unpacking of GeoJson data to CSV.
+     */
+    public String toCsvRow() {
+        return location_id + "," +
+            geometry_id + "," +
+            geometry_type + "," +
+            geometry_pt_lat + "," +
+            geometry_pt_lon + "\n";
+    }
+
+    public String getGeometry_id() {
+        return geometry_id;
+    }
 }
 
 //    public int shape_polygon_id = INT_MISSING;
@@ -125,28 +148,9 @@ public class LocationShape extends Entity{
 //        }
 //    }
 
-    /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
-     * of the unpacking of GeoJson data to CSV.
-     */
-//    public static String header() {
-//        return "shape_id,shape_polygon_id,shape_ring_id,shape_line_string_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence,location_meta_data_id\n";
-//    }
 
-    /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
-     * of the unpacking of GeoJson data to CSV.
-     */
-//    public String toCsvRow() {
-//        return shape_id + "," +
-//            shape_polygon_id + "," +
-//            shape_ring_id + "," +
-//            shape_line_string_id + "," +
-//            shape_pt_lat + "," +
-//            shape_pt_lon + "," +
-//            shape_pt_sequence + "," +
-//            location_meta_data_id + "\n";
-//    }
+
+
 
 //    @Override
 //    public boolean equals(Object o) {
