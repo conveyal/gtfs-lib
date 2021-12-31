@@ -227,6 +227,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("stop_desc"))
             .field(MapFetcher.field("zone_id"))
             .field(MapFetcher.field("stop_url"))
+            .field(MapFetcher.field("geometry_type"))
             .field(newFieldDefinition()
                     .name("location_shapes")
                     .type(new GraphQLList(locationShapeType))

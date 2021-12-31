@@ -20,7 +20,6 @@ public class LocationShape extends Entity{
 
     public String location_id;
     public String geometry_id;
-    public String geometry_type;
     public double geometry_pt_lat;
     public double geometry_pt_lon;
 
@@ -36,7 +35,6 @@ public class LocationShape extends Entity{
         if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         statement.setString(oneBasedIndex++, location_id);
         statement.setString(oneBasedIndex++, geometry_id);
-        statement.setString(oneBasedIndex++, geometry_type);
         statement.setDouble(oneBasedIndex++, geometry_pt_lat);
         statement.setDouble(oneBasedIndex++, geometry_pt_lon);
     }

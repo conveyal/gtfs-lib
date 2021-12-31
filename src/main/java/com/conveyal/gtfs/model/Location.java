@@ -18,6 +18,7 @@ public class Location extends Entity {
     public String stop_desc;
     public String zone_id;
     public URL stop_url;
+    public String geometry_type;
 
     @Override
     public String getId() {
@@ -37,6 +38,7 @@ public class Location extends Entity {
         statement.setString(oneBasedIndex++, stop_desc);
         statement.setString(oneBasedIndex++, zone_id);
         statement.setString(oneBasedIndex++, stop_url != null ? stop_url.toString() : null);
+        statement.setString(oneBasedIndex++, geometry_type);
     }
 
     public static class Loader extends Entity.Loader<Location> {
@@ -58,6 +60,8 @@ public class Location extends Entity {
             location.stop_name = getStringField("stop_name", false);
             location.zone_id = getStringField("zone_id", false);
             location.stop_url = getUrlField("stop_url", false);
+            // Must be a geometry associated w/ a location
+            location.geometry_type = getStringField("geometry_type", true);
 
             // Attempting to put a null key or value will cause an NPE in BTreeMap
             if (location.location_id != null) {
@@ -79,7 +83,7 @@ public class Location extends Entity {
 
         @Override
         public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[]{"location_id", "stop_name", "zone_id", "stop_url"});
+            writer.writeRecord(new String[]{"location_id", "stop_name", "zone_id", "stop_url", "geometry_type"});
         }
 
         @Override
@@ -88,6 +92,7 @@ public class Location extends Entity {
             writeStringField(locations.zone_id);
             writeStringField(locations.stop_name);
             writeUrlField(locations.stop_url);
+            writeStringField(locations.geometry_type);
             endRecord();
         }
 
@@ -105,7 +110,8 @@ public class Location extends Entity {
         return stop_name == that.stop_name &&
                 zone_id == that.zone_id &&
                 Objects.equals(stop_url, that.stop_url) &&
-                Objects.equals(location_id, that.location_id);
+                Objects.equals(location_id, that.location_id) &&
+                geometry_type == that.geometry_type;
     }
 
     @Override
@@ -114,7 +120,8 @@ public class Location extends Entity {
                 location_id,
                 stop_name,
                 stop_url,
-                zone_id
+                zone_id,
+                geometry_type
         );
     }
 }
