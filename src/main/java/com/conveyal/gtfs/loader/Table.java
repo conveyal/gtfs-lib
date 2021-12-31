@@ -450,7 +450,8 @@ public class Table {
             new StringField("stop_name", OPTIONAL),
             new StringField("stop_desc", OPTIONAL),
             new StringField("zone_id", OPTIONAL),
-            new URLField("stop_url", OPTIONAL)
+            new URLField("stop_url", OPTIONAL),
+            new StringField("geometry_type", REQUIRED)
     );
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
@@ -472,20 +473,10 @@ public class Table {
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#locationsgeojson-file-added
     public static final Table LOCATION_SHAPES = new Table("location_shapes", LocationShape.class, OPTIONAL,
-//        new StringField("shape_id", REQUIRED),
         new StringField("location_id", REQUIRED).isReferenceTo(LOCATIONS),
         new StringField("geometry_id", REQUIRED),
-        new StringField("geometry_type", REQUIRED),
         new DoubleField("geometry_pt_lat", REQUIRED, -80, 80, 6),
         new DoubleField("geometry_pt_lon", REQUIRED, -180, 180, 6)
-
-//        new IntegerField("shape_polygon_id", REQUIRED, -1, Integer.MAX_VALUE),
-//        new IntegerField("shape_ring_id", REQUIRED, -1, Integer.MAX_VALUE),
-//        new IntegerField("shape_line_string_id", REQUIRED,  -1, Integer.MAX_VALUE),
-//        new DoubleField("shape_pt_lat", REQUIRED, -80, 80, 6),
-//        new DoubleField("shape_pt_lon", REQUIRED, -180, 180, 6)
-//        new IntegerField("shape_pt_sequence", REQUIRED)
-//        new StringField("location_meta_data_id", REQUIRED).isReferenceTo(LOCATION_META_DATA),
     ).withParentTable(LOCATIONS);
 
     /** List of tables in order needed for checking referential integrity during load stage. */

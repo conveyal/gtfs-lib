@@ -241,6 +241,7 @@ public interface EntityPopulator<T> {
         location.stop_name = getStringIfPresent(result, "location_stop_name", columnForName);
         location.zone_id = getStringIfPresent(result, "zone_id", columnForName);
         location.stop_url = getUrlIfPresent(result, "location_stop_url", columnForName);
+        location.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
         return location;
     };
 
@@ -264,7 +265,6 @@ public interface EntityPopulator<T> {
         LocationShape locationShape = new LocationShape();
         locationShape.location_id = getStringIfPresent(result, "location_id", columnForName);
         locationShape.geometry_id = getStringIfPresent(result, "polygon_id", columnForName);
-        locationShape.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
 
 //        locationShape.shape_id = getStringIfPresent(result, "shape_id", columnForName);
 //        locationShape.shape_polygon_id = getIntIfPresent(result, "shape_polygon_id", columnForName);
