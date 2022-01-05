@@ -21,7 +21,6 @@ import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationGroup;
-import com.conveyal.gtfs.model.LocationMetaData;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternStop;
@@ -43,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -465,13 +463,6 @@ public class Table {
     );
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#locationsgeojson-file-added
-    public static final Table LOCATION_META_DATA = new Table("location_meta_data", LocationMetaData.class, OPTIONAL,
-        new StringField("location_meta_data_id", REQUIRED),
-        new StringField("properties", OPTIONAL),
-        new StringField("geometry_type", OPTIONAL)
-    );
-
-    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#locationsgeojson-file-added
     public static final Table LOCATION_SHAPES = new Table("location_shapes", LocationShape.class, OPTIONAL,
         new StringField("location_id", REQUIRED).isReferenceTo(LOCATIONS),
         new StringField("geometry_id", REQUIRED),
@@ -501,7 +492,6 @@ public class Table {
         ATTRIBUTIONS,
         BOOKING_RULES,
         LOCATION_GROUPS,
-        LOCATION_META_DATA,
         LOCATION_SHAPES,
         LOCATIONS,
     };
@@ -673,7 +663,7 @@ public class Table {
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
         String tableFileName = this.name + ".txt";
-        if (name.equals(Table.LOCATION_META_DATA.name) || name.equals(Table.LOCATION_SHAPES.name)) {
+        if (name.equals(Table.LOCATIONS.name) || name.equals(Table.LOCATION_SHAPES.name)) {
             tableFileName = locationGeoJsonFileName;
             LOG.info("Loading data for {}, into supporting table {}", tableFileName, name);
         }

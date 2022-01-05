@@ -101,7 +101,6 @@ public class JdbcGtfsSnapshotter {
             result.frequencies = copy(Table.FREQUENCIES, true);
             result.locations = copy(Table.LOCATIONS, true);
             result.locationGroups = copy(Table.LOCATION_GROUPS, true);
-            result.locationMetaData = copy(Table.LOCATION_META_DATA, true);
             result.locationShapes = copy(Table.LOCATION_SHAPES, true);
             result.routes = copy(Table.ROUTES, true);
             // FIXME: Find some place to store errors encountered on copy for patterns and pattern stops.

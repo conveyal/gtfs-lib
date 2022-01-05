@@ -253,27 +253,10 @@ public interface EntityPopulator<T> {
         return locationGroup;
     };
 
-    EntityPopulator<LocationMetaData> LOCATION_META_DATA = (result, columnForName) -> {
-        LocationMetaData locationMetaData = new LocationMetaData();
-        locationMetaData.location_meta_data_id = getStringIfPresent(result, "location_meta_data_id", columnForName);
-        locationMetaData.properties = getStringIfPresent(result, "properties", columnForName);
-        locationMetaData.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
-        return locationMetaData;
-    };
-
     EntityPopulator<LocationShape> LOCATION_SHAPES = (result, columnForName) -> {
         LocationShape locationShape = new LocationShape();
         locationShape.location_id = getStringIfPresent(result, "location_id", columnForName);
         locationShape.geometry_id = getStringIfPresent(result, "polygon_id", columnForName);
-
-//        locationShape.shape_id = getStringIfPresent(result, "shape_id", columnForName);
-//        locationShape.shape_polygon_id = getIntIfPresent(result, "shape_polygon_id", columnForName);
-//        locationShape.shape_ring_id = getIntIfPresent(result, "shape_ring_id", columnForName);
-//        locationShape.shape_line_string_id = getIntIfPresent(result, "shape_line_string_id", columnForName);
-//        locationShape.shape_pt_lat = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
-//        locationShape.shape_pt_lon = getDoubleIfPresent(result, "shape_pt_lon", columnForName);
-//        locationShape.shape_pt_sequence = getIntIfPresent(result, "shape_pt_sequence", columnForName);
-//        locationShape.location_meta_data_id = getStringIfPresent(result, "location_meta_data_id", columnForName);
         return locationShape;
     };
 

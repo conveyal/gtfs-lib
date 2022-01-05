@@ -63,7 +63,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, BookingRule> bookingRules;
     public final Map<String, Location> locations;
     public final Map<String, LocationGroup> locationGroups;
-    public final Map<String, LocationMetaData> locationMetaData;
     public final Map<String, LocationShape> locationShapes;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
@@ -181,8 +180,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         // we are working with a flex feed.
         new BookingRule.Loader(this).loadTable(zip);
         new LocationGroup.Loader(this).loadTable(zip);
-        new LocationMetaData.Loader(this).loadTable(zip);
-//        new LocationShape.Loader(this).loadTable(zip);
         new Location.Loader(this).loadTable(zip);
 
         new Route.Loader(this).loadTable(zip);
@@ -238,11 +235,11 @@ public class GTFSFeed implements Cloneable, Closeable {
 
             if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
             if (!this.locationGroups.isEmpty()) new LocationGroup.Writer(this).writeTable(zip);
-            if (!this.locationMetaData.isEmpty()) {
+            if (!this.locations.isEmpty()) {
                 // export locations
                 JdbcGtfsExporter.writeLocationsToFile(
                     zip,
-                    new ArrayList<>(locationMetaData.values()),
+                    new ArrayList<>(locations.values()),
                     new ArrayList<>(locationShapes.values())
                 );
             }
@@ -673,7 +670,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         bookingRules = db.getTreeMap("booking_rules");
         locations = db.getTreeMap("locations");
         locationGroups = db.getTreeMap("location_groups");
-        locationMetaData = db.getTreeMap("location_meta_data");
         locationShapes = db.getTreeMap("location_shapes");
 
         feedId = db.getAtomicString("feed_id").get();
@@ -699,7 +695,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         return
             !bookingRules.isEmpty() ||
             !locationGroups.isEmpty() ||
-            !locationMetaData.isEmpty() ||
             !locationShapes.isEmpty();
     }
 }

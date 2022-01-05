@@ -189,15 +189,6 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("location_group_name"))
             .build();
 
-    // Represents the meta data aspect of locations.geojson
-    public static final GraphQLObjectType locationMetaDataType = newObject().name("location_meta_data")
-            .description("A GTFS location_meta_data object")
-            .field(MapFetcher.field("id", GraphQLInt))
-            .field(MapFetcher.field("location_meta_data_id"))
-            .field(MapFetcher.field("properties"))
-            .field(MapFetcher.field("geometry_type"))
-            .build();
-
     // Represents the shapes held within locations.geojson
     public static final GraphQLObjectType locationShapeType = newObject().name("location_shapes")
             .description("A GTFS location_shape object")
@@ -218,7 +209,7 @@ public class GraphQLGtfsSchema {
 //            .field(MapFetcher.field("location_meta_data_id"))
             .build();
 
-    // Represents rows from locations.geoJSON (hack to allow saving for UI dev)
+    // Represents more 'meta' data from locations.geoJSON
     public static final GraphQLObjectType locationsType = newObject().name("locations")
             .description("A GTFS locations object")
             .field(MapFetcher.field("id", GraphQLInt))
@@ -854,17 +845,6 @@ public class GraphQLGtfsSchema {
                 .argument(intArg(LIMIT_ARG))
                 .argument(intArg(OFFSET_ARG))
                 .dataFetcher(new JDBCFetcher(Table.LOCATION_GROUPS.name))
-                .build()
-            )
-            .field(newFieldDefinition()
-                .name("location_meta_data")
-                .type(new GraphQLList(GraphQLGtfsSchema.locationMetaDataType))
-                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
-                .argument(multiStringArg("location_meta_data_id"))
-                .argument(intArg(ID_ARG))
-                .argument(intArg(LIMIT_ARG))
-                .argument(intArg(OFFSET_ARG))
-                .dataFetcher(new JDBCFetcher(Table.LOCATION_META_DATA.name))
                 .build()
             )
             .field(newFieldDefinition()

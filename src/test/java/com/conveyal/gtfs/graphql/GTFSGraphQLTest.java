@@ -181,12 +181,12 @@ public class GTFSGraphQLTest {
     }
 
     /** Tests that the location meta data of a feed can be fetched. */
-    @Test
-    public void canFetchLocationMetaData() {
-        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-            MatcherAssert.assertThat(queryGraphQL("feedLocationMetaData.txt"), matchesSnapshot());
-        });
-    }
+//    @Test
+//    public void canFetchLocationMetaData() {
+//        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+//            MatcherAssert.assertThat(queryGraphQL("feedLocationMetaData.txt"), matchesSnapshot());
+//        });
+//    }
 
     /** Tests that the location shapes of a feed can be fetched. */
     @Test

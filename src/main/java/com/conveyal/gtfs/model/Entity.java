@@ -288,7 +288,7 @@ public abstract class Entity implements Serializable {
          */
         public void loadTable(ZipFile zip) throws IOException {
             String tableFileName = tableName + ".txt";
-            if (tableName.equals(Table.LOCATION_META_DATA.name) || tableName.equals(Table.LOCATION_SHAPES.name)) {
+            if (tableName.equals(Table.LOCATIONS.name) || tableName.equals(Table.LOCATION_SHAPES.name)) {
                 tableFileName = locationGeoJsonFileName;
                 LOG.info("Loading data for {}, into supporting table {}", tableFileName, tableName);
             }
