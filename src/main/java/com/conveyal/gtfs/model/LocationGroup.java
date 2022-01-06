@@ -61,7 +61,7 @@ public class LocationGroup extends Entity {
               Check referential integrity without storing references. BookingRule cannot directly reference Calenders
               because they would be serialized into the MapDB.
              */
-            getRefField("location_id", true, feed.stops);
+//            getRefField("location_id", true, feed.stops);
             //FIXME: Add locations.geojson once created.
 //            getRefField("location_id", true, feed.locations);
         }

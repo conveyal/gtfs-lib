@@ -20,6 +20,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -71,7 +73,7 @@ public class GeoJsonUtil {
     /**
      * Extract from a list of features, the items which are common to all features.
      */
-    private static List<Location> unpackLocations(FeatureCollection featureCollection) {
+    private static List<Location> unpackLocations(FeatureCollection featureCollection) throws MalformedURLException {
         ArrayList<Location> locations = new ArrayList<>();
         List<Feature> features = featureCollection.getFeatures();
         for (Feature feature : features) {
@@ -93,20 +95,33 @@ public class GeoJsonUtil {
                     location.geometry_type = geometry_type.toLowerCase();
                     break;
             }
-            location.geometry_type = feature.getGeometryType().getName();
             Map<String, Object> props = feature.getProperties();
             // To avoid any comma related issues when reading this data in, the PROP_KEY_VALUE_SEPARATOR
             // and PROP_SEPARATOR characters are used.
 
             for (Map.Entry<String, Object> entry : props.entrySet()) {
-                System.out.println(entry.getKey() + "/" + entry.getValue());
+                if (entry.getValue() != null) {
+                    switch (entry.getKey()) {
+                        case "stop_name":
+                            location.stop_name = (String) entry.getValue();
+                            break;
+                        case "stop_desc":
+                            location.stop_desc = (String) entry.getValue();
+                            break;
+                        case "zone_id":
+                            location.zone_id = (String) entry.getValue();
+                            break;
+                        case "stop_url":
+                            location.stop_url = new URL((String) entry.getValue());
+                            break;
+                        default:
+                            //TODO: handle invalid GTFS
+                            break;
+                    }
+                }
             }
 
-//            location.properties = props.keySet().stream()
-//                .map(key -> key + PROP_KEY_VALUE_SEPARATOR + props.get(key))
-//                .collect(Collectors.joining(PROP_SEPARATOR));
-//            locations.add(location);
-
+            locations.add(location);
         }
         return locations;
     }
@@ -254,7 +269,13 @@ public class GeoJsonUtil {
         }
         StringBuilder csvContent = new StringBuilder();
         if (tableName.equals(Table.LOCATIONS.name)) {
-            List<Location> locations = GeoJsonUtil.unpackLocations(features);
+            List<Location> locations = null;
+            try {
+                locations = GeoJsonUtil.unpackLocations(features);
+            } catch (MalformedURLException e) {
+                // TODO: Handle this error properly
+                e.printStackTrace();
+            }
             csvContent.append(Location.header());
             locations.forEach(location -> csvContent.append(location.toCsvRow()));
         } else if (tableName.equals(Table.LOCATION_SHAPES.name)) {

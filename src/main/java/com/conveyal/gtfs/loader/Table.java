@@ -34,7 +34,7 @@ import com.conveyal.gtfs.model.Translation;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.GeoJsonException;
-//import com.conveyal.gtfs.util.GeoJsonUtil;
+import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
@@ -443,6 +443,7 @@ public class Table {
             new URLField("booking_url", OPTIONAL)
     );
 
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#
     public static final Table LOCATIONS = new Table("locations", Location.class, OPTIONAL,
             new StringField("location_id", REQUIRED),
             new StringField("stop_name", OPTIONAL),
@@ -450,7 +451,8 @@ public class Table {
             new StringField("zone_id", OPTIONAL),
             new URLField("stop_url", OPTIONAL),
             new StringField("geometry_type", REQUIRED)
-    );
+    ).addPrimaryKey()
+    .restrictDelete();
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
     public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
@@ -493,7 +495,7 @@ public class Table {
         BOOKING_RULES,
         LOCATION_GROUPS,
         LOCATION_SHAPES,
-        LOCATIONS,
+        LOCATIONS
     };
 
     /**
@@ -711,15 +713,15 @@ public class Table {
         ZipEntry entry
     ) throws IOException, GeoJsonException {
         CsvReader csvReader;
-//        if (tableFileName.equals(locationGeoJsonFileName)) {
-////            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry);
-//        } else {
+        if (tableFileName.equals(locationGeoJsonFileName)) {
+            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry);
+        } else {
             InputStream zipInputStream = zipFile.getInputStream(entry);
             // Skip any byte order mark that may be present. Files must be UTF-8,
             // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
             InputStream bomInputStream = new BOMInputStream(zipInputStream);
             csvReader = new CsvReader(bomInputStream, ',', StandardCharsets.UTF_8);
-//        }
+        }
         return csvReader;
     }
 

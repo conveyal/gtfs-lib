@@ -48,16 +48,15 @@ public class Location extends Entity {
      * of the unpacking of GeoJson data to CSV.
      */
     public static String header() {
-        return "location_id,stop_name,stop_desc,zone_id,stop_url\n";
+        return "location_id,stop_name,stop_desc,zone_id,stop_url,geometry_type\n";
     }
-
 
     /**
      * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
      * of the unpacking of GeoJson data to CSV.
      */
     public String toCsvRow() {
-        return location_id + "," + stop_name + "," + stop_desc + "," + zone_id + "," + stop_url + "\n";
+        return location_id + "," + stop_name + "," + stop_desc + "," + zone_id + "," + stop_url + "," + geometry_type + "\n";
     }
 
     public static class Loader extends Entity.Loader<Location> {
@@ -87,12 +86,6 @@ public class Location extends Entity {
             if (location.location_id != null) {
                 feed.locations.put(location.location_id, location);
             }
-
-            /*
-              Check referential integrity without storing references. Location cannot directly reference Calenders
-              because they would be serialized into the MapDB.
-             */
-//            getRefField("location_id", true, feed.);
         }
     }
 
