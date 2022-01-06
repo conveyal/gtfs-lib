@@ -647,12 +647,16 @@ public class JdbcTableWriter implements TableWriter {
                     insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
                 }
                 // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
-                if ("pattern_stops".equals(subTable.name)) {
+                if ("pattern_stops".equals(subTable.name) || "pattern_locations".equals(subTable.name)) {
+                    // FLEX TODO: this ideally is cleaner
                     if (referencedPatternUsesFrequencies) {
                         // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
                         // Default travel and dwell time behave as "linked fields" for associated stop times. In other
                         // words, frequency trips in the editor must match the pattern stop travel times.
-                        cumulativeTravelTime += updateStopTimesForPatternStop(subEntity, cumulativeTravelTime);
+                        int travelTimeForPatternHalts = "pattern_stops".equals(subTable.name) ?
+                                updateStopTimesForPatternStop(subEntity, cumulativeTravelTime) :
+                                updateStopTimesForPatternLocation(subEntity, cumulativeTravelTime);
+                        cumulativeTravelTime += travelTimeForPatternHalts;
                     }
                     // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
                     updateLinkedFields(
@@ -676,14 +680,19 @@ public class JdbcTableWriter implements TableWriter {
                     int orderValue = subEntity.get(orderFieldName).asInt();
                     boolean orderIsUnique = orderValues.add(orderValue);
                     boolean valuesAreIncrementing = ++previousOrder == orderValue;
-                    if (!orderIsUnique || !valuesAreIncrementing) {
+                    boolean valuesAreIncreasing = previousOrder < orderValue;
+
+                    // PatternStop and PatternLocations must only increase, not increment
+                    boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
+                            valuesAreIncreasing : valuesAreIncrementing;
+                    if (!orderIsUnique || !valuesAreAscending) {
                         throw new SQLException(
                                 String.format(
                                         "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
                                         subTable.name,
                                         orderFieldName,
                                         entityCount,
-                                        previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
+                                        previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing" : "duplicate",
                                         orderValue
                                 )
                         );
@@ -760,6 +769,42 @@ public class JdbcTableWriter implements TableWriter {
         // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
         // normalize stop sequence values for stop times during snapshotting for the editor.
         statement.setInt(oneBasedIndex++, patternStop.get("stop_sequence").asInt());
+        // Log query, execute statement, and log result.
+        LOG.debug(statement.toString());
+        int entitiesUpdated = statement.executeUpdate();
+        LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
+        return travelTime + dwellTime;
+    }
+
+    /**
+     * Updates the stop times that reference the specified pattern location.
+     * @param patternLocation the pattern stop for which to update stop times
+     * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
+     *                           previous pattern stop's dwell time)
+     * @return the travel and dwell time added by this pattern location
+     * @throws SQLException
+     */
+    private int updateStopTimesForPatternLocation(ObjectNode patternLocation, int previousTravelTime) throws SQLException {
+        String sql = String.format(
+                "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
+                        "where st.trip_id = t.trip_id AND t.pattern_id = ? AND st.stop_sequence = ?",
+                tablePrefix,
+                tablePrefix
+        );
+        // Prepare the statement and set statement parameters
+        PreparedStatement statement = connection.prepareStatement(sql);
+        int oneBasedIndex = 1;
+        int travelTime = patternLocation.get("end_pickup_dropoff_window").asInt() - patternLocation.get("start_pickup_dropoff_window").asInt();
+        int arrivalTime = previousTravelTime + travelTime;
+        statement.setInt(oneBasedIndex++, arrivalTime);
+        // FLEX TODO: are we sure about this? this might be an oppertunity to use the mean/safe duration factors... maybe
+        int dwellTime = 0;
+        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
+        // Set "where clause" with value for pattern_id and stop_sequence
+        statement.setString(oneBasedIndex++, patternLocation.get("pattern_id").asText());
+        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
+        // normalize stop sequence values for stop times during snapshotting for the editor.
+        statement.setInt(oneBasedIndex++, patternLocation.get("stop_sequence").asInt());
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();

@@ -3,6 +3,7 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -38,6 +39,7 @@ public class NewTripTimesValidator extends FeedValidator {
     // TODO build this same kind of caching into the table reader class.
 //    ListMultimap<String, ShapePoint> shapeById = MultimapBuilder.treeKeys().arrayListValues().build();
     Map<String, Stop> stopById = new HashMap<>();
+    Map<String, Location> locationById = new HashMap<>();
     Map<String, Trip> tripById = new HashMap<>();
     Map<String, Route> routeById = new HashMap<>();
 
@@ -60,6 +62,7 @@ public class NewTripTimesValidator extends FeedValidator {
         // TODO cache automatically in feed or TableReader object
         LOG.info("Cacheing stops, trips, and routes...");
         for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
+        for (Location location : feed.locations) locationById.put(location.location_id, location);
         // FIXME: determine a good way to validate shapes without caching them all in memory...
 //        for (ShapePoint shape : feed.shapePoints.getAllOrdered()) shapeById.put(shape.shape_id, shape);
         for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
@@ -151,17 +154,23 @@ public class NewTripTimesValidator extends FeedValidator {
         // We will remove any stop_times for stops that don't exist in the feed.
         // We could ask the SQL server to do the join between stop_times and stops, but we want to check references.
         List<Stop> stops = new ArrayList<>();
+        List<Location> locations = new ArrayList<>();
         for (Iterator<StopTime> it = stopTimes.iterator(); it.hasNext(); ) {
             StopTime stopTime = it.next();
             if (hasContinuousBehavior(stopTime.continuous_drop_off, stopTime.continuous_pickup)) {
                 hasContinuousBehavior = true;
             }
             Stop stop = stopById.get(stopTime.stop_id);
-            if (stop == null) {
+            Location location = locationById.get(stopTime.stop_id);
+            if (stop == null && location == null) {
                 // All bad references should have been recorded at import, we can just remove them from the trips.
                 it.remove();
             } else {
-                stops.add(stop);
+                if (stop == null) {
+                    locations.add(location);
+                } else {
+                    stops.add(stop);
+                }
             }
         }
         // StopTimes list may have shrunk due to missing stop references.

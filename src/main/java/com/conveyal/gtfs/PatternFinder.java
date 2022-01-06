@@ -149,7 +149,8 @@ public class PatternFinder {
 
             for (String stopId : pattern.orderedStops) {
                 Stop stop = stopById.get(stopId);
-                if (fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) continue;
+                // If the stop doesn't exist, it's probably a location and we can ignore it for renaming
+                if (stop == null || fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) continue;
                 namingInfo.vias.put(stop.stop_name, pattern);
             }
             namingInfo.patternsOnRoute.add(pattern);
