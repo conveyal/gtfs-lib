@@ -59,6 +59,27 @@ public interface EntityPopulator<T> {
         return patternStop;
     };
 
+    EntityPopulator<PatternLocation> PATTERN_LOCATION = (result, columnForName) -> {
+        PatternLocation patternLocation = new PatternLocation();
+        patternLocation.location_id = getStringIfPresent(result, "location_id", columnForName);
+        patternLocation.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        patternLocation.drop_off_type = getIntIfPresent(result, "drop_off_type", columnForName);
+        patternLocation.pickup_type = getIntIfPresent(result, "pickup_type", columnForName);
+        patternLocation.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
+        patternLocation.timepoint = getIntIfPresent(result, "timepoint", columnForName);
+        patternLocation.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
+        patternLocation.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
+
+        patternLocation.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
+        patternLocation.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
+        patternLocation.flex_default_travel_time = getIntIfPresent(result, "flex_default_travel_time", columnForName);
+        patternLocation.flex_default_zone_time = getIntIfPresent(result, "flex_default_zone_time", columnForName);
+        patternLocation.mean_duration_factor = getDoubleIfPresent(result, "mean_duration_factor", columnForName);
+        patternLocation.mean_duration_offset = getDoubleIfPresent(result, "mean_duration_offset", columnForName);
+        patternLocation.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
+        patternLocation.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);        return patternLocation;
+    };
+
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
 
     EntityPopulator<Agency> AGENCY = (result, columnForName) -> {
