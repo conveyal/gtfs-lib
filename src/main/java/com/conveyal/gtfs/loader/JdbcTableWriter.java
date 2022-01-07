@@ -680,7 +680,7 @@ public class JdbcTableWriter implements TableWriter {
                     int orderValue = subEntity.get(orderFieldName).asInt();
                     boolean orderIsUnique = orderValues.add(orderValue);
                     boolean valuesAreIncrementing = ++previousOrder == orderValue;
-                    boolean valuesAreIncreasing = previousOrder < orderValue;
+                    boolean valuesAreIncreasing = previousOrder <= orderValue;
 
                     // PatternStop and PatternLocations must only increase, not increment
                     boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
