@@ -684,7 +684,7 @@ public class JdbcTableWriter implements TableWriter {
 
                     // PatternStop and PatternLocations must only increase, not increment
                     boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
-                            valuesAreIncreasing : valuesAreIncrementing;
+                            valuesAreIncrementing : valuesAreIncreasing;
                     if (!orderIsUnique || !valuesAreAscending) {
                         throw new SQLException(
                                 String.format(
