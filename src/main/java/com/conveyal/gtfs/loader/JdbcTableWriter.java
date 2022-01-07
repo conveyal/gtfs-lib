@@ -786,7 +786,7 @@ public class JdbcTableWriter implements TableWriter {
      */
     private int updateStopTimesForPatternLocation(ObjectNode patternLocation, int previousTravelTime) throws SQLException {
         String sql = String.format(
-                "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
+                "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
                         "where st.trip_id = t.trip_id AND t.pattern_id = ? AND st.stop_sequence = ?",
                 tablePrefix,
                 tablePrefix
@@ -794,12 +794,14 @@ public class JdbcTableWriter implements TableWriter {
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
         int oneBasedIndex = 1;
-        int travelTime = patternLocation.get("end_pickup_dropoff_window").asInt() - patternLocation.get("start_pickup_dropoff_window").asInt();
+        int travelTime = patternLocation.get("flex_default_travel_time").asInt();
+        int timeInLocation = patternLocation.get("flex_default_zone_time").asInt();
         int arrivalTime = previousTravelTime + travelTime;
+        // Setting start of the pickup window (when the vehicle arrives in the flex location)
         statement.setInt(oneBasedIndex++, arrivalTime);
-        // FLEX TODO: are we sure about this? this might be an oppertunity to use the mean/safe duration factors... maybe
-        int dwellTime = 0;
-        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
+        // Set the end of the pickup window (when the vehicle leaves the flex location)
+        statement.setInt(oneBasedIndex++, arrivalTime + timeInLocation);
+
         // Set "where clause" with value for pattern_id and stop_sequence
         statement.setString(oneBasedIndex++, patternLocation.get("pattern_id").asText());
         // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
@@ -809,7 +811,7 @@ public class JdbcTableWriter implements TableWriter {
         LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
         LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
-        return travelTime + dwellTime;
+        return travelTime + timeInLocation;
     }
 
     /**

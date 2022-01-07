@@ -28,8 +28,8 @@ public class PatternLocation extends Entity {
     public String drop_off_booking_rule_id;
 
     // Additional GTFS Flex location groups and locations fields
-    public int start_pickup_dropoff_window = INT_MISSING;
-    public int end_pickup_dropoff_window = INT_MISSING;
+    public int flex_default_travel_time = INT_MISSING;
+    public int flex_default_zone_time = INT_MISSING;
     public double mean_duration_factor = DOUBLE_MISSING;
     public double mean_duration_offset = DOUBLE_MISSING;
     public double safe_duration_factor = DOUBLE_MISSING;

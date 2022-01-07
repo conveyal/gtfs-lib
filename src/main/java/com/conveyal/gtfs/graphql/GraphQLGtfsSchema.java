@@ -564,8 +564,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("drop_off_booking_rule_id"))
 
             // Additional GTFS Flex location groups and locations fields
-            .field(MapFetcher.field("start_pickup_dropoff_window", GraphQLInt))
-            .field(MapFetcher.field("end_pickup_dropoff_window", GraphQLInt))
+            .field(MapFetcher.field("flex_default_travel_time", GraphQLInt))
+            .field(MapFetcher.field("flex_default_zone_time", GraphQLInt))
             .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
             .field(MapFetcher.field("mean_duration_offset", GraphQLFloat))
             .field(MapFetcher.field("safe_duration_factor", GraphQLFloat))
