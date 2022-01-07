@@ -198,7 +198,7 @@ public class NewTripTimesValidator extends FeedValidator {
             );
         }
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
-        for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops);
+        for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops, locations);
     }
 
     /**

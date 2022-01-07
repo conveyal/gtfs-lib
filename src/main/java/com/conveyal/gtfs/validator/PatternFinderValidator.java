@@ -58,7 +58,7 @@ public class PatternFinderValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
         // As we hit each trip, accumulate them into the wrapped PatternFinder object.
         patternFinder.processTrip(trip, stopTimes);
     }

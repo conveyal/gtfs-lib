@@ -5,6 +5,7 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -32,7 +33,9 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
+        // TODO: re-enable this test and support locations
+        return;/*
         // The specific maximum speed for this trip's route's mode of travel.
         double maxSpeedKph = getMaxSpeedKph(route);
         // Skip over any initial stop times that won't allow calculating speeds.
@@ -94,7 +97,7 @@ public class SpeedTripValidator extends TripValidator {
             distanceMeters = 0;
             // Redefine current stopTime for the next iteration.
             prevStopTime = currStopTime;
-        }
+        }*/
     }
 
     /**
