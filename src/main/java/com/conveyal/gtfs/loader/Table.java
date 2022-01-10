@@ -515,6 +515,7 @@ public class Table {
         STOPS,
         FARE_RULES,
         PATTERN_STOP,
+        PATTERN_LOCATION,
         TRANSFERS,
         TRIPS,
         STOP_TIMES,
