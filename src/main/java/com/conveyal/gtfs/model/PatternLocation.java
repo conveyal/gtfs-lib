@@ -10,11 +10,9 @@ import java.sql.SQLException;
  * traveled) are specific to the editor and usually based on values from the first trip encountered in a feed for a
  * given pattern.
  */
-public class PatternLocation extends Entity {
+public class PatternLocation extends PatternHalt {
     private static final long serialVersionUID = 1L;
 
-    public String pattern_id;
-    public int stop_sequence;
     public String location_id;
 
     public int pickup_type;
