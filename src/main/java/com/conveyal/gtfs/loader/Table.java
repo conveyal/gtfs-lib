@@ -351,7 +351,8 @@ public class Table {
             new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
-            new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
+            // FLEX TODO: create multi-reference, as this can reference both stops and locations
+            new StringField("stop_id", REQUIRED), //.isReferenceTo(STOPS),
 //                    .indexThisColumn(),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are required
             new TimeField("arrival_time", OPTIONAL),
