@@ -454,8 +454,7 @@ public class Table {
             new StringField("zone_id", OPTIONAL),
             new URLField("stop_url", OPTIONAL),
             new StringField("geometry_type", REQUIRED)
-    ).addPrimaryKey()
-    .restrictDelete();
+    ).addPrimaryKey();
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
     public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,

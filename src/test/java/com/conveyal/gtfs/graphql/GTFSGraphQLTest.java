@@ -150,9 +150,10 @@ public class GTFSGraphQLTest {
 
     /** Tests that the booking rules of a feed can be fetched. */
     @Test
-    public void canFetchBookingRules() {
+    public void canFetchBookingRules() throws IOException {
+        Map<String, Object> blah = queryGraphQL("feedBookingRules.txt");
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-            MatcherAssert.assertThat(queryGraphQL("feedBookingRules.txt"), matchesSnapshot());
+            MatcherAssert.assertThat(blah, matchesSnapshot());
         });
     }
 
@@ -180,14 +181,13 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests that the location meta data of a feed can be fetched. */
-    // TODO: make sure this works well.
-//    @Test
-//    public void canFetchLocationMetaData() {
-//        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-//            MatcherAssert.assertThat(queryGraphQL("feedLocations.txt"), matchesSnapshot());
-//        });
-//    }
+    /** Tests that the locations of a feed can be fetched. */
+    @Test
+    public void canFetchLocations() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedLocations.txt"), matchesSnapshot());
+        });
+    }
 
     /** Tests that the location shapes of a feed can be fetched. */
     @Test

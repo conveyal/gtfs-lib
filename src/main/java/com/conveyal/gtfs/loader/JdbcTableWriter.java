@@ -164,6 +164,17 @@ public class JdbcTableWriter implements TableWriter {
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
+                    if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
+                        (childEntities == null ||
+                        childEntities.isNull() ||
+                        !childEntities.isArray())
+                    ) {
+                        // FLEX TODO: I'm not sure on this approach. This is a backwards hack to prevent the addition
+                        // of pattern location breaking existing pattern functionality. If pattern location is not
+                        // provided set to an empty array to avoid the following exception.
+                        childEntities = mapper.createArrayNode();
+                    }
+
                     if (childEntities == null || childEntities.isNull() || !childEntities.isArray()) {
                         throw new SQLException(String.format("Child entities %s must be an array and not null", referencingTable.name));
                     }

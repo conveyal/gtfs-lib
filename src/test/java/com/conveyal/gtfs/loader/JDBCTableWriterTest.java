@@ -503,19 +503,9 @@ public class JDBCTableWriterTest {
             assertResultValue(resultSet, "stop_url", equalTo(createdLocation.stop_url.toString()));
             assertResultValue(resultSet, "geometry_type", equalTo(createdLocation.geometry_type));
         }
-        // try to delete record
-        JdbcTableWriter deleteTableWriter = createTestTableWriter(Table.LOCATION_SHAPES);
-        int deleteOutput = deleteTableWriter.delete(
-                2,
-                true
-        );
-        LOG.info("deleted {} records from {}", deleteOutput, locationTable.name);
-        // try to delete record
-        deleteTableWriter = createTestTableWriter(locationTable);
-        deleteOutput = deleteTableWriter.delete(
-                createdLocation.id,
-                true
-        );
+        // Delete location record and all child location shape records
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationTable);
+        int deleteOutput = deleteTableWriter.delete(createdLocation.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, locationTable.name);
 
         // make sure location record does not exist in DB
@@ -1124,6 +1114,7 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
+        // FLEX TODO: Update table writer to include pattern location if not provided.
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
