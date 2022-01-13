@@ -1,5 +1,7 @@
 package com.conveyal.gtfs.util;
 
+import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationShape;
@@ -11,6 +13,7 @@ import mil.nga.sf.Polygon;
 import mil.nga.sf.geojson.Feature;
 import mil.nga.sf.geojson.FeatureCollection;
 import mil.nga.sf.geojson.FeatureConverter;
+import mil.nga.sf.geojson.MultiLineString;
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +31,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.GEO_JSON_PARSING;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -91,9 +95,10 @@ public class GeoJsonUtil {
                     location.geometry_type = "polyline";
                     break;
                 default:
-                    // Effectively, POLYGON and MULTIPOLYGON types
-                    location.geometry_type = geometry_type.toLowerCase();
-                    break;
+                    // Effectively, POLYGON and MULTIPOLYGON types which aren't supported yet.
+                    continue;
+//                    location.geometry_type = geometry_type.toLowerCase();
+//                    break;
             }
             Map<String, Object> props = feature.getProperties();
             // To avoid any comma related issues when reading this data in, the PROP_KEY_VALUE_SEPARATOR
@@ -132,12 +137,11 @@ public class GeoJsonUtil {
      *
      * GeoJson format reference: https://datatracker.ietf.org/doc/html/rfc7946#section-3.1.4
      */
-    private static List<LocationShape> unpackLocationShapes(FeatureCollection featureCollection)
-        throws GeoJsonException {
-
+    private static List<LocationShape> unpackLocationShapes(
+        FeatureCollection featureCollection
+    ) {
         ArrayList<LocationShape> locationShapes = new ArrayList<>();
         List<Feature> features = featureCollection.getFeatures();
-        int shapeId = 1;
         int ringId;
         int sequenceId;
         int lineId;
@@ -211,7 +215,7 @@ public class GeoJsonUtil {
                 default:
                     String message = String.format("Geometry type %s unknown or not supported.", geometry.getGeometryType());
                     LOG.warn(message);
-                    throw new GeoJsonException(message);
+//                    if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, message));
             }
         }
         return locationShapes;
@@ -248,8 +252,8 @@ public class GeoJsonUtil {
         double geometry_pt_lon
     ) {
         LocationShape shape = new LocationShape();
-        shape.geometry_id = geometry_id;
         shape.location_id = location_id;
+        shape.geometry_id = geometry_id;
         shape.geometry_pt_lat = geometry_pt_lat;
         shape.geometry_pt_lon = geometry_pt_lon;
         return shape;
@@ -258,14 +262,17 @@ public class GeoJsonUtil {
     /**
      * Extract the location features from file, unpack and convert to a CSV representation.
      */
-    public static CsvReader getCsvReaderFromGeoJson(String tableName, ZipFile zipFile, ZipEntry entry)
-        throws GeoJsonException {
-
+    public static CsvReader getCsvReaderFromGeoJson(
+        String tableName,
+        ZipFile zipFile,
+        ZipEntry entry
+    ) {
         FeatureCollection features = GeoJsonUtil.getLocations(zipFile, entry);
         if (features == null || features.numFeatures() == 0) {
             String message = "Unable to extract GeoJson features (or none are available) from " +  entry.getName();
             LOG.warn(message);
-            throw new GeoJsonException(message);
+//            if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, message));
+            return null;
         }
         StringBuilder csvContent = new StringBuilder();
         if (tableName.equals(Table.LOCATIONS.name)) {
@@ -318,9 +325,10 @@ public class GeoJsonUtil {
                     setFeatureProps(location, polygonFeature);
                     features.add(polygonFeature);
                     break;
-//                case "MULTILINESTRING":
+                // location geometry type (multipolyline) rather than spec MULTILINESTRING
+//                case "multipolyline":
 //                    List<LineString> lineStrings = new ArrayList<>();
-//                    Map<Integer, List<LocationShape>> multiLineStrings = getMultiLineStings(meta.location_meta_data_id, locationShapes);
+//                    Map<Integer, List<LocationShape>> multiLineStrings = getMultiLineStings(location.location_id, locationShapes);
 //                    multiLineStrings.forEach((lineStringId, lineString) -> {
 //                        lineStrings.add(buildLineString(lineString));
 //                    });
@@ -328,7 +336,7 @@ public class GeoJsonUtil {
 //                    multiLineString.setLineStrings(lineStrings);
 //                    mil.nga.sf.geojson.Feature multiLineStringFeature = new mil.nga.sf.geojson.Feature();
 //                    multiLineStringFeature.setGeometry(new mil.nga.sf.geojson.MultiLineString(multiLineString));
-//                    setFeatureProps(meta, multiLineStringFeature);
+//                    setFeatureProps(location, multiLineStringFeature);
 //                    features.add(multiLineStringFeature);
 //                    break;
                 // location geometry type (polyline) rather than spec LINESTRING
@@ -344,7 +352,7 @@ public class GeoJsonUtil {
                 default:
                     String message = String.format("Geometry type %s unknown or not supported.", location.geometry_type);
                     LOG.warn(message);
-                    throw new GeoJsonException(message);
+//                    throw new GeoJsonException(message);
             }
         }
         featureCollection.setFeatures(features);

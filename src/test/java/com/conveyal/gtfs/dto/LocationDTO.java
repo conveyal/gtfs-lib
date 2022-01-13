@@ -17,4 +17,6 @@ public class LocationDTO {
     public String zone_id;
     public URL stop_url;
     public String geometry_type;
+    public LocationShapeDTO[] location_shapes;
+
 }

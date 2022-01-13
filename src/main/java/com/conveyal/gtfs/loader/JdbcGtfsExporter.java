@@ -302,9 +302,9 @@ public class JdbcGtfsExporter {
             } else {
                 result.trips = export(Table.TRIPS, connection);
             }
-            // Location meta data and location shapes are exported at the same time. The result will be the same for both.
+            // Locations and location shapes are exported at the same time. The result will be the same for both.
             result.locations = exportLocations();
-            result.locationShapes = result.locationMetaData;
+            result.locationShapes = result.locations;
 
             zipOutputStream.close();
             // Run clean up on the resulting zip file.

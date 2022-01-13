@@ -313,7 +313,7 @@ public abstract class Entity implements Serializable {
                 if (entry == null) return;
             }
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
-            try {
+//            try {
                 this.reader = Table.getCsvReader(tableFileName, tableName, zip, entry);
                 boolean hasHeaders = reader.readHeaders();
                 if (!hasHeaders) {
@@ -329,10 +329,11 @@ public abstract class Entity implements Serializable {
                 if (row == 0) {
                     feed.errors.add(new EmptyTableError(tableName));
                 }
-            } catch (GeoJsonException e) {
-                LOG.error("GeoJson parser error ", e);
-                feed.errors.add(new GeoJsonParseError(tableName, e.getMessage()));
-            }
+                // FIXME: Sort error handing.
+//            } catch (GeoJsonException e) {
+//                LOG.error("GeoJson parser error ", e);
+//                feed.errors.add(new GeoJsonParseError(tableName, e.getMessage()));
+//            }
         }
 
     }

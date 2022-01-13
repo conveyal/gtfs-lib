@@ -469,11 +469,9 @@ public class JDBCTableWriterTest {
         // create new object to be saved
         String locationId = "c342a";
         LocationDTO createdLocation = createSimpleTestLocation(locationId);
-        // Set value to empty strings/null to later verify that it is set to null in the database.
-        createdLocation.geometry_type = "polygon";
         // make sure saved data matches expected data
         assertThat(createdLocation.location_id, equalTo(locationId));
-        // Check that location meta data exists.
+        // Check that location exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocation.id, Table.LOCATIONS), 1);
         // try to update record
         String updatedLocationId = "d12ff";
@@ -495,7 +493,6 @@ public class JDBCTableWriterTest {
         assertThat(updatedLocationDTO.location_id, equalTo(updatedLocationId));
         // Ensure message is null (not empty string).
         LOG.info("geometry_type: {}", updatedLocationDTO.geometry_type);
-        assertNull(updatedLocationDTO.geometry_type);
         // Verify that certain values are correctly set in the database.
         ResultSet resultSet = getResultSetForId(updatedLocationDTO.id, locationTable);
         while (resultSet.next()) {
@@ -503,18 +500,25 @@ public class JDBCTableWriterTest {
             assertResultValue(resultSet, "stop_name", equalTo(createdLocation.stop_name));
             assertResultValue(resultSet, "stop_desc", equalTo(createdLocation.stop_desc));
             assertResultValue(resultSet, "zone_id", equalTo(createdLocation.zone_id));
-            assertResultValue(resultSet, "stop_url", equalTo(createdLocation.stop_url));
+            assertResultValue(resultSet, "stop_url", equalTo(createdLocation.stop_url.toString()));
             assertResultValue(resultSet, "geometry_type", equalTo(createdLocation.geometry_type));
         }
         // try to delete record
-        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationTable);
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(Table.LOCATION_SHAPES);
         int deleteOutput = deleteTableWriter.delete(
+                2,
+                true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, locationTable.name);
+        // try to delete record
+        deleteTableWriter = createTestTableWriter(locationTable);
+        deleteOutput = deleteTableWriter.delete(
                 createdLocation.id,
                 true
         );
         LOG.info("deleted {} records from {}", deleteOutput, locationTable.name);
 
-        // make sure route record does not exist in DB
+        // make sure location record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocation.id, locationTable));
     }
 
@@ -1217,14 +1221,23 @@ public class JDBCTableWriterTest {
     private static LocationDTO createSimpleTestLocation(String locationId)
         throws InvalidNamespaceException, IOException, SQLException {
 
+        LocationShapeDTO locationShape = new LocationShapeDTO();
+//        locationShape.location_shape_id = "1";
+        locationShape.location_id = locationId;
+        locationShape.geometry_id = "1";
+        locationShape.geometry_pt_lat = 45.1111111;
+        locationShape.geometry_pt_lon = -80.432222;
+
         LocationDTO location = new LocationDTO();
         location.location_id = locationId;
-        location.geometry_type = "Polygon";
+        location.geometry_type = "polygon";
         location.stop_name = "Templeboy to Ballisodare";
         location.stop_desc = "Templeboy to Ballisodare Door-to-door pickup area";
         location.zone_id = "1";
-        location.stop_url = new URL("Teststopsite.com");
-        location.geometry_type = "polygon";
+        location.stop_url = new URL("https://www.Teststopsite.com");
+        location.location_shapes = new LocationShapeDTO[] {
+            locationShape
+        };
 
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(Table.LOCATIONS);

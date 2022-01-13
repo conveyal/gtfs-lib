@@ -181,6 +181,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         new BookingRule.Loader(this).loadTable(zip);
         new LocationGroup.Loader(this).loadTable(zip);
         new Location.Loader(this).loadTable(zip);
+        new LocationShape.Loader(this).loadTable(zip);
 
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
@@ -219,7 +220,6 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
 
             new Agency.Writer(this).writeTable(zip);
-            new BookingRule.Writer(this).writeTable(zip);
             new Location.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);

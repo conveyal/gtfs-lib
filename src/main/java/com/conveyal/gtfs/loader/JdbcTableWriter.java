@@ -657,114 +657,84 @@ public class JdbcTableWriter implements TableWriter {
             // actual value.
             subEntity.put(keyField.name, keyValue);
 
-            if ("location_shapes".equals(subTable.name)) {
-                ArrayNode coords = (ArrayNode) entityNode.get("geometry_coords");
-                subEntity.remove("geometry_coords");
-
-                for (JsonNode coord : coords) {
-                    // Copy id and geometry type fields
-                    ObjectNode locationSubEntity = subEntity.deepCopy();
-                    ArrayNode coordArray = (ArrayNode) coord;
-                    locationSubEntity.set("geometry_pt_lat", coordArray.get(0));
-                    locationSubEntity.set("geometry_pt_lon", coordArray.get(1));
-
-                    // Insert new sub-entity.
-                    // If handling first iteration, create the prepared statement (later iterations will add to batch).
-                    if (entityCount == 0) insertStatement = createPreparedUpdate(id, true, locationSubEntity, subTable, connection, true);
-
-                    setStatementParameters(locationSubEntity, subTable, insertStatement, connection);
-
-                    // Log statement on first iteration so that it is not logged for each item in the batch.
-                    if (entityCount == 0) LOG.info(insertStatement.toString());
-                    insertStatement.addBatch();
-
-                    // Prefix increment count and check whether to execute batched update.
-                    if (++entityCount % INSERT_BATCH_SIZE == 0) {
-                        LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
-                        int[] newIds = insertStatement.executeBatch();
-                        LOG.info("Updated {}", newIds.length);
-                    }
+            // Check any references the sub entity might have. For example, this checks that stop_id values on
+            // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
+            // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
+            // field statement above.
+            for (Field field : subTable.specFields()) {
+                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
+                    JsonNode refValueNode = subEntity.get(field.name);
+                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                    if (refValueNode.isNull() && !field.isRequired()) continue;
+                    String refValue = refValueNode.asText();
+                    referencesPerTable.put(field.referenceTable, refValue);
                 }
-            } else {
-                // Check any references the sub entity might have. For example, this checks that stop_id values on
-                // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
-                // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
-                // field statement above.
-                for (Field field : subTable.specFields()) {
-                    if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-                        JsonNode refValueNode = subEntity.get(field.name);
-                        // Skip over references that are null but not required (e.g., route_id in fare_rules).
-                        if (refValueNode.isNull() && !field.isRequired()) continue;
-                        String refValue = refValueNode.asText();
-                        referencesPerTable.put(field.referenceTable, refValue);
-                    }
+            }
+            // Insert new sub-entity.
+            if (entityCount == 0) {
+                // If handling first iteration, create the prepared statement (later iterations will add to batch).
+                insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
+            }
+            // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
+            if ("pattern_stops".equals(subTable.name) || "pattern_locations".equals(subTable.name)) {
+                // FLEX TODO: this ideally is cleaner
+                if (referencedPatternUsesFrequencies) {
+                    // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
+                    // Default travel and dwell time behave as "linked fields" for associated stop times. In other
+                    // words, frequency trips in the editor must match the pattern stop travel times.
+                    int travelTimeForPatternHalts = "pattern_stops".equals(subTable.name) ?
+                            updateStopTimesForPatternStop(subEntity, cumulativeTravelTime) :
+                            updateStopTimesForPatternLocation(subEntity, cumulativeTravelTime);
+                    cumulativeTravelTime += travelTimeForPatternHalts;
                 }
-                // Insert new sub-entity.
-                if (entityCount == 0) {
-                    // If handling first iteration, create the prepared statement (later iterations will add to batch).
-                    insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
-                }
-                // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
-                if ("pattern_stops".equals(subTable.name) || "pattern_locations".equals(subTable.name)) {
-                    // FLEX TODO: this ideally is cleaner
-                    if (referencedPatternUsesFrequencies) {
-                        // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
-                        // Default travel and dwell time behave as "linked fields" for associated stop times. In other
-                        // words, frequency trips in the editor must match the pattern stop travel times.
-                        int travelTimeForPatternHalts = "pattern_stops".equals(subTable.name) ?
-                                updateStopTimesForPatternStop(subEntity, cumulativeTravelTime) :
-                                updateStopTimesForPatternLocation(subEntity, cumulativeTravelTime);
-                        cumulativeTravelTime += travelTimeForPatternHalts;
-                    }
-                    // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
-                    updateLinkedFields(
-                            subTable,
-                            subEntity,
-                            "stop_times",
-                            "pattern_id",
-                            "timepoint",
-                            "drop_off_type",
-                            "pickup_type",
-                            "continuous_pickup",
-                            "continuous_drop_off",
-                            "shape_dist_traveled"
+                // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
+                updateLinkedFields(
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "continuous_pickup",
+                        "continuous_drop_off",
+                        "shape_dist_traveled"
+                );
+            }
+            setStatementParameters(subEntity, subTable, insertStatement, connection);
+            if (hasOrderField) {
+                // If the table has an order field, check that it is zero-based and incrementing for all sub entities.
+                // NOTE: Rather than coercing the order values to conform to the sequence in which they are found, we
+                // check the values here as a sanity check.
+                int orderValue = subEntity.get(orderFieldName).asInt();
+                boolean orderIsUnique = orderValues.add(orderValue);
+                boolean valuesAreIncrementing = ++previousOrder == orderValue;
+                boolean valuesAreIncreasing = previousOrder <= orderValue;
+
+                // PatternStop and PatternLocations must only increase, not increment
+                boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
+                        valuesAreIncrementing : valuesAreIncreasing;
+                if (!orderIsUnique || !valuesAreAscending) {
+                    throw new SQLException(
+                            String.format(
+                                    "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
+                                    subTable.name,
+                                    orderFieldName,
+                                    entityCount,
+                                    previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing" : "duplicate",
+                                    orderValue
+                            )
                     );
                 }
-                setStatementParameters(subEntity, subTable, insertStatement, connection);
-                if (hasOrderField) {
-                    // If the table has an order field, check that it is zero-based and incrementing for all sub entities.
-                    // NOTE: Rather than coercing the order values to conform to the sequence in which they are found, we
-                    // check the values here as a sanity check.
-                    int orderValue = subEntity.get(orderFieldName).asInt();
-                    boolean orderIsUnique = orderValues.add(orderValue);
-                    boolean valuesAreIncrementing = ++previousOrder == orderValue;
-                    boolean valuesAreIncreasing = previousOrder <= orderValue;
-
-                    // PatternStop and PatternLocations must only increase, not increment
-                    boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
-                            valuesAreIncrementing : valuesAreIncreasing;
-                    if (!orderIsUnique || !valuesAreAscending) {
-                        throw new SQLException(
-                                String.format(
-                                        "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
-                                        subTable.name,
-                                        orderFieldName,
-                                        entityCount,
-                                        previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing" : "duplicate",
-                                        orderValue
-                                )
-                        );
-                    }
-                }
-                // Log statement on first iteration so that it is not logged for each item in the batch.
-                if (entityCount == 0) LOG.info(insertStatement.toString());
-                insertStatement.addBatch();
-                // Prefix increment count and check whether to execute batched update.
-                if (++entityCount % INSERT_BATCH_SIZE == 0) {
-                    LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
-                    int[] newIds = insertStatement.executeBatch();
-                    LOG.info("Updated {}", newIds.length);
-                }
+            }
+            // Log statement on first iteration so that it is not logged for each item in the batch.
+            if (entityCount == 0) LOG.info(insertStatement.toString());
+            insertStatement.addBatch();
+            // Prefix increment count and check whether to execute batched update.
+            if (++entityCount % INSERT_BATCH_SIZE == 0) {
+                LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
+                int[] newIds = insertStatement.executeBatch();
+                LOG.info("Updated {}", newIds.length);
             }
         }
         // Check that accumulated references all exist in reference tables.

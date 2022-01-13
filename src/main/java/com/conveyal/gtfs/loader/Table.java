@@ -473,7 +473,9 @@ public class Table {
         new StringField("geometry_id", REQUIRED),
         new DoubleField("geometry_pt_lat", REQUIRED, -80, 80, 6),
         new DoubleField("geometry_pt_lon", REQUIRED, -180, 180, 6)
-    ).withParentTable(LOCATIONS);
+    )
+    .keyFieldIsNotUnique()
+    .withParentTable(LOCATIONS);
 
     public static final Table PATTERN_LOCATION = new Table("pattern_locations", PatternLocation.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
@@ -716,18 +718,13 @@ public class Table {
         if (entry == null) return null;
         try {
             CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry);
-            // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
+            // Don't skip empty records. This is set to true by default on CsvReader. We want to check for empty records
             // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
             csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
             LOG.error("Exception while opening zip entry: {}", entry, e);
-            e.printStackTrace();
-            return null;
-        } catch (GeoJsonException e) {
-            if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, GEO_JSON_PARSING));
-            LOG.error("Exception while parsing GeoJson locations: {}", entry, e);
             e.printStackTrace();
             return null;
         }
@@ -742,7 +739,7 @@ public class Table {
         String name,
         ZipFile zipFile,
         ZipEntry entry
-    ) throws IOException, GeoJsonException {
+    ) throws IOException {
         CsvReader csvReader;
         if (tableFileName.equals(locationGeoJsonFileName)) {
             csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry);

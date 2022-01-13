@@ -277,7 +277,9 @@ public interface EntityPopulator<T> {
     EntityPopulator<LocationShape> LOCATION_SHAPES = (result, columnForName) -> {
         LocationShape locationShape = new LocationShape();
         locationShape.location_id = getStringIfPresent(result, "location_id", columnForName);
-        locationShape.geometry_id = getStringIfPresent(result, "polygon_id", columnForName);
+        locationShape.geometry_id = getStringIfPresent(result, "geometry_id", columnForName);
+        locationShape.geometry_pt_lat = getDoubleIfPresent(result, "geometry_pt_lat", columnForName);
+        locationShape.geometry_pt_lon = getDoubleIfPresent(result, "geometry_pt_lon", columnForName);
         return locationShape;
     };
 

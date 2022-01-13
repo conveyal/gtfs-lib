@@ -31,7 +31,6 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult frequencies;
     public TableLoadResult locations;
     public TableLoadResult locationGroups;
-    public TableLoadResult locationMetaData;
     public TableLoadResult locationShapes;
     public TableLoadResult routes;
     public TableLoadResult shapes;
@@ -63,7 +62,6 @@ public class FeedLoadResult implements Serializable {
         frequencies = new TableLoadResult();
         locations = new TableLoadResult();
         locationGroups = new TableLoadResult();
-        locationMetaData = new TableLoadResult();
         locationShapes = new TableLoadResult();
         routes = new TableLoadResult();
         shapes = new TableLoadResult();

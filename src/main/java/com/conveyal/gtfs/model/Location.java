@@ -75,6 +75,7 @@ public class Location extends Entity {
             Location location = new Location();
 
             location.id = row + 1;
+            location.location_id = getStringField("location_id", true);
             location.stop_name = getStringField("stop_name", false);
             location.stop_desc = getStringField("stop_desc", false);
             location.zone_id = getStringField("zone_id", false);
