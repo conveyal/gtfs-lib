@@ -293,13 +293,13 @@ public class JdbcTableWriter implements TableWriter {
                 }
             }
             for (PatternLocation patternLocation : patternLocations.getOrdered(patternId)) {
-                // Update stop times for any pattern stop with matching stop sequence (or for all pattern stops if the list
+                // Update stop times for any pattern location with matching stop sequence (or for all pattern stops if the list
                 // is null).
                 if (patternLocation.stop_sequence >= beginWithSequence) {
                     patternHaltsToNormalize.add(patternLocation);
                 }
             }
-            // Treating both as pattern stop is alright, since both PatternStop and PatternLocation have a stop_sequence value
+            // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
             patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> ((PatternHalt) o).stop_sequence)).collect(Collectors.toList());
             PatternHalt firstPatternHalt = (PatternHalt) patternHaltsToNormalize.iterator().next();
             int firstStopSequence = firstPatternHalt.stop_sequence;
@@ -334,7 +334,7 @@ public class JdbcTableWriter implements TableWriter {
                     } else if (patternHalt instanceof PatternLocation) {
                         cumulativeTravelTime += updateStopTimesForPatternLocation((PatternLocation) patternHalt, cumulativeTravelTime, tripId);
                     } else {
-                        // TODO: error if pattern halt isn't location or stop
+                        LOG.warn("Pattern with ID {} contained a halt that wasn't a stop or a location!", patternId);
                         continue;
                     }
                     stopTimesUpdated++;
