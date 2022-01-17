@@ -413,6 +413,7 @@ public class GraphQLGtfsSchema {
                     .dataFetcher(new NestedJDBCFetcher(
                             new JDBCFetcher("patterns", "route_id", null, false),
                             new JDBCFetcher("pattern_stops", "pattern_id", null, false),
+                            // FLEX TODO: Including pattern locations kills this nested fetch.
                             new JDBCFetcher("pattern_locations", "pattern_id", null, false),
                             new JDBCFetcher("stops", "stop_id")))
                     .build())
@@ -479,6 +480,8 @@ public class GraphQLGtfsSchema {
                     .argument(stringArg("namespace"))
                     .dataFetcher(new NestedJDBCFetcher(
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
+                        // FLEX TODO: The parentJoinField has to match a field in the stop table. Even when this is
+                        // changed to pattern_id it fails to return anything for these three nested items.
                             new JDBCFetcher("pattern_locations", "location_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id")))
                     .build())
@@ -491,6 +494,8 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new NestedJDBCFetcher(
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
+                        // FLEX TODO: The parentJoinField has to match a field in the stop table. Even when this is
+                        // changed to pattern_id it fails to return anything for these four nested items.
                             new JDBCFetcher("pattern_locations", "location_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id", null, false),
                             new JDBCFetcher("routes", "route_id")))

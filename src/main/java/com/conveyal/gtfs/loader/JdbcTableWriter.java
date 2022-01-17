@@ -799,10 +799,10 @@ public class JdbcTableWriter implements TableWriter {
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
         int oneBasedIndex = 1;
-        int travelTime = patternStop.default_travel_time;
+        int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+        int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
         int arrivalTime = previousTravelTime + travelTime;
         statement.setInt(oneBasedIndex++, arrivalTime);
-        int dwellTime = patternStop.default_dwell_time;
         statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
         // Set trip id either from params or all
         if (tripId != null) {

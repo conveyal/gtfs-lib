@@ -10,9 +10,11 @@
         "pattern_stops" : [ {
           "default_dwell_time" : 0,
           "default_travel_time" : 0,
+          "drop_off_booking_rule_id" : "1",
           "drop_off_type" : 0,
           "id" : 1,
           "pattern_id" : "1",
+          "pickup_booking_rule_id" : "1",
           "pickup_type" : 0,
           "shape_dist_traveled" : 0.0,
           "stop" : [ {
@@ -20,15 +22,15 @@
           } ],
           "stop_id" : "4u6g",
           "stop_sequence" : 0,
-          "timepoint" : 1,
-          "pickup_booking_rule_id" : 1,
-          "drop_off_booking_rule_id" : 1
+          "timepoint" : 1
         }, {
           "default_dwell_time" : 0,
           "default_travel_time" : 60,
+          "drop_off_booking_rule_id" : "1",
           "drop_off_type" : 0,
           "id" : 2,
           "pattern_id" : "1",
+          "pickup_booking_rule_id" : "1",
           "pickup_type" : 0,
           "shape_dist_traveled" : 341.4491961,
           "stop" : [ {
@@ -36,9 +38,7 @@
           } ],
           "stop_id" : "johv",
           "stop_sequence" : 1,
-          "timepoint" : 1,
-          "pickup_booking_rule_id" : 1,
-          "drop_off_booking_rule_id" : 1
+          "timepoint" : 1
         } ],
         "route" : [ {
           "route_id" : "1"
@@ -113,9 +113,11 @@
         "pattern_stops" : [ {
           "default_dwell_time" : 0,
           "default_travel_time" : 0,
+          "drop_off_booking_rule_id" : "1",
           "drop_off_type" : 0,
           "id" : 3,
           "pattern_id" : "2",
+          "pickup_booking_rule_id" : "1",
           "pickup_type" : 0,
           "shape_dist_traveled" : 0.0,
           "stop" : [ {
@@ -123,15 +125,15 @@
           } ],
           "stop_id" : "4u6g",
           "stop_sequence" : 0,
-          "timepoint" : 1,
-          "pickup_booking_rule_id" : 1,
-          "drop_off_booking_rule_id" : 1
+          "timepoint" : 1
         }, {
           "default_dwell_time" : 0,
           "default_travel_time" : 1740,
+          "drop_off_booking_rule_id" : "1",
           "drop_off_type" : 0,
           "id" : 4,
           "pattern_id" : "2",
+          "pickup_booking_rule_id" : "1",
           "pickup_type" : 0,
           "shape_dist_traveled" : 341.4491961,
           "stop" : [ {
@@ -139,9 +141,7 @@
           } ],
           "stop_id" : "1234",
           "stop_sequence" : 1,
-          "timepoint" : 1,
-          "pickup_booking_rule_id" : 1,
-          "drop_off_booking_rule_id" : 1
+          "timepoint" : 1
         } ],
         "route" : [ {
           "route_id" : "1"

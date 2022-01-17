@@ -21,7 +21,7 @@ import static com.conveyal.gtfs.TestUtils.loadFeedAndValidate;
  * Load in a GTFS feed with GTFS flex features, and ensure all needed fields are imported correctly.
  * TODO: update feed to use more features, and test for these.
  */
-public class AAAA {
+public class GtfsFlexTest {
     private static String washingtonTestDBName;
     private static DataSource washingtonTestDataSource;
     private static String washingtonTestNamespace;
@@ -32,9 +32,9 @@ public class AAAA {
     @BeforeAll
     public static void setUpClass() throws IOException {
 
-//        washingtonTestDBName = TestUtils.generateNewDB();
-//        washingtonTestDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", washingtonTestDBName));
-//        washingtonTestNamespace = loadFeedAndValidate(washingtonTestDataSource, "real-world-gtfs-feeds/washington-park-shuttle-with-flex-additions");
+        washingtonTestDBName = TestUtils.generateNewDB();
+        washingtonTestDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", washingtonTestDBName));
+        washingtonTestNamespace = loadFeedAndValidate(washingtonTestDataSource, "real-world-gtfs-feeds/washington-park-shuttle-with-flex-additions");
 
         fakeAgencyTestDBName = TestUtils.generateNewDB();
         fakeAgencyTestDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", fakeAgencyTestDBName));

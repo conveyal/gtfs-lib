@@ -153,7 +153,9 @@ public class PatternFinderValidator extends TripValidator {
                         if (prevDepartureStop != INT_MISSING) {
                             prevDeparture = prevDepartureStop;
                         }
-                        if (prevDepartureFlex != INT_MISSING) {
+                        // Only use the flex departure if it is after the stop departure.
+                        // FLEX TODO: Create a unit test to test this!
+                        if (prevDepartureFlex > prevDepartureStop) {
                             prevDeparture = prevDepartureFlex;
                         }
 

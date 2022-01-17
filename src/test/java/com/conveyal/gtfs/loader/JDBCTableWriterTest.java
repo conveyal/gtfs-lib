@@ -4,6 +4,7 @@ import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.dto.*;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -1114,7 +1115,6 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
-        // FLEX TODO: Update table writer to include pattern location if not provided.
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);

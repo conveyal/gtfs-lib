@@ -51,7 +51,7 @@
   <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jackson.version>2.12.1</jackson.version>
+    <jackson.version>2.13.1</jackson.version>
   </properties>
 
   <!-- Define where the artifacts produced by this build will be deployed -->
@@ -258,11 +258,17 @@
     </dependency>
     <!-- Snapshotting library for testing -->
     <dependency>
-      <groupId>com.github.conveyal</groupId>
-      <artifactId>java-snapshot-matcher</artifactId>
-      <version>3495b32f7b4d3f82590e0a2284029214070b6984</version>
+      <groupId>com.zenika</groupId>
+      <artifactId>snapshot-matcher</artifactId>
+      <version>1.1-SNAPSHOT</version>
       <scope>test</scope>
     </dependency>
+<!--    <dependency>-->
+<!--      <groupId>com.github.conveyal</groupId>-->
+<!--      <artifactId>java-snapshot-matcher</artifactId>-->
+<!--      <version>3495b32f7b4d3f82590e0a2284029214070b6984</version>-->
+<!--      <scope>test</scope>-->
+<!--    </dependency>-->
     <!-- Disk-backed storage that looks like a Java map. -->
     <dependency>
     	<groupId>org.mapdb</groupId>

@@ -18,11 +18,6 @@
         "type" : "MISSING_FIELD"
       }, {
         "count" : 1,
-        "message" : "This line references an ID that does not exist in the target table.",
-        "priority" : "HIGH",
-        "type" : "REFERENTIAL_INTEGRITY"
-      }, {
-        "count" : 1,
         "message" : "The long name of a route should complement the short name, not include it.",
         "priority" : "LOW",
         "type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME"
@@ -31,6 +26,11 @@
         "message" : "This stop is not referenced by any trips.",
         "priority" : "MEDIUM",
         "type" : "STOP_UNUSED"
+      }, {
+        "count" : 1,
+        "message" : "URL format should be <scheme>://<authority><path>?<query>#<fragment>",
+        "priority" : "MEDIUM",
+        "type" : "URL_FORMAT"
       } ],
       "errors" : [ {
         "bad_value" : "agency_url",
@@ -41,13 +41,13 @@
         "error_type" : "MISSING_FIELD",
         "line_number" : 2
       }, {
-        "bad_value" : "bad_stop_id_ref",
-        "entity_id" : "1234567",
+        "bad_value" : "null",
+        "entity_id" : null,
         "entity_sequence" : null,
-        "entity_type" : "Stop",
+        "entity_type" : "Location",
         "error_id" : 1,
-        "error_type" : "REFERENTIAL_INTEGRITY",
-        "line_number" : 6
+        "error_type" : "URL_FORMAT",
+        "line_number" : 2
       }, {
         "bad_value" : "route 1",
         "entity_id" : "1",
