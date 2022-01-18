@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.GeoJsonParseError;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
@@ -716,7 +717,13 @@ public class Table {
         }
         if (entry == null) return null;
         try {
-            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry);
+            List<String> geoJsonErrors = new ArrayList<>();
+            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, geoJsonErrors);
+            if (!geoJsonErrors.isEmpty() && sqlErrorStorage != null) {
+                geoJsonErrors.forEach(error ->
+                    sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, error))
+                );
+            }
             // Don't skip empty records. This is set to true by default on CsvReader. We want to check for empty records
             // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
             csvReader.setSkipEmptyRecords(false);
@@ -737,11 +744,12 @@ public class Table {
         String tableFileName,
         String name,
         ZipFile zipFile,
-        ZipEntry entry
+        ZipEntry entry,
+        List<String> errors
     ) throws IOException {
         CsvReader csvReader;
         if (tableFileName.equals(locationGeoJsonFileName)) {
-            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry);
+            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry, errors);
         } else {
             InputStream zipInputStream = zipFile.getInputStream(entry);
             // Skip any byte order mark that may be present. Files must be UTF-8,

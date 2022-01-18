@@ -10,18 +10,21 @@
           "geometry_id" : "area_251",
           "geometry_pt_lat" : 10.0,
           "geometry_pt_lon" : 30.0,
+          "geometry_type" : null,
           "id" : 2,
           "location_id" : "area_251"
         }, {
           "geometry_id" : "area_251",
           "geometry_pt_lat" : 30.0,
           "geometry_pt_lon" : 10.0,
+          "geometry_type" : null,
           "id" : 3,
           "location_id" : "area_251"
         }, {
           "geometry_id" : "area_251",
           "geometry_pt_lat" : 40.0,
           "geometry_pt_lon" : 40.0,
+          "geometry_type" : null,
           "id" : 4,
           "location_id" : "area_251"
         } ],

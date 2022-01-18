@@ -437,7 +437,7 @@ public class JdbcGtfsExporter {
             if (locations.size() > 0) {
                 // Only export if data is available.
                 tableLoadResult.rowCount = locations.size() + locationShapes.size();
-                writeLocationsToFile(zipOutputStream, locations, locationShapes);
+                tableLoadResult.errorCount = writeLocationsToFile(zipOutputStream, locations, locationShapes);
                 LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, Table.locationGeoJsonFileName, System.currentTimeMillis() - startTime);
             } else {
                 LOG.warn("No locations exported to {} as the {} table is empty!", Table.locationGeoJsonFileName, Table.LOCATIONS.name);
@@ -452,7 +452,7 @@ public class JdbcGtfsExporter {
     /**
      * Pack the locations data and write to zip file.
      */
-    public static void writeLocationsToFile(
+    public static int writeLocationsToFile(
         ZipOutputStream zipOutputStream,
         List<Location> locations,
         List<LocationShape> locationShapes
@@ -461,8 +461,10 @@ public class JdbcGtfsExporter {
         zipOutputStream.putNextEntry(new ZipEntry(Table.locationGeoJsonFileName));
         // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
         PrintWriter p = new PrintWriter(zipOutputStream);
-        p.println(GeoJsonUtil.packLocations(locations, locationShapes));
+        List<String> errors = new ArrayList<>();
+        p.println(GeoJsonUtil.packLocations(locations, locationShapes, errors));
         p.flush();
         zipOutputStream.closeEntry();
+        return errors.size();
     }
 }

@@ -12,6 +12,11 @@
         "priority" : "LOW",
         "type" : "FEED_TRAVEL_TIMES_ROUNDED"
       }, {
+        "count" : 6,
+        "message" : "Unable to parse the locations.geojson file. Make sure the file conforms to the GeoJson standard and supported geometry types are used.",
+        "priority" : "HIGH",
+        "type" : "GEO_JSON_PARSING"
+      }, {
         "count" : 1,
         "message" : "A required field was missing or empty in a particular row.",
         "priority" : "MEDIUM",
@@ -41,19 +46,67 @@
         "error_type" : "MISSING_FIELD",
         "line_number" : 2
       }, {
+        "bad_value" : "Geometry type MULTIPOLYGON unknown or not supported.",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 1,
+        "error_type" : "GEO_JSON_PARSING",
+        "line_number" : null
+      }, {
+        "bad_value" : "Geometry type POLYGON unknown or not supported.",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 2,
+        "error_type" : "GEO_JSON_PARSING",
+        "line_number" : null
+      }, {
+        "bad_value" : "Geometry type MULTILINESTRING unknown or not supported.",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 3,
+        "error_type" : "GEO_JSON_PARSING",
+        "line_number" : null
+      }, {
         "bad_value" : "null",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : "Location",
-        "error_id" : 1,
+        "error_id" : 4,
         "error_type" : "URL_FORMAT",
         "line_number" : 2
+      }, {
+        "bad_value" : "Geometry type MULTIPOLYGON unknown or not supported.",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 5,
+        "error_type" : "GEO_JSON_PARSING",
+        "line_number" : null
+      }, {
+        "bad_value" : "Geometry type POLYGON unknown or not supported.",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 6,
+        "error_type" : "GEO_JSON_PARSING",
+        "line_number" : null
+      }, {
+        "bad_value" : "Geometry type MULTILINESTRING unknown or not supported.",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 7,
+        "error_type" : "GEO_JSON_PARSING",
+        "line_number" : null
       }, {
         "bad_value" : "route 1",
         "entity_id" : "1",
         "entity_sequence" : null,
         "entity_type" : "Route",
-        "error_id" : 2,
+        "error_id" : 8,
         "error_type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME",
         "line_number" : 2
       }, {
@@ -61,7 +114,7 @@
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
-        "error_id" : 3,
+        "error_id" : 9,
         "error_type" : "FEED_TRAVEL_TIMES_ROUNDED",
         "line_number" : null
       }, {
@@ -69,7 +122,7 @@
         "entity_id" : "1234567",
         "entity_sequence" : null,
         "entity_type" : "Stop",
-        "error_id" : 4,
+        "error_id" : 10,
         "error_type" : "STOP_UNUSED",
         "line_number" : 6
       }, {
@@ -77,7 +130,7 @@
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
-        "error_id" : 5,
+        "error_id" : 11,
         "error_type" : "DATE_NO_SERVICE",
         "line_number" : null
       } ],
