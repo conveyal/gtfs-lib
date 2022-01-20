@@ -78,6 +78,25 @@
         "stop_sequence" : 2,
         "timepoint" : 1,
         "trip_id" : "frequency-trip"
+      }, {
+        "arrival_time" : 30660,
+        "departure_time" : 30660,
+        "drop_off_booking_rule_id" : "1",
+        "drop_off_type" : 0,
+        "end_pickup_dropoff_window" : 25380,
+        "mean_duration_factor" : 1.0,
+        "mean_duration_offset" : 60.0,
+        "pickup_booking_rule_id" : "1",
+        "pickup_type" : 0,
+        "safe_duration_factor" : 1.0,
+        "safe_duration_offset" : 60.0,
+        "shape_dist_traveled" : 341.4491961,
+        "start_pickup_dropoff_window" : 25380,
+        "stop_headsign" : null,
+        "stop_id" : "area_251",
+        "stop_sequence" : 3,
+        "timepoint" : 1,
+        "trip_id" : "frequency-trip"
       } ]
     }
   }

@@ -34,7 +34,10 @@ public class SpeedTripValidator extends TripValidator {
 
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
-        // TODO: The validator needs to be refactored to work with flex locations
+        if (containsFlexLocations(stopTimes, locations)) {
+            // FLEX TODO: The validator needs to be refactored to work with flex locations
+            return;
+        }
         // The specific maximum speed for this trip's route's mode of travel.
         double maxSpeedKph = getMaxSpeedKph(route);
         // Skip over any initial stop times that won't allow calculating speeds.
@@ -56,6 +59,7 @@ public class SpeedTripValidator extends TripValidator {
             }
             // FLEX TODO: stop times can be either stop or location.
             Stop currStop = stops.get(i);
+
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
             // Redefine previous stop for next iteration (doing so here ensures the reassignment is not skipped if both
@@ -98,6 +102,22 @@ public class SpeedTripValidator extends TripValidator {
             // Redefine current stopTime for the next iteration.
             prevStopTime = currStopTime;
         }
+    }
+
+    /**
+     * If any stop time contains a location instead of a stop the trip speed will need to be calculated differently
+     * to work with stops as well as locations.
+     */
+    private boolean containsFlexLocations(List<StopTime> stopTimes, List<Location> locations) {
+        boolean containsFlexLocation = false;
+        for (StopTime stopTime : stopTimes) {
+            for (Location location : locations) {
+                if (stopTime.stop_id.equals(location.location_id)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**

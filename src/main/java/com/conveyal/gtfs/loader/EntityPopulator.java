@@ -259,9 +259,10 @@ public interface EntityPopulator<T> {
     EntityPopulator<Location> LOCATION = (result, columnForName) -> {
         Location location = new Location();
         location.location_id = getStringIfPresent(result, "location_id", columnForName);
-        location.stop_name = getStringIfPresent(result, "location_stop_name", columnForName);
+        location.stop_name = getStringIfPresent(result, "stop_name", columnForName);
+        location.stop_desc = getStringIfPresent(result, "stop_desc", columnForName);
         location.zone_id = getStringIfPresent(result, "zone_id", columnForName);
-        location.stop_url = getUrlIfPresent(result, "location_stop_url", columnForName);
+        location.stop_url = getUrlIfPresent(result, "stop_url", columnForName);
         location.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
         return location;
     };

@@ -295,7 +295,7 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests whether a graphQL query that has superflous and redundant nesting can find the right result. */
+    /** Tests whether a graphQL query that has superfluous and redundant nesting can find the right result. */
     // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
     @Test
     public void canFetchMultiNestedEntities() {

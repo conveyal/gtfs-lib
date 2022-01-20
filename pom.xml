@@ -257,6 +257,12 @@
       <scope>test</scope>
     </dependency>
     <!-- Snapshotting library for testing -->
+<!--    <dependency>-->
+<!--      <groupId>com.github.br648</groupId>-->
+<!--      <artifactId>ibi-java-snapshot-matcher</artifactId>-->
+<!--      <version>master</version>-->
+<!--      <scope>test</scope>-->
+<!--    </dependency>-->
     <dependency>
       <groupId>com.zenika</groupId>
       <artifactId>snapshot-matcher</artifactId>

@@ -83,7 +83,7 @@ public class GtfsFlexTest {
     @Test
     void hasLoadedExpectedNumberOfStopTimes() {
         String query = buildQuery(fakeAgencyTestNamespace, "stop_times","pickup_booking_rule_id","1");
-        assertThatSqlCountQueryYieldsExpectedCount(fakeAgencyTestDataSource, query, 4);
+        assertThatSqlCountQueryYieldsExpectedCount(fakeAgencyTestDataSource, query, 5);
     }
 
     private String buildQuery(String namespace, String tableName, String columnName, String columnValue) {
