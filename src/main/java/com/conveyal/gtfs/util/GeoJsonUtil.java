@@ -123,6 +123,7 @@ public class GeoJsonUtil {
                                 String message = String.format("Malformed URL %s.", property);
                                 LOG.warn(message);
                                 if (errors != null) errors.add(message);
+                                location.stop_url = null;
                             }
                             break;
                         default:
