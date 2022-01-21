@@ -75,6 +75,8 @@ public class GeoJsonUtil {
         switch (geometry_type) {
             case "LINESTRING":
                 return "polyline";
+            case "POLYGON":
+                return "polygon";
             // TODO: Add additional geometry types.
             default:
                 // Effectively, MultiPolygon, Polygon and MultiLineString types which aren't supported yet.
