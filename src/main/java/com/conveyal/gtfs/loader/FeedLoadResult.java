@@ -29,8 +29,8 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult fareRules;
     public TableLoadResult feedInfo;
     public TableLoadResult frequencies;
+    public TableLoadResult locations;
     public TableLoadResult locationGroups;
-    public TableLoadResult locationMetaData;
     public TableLoadResult locationShapes;
     public TableLoadResult routes;
     public TableLoadResult shapes;
@@ -60,8 +60,8 @@ public class FeedLoadResult implements Serializable {
         fareRules = new TableLoadResult();
         feedInfo = new TableLoadResult();
         frequencies = new TableLoadResult();
+        locations = new TableLoadResult();
         locationGroups = new TableLoadResult();
-        locationMetaData = new TableLoadResult();
         locationShapes = new TableLoadResult();
         routes = new TableLoadResult();
         shapes = new TableLoadResult();
@@ -81,11 +81,11 @@ public class FeedLoadResult implements Serializable {
         return
             bookingRules != null &&
             locationGroups != null &&
-            locationMetaData != null &&
+            locations != null &&
             locationShapes != null &&
             bookingRules.rowCount > 0 &&
             locationGroups.rowCount > 0 &&
-            locationMetaData.rowCount > 0 &&
+            locations.rowCount > 0 &&
             locationShapes.rowCount > 0;
     }
 }

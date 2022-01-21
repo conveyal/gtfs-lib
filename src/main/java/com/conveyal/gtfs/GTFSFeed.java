@@ -6,6 +6,7 @@ import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.util.Util;
 import com.conveyal.gtfs.validator.service.GeoUtils;
@@ -60,8 +61,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency> agency;
     public final Map<String, BookingRule> bookingRules;
+    public final Map<String, Location> locations;
     public final Map<String, LocationGroup> locationGroups;
-    public final Map<String, LocationMetaData> locationMetaData;
     public final Map<String, LocationShape> locationShapes;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
@@ -179,7 +180,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         // we are working with a flex feed.
         new BookingRule.Loader(this).loadTable(zip);
         new LocationGroup.Loader(this).loadTable(zip);
-        new LocationMetaData.Loader(this).loadTable(zip);
+        new Location.Loader(this).loadTable(zip);
         new LocationShape.Loader(this).loadTable(zip);
 
         new Route.Loader(this).loadTable(zip);
@@ -219,6 +220,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
 
             new Agency.Writer(this).writeTable(zip);
+            new Location.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
             new FareAttribute.Writer(this).writeTable(zip);
@@ -233,11 +235,11 @@ public class GTFSFeed implements Cloneable, Closeable {
 
             if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
             if (!this.locationGroups.isEmpty()) new LocationGroup.Writer(this).writeTable(zip);
-            if (!this.locationMetaData.isEmpty()) {
+            if (!this.locations.isEmpty()) {
                 // export locations
                 JdbcGtfsExporter.writeLocationsToFile(
                     zip,
-                    new ArrayList<>(locationMetaData.values()),
+                    new ArrayList<>(locations.values()),
                     new ArrayList<>(locationShapes.values())
                 );
             }
@@ -382,7 +384,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
             patternFinder.processTrip(trip, orderedStopTimesForTrip);
         }
-        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null);
+        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null,null);
         this.patterns.putAll(patternObjects.values().stream()
                 .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
@@ -666,8 +668,8 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         // Flex tables.
         bookingRules = db.getTreeMap("booking_rules");
+        locations = db.getTreeMap("locations");
         locationGroups = db.getTreeMap("location_groups");
-        locationMetaData = db.getTreeMap("location_meta_data");
         locationShapes = db.getTreeMap("location_shapes");
 
         feedId = db.getAtomicString("feed_id").get();
@@ -685,15 +687,14 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     * If any of the flex only tables contain data, the assumption is that this is a GTFS Flex feed. These tables must
-     * be loaded before this can be referenced. At the moment {@link StopTime} references this and is loaded after the
-     * check is made on these tables.
+     * If booking rules and location groups have been created and contain data, the assumption is that this is a GTFS
+     * Flex feed. Booking rules and location groups must be loaded before this can be referenced. At the moment StopTime
+     * references this and is loaded after the check is made on these tables.
      */
     public boolean isGTFSFlexFeed() {
         return
             !bookingRules.isEmpty() ||
             !locationGroups.isEmpty() ||
-            !locationMetaData.isEmpty() ||
             !locationShapes.isEmpty();
     }
 }

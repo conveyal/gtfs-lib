@@ -7,8 +7,6 @@
         "location_type" : 0,
         "parent_station" : null,
         "patterns" : [ {
-          "pattern_id" : "1"
-        }, {
           "pattern_id" : "2"
         } ],
         "routes" : [ {
@@ -39,7 +37,7 @@
         "location_type" : 0,
         "parent_station" : null,
         "patterns" : [ {
-          "pattern_id" : "1"
+          "pattern_id" : "2"
         } ],
         "routes" : [ {
           "route_id" : "1"
@@ -107,7 +105,7 @@
       }, {
         "id" : 6,
         "location_type" : 0,
-        "parent_station" : "bad_stop_id_ref",
+        "parent_station" : "123",
         "patterns" : [ ],
         "routes" : [ ],
         "stop_code" : null,

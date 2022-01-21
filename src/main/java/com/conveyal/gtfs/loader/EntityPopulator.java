@@ -1,22 +1,6 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.model.Agency;
-import com.conveyal.gtfs.model.BookingRule;
-import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.model.CalendarDate;
-import com.conveyal.gtfs.model.Entity;
-import com.conveyal.gtfs.model.FareAttribute;
-import com.conveyal.gtfs.model.Frequency;
-import com.conveyal.gtfs.model.LocationGroup;
-import com.conveyal.gtfs.model.LocationMetaData;
-import com.conveyal.gtfs.model.LocationShape;
-import com.conveyal.gtfs.model.PatternStop;
-import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.ScheduleException;
-import com.conveyal.gtfs.model.ShapePoint;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.model.*;
 import gnu.trove.map.TObjectIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,6 +57,27 @@ public interface EntityPopulator<T> {
         patternStop.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
         patternStop.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
         return patternStop;
+    };
+
+    EntityPopulator<PatternLocation> PATTERN_LOCATION = (result, columnForName) -> {
+        PatternLocation patternLocation = new PatternLocation();
+        patternLocation.location_id = getStringIfPresent(result, "location_id", columnForName);
+        patternLocation.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        patternLocation.drop_off_type = getIntIfPresent(result, "drop_off_type", columnForName);
+        patternLocation.pickup_type = getIntIfPresent(result, "pickup_type", columnForName);
+        patternLocation.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
+        patternLocation.timepoint = getIntIfPresent(result, "timepoint", columnForName);
+        patternLocation.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
+        patternLocation.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
+
+        patternLocation.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
+        patternLocation.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
+        patternLocation.flex_default_travel_time = getIntIfPresent(result, "flex_default_travel_time", columnForName);
+        patternLocation.flex_default_zone_time = getIntIfPresent(result, "flex_default_zone_time", columnForName);
+        patternLocation.mean_duration_factor = getDoubleIfPresent(result, "mean_duration_factor", columnForName);
+        patternLocation.mean_duration_offset = getDoubleIfPresent(result, "mean_duration_offset", columnForName);
+        patternLocation.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
+        patternLocation.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);        return patternLocation;
     };
 
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;
@@ -251,6 +256,17 @@ public interface EntityPopulator<T> {
         return bookingRule;
     };
 
+    EntityPopulator<Location> LOCATION = (result, columnForName) -> {
+        Location location = new Location();
+        location.location_id = getStringIfPresent(result, "location_id", columnForName);
+        location.stop_name = getStringIfPresent(result, "stop_name", columnForName);
+        location.stop_desc = getStringIfPresent(result, "stop_desc", columnForName);
+        location.zone_id = getStringIfPresent(result, "zone_id", columnForName);
+        location.stop_url = getUrlIfPresent(result, "stop_url", columnForName);
+        location.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
+        return location;
+    };
+
     EntityPopulator<LocationGroup> LOCATION_GROUP = (result, columnForName) -> {
         LocationGroup locationGroup = new LocationGroup();
         locationGroup.location_group_id = getStringIfPresent(result, "location_group_id", columnForName);
@@ -259,24 +275,12 @@ public interface EntityPopulator<T> {
         return locationGroup;
     };
 
-    EntityPopulator<LocationMetaData> LOCATION_META_DATA = (result, columnForName) -> {
-        LocationMetaData locationMetaData = new LocationMetaData();
-        locationMetaData.location_meta_data_id = getStringIfPresent(result, "location_meta_data_id", columnForName);
-        locationMetaData.properties = getStringIfPresent(result, "properties", columnForName);
-        locationMetaData.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
-        return locationMetaData;
-    };
-
     EntityPopulator<LocationShape> LOCATION_SHAPES = (result, columnForName) -> {
         LocationShape locationShape = new LocationShape();
-        locationShape.shape_id = getStringIfPresent(result, "shape_id", columnForName);
-        locationShape.shape_polygon_id = getIntIfPresent(result, "shape_polygon_id", columnForName);
-        locationShape.shape_ring_id = getIntIfPresent(result, "shape_ring_id", columnForName);
-        locationShape.shape_line_string_id = getIntIfPresent(result, "shape_line_string_id", columnForName);
-        locationShape.shape_pt_lat = getDoubleIfPresent(result, "shape_pt_lat", columnForName);
-        locationShape.shape_pt_lon = getDoubleIfPresent(result, "shape_pt_lon", columnForName);
-        locationShape.shape_pt_sequence = getIntIfPresent(result, "shape_pt_sequence", columnForName);
-        locationShape.location_meta_data_id = getStringIfPresent(result, "location_meta_data_id", columnForName);
+        locationShape.location_id = getStringIfPresent(result, "location_id", columnForName);
+        locationShape.geometry_id = getStringIfPresent(result, "geometry_id", columnForName);
+        locationShape.geometry_pt_lat = getDoubleIfPresent(result, "geometry_pt_lat", columnForName);
+        locationShape.geometry_pt_lon = getDoubleIfPresent(result, "geometry_pt_lon", columnForName);
         return locationShape;
     };
 

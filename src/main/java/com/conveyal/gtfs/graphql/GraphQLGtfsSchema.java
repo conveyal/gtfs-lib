@@ -81,10 +81,10 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("booking_type", GraphQLInt))
             .field(MapFetcher.field("prior_notice_duration_min", GraphQLInt))
             .field(MapFetcher.field("prior_notice_duration_max", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_last_day", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_last_time", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_start_day", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_start_time", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_last_day"))
+            .field(MapFetcher.field("prior_notice_last_time"))
+            .field(MapFetcher.field("prior_notice_start_day"))
+            .field(MapFetcher.field("prior_notice_start_time"))
             .field(MapFetcher.field("prior_notice_service_id"))
             .field(MapFetcher.field("message"))
             .field(MapFetcher.field("pickup_message"))
@@ -189,27 +189,46 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("location_group_name"))
             .build();
 
-    // Represents the meta data aspect of locations.geojson
-    public static final GraphQLObjectType locationMetaDataType = newObject().name("location_meta_data")
-            .description("A GTFS location_meta_data object")
-            .field(MapFetcher.field("id", GraphQLInt))
-            .field(MapFetcher.field("location_meta_data_id"))
-            .field(MapFetcher.field("properties"))
-            .field(MapFetcher.field("geometry_type"))
-            .build();
-
     // Represents the shapes held within locations.geojson
     public static final GraphQLObjectType locationShapeType = newObject().name("location_shapes")
             .description("A GTFS location_shape object")
             .field(MapFetcher.field("id", GraphQLInt))
-            .field(MapFetcher.field("shape_id"))
-            .field(MapFetcher.field("shape_polygon_id"))
-            .field(MapFetcher.field("shape_ring_id"))
-            .field(MapFetcher.field("shape_line_string_id"))
-            .field(MapFetcher.field("shape_pt_lat"))
-            .field(MapFetcher.field("shape_pt_lon"))
-            .field(MapFetcher.field("shape_pt_sequence"))
-            .field(MapFetcher.field("location_meta_data_id"))
+            .field(MapFetcher.field("location_id"))
+            .field(MapFetcher.field("geometry_id"))
+            .field(MapFetcher.field("geometry_type"))
+            .field(MapFetcher.field("geometry_pt_lat", GraphQLFloat))
+            .field(MapFetcher.field("geometry_pt_lon", GraphQLFloat))
+
+//            .field(MapFetcher.field("shape_id"))
+//            .field(MapFetcher.field("shape_polygon_id"))
+//            .field(MapFetcher.field("shape_ring_id"))
+//            .field(MapFetcher.field("shape_line_string_id"))
+//            .field(MapFetcher.field("shape_pt_lat"))
+//            .field(MapFetcher.field("shape_pt_lon"))
+//            .field(MapFetcher.field("shape_pt_sequence"))
+//            .field(MapFetcher.field("location_meta_data_id"))
+            .build();
+
+    // Represents more 'meta' data from locations.geoJSON
+    public static final GraphQLObjectType locationsType = newObject().name("locations")
+            .description("A GTFS locations object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("location_id"))
+            .field(MapFetcher.field("stop_name"))
+            .field(MapFetcher.field("stop_desc"))
+            .field(MapFetcher.field("zone_id"))
+            .field(MapFetcher.field("stop_url"))
+            .field(MapFetcher.field("geometry_type"))
+            .field(newFieldDefinition()
+                    .name("location_shapes")
+                    .type(new GraphQLList(locationShapeType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
+                    .dataFetcher(new JDBCFetcher("location_shapes", "location_id"))
+                    .build()
+            )
             .build();
 
     // Represents rows from shapes.txt
@@ -392,8 +411,11 @@ public class GraphQLGtfsSchema {
                     // of join queries).
                     .argument(stringArg("route_id"))
                     .dataFetcher(new NestedJDBCFetcher(
+                            // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                            // will be returned.
                             new JDBCFetcher("patterns", "route_id", null, false),
                             new JDBCFetcher("pattern_stops", "pattern_id", null, false),
+                            new JDBCFetcher("pattern_locations", "pattern_id", null, false),
                             new JDBCFetcher("stops", "stop_id")))
                     .build())
             .field(newFieldDefinition()
@@ -458,8 +480,11 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(new GraphQLTypeReference("pattern")))
                     .argument(stringArg("namespace"))
                     .dataFetcher(new NestedJDBCFetcher(
+                            // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                            // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
-                            new JDBCFetcher("patterns", "pattern_id")))
+                            new JDBCFetcher("patterns", "pattern_id"),
+                            new JDBCFetcher("pattern_locations", "location_id")))
                     .build())
             .field(newFieldDefinition()
                     .name("routes")
@@ -469,7 +494,10 @@ public class GraphQLGtfsSchema {
                     .argument(stringArg(SEARCH_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new NestedJDBCFetcher(
+                            // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                            // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
+                            new JDBCFetcher("pattern_locations", "location_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id", null, false),
                             new JDBCFetcher("routes", "route_id")))
                     .build())
@@ -482,6 +510,8 @@ public class GraphQLGtfsSchema {
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new JDBCFetcher("stop_times", "stop_id", "stop_sequence", false)))
+            // Flex locations location_group
+
             .build();
 
     /**
@@ -494,6 +524,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("pattern_id"))
             .field(MapFetcher.field("stop_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+            .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("default_travel_time", GraphQLInt))
             .field(MapFetcher.field("default_dwell_time", GraphQLInt))
             .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
@@ -514,6 +546,46 @@ public class GraphQLGtfsSchema {
                     .build()
             )
             .build();
+
+    /**
+     * Represents each stop in a list of locations within a pattern.
+     * We could return just a list of LocationIDs within the pattern (a JSON array of strings) but
+     * that structure would prevent us from joining tables and returning additional stop details
+     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     */
+    public static final GraphQLObjectType patternLocationType = newObject().name("patternLocation")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("pattern_id"))
+            .field(MapFetcher.field("location_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+            .field(MapFetcher.field("pickup_booking_rule_id"))
+            .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
+            .field(MapFetcher.field("drop_off_type", GraphQLInt))
+            .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
+            .field(MapFetcher.field("stop_sequence", GraphQLInt))
+            .field(MapFetcher.field("timepoint", GraphQLInt))
+            .field(MapFetcher.field("pickup_booking_rule_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+
+            // Additional GTFS Flex location groups and locations fields
+            .field(MapFetcher.field("flex_default_travel_time", GraphQLInt))
+            .field(MapFetcher.field("flex_default_zone_time", GraphQLInt))
+            .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
+            .field(MapFetcher.field("mean_duration_offset", GraphQLFloat))
+            .field(MapFetcher.field("safe_duration_factor", GraphQLFloat))
+            .field(MapFetcher.field("safe_duration_offset", GraphQLFloat))
+            // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
+            // Should this be modified to be an object, rather than a list?
+            .field(newFieldDefinition()
+                    .type(new GraphQLList(locationsType))
+                    .name("location")
+                    .dataFetcher(new JDBCFetcher("locations", "location_id"))
+                    .build()
+            )
+            .build();
+
 
     /**
      * The GraphQL API type representing entries in the table of errors encountered while loading or validating a feed.
@@ -606,6 +678,18 @@ public class GraphQLGtfsSchema {
                         false))
                 .build())
             .field(newFieldDefinition()
+                    .name("pattern_locations")
+                    .type(new GraphQLList(patternLocationType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
+                    .dataFetcher(new JDBCFetcher("pattern_locations",
+                            "pattern_id",
+                            "stop_sequence",
+                            false))
+                    .build())
+            .field(newFieldDefinition()
                 .name("stops")
                 .description("GTFS stop entities that the pattern serves")
                 // Field type should be equivalent to the final JDBCFetcher table type.
@@ -617,7 +701,10 @@ public class GraphQLGtfsSchema {
                 // of join queries).
                 .argument(stringArg("pattern_id"))
                 .dataFetcher(new NestedJDBCFetcher(
+                        // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                        // will be returned.
                         new JDBCFetcher("pattern_stops", "pattern_id", null, false),
+                        new JDBCFetcher("pattern_locations", "location_id", null, false),
                         new JDBCFetcher("stops", "stop_id")))
                 .build())
             .field(newFieldDefinition()
@@ -781,6 +868,17 @@ public class GraphQLGtfsSchema {
                     .build()
             )
             .field(newFieldDefinition()
+                    .name("locations")
+                    .type(new GraphQLList(GraphQLGtfsSchema.locationsType))
+                    .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                    .argument(multiStringArg("location_id"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    .dataFetcher(new JDBCFetcher(Table.LOCATIONS.name))
+                    .build()
+            )
+            .field(newFieldDefinition()
                     .name("calendar")
                     .type(new GraphQLList(GraphQLGtfsSchema.calendarType))
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
@@ -811,17 +909,6 @@ public class GraphQLGtfsSchema {
                 .argument(intArg(LIMIT_ARG))
                 .argument(intArg(OFFSET_ARG))
                 .dataFetcher(new JDBCFetcher(Table.LOCATION_GROUPS.name))
-                .build()
-            )
-            .field(newFieldDefinition()
-                .name("location_meta_data")
-                .type(new GraphQLList(GraphQLGtfsSchema.locationMetaDataType))
-                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
-                .argument(multiStringArg("location_meta_data_id"))
-                .argument(intArg(ID_ARG))
-                .argument(intArg(LIMIT_ARG))
-                .argument(intArg(OFFSET_ARG))
-                .dataFetcher(new JDBCFetcher(Table.LOCATION_META_DATA.name))
                 .build()
             )
             .field(newFieldDefinition()

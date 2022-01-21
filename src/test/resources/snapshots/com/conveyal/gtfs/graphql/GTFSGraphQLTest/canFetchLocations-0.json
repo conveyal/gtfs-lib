@@ -1,0 +1,38 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "locations" : [ {
+        "geometry_type" : "polyline",
+        "id" : 2,
+        "location_id" : "area_251",
+        "location_shapes" : [ {
+          "geometry_id" : "area_251",
+          "geometry_pt_lat" : 10.0,
+          "geometry_pt_lon" : 30.0,
+          "geometry_type" : null,
+          "id" : 2,
+          "location_id" : "area_251"
+        }, {
+          "geometry_id" : "area_251",
+          "geometry_pt_lat" : 30.0,
+          "geometry_pt_lon" : 10.0,
+          "geometry_type" : null,
+          "id" : 3,
+          "location_id" : "area_251"
+        }, {
+          "geometry_id" : "area_251",
+          "geometry_pt_lat" : 40.0,
+          "geometry_pt_lon" : 40.0,
+          "geometry_type" : null,
+          "id" : 4,
+          "location_id" : "area_251"
+        } ],
+        "stop_desc" : "Muff to Moville Door-to-door pickup area",
+        "stop_name" : "Muff to Moville",
+        "stop_url" : "null",
+        "zone_id" : "null"
+      } ]
+    }
+  }
+}

@@ -100,12 +100,19 @@ public class GTFSTest {
     }
 
     /**
-     * Tests whether or not a super simple 2-stop, 1-route, 1-trip, valid gtfs can be loaded and exported
+     * Tests whether a super simple 2-stop, 1-route, 1-trip, valid gtfs can be loaded and exported
      */
     @Test
     public void canLoadAndExportSimpleAgency() {
         ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.URL_FORMAT),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
@@ -229,8 +236,15 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.URL_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),

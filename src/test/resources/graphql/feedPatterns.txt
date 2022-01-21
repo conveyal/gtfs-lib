@@ -23,6 +23,10 @@ query ($namespace: String) {
         pickup_booking_rule_id
         drop_off_booking_rule_id
       }
+      pattern_locations {
+        id
+        location_id
+      }
       route {
         route_id
       }

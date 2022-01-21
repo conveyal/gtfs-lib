@@ -1,6 +1,8 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.PatternHalt;
+import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
@@ -22,15 +24,11 @@ import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.JDBCType;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +39,7 @@ import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.INSERT_BATCH_SIZE;
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
+
 
 /**
  * This wraps a single database table and provides methods to modify GTFS entities.
@@ -165,6 +164,17 @@ public class JdbcTableWriter implements TableWriter {
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
+                    if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
+                        (childEntities == null ||
+                        childEntities.isNull() ||
+                        !childEntities.isArray())
+                    ) {
+                        // FLEX TODO: I'm not sure on this approach. This is a backwards hack to prevent the addition
+                        // of pattern location breaking existing pattern functionality. If pattern location is not
+                        // provided set to an empty array to avoid the following exception.
+                        childEntities = mapper.createArrayNode();
+                    }
+
                     if (childEntities == null || childEntities.isNull() || !childEntities.isArray()) {
                         throw new SQLException(String.format("Child entities %s must be an array and not null", referencingTable.name));
                     }
@@ -267,16 +277,70 @@ public class JdbcTableWriter implements TableWriter {
                 tablePrefix + ".",
                 EntityPopulator.PATTERN_STOP
             );
+            JDBCTableReader<PatternLocation> patternLocations = new JDBCTableReader(
+                    Table.PATTERN_LOCATION,
+                    dataSource,
+                    tablePrefix + ".",
+                    EntityPopulator.PATTERN_LOCATION
+            );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
-            List<PatternStop> patternStopsToNormalize = new ArrayList<>();
+            List<Object> patternHaltsToNormalize = new ArrayList<>();
             for (PatternStop patternStop : patternStops.getOrdered(patternId)) {
                 // Update stop times for any pattern stop with matching stop sequence (or for all pattern stops if the list
                 // is null).
                 if (patternStop.stop_sequence >= beginWithSequence) {
-                    patternStopsToNormalize.add(patternStop);
+                    patternHaltsToNormalize.add(patternStop);
                 }
             }
-            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize);
+            for (PatternLocation patternLocation : patternLocations.getOrdered(patternId)) {
+                // Update stop times for any pattern location with matching stop sequence (or for all pattern stops if the list
+                // is null).
+                if (patternLocation.stop_sequence >= beginWithSequence) {
+                    patternHaltsToNormalize.add(patternLocation);
+                }
+            }
+            // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
+            patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> ((PatternHalt) o).stop_sequence)).collect(Collectors.toList());
+            PatternHalt firstPatternHalt = (PatternHalt) patternHaltsToNormalize.iterator().next();
+            int firstStopSequence = firstPatternHalt.stop_sequence;
+            // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
+            int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
+            String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
+            String getFirstTravelTimeSql = String.format(
+                    "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
+                            "and t.pattern_id = ? " +
+                            "and t.trip_id = st.trip_id",
+                    timeField,
+                    tablePrefix,
+                    tablePrefix
+            );
+            PreparedStatement statement = connection.prepareStatement(getFirstTravelTimeSql);
+            statement.setInt(1, previousStopSequence);
+            statement.setString(2, firstPatternHalt.pattern_id);
+            LOG.info(statement.toString());
+            ResultSet resultSet = statement.executeQuery();
+            Map<String, Integer> timesForTripIds = new HashMap<>();
+            while (resultSet.next()) {
+                timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
+            }
+
+            int stopTimesUpdated = 0;
+            for (String tripId : timesForTripIds.keySet()) {
+                // Initialize travel time with previous stop time value.
+                int cumulativeTravelTime = timesForTripIds.get(tripId);
+                for (Object patternHalt : patternHaltsToNormalize) {
+                    if (patternHalt instanceof PatternStop) {
+                        cumulativeTravelTime += updateStopTimesForPatternStop((PatternStop) patternHalt, cumulativeTravelTime, tripId);
+                    } else if (patternHalt instanceof PatternLocation) {
+                        cumulativeTravelTime += updateStopTimesForPatternLocation((PatternLocation) patternHalt, cumulativeTravelTime, tripId);
+                    } else {
+                        LOG.warn("Pattern with ID {} contained a halt that wasn't a stop or a location!", patternId);
+                        continue;
+                    }
+                    stopTimesUpdated++;
+                }
+            }
+
             connection.commit();
             return stopTimesUpdated;
         } catch (Exception e) {
@@ -603,6 +667,7 @@ public class JdbcTableWriter implements TableWriter {
             // Always override the key field (shape_id for shapes, pattern_id for patterns) regardless of the entity's
             // actual value.
             subEntity.put(keyField.name, keyValue);
+
             // Check any references the sub entity might have. For example, this checks that stop_id values on
             // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
             // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
@@ -622,25 +687,29 @@ public class JdbcTableWriter implements TableWriter {
                 insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
             }
             // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
-            if ("pattern_stops".equals(subTable.name)) {
+            if ("pattern_stops".equals(subTable.name) || "pattern_locations".equals(subTable.name)) {
+                // FLEX TODO: this ideally is cleaner
                 if (referencedPatternUsesFrequencies) {
                     // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
                     // Default travel and dwell time behave as "linked fields" for associated stop times. In other
                     // words, frequency trips in the editor must match the pattern stop travel times.
-                    cumulativeTravelTime += updateStopTimesForPatternStop(subEntity, cumulativeTravelTime);
+                    int travelTimeForPatternHalts = "pattern_stops".equals(subTable.name) ?
+                            updateStopTimesForPatternStop(subEntity, cumulativeTravelTime) :
+                            updateStopTimesForPatternLocation(subEntity, cumulativeTravelTime);
+                    cumulativeTravelTime += travelTimeForPatternHalts;
                 }
                 // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
                 updateLinkedFields(
-                    subTable,
-                    subEntity,
-                    "stop_times",
-                    "pattern_id",
-                    "timepoint",
-                    "drop_off_type",
-                    "pickup_type",
-                    "continuous_pickup",
-                    "continuous_drop_off",
-                    "shape_dist_traveled"
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "continuous_pickup",
+                        "continuous_drop_off",
+                        "shape_dist_traveled"
                 );
             }
             setStatementParameters(subEntity, subTable, insertStatement, connection);
@@ -651,16 +720,21 @@ public class JdbcTableWriter implements TableWriter {
                 int orderValue = subEntity.get(orderFieldName).asInt();
                 boolean orderIsUnique = orderValues.add(orderValue);
                 boolean valuesAreIncrementing = ++previousOrder == orderValue;
-                if (!orderIsUnique || !valuesAreIncrementing) {
+                boolean valuesAreIncreasing = previousOrder <= orderValue;
+
+                // PatternStop and PatternLocations must only increase, not increment
+                boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
+                        valuesAreIncrementing : valuesAreIncreasing;
+                if (!orderIsUnique || !valuesAreAscending) {
                     throw new SQLException(
-                        String.format(
-                            "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
-                            subTable.name,
-                            orderFieldName,
-                            entityCount,
-                            previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
-                            orderValue
-                        )
+                            String.format(
+                                    "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
+                                    subTable.name,
+                                    orderFieldName,
+                                    entityCount,
+                                    previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing" : "duplicate",
+                                    orderValue
+                            )
                     );
                 }
             }
@@ -706,6 +780,7 @@ public class JdbcTableWriter implements TableWriter {
         //   if (result == 0) throw new SQLException("No stop times found for trip ID");
     }
 
+
     /**
      * Updates the stop times that reference the specified pattern stop.
      * @param patternStop the pattern stop for which to update stop times
@@ -714,93 +789,98 @@ public class JdbcTableWriter implements TableWriter {
      * @return the travel and dwell time added by this pattern stop
      * @throws SQLException
      */
-    private int updateStopTimesForPatternStop(ObjectNode patternStop, int previousTravelTime) throws SQLException {
+    private int updateStopTimesForPatternStop(PatternStop patternStop, int previousTravelTime, String tripId) throws SQLException {
         String sql = String.format(
             "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
-                "where st.trip_id = t.trip_id AND t.pattern_id = ? AND st.stop_sequence = ?",
+                "where st.trip_id = ? AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
             tablePrefix
         );
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
         int oneBasedIndex = 1;
-        int travelTime = patternStop.get("default_travel_time").asInt();
+        int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+        int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
         int arrivalTime = previousTravelTime + travelTime;
         statement.setInt(oneBasedIndex++, arrivalTime);
-        int dwellTime = patternStop.get("default_dwell_time").asInt();
         statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
+        // Set trip id either from params or all
+        if (tripId != null) {
+            statement.setString(oneBasedIndex++, tripId);
+        } else {
+            statement.setString(oneBasedIndex++, "t.trip_id");
+        }
         // Set "where clause" with value for pattern_id and stop_sequence
-        statement.setString(oneBasedIndex++, patternStop.get("pattern_id").asText());
+        statement.setString(oneBasedIndex++, patternStop.pattern_id);
         // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
         // normalize stop sequence values for stop times during snapshotting for the editor.
-        statement.setInt(oneBasedIndex++, patternStop.get("stop_sequence").asInt());
+        statement.setInt(oneBasedIndex++, patternStop.stop_sequence);
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
         LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
     }
+    private int updateStopTimesForPatternStop(ObjectNode patternStop, int previousTravelTime) throws SQLException {
+        PatternStop extractedPatternStop = new PatternStop();
+        extractedPatternStop.default_travel_time = patternStop.get("default_travel_time").asInt();
+        extractedPatternStop.default_dwell_time = patternStop.get("default_dwell_time").asInt();
+        extractedPatternStop.pattern_id = patternStop.get("pattern_id").asText();
+        extractedPatternStop.stop_sequence = patternStop.get("stop_sequence").asInt();
+        return updateStopTimesForPatternStop(extractedPatternStop, previousTravelTime, null);
+    }
+
 
     /**
-     * Normalizes all stop times' arrivals and departures for an ordered set of pattern stops. This set can be the full
-     * set of stops for a pattern or just a subset. Typical usage for this method would be to overwrite the arrival and
-     * departure times for existing trips after a pattern stop has been added or inserted into a pattern or if a
-     * pattern stop's default travel or dwell time were updated and the stop times need to reflect this update.
-     * @param patternStops list of pattern stops for which to update stop times (ordered by increasing stop_sequence)
+     * Updates the stop times that reference the specified pattern location.
+     * @param patternLocation the pattern stop for which to update stop times
+     * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
+     *                           previous pattern stop's dwell time)
+     * @return the travel and dwell time added by this pattern location
      * @throws SQLException
-     *
-     * TODO? add param Set<String> serviceIdFilters service_id values to filter trips on
      */
-    private int updateStopTimesForPatternStops(List<PatternStop> patternStops) throws SQLException {
-        PatternStop firstPatternStop = patternStops.iterator().next();
-        int firstStopSequence = firstPatternStop.stop_sequence;
-        // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
-        int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
-        String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
-        String getFirstTravelTimeSql = String.format(
-            "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
-                "and t.pattern_id = ? " +
-                "and t.trip_id = st.trip_id",
-            timeField,
-            tablePrefix,
-            tablePrefix
+    private int updateStopTimesForPatternLocation(PatternLocation patternLocation, int previousTravelTime, String tripId) throws SQLException {
+        String sql = String.format(
+                "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
+                        "where st.trip_id = ? AND t.pattern_id = ? AND st.stop_sequence = ?",
+                tablePrefix,
+                tablePrefix
         );
-        PreparedStatement statement = connection.prepareStatement(getFirstTravelTimeSql);
-        statement.setInt(1, previousStopSequence);
-        statement.setString(2, firstPatternStop.pattern_id);
-        LOG.info(statement.toString());
-        ResultSet resultSet = statement.executeQuery();
-        Map<String, Integer> timesForTripIds = new HashMap<>();
-        while (resultSet.next()) {
-            timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
+        // Prepare the statement and set statement parameters
+        PreparedStatement statement = connection.prepareStatement(sql);
+        int oneBasedIndex = 1;
+        int travelTime = patternLocation.flex_default_travel_time;
+        int timeInLocation = patternLocation.flex_default_zone_time;
+        int arrivalTime = previousTravelTime + travelTime;
+        // Setting start of the pickup window (when the vehicle arrives in the flex location)
+        statement.setInt(oneBasedIndex++, arrivalTime);
+        // Set the end of the pickup window (when the vehicle leaves the flex location)
+        statement.setInt(oneBasedIndex++, arrivalTime + timeInLocation);
+
+        // Set trip id either from params or all
+        if (tripId != null) {
+            statement.setString(oneBasedIndex++, tripId);
+        } else {
+            statement.setString(oneBasedIndex++, "t.trip_id");
         }
-        // Update stop times for individual trips with normalized travel times.
-        String updateTravelTimeSql = String.format(
-            "update %s.stop_times set arrival_time = ?, departure_time = ? where trip_id = ? and stop_sequence = ?",
-            tablePrefix
-        );
-        PreparedStatement updateStopTimeStatement = connection.prepareStatement(updateTravelTimeSql);
-        LOG.info(updateStopTimeStatement.toString());
-        final BatchTracker stopTimesTracker = new BatchTracker("stop_times", updateStopTimeStatement);
-        for (String tripId : timesForTripIds.keySet()) {
-            // Initialize travel time with previous stop time value.
-            int cumulativeTravelTime = timesForTripIds.get(tripId);
-            for (PatternStop patternStop : patternStops) {
-                // Gather travel/dwell time for pattern stop (being sure to check for missing values).
-                int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
-                int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
-                int oneBasedIndex = 1;
-                // Increase travel time by current pattern stop's travel and dwell times (and set values for update).
-                cumulativeTravelTime += travelTime;
-                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
-                cumulativeTravelTime += dwellTime;
-                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
-                updateStopTimeStatement.setString(oneBasedIndex++, tripId);
-                updateStopTimeStatement.setInt(oneBasedIndex++, patternStop.stop_sequence);
-                stopTimesTracker.addBatch();
-            }
-        }
-        return stopTimesTracker.executeRemaining();
+        // Set "where clause" with value for pattern_id and stop_sequence
+        statement.setString(oneBasedIndex++, patternLocation.pattern_id);
+        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
+        // normalize stop sequence values for stop times during snapshotting for the editor.
+        statement.setInt(oneBasedIndex++, patternLocation.stop_sequence);
+        // Log query, execute statement, and log result.
+        LOG.debug(statement.toString());
+        int entitiesUpdated = statement.executeUpdate();
+        LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
+        return travelTime + timeInLocation;
+    }
+    private int updateStopTimesForPatternLocation(ObjectNode patternLocation, int previousTravelTime) throws SQLException {
+        PatternLocation extractedPatternLocation = new PatternLocation();
+        extractedPatternLocation.flex_default_travel_time = patternLocation.get("flex_default_travel_time").asInt();
+        extractedPatternLocation.flex_default_zone_time = patternLocation.get("flex_default_zone_time").asInt();
+        extractedPatternLocation.pattern_id = patternLocation.get("pattern_id").asText();
+        extractedPatternLocation.stop_sequence = patternLocation.get("stop_sequence").asInt();
+        return updateStopTimesForPatternLocation(extractedPatternLocation, previousTravelTime, null);
     }
 
     /**

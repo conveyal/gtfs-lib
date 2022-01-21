@@ -168,8 +168,8 @@ public class JdbcGtfsLoader {
             result.translations = load(Table.TRANSLATIONS);
             result.attributions = load(Table.ATTRIBUTIONS);
             result.bookingRules = load(Table.BOOKING_RULES);
+            result.locations = load(Table.LOCATIONS);
             result.locationGroups = load(Table.LOCATION_GROUPS);
-            result.locationMetaData = load(Table.LOCATION_META_DATA);
             result.locationShapes = load(Table.LOCATION_SHAPES);
             result.errorCount = errorStorage.getErrorCount();
 

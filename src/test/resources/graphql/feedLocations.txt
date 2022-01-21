@@ -1,0 +1,22 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    locations {
+      id
+      location_id
+      stop_name
+      stop_desc
+      zone_id
+      stop_url
+      geometry_type
+      location_shapes {
+        id
+        location_id
+        geometry_id
+        geometry_type
+        geometry_pt_lat
+        geometry_pt_lon
+      }
+    }
+  }
+}

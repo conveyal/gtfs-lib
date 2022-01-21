@@ -2,8 +2,8 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
@@ -34,10 +34,14 @@ public class ReferencesTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
         if (trip != null) referencedTrips.add(trip.trip_id);
         if (route != null) referencedRoutes.add(route.route_id);
         for (Stop stop : stops) {
+            // TODO: Refactor this validator to work with flex locations
+            if (stop == null) {
+                continue;
+            }
             referencedStops.add(stop.stop_id);
             // If a stop used by the trip has a parent station, count this among the referenced stops, too. While the
             // parent station may not be referenced directly, the relationship is functioning correctly and there is
