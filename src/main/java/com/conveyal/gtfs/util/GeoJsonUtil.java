@@ -157,7 +157,6 @@ public class GeoJsonUtil {
             if (geometryType == null) continue;
             switch (geometryType) {
                 case "polyline":
-                case "polygon":
                     LineString lineString = (LineString) geometry;
                     List<Point> points = lineString.getPoints();
                     for (Point point : points) {
@@ -166,6 +165,20 @@ public class GeoJsonUtil {
                             buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
                         );
                     }
+                    break;
+                case "polygon":
+                    Polygon polygon = (Polygon) geometry;
+                    List<LineString> lineStrings = polygon.getRings();
+                    for (LineString ls : lineStrings) {
+                        List<Point> p = ls.getPoints();
+                        for (Point point : p) {
+                            locationShapes.add(
+                                    // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
+                                    buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
+                            );
+                        }
+                    }
+
                     break;
                 // TODO: Add additional geometry types.
             }
