@@ -157,6 +157,7 @@ public class GeoJsonUtil {
             if (geometryType == null) continue;
             switch (geometryType) {
                 case "polyline":
+                case "polygon":
                     LineString lineString = (LineString) geometry;
                     List<Point> points = lineString.getPoints();
                     for (Point point : points) {
