@@ -150,9 +150,10 @@ public class GTFSGraphQLTest {
 
     /** Tests that the booking rules of a feed can be fetched. */
     @Test
-    public void canFetchBookingRules() {
+    public void canFetchBookingRules() throws IOException {
+        Map<String, Object> blah = queryGraphQL("feedBookingRules.txt");
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-            MatcherAssert.assertThat(queryGraphQL("feedBookingRules.txt"), matchesSnapshot());
+            MatcherAssert.assertThat(blah, matchesSnapshot());
         });
     }
 
@@ -180,10 +181,9 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests that the location meta data of a feed can be fetched. */
-    // TODO: make sure this works well.
+    /** Tests that the locations of a feed can be fetched. */
     @Test
-    public void canFetchLocationMetaData() {
+    public void canFetchLocations() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
             MatcherAssert.assertThat(queryGraphQL("feedLocations.txt"), matchesSnapshot());
         });
@@ -295,7 +295,7 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests whether a graphQL query that has superflous and redundant nesting can find the right result. */
+    /** Tests whether a graphQL query that has superfluous and redundant nesting can find the right result. */
     // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
     @Test
     public void canFetchMultiNestedEntities() {

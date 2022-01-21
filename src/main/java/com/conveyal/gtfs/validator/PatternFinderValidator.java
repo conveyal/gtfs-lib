@@ -80,7 +80,7 @@ public class PatternFinderValidator extends TripValidator {
             locationById.put(location.location_id, location);
         }
         // FIXME In the editor we need patterns to exist separately from and before trips themselves, so me make another table.
-        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, errorStorage);
+        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, locationById, errorStorage);
         Connection connection = null;
         try {
             // TODO this assumes gtfs-lib is using an SQL database and not a MapDB.
@@ -153,7 +153,9 @@ public class PatternFinderValidator extends TripValidator {
                         if (prevDepartureStop != INT_MISSING) {
                             prevDeparture = prevDepartureStop;
                         }
-                        if (prevDepartureFlex != INT_MISSING) {
+                        // Only use the flex departure if it is after the stop departure.
+                        // FLEX TODO: Create a unit test to test this!
+                        if (prevDepartureFlex > prevDepartureStop) {
                             prevDeparture = prevDepartureFlex;
                         }
 

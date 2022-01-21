@@ -7,6 +7,7 @@ import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -44,7 +45,7 @@ public class Location extends Entity {
     }
 
     /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry, List)} as part
      * of the unpacking of GeoJson data to CSV.
      */
     public static String header() {
@@ -52,7 +53,7 @@ public class Location extends Entity {
     }
 
     /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry)} as part
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry, List)} as part
      * of the unpacking of GeoJson data to CSV.
      */
     public String toCsvRow() {
@@ -75,6 +76,7 @@ public class Location extends Entity {
             Location location = new Location();
 
             location.id = row + 1;
+            location.location_id = getStringField("location_id", true);
             location.stop_name = getStringField("stop_name", false);
             location.stop_desc = getStringField("stop_desc", false);
             location.zone_id = getStringField("zone_id", false);

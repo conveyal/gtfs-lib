@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.error.GeoJsonParseError;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
@@ -454,8 +455,7 @@ public class Table {
             new StringField("zone_id", OPTIONAL),
             new URLField("stop_url", OPTIONAL),
             new StringField("geometry_type", REQUIRED)
-    ).addPrimaryKey()
-    .restrictDelete();
+    ).addPrimaryKey();
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
     public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
@@ -473,7 +473,9 @@ public class Table {
         new StringField("geometry_id", REQUIRED),
         new DoubleField("geometry_pt_lat", REQUIRED, -80, 80, 6),
         new DoubleField("geometry_pt_lon", REQUIRED, -180, 180, 6)
-    ).withParentTable(LOCATIONS);
+    )
+    .keyFieldIsNotUnique()
+    .withParentTable(LOCATIONS);
 
     public static final Table PATTERN_LOCATION = new Table("pattern_locations", PatternLocation.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
@@ -715,19 +717,20 @@ public class Table {
         }
         if (entry == null) return null;
         try {
-            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry);
-            // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
+            List<String> geoJsonErrors = new ArrayList<>();
+            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, geoJsonErrors);
+            if (!geoJsonErrors.isEmpty() && sqlErrorStorage != null) {
+                geoJsonErrors.forEach(error ->
+                    sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, error))
+                );
+            }
+            // Don't skip empty records. This is set to true by default on CsvReader. We want to check for empty records
             // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
             csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
             LOG.error("Exception while opening zip entry: {}", entry, e);
-            e.printStackTrace();
-            return null;
-        } catch (GeoJsonException e) {
-            if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, GEO_JSON_PARSING));
-            LOG.error("Exception while parsing GeoJson locations: {}", entry, e);
             e.printStackTrace();
             return null;
         }
@@ -741,11 +744,12 @@ public class Table {
         String tableFileName,
         String name,
         ZipFile zipFile,
-        ZipEntry entry
-    ) throws IOException, GeoJsonException {
+        ZipEntry entry,
+        List<String> errors
+    ) throws IOException {
         CsvReader csvReader;
         if (tableFileName.equals(locationGeoJsonFileName)) {
-            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry);
+            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry, errors);
         } else {
             InputStream zipInputStream = zipFile.getInputStream(entry);
             // Skip any byte order mark that may be present. Files must be UTF-8,

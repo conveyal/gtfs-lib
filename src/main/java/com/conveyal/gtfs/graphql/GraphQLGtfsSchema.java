@@ -81,10 +81,10 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("booking_type", GraphQLInt))
             .field(MapFetcher.field("prior_notice_duration_min", GraphQLInt))
             .field(MapFetcher.field("prior_notice_duration_max", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_last_day", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_last_time", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_start_day", GraphQLInt))
-            .field(MapFetcher.field("prior_notice_start_time", GraphQLInt))
+            .field(MapFetcher.field("prior_notice_last_day"))
+            .field(MapFetcher.field("prior_notice_last_time"))
+            .field(MapFetcher.field("prior_notice_start_day"))
+            .field(MapFetcher.field("prior_notice_start_time"))
             .field(MapFetcher.field("prior_notice_service_id"))
             .field(MapFetcher.field("message"))
             .field(MapFetcher.field("pickup_message"))
@@ -411,6 +411,8 @@ public class GraphQLGtfsSchema {
                     // of join queries).
                     .argument(stringArg("route_id"))
                     .dataFetcher(new NestedJDBCFetcher(
+                            // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                            // will be returned.
                             new JDBCFetcher("patterns", "route_id", null, false),
                             new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                             new JDBCFetcher("pattern_locations", "pattern_id", null, false),
@@ -478,9 +480,11 @@ public class GraphQLGtfsSchema {
                     .type(new GraphQLList(new GraphQLTypeReference("pattern")))
                     .argument(stringArg("namespace"))
                     .dataFetcher(new NestedJDBCFetcher(
+                            // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                            // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
-                            new JDBCFetcher("pattern_locations", "location_id", null, false),
-                            new JDBCFetcher("patterns", "pattern_id")))
+                            new JDBCFetcher("patterns", "pattern_id"),
+                            new JDBCFetcher("pattern_locations", "location_id")))
                     .build())
             .field(newFieldDefinition()
                     .name("routes")
@@ -490,6 +494,8 @@ public class GraphQLGtfsSchema {
                     .argument(stringArg(SEARCH_ARG))
                     .argument(intArg(LIMIT_ARG))
                     .dataFetcher(new NestedJDBCFetcher(
+                            // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                            // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("pattern_locations", "location_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id", null, false),
@@ -695,8 +701,10 @@ public class GraphQLGtfsSchema {
                 // of join queries).
                 .argument(stringArg("pattern_id"))
                 .dataFetcher(new NestedJDBCFetcher(
+                        // If it is not possible to join across all fetches (e.g. no matching id) an empty array
+                        // will be returned.
                         new JDBCFetcher("pattern_stops", "pattern_id", null, false),
-                        new JDBCFetcher("pattern_locations", "pattern_id", null, false),
+                        new JDBCFetcher("pattern_locations", "location_id", null, false),
                         new JDBCFetcher("stops", "stop_id")))
                 .build())
             .field(newFieldDefinition()

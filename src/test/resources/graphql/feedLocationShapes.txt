@@ -2,15 +2,12 @@ query ($namespace: String) {
   feed(namespace: $namespace) {
     feed_version
     location_shapes {
-      shape_id
-      shape_polygon_id
-      shape_ring_id
-      shape_line_string_id
-      shape_pt_lat
-      shape_pt_lon
-      shape_pt_sequence
-      location_meta_data_id
       id
+      location_id
+      geometry_id
+      geometry_type
+      geometry_pt_lat
+      geometry_pt_lon
     }
   }
 }

@@ -259,9 +259,10 @@ public interface EntityPopulator<T> {
     EntityPopulator<Location> LOCATION = (result, columnForName) -> {
         Location location = new Location();
         location.location_id = getStringIfPresent(result, "location_id", columnForName);
-        location.stop_name = getStringIfPresent(result, "location_stop_name", columnForName);
+        location.stop_name = getStringIfPresent(result, "stop_name", columnForName);
+        location.stop_desc = getStringIfPresent(result, "stop_desc", columnForName);
         location.zone_id = getStringIfPresent(result, "zone_id", columnForName);
-        location.stop_url = getUrlIfPresent(result, "location_stop_url", columnForName);
+        location.stop_url = getUrlIfPresent(result, "stop_url", columnForName);
         location.geometry_type = getStringIfPresent(result, "geometry_type", columnForName);
         return location;
     };
@@ -277,7 +278,9 @@ public interface EntityPopulator<T> {
     EntityPopulator<LocationShape> LOCATION_SHAPES = (result, columnForName) -> {
         LocationShape locationShape = new LocationShape();
         locationShape.location_id = getStringIfPresent(result, "location_id", columnForName);
-        locationShape.geometry_id = getStringIfPresent(result, "polygon_id", columnForName);
+        locationShape.geometry_id = getStringIfPresent(result, "geometry_id", columnForName);
+        locationShape.geometry_pt_lat = getDoubleIfPresent(result, "geometry_pt_lat", columnForName);
+        locationShape.geometry_pt_lon = getDoubleIfPresent(result, "geometry_pt_lon", columnForName);
         return locationShape;
     };
 

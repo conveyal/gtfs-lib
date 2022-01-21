@@ -51,7 +51,7 @@
   <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <jackson.version>2.12.1</jackson.version>
+    <jackson.version>2.13.1</jackson.version>
   </properties>
 
   <!-- Define where the artifacts produced by this build will be deployed -->
@@ -257,10 +257,12 @@
       <scope>test</scope>
     </dependency>
     <!-- Snapshotting library for testing -->
+    <!-- This should only be temporary until https://github.com/Zenika/java-snapshot-matcher is updated to work with
+    the latest version of jackson databind -->
     <dependency>
-      <groupId>com.github.conveyal</groupId>
-      <artifactId>java-snapshot-matcher</artifactId>
-      <version>3495b32f7b4d3f82590e0a2284029214070b6984</version>
+      <groupId>com.github.ibi-group</groupId>
+      <artifactId>ibi-java-snapshot-matcher</artifactId>
+      <version>0820e1a3a2a6c7f845038859d0c4c09bf18c7910</version>
       <scope>test</scope>
     </dependency>
     <!-- Disk-backed storage that looks like a Java map. -->

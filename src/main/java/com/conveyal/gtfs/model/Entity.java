@@ -41,8 +41,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -313,25 +315,24 @@ public abstract class Entity implements Serializable {
                 if (entry == null) return;
             }
             LOG.info("Loading GTFS table {} from {}", tableName, entry);
-            try {
-                this.reader = Table.getCsvReader(tableFileName, tableName, zip, entry);
-                boolean hasHeaders = reader.readHeaders();
-                if (!hasHeaders) {
-                    feed.errors.add(new EmptyTableError(tableName));
+            List<String> geoJsonErrors = new ArrayList<>();
+            this.reader = Table.getCsvReader(tableFileName, tableName, zip, entry, geoJsonErrors);
+            if (!geoJsonErrors.isEmpty()) {
+                geoJsonErrors.forEach(error -> feed.errors.add(new GeoJsonParseError(tableName, error)));
+            }
+            boolean hasHeaders = reader.readHeaders();
+            if (!hasHeaders) {
+                feed.errors.add(new EmptyTableError(tableName));
+            }
+            while (reader.readRecord()) {
+                // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
+                if (++row % 500000 == 0) {
+                    LOG.info("Record number {}", human(row));
                 }
-                while (reader.readRecord()) {
-                    // reader.getCurrentRecord() is zero-based and does not include the header line, keep our own row count
-                    if (++row % 500000 == 0) {
-                        LOG.info("Record number {}", human(row));
-                    }
-                    loadOneRow(); // Call subclass method to produce an entity from the current row.
-                }
-                if (row == 0) {
-                    feed.errors.add(new EmptyTableError(tableName));
-                }
-            } catch (GeoJsonException e) {
-                LOG.error("GeoJson parser error ", e);
-                feed.errors.add(new GeoJsonParseError(tableName, e.getMessage()));
+                loadOneRow(); // Call subclass method to produce an entity from the current row.
+            }
+            if (row == 0) {
+                feed.errors.add(new EmptyTableError(tableName));
             }
         }
 
