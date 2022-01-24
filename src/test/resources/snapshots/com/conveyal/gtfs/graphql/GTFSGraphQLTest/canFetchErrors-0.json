@@ -62,22 +62,6 @@
         "error_type" : "GEO_JSON_PARSING",
         "line_number" : null
       }, {
-        "bad_value" : "null",
-        "entity_id" : null,
-        "entity_sequence" : null,
-        "entity_type" : "Location",
-        "error_id" : 3,
-        "error_type" : "URL_FORMAT",
-        "line_number" : 2
-      }, {
-        "bad_value" : "null",
-        "entity_id" : null,
-        "entity_sequence" : null,
-        "entity_type" : "Location",
-        "error_id" : 4,
-        "error_type" : "URL_FORMAT",
-        "line_number" : 3
-      }, {
         "bad_value" : "Geometry type MULTIPOLYGON unknown or not supported.",
         "entity_id" : null,
         "entity_sequence" : null,
