@@ -32,7 +32,7 @@
         "priority" : "MEDIUM",
         "type" : "STOP_UNUSED"
       }, {
-        "count" : 2,
+        "count" : 0,
         "message" : "URL format should be <scheme>://<authority><path>?<query>#<fragment>",
         "priority" : "MEDIUM",
         "type" : "URL_FORMAT"
