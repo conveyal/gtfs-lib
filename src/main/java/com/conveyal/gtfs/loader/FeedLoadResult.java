@@ -74,9 +74,8 @@ public class FeedLoadResult implements Serializable {
     }
 
     /**
-     * Determine if the feed loaded has GTFS Flex enhancements.
+     * Determine if the feed loaded has GTFS Flex enhancements. Is used in datatools-server -> FeedSource.java.
      */
-    // TODO: Confirm this is adequate to determine a flex feed.
     public boolean isGTFSFlex() {
         return
             bookingRules != null &&

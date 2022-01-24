@@ -169,14 +169,19 @@ public class GeoJsonUtil {
                 case "polygon":
                     Polygon polygon = (Polygon) geometry;
                     List<LineString> lineStrings = polygon.getRings();
-                    for (LineString ls : lineStrings) {
-                        List<Point> p = ls.getPoints();
-                        for (Point point : p) {
-                            locationShapes.add(
-                                    // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
-                                    buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
-                            );
-                        }
+                    if (lineStrings.size() > 1) {
+                        String message = "Polygon has multiple line strings, this is not supported yet. Only the " +
+                            "first line string will be processed.";
+                        LOG.warn(message);
+                        if (errors != null) errors.add(message);
+                    }
+                    LineString firstLineString = lineStrings.get(0);
+                    List<Point> p = firstLineString.getPoints();
+                    for (Point point : p) {
+                        locationShapes.add(
+                            // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
+                            buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
+                        );
                     }
 
                     break;
@@ -255,16 +260,25 @@ public class GeoJsonUtil {
                     setFeatureProps(location, lineStringFeature);
                     features.add(lineStringFeature);
                     break;
+                case "polygon":
+                    // We are only supporting a polygon with a single line string so this ok for now. If multiple line
+                    // strings are to be supported this will need to change.
+                    Polygon polygon = buildPolygon(getLineStings(location.location_id, locationShapes));
+                    mil.nga.sf.geojson.Feature polygonFeature = new mil.nga.sf.geojson.Feature();
+                    polygonFeature.setGeometry(new mil.nga.sf.geojson.Polygon(polygon));
+                    setFeatureProps(location, polygonFeature);
+                    features.add(polygonFeature);
+                    break;
                 // TODO: Add additional geometry types.
                 default:
-                    // Effectively, MultiPolygon, Polygon and MultiLineString types which aren't supported yet.
+                    // Effectively, MultiPolygon and MultiLineString types which aren't supported yet.
                     String message = String.format("Geometry type %s unknown or not supported.", location.geometry_type);
                     LOG.warn(message);
                     if (errors != null) errors.add(message);
-                    return null;
             }
         }
         featureCollection.setFeatures(features);
+        LOG.info(FeatureConverter.toStringValue(featureCollection));
         return FeatureConverter.toStringValue(featureCollection);
     }
 

@@ -13,7 +13,6 @@ query ($namespace: String) {
         id
         location_id
         geometry_id
-        geometry_type
         geometry_pt_lat
         geometry_pt_lon
       }

@@ -1,7 +1,12 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationShape;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.util.GeoJsonException;
 import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.google.common.collect.Lists;
@@ -422,7 +427,7 @@ public class JdbcGtfsExporter {
     }
 
     /**
-     * Export location metadata and location shapes to a single locations.geojson file.
+     * Export locations and location shapes to a single locations.geojson file.
      */
     private TableLoadResult exportLocations() {
         long startTime = System.currentTimeMillis();

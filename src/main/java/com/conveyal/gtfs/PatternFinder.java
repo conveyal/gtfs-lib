@@ -150,8 +150,8 @@ public class PatternFinder {
             // Stop names, unlike IDs, are not guaranteed to be unique.
             // Therefore we must track used names carefully to avoid duplicates.
 
-            String fromName = getFromName(pattern, stopById, locationById);
-            String toName = getToName(pattern, stopById, locationById);
+            String fromName = getName(pattern, stopById, locationById, true);
+            String toName = getName(pattern, stopById, locationById, false);
 
             namingInfo.fromStops.put(fromName, pattern);
             namingInfo.toStops.put(toName, pattern);
@@ -169,8 +169,8 @@ public class PatternFinder {
         for (PatternNamingInfo info : namingInfoForRoute.values()) {
             for (Pattern pattern : info.patternsOnRoute) {
                 pattern.name = null; // clear this now so we don't get confused later on
-                String fromName = getFromName(pattern, stopById, locationById);
-                String toName = getToName(pattern, stopById, locationById);
+                String fromName = getName(pattern, stopById, locationById, true);
+                String toName = getName(pattern, stopById, locationById, false);
 
                 // check if combination from, to is unique
                 Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
@@ -221,30 +221,23 @@ public class PatternFinder {
         }
     }
 
-    private static String getFromName(
+    /**
+     * Return either the 'from' or 'to' name. Check the list of stops first, if there is no match, then check the
+     * locations. If neither provide a match return a default value.
+     */
+    private static String getName(
         Pattern pattern,
         Map<String, Stop> stopById,
-        Map<String, Location> locationById
+        Map<String, Location> locationById,
+        boolean fromName
     ) {
-        if (stopById.containsKey(pattern.orderedStops.get(0)))
-            return stopById.get(pattern.orderedStops.get(0)).stop_name;
-        else if (locationById.containsKey(pattern.orderedStops.get(0))) {
-            return locationById.get(pattern.orderedStops.get(0)).stop_name;
+        int id = fromName ? 0 : pattern.orderedStops.size() - 1;
+        if (stopById.containsKey(pattern.orderedStops.get(id)))
+            return stopById.get(pattern.orderedStops.get(id)).stop_name;
+        else if (locationById.containsKey(pattern.orderedStops.get(id))) {
+            return locationById.get(pattern.orderedStops.get(id)).stop_name;
         }
-        return "fromNameUnknown";
-    }
-
-    private static String getToName(
-        Pattern pattern,
-        Map<String, Stop> stopById,
-        Map<String, Location> locationById
-    ) {
-        if (stopById.containsKey(pattern.orderedStops.get(pattern.orderedStops.size() - 1)))
-            return stopById.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
-        else if (locationById.containsKey(pattern.orderedStops.get(pattern.orderedStops.size() - 1))) {
-            return locationById.get(pattern.orderedStops.get(pattern.orderedStops.size() - 1)).stop_name;
-        }
-        return "toNameUnknown";
+        return fromName ? "fromNameUnknown" : "toNameUnknown";
     }
 
     /**

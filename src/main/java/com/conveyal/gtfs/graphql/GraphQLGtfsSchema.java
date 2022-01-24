@@ -195,18 +195,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("location_id"))
             .field(MapFetcher.field("geometry_id"))
-            .field(MapFetcher.field("geometry_type"))
             .field(MapFetcher.field("geometry_pt_lat", GraphQLFloat))
             .field(MapFetcher.field("geometry_pt_lon", GraphQLFloat))
-
-//            .field(MapFetcher.field("shape_id"))
-//            .field(MapFetcher.field("shape_polygon_id"))
-//            .field(MapFetcher.field("shape_ring_id"))
-//            .field(MapFetcher.field("shape_line_string_id"))
-//            .field(MapFetcher.field("shape_pt_lat"))
-//            .field(MapFetcher.field("shape_pt_lon"))
-//            .field(MapFetcher.field("shape_pt_sequence"))
-//            .field(MapFetcher.field("location_meta_data_id"))
             .build();
 
     // Represents more 'meta' data from locations.geoJSON
