@@ -6,7 +6,6 @@ import com.conveyal.gtfs.model.LocationShape;
 import com.csvreader.CsvReader;
 import mil.nga.sf.Geometry;
 import mil.nga.sf.LineString;
-import mil.nga.sf.MultiLineString;
 import mil.nga.sf.Point;
 import mil.nga.sf.Polygon;
 import mil.nga.sf.geojson.Feature;
@@ -25,7 +24,6 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -325,25 +323,6 @@ public class GeoJsonUtil {
             points.add(new Point(locationShape.geometry_pt_lat, locationShape.geometry_pt_lon));
         });
         return points;
-    }
-
-    /**
-     * From the provided list of {@link LocationShape}s extract all rings entries.
-     */
-    private static List<LocationShape> getPolygons(
-        String location_id,
-        List<LocationShape> locationShapes
-    ) {
-        return locationShapes
-            .stream()
-            .filter(
-                item -> item.location_id.equals(location_id)
-            )
-            .sorted(
-                Comparator
-                    .comparing(LocationShape::getGeometry_id)
-            )
-            .collect(toList());
     }
 
     /**
