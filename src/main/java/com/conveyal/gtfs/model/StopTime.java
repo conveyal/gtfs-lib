@@ -62,13 +62,6 @@ public class StopTime extends Entity implements Cloneable, Serializable {
      */
     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
-        // Ideally we always pull this info from feed, but sometimes feed is undefined
-        // FLEX TODO: find a better solution for this problem. Should we keep the flex variable at all?
-        boolean isFlex = this.safe_duration_factor != DOUBLE_MISSING;
-        if (feed != null) {
-            isFlex = feed.isGTFSFlexFeed();
-        }
-
         int oneBasedIndex = 1;
         if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         statement.setString(oneBasedIndex++, trip_id);
@@ -83,16 +76,16 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
         statement.setDouble(oneBasedIndex++, shape_dist_traveled);
         setIntParameter(statement, oneBasedIndex++, timepoint);
-        if (isFlex) {
-            statement.setString(oneBasedIndex++, pickup_booking_rule_id);
-            statement.setString(oneBasedIndex++, drop_off_booking_rule_id);
-            setIntParameter(statement, oneBasedIndex++, start_pickup_dropoff_window);
-            setIntParameter(statement, oneBasedIndex++, end_pickup_dropoff_window);
-            statement.setDouble(oneBasedIndex++, mean_duration_factor);
-            statement.setDouble(oneBasedIndex++, mean_duration_offset);
-            statement.setDouble(oneBasedIndex++, safe_duration_factor);
-            statement.setDouble(oneBasedIndex++, safe_duration_offset);
-        }
+
+        // Flex fields
+        statement.setString(oneBasedIndex++, pickup_booking_rule_id);
+        statement.setString(oneBasedIndex++, drop_off_booking_rule_id);
+        setIntParameter(statement, oneBasedIndex++, start_pickup_dropoff_window);
+        setIntParameter(statement, oneBasedIndex++, end_pickup_dropoff_window);
+        statement.setDouble(oneBasedIndex++, mean_duration_factor);
+        statement.setDouble(oneBasedIndex++, mean_duration_offset);
+        statement.setDouble(oneBasedIndex++, safe_duration_factor);
+        statement.setDouble(oneBasedIndex++, safe_duration_offset);
     }
 
     public static class Loader extends Entity.Loader<StopTime> {
