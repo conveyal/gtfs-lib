@@ -47,7 +47,7 @@ public class GeoJsonUtil {
      * Takes the content of a zip file entry and converts it into a {@link FeatureCollection} which is a class
      * representation of features held in the locations file.
      */
-    private static FeatureCollection getLocations(ZipFile zipFile, ZipEntry entry) {
+    public static FeatureCollection getLocations(ZipFile zipFile, ZipEntry entry) {
         try (InputStream zipInputStream = zipFile.getInputStream(entry)) {
             String content;
             try (InputStream bomInputStream = new BOMInputStream(zipInputStream)) {
@@ -276,7 +276,6 @@ public class GeoJsonUtil {
             }
         }
         featureCollection.setFeatures(features);
-        LOG.info(FeatureConverter.toStringValue(featureCollection));
         return FeatureConverter.toStringValue(featureCollection);
     }
 

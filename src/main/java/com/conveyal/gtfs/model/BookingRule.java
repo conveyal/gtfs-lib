@@ -123,11 +123,10 @@ public class BookingRule extends Entity {
             writeIntField(bookingRule.prior_notice_duration_min);
             writeIntField(bookingRule.prior_notice_duration_max);
             writeIntField(bookingRule.prior_notice_last_day);
-            writeIntField(bookingRule.prior_notice_last_time);
+            writeTimeField(bookingRule.prior_notice_last_time);
             writeIntField(bookingRule.prior_notice_start_day);
-            writeIntField(bookingRule.prior_notice_start_time);
+            writeTimeField(bookingRule.prior_notice_start_time);
             writeStringField(bookingRule.prior_notice_service_id);
-            writeStringField(bookingRule.message);
             writeStringField(bookingRule.message);
             writeStringField(bookingRule.pickup_message);
             writeStringField(bookingRule.drop_off_message);

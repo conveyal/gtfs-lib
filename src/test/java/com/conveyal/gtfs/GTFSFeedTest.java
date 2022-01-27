@@ -1,9 +1,10 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.model.StopTime;
-import com.csvreader.CsvReader;
-import org.apache.commons.io.input.BOMInputStream;
+
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
+import com.conveyal.gtfs.TestUtils.DataExpectation;
+import com.conveyal.gtfs.TestUtils.FileTestCase;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -11,14 +12,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 
@@ -29,26 +26,6 @@ public class GTFSFeedTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeedTest.class);
     private static String simpleGtfsZipFileName;
-
-    private static class FileTestCase {
-        public String filename;
-        public DataExpectation[] expectedColumnData;
-
-        public FileTestCase(String filename, DataExpectation[] expectedColumnData) {
-            this.filename = filename;
-            this.expectedColumnData = expectedColumnData;
-        }
-    }
-
-    private static class DataExpectation {
-        public String columnName;
-        public String expectedValue;
-
-        public DataExpectation(String columnName, String expectedValue) {
-            this.columnName = columnName;
-            this.expectedValue = expectedValue;
-        }
-    }
 
     @BeforeAll
     public static void setUpClass() {
@@ -84,18 +61,9 @@ public class GTFSFeedTest {
             // agency.txt
             new FileTestCase(
                 "agency.txt",
-                new DataExpectation[]{
-                    new DataExpectation("agency_id", "1"),
-                    new DataExpectation("agency_name", "Fake Transit")
-                }
-            ),
-            // booking_rules.txt
-            new FileTestCase(
-                "booking_rules.txt",
-                new DataExpectation[]{
-                    new DataExpectation("booking_rule_id", "1"),
-                    new DataExpectation("booking_type", "1"),
-                    new DataExpectation("message", "This is a message")
+                new TestUtils.DataExpectation[]{
+                    new TestUtils.DataExpectation("agency_id", "1"),
+                    new TestUtils.DataExpectation("agency_name", "Fake Transit")
                 }
             ),
             new FileTestCase(
@@ -104,14 +72,6 @@ public class GTFSFeedTest {
                     new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"),
                     new DataExpectation("start_date", "20170915"),
                     new DataExpectation("end_date", "20170917")
-                }
-            ),
-            new FileTestCase(
-                "location_groups.txt",
-                new DataExpectation[]{
-                    new DataExpectation("location_group_id", "1"),
-                    new DataExpectation("location_id", "123"),
-                    new DataExpectation("location_group_name", "This is the location group name")
                 }
             ),
             new FileTestCase(
@@ -147,43 +107,11 @@ public class GTFSFeedTest {
                 }
             )
         };
-
-        // look through all written files in the zipfile
-        for (FileTestCase fileTestCase: fileTestCases) {
-            ZipEntry entry = zip.getEntry(fileTestCase.filename);
-
-            // make sure the file exists within the zipfile
-            assertThat(entry, notNullValue());
-
-            // create csv reader for file
-            InputStream zis = zip.getInputStream(entry);
-            InputStream bis = new BOMInputStream(zis);
-            CsvReader reader = new CsvReader(bis, ',', StandardCharsets.UTF_8);
-
-            // make sure the file has headers
-            boolean hasHeaders = reader.readHeaders();
-            assertThat(hasHeaders, is(true));
-
-            // make sure that the record matching the expected row exists in this table
-            boolean recordFound = false;
-            while (reader.readRecord() && !recordFound) {
-                boolean allExpectationsMetForThisRecord = true;
-                for (DataExpectation dataExpectation : fileTestCase.expectedColumnData) {
-                    if(!reader.get(dataExpectation.columnName).equals(dataExpectation.expectedValue)) {
-                        allExpectationsMetForThisRecord = false;
-                        break;
-                    }
-                }
-                if (allExpectationsMetForThisRecord) {
-                    recordFound = true;
-                }
-            }
-            assertThat(
-                String.format("Data Expectation record not found in %s", fileTestCase.filename),
-                recordFound,
-                is(true)
-            );
-        }
+        TestUtils.lookThroughFiles(fileTestCases, zip);
+        // Close the zip file so it can be deleted.
+        zip.close();
+        // delete file to make sure we can assert that this program created the file
+        outZip.delete();
     }
 
     /**
