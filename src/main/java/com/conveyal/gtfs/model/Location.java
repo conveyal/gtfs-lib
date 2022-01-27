@@ -57,9 +57,11 @@ public class Location extends Entity {
      * of the unpacking of GeoJson data to CSV.
      */
     public String toCsvRow() {
+        String stopName = stop_name == null ? "" : stop_name;
+        String stopDesc = stop_desc == null ? "" : stop_desc;
         String stopUrl = stop_url == null ? "" : stop_url.toString();
         String zoneId = zone_id == null ? "" : zone_id;
-        return location_id + "," + stop_name + "," + stop_desc + "," + zoneId + "," + stopUrl + "," + geometry_type + "\n";
+        return location_id + "," + stopName + "," + stopDesc + "," + zoneId + "," + stopUrl + "," + geometry_type + "\n";
     }
 
     public static class Loader extends Entity.Loader<Location> {
