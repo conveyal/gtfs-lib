@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.loader;
 
-
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.BookingRule;
 import com.conveyal.gtfs.model.Calendar;

@@ -232,10 +232,11 @@ public class PatternFinder {
         boolean fromName
     ) {
         int id = fromName ? 0 : pattern.orderedStops.size() - 1;
-        if (stopById.containsKey(pattern.orderedStops.get(id)))
-            return stopById.get(pattern.orderedStops.get(id)).stop_name;
-        else if (locationById.containsKey(pattern.orderedStops.get(id))) {
-            return locationById.get(pattern.orderedStops.get(id)).stop_name;
+        String haltId = pattern.orderedStops.get(id);
+        if (stopById.containsKey(haltId))
+            return stopById.get(haltId).stop_name;
+        else if (locationById.containsKey(haltId)) {
+            return locationById.get(haltId).stop_name;
         }
         return fromName ? "fromNameUnknown" : "toNameUnknown";
     }

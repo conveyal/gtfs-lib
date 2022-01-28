@@ -13,11 +13,11 @@
         "pickup_message" : "This is a pickup message",
         "prior_notice_duration_max" : 60,
         "prior_notice_duration_min" : 30,
-        "prior_notice_last_day" : "1",
-        "prior_notice_last_time" : "61200",
+        "prior_notice_last_day" : 1,
+        "prior_notice_last_time" : 61200,
         "prior_notice_service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57",
-        "prior_notice_start_day" : "7",
-        "prior_notice_start_time" : "0"
+        "prior_notice_start_day" : 7,
+        "prior_notice_start_time" : 0
       } ],
       "feed_version" : "1.0"
     }

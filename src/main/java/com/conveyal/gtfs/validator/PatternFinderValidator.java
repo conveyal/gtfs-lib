@@ -63,7 +63,6 @@ public class PatternFinderValidator extends TripValidator {
         patternFinder.processTrip(trip, stopTimes);
     }
 
-
     /**
      * Store patterns and pattern stops in the database. Also, update the trips table with a pattern_id column.
      */
@@ -142,8 +141,7 @@ public class PatternFinderValidator extends TripValidator {
                 // FIXME: Use pattern stops table here?
                 int lastValidDeparture = key.departureTimes.get(0);
                 for (int i = 0; i < key.stops.size(); i++) {
-                    // Can also be a location ID
-                    String stopId = key.stops.get(i);
+                    String stopOrLocationId = key.stops.get(i);
                     int travelTime = 0;
                     // Calculate previous departure time, needed for both pattern location and pattern stop
                     int prevDeparture = INT_MISSING;
@@ -167,7 +165,7 @@ public class PatternFinderValidator extends TripValidator {
                         }
                     }
 
-                    if (stopById.containsKey(stopId)) {
+                    if (stopById.containsKey(stopOrLocationId)) {
                         int arrival = key.arrivalTimes.get(i);
                         if (i > 0) {
                             travelTime = arrival == INT_MISSING || lastValidDeparture == INT_MISSING
@@ -182,7 +180,7 @@ public class PatternFinderValidator extends TripValidator {
                         insertPatternStopStatement.setString(1, pattern.pattern_id);
                         // Stop sequence is zero-based.
                         setIntParameter(insertPatternStopStatement, 2, i);
-                        insertPatternStopStatement.setString(3, stopId);
+                        insertPatternStopStatement.setString(3, stopOrLocationId);
                         setIntParameter(insertPatternStopStatement, 4, travelTime);
                         setIntParameter(insertPatternStopStatement, 5, dwellTime);
                         setIntParameter(insertPatternStopStatement, 6, key.dropoffTypes.get(i));
@@ -195,7 +193,7 @@ public class PatternFinderValidator extends TripValidator {
                         insertPatternStopStatement.setString(13, key.drop_off_booking_rule_id.get(i));
                         patternStopTracker.addBatch();
                     }
-                    else if (locationById.containsKey(stopId)) {
+                    else if (locationById.containsKey(stopOrLocationId)) {
                         int pickupStart = key.start_pickup_dropoff_window.get(i);
                         if (i > 0) {
                             travelTime = pickupStart == INT_MISSING || lastValidDeparture == INT_MISSING
@@ -212,7 +210,7 @@ public class PatternFinderValidator extends TripValidator {
                         insertPatternLocationStatement.setString(1, pattern.pattern_id);
                         // Stop sequence is zero-based.
                         setIntParameter(insertPatternLocationStatement, 2, i);
-                        insertPatternLocationStatement.setString(3, stopId); // is actually location id
+                        insertPatternLocationStatement.setString(3, stopOrLocationId); // is actually location id
                         setDoubleParameter(insertPatternLocationStatement, 4, key.shapeDistances.get(i));
                         setIntParameter(insertPatternLocationStatement, 5, key.pickupTypes.get(i));
                         setIntParameter(insertPatternLocationStatement, 6, key.dropoffTypes.get(i));
@@ -309,4 +307,3 @@ public class PatternFinderValidator extends TripValidator {
     }
 
 }
-

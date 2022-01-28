@@ -61,12 +61,19 @@ public class NewTripTimesValidator extends FeedValidator {
     public void validate () {
         // TODO cache automatically in feed or TableReader object
         LOG.info("Cacheing stops, trips, and routes...");
-        for (Stop stop : feed.stops) stopById.put(stop.stop_id, stop);
-        for (Location location : feed.locations) locationById.put(location.location_id, location);
+        for (Stop stop : feed.stops) {
+            stopById.put(stop.stop_id, stop);
+        }
+        for (Location location : feed.locations) {
+            locationById.put(location.location_id, location);
+        }
         // FIXME: determine a good way to validate shapes without caching them all in memory...
-//        for (ShapePoint shape : feed.shapePoints.getAllOrdered()) shapeById.put(shape.shape_id, shape);
-        for (Trip trip: feed.trips) tripById.put(trip.trip_id, trip);
-        for (Route route: feed.routes) routeById.put(route.route_id, route);
+        for (Trip trip: feed.trips) {
+            tripById.put(trip.trip_id, trip);
+        }
+        for (Route route: feed.routes) {
+            routeById.put(route.route_id, route);
+        }
         LOG.info("Done.");
         // Accumulate StopTimes with the same trip_id into a list, then process each trip separately.
         List<StopTime> stopTimesForTrip = new ArrayList<>();
