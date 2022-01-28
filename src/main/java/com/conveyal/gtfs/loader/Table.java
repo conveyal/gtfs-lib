@@ -347,13 +347,23 @@ public class Table {
         new StringField("pattern_id", EDITOR).isReferenceTo(PATTERNS)
     ).addPrimaryKey();
 
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#
+    public static final Table LOCATIONS = new Table("locations", Location.class, OPTIONAL,
+        new StringField("location_id", REQUIRED),
+        new StringField("stop_name", OPTIONAL),
+        new StringField("stop_desc", OPTIONAL),
+        new StringField("zone_id", OPTIONAL),
+        new URLField("stop_url", OPTIONAL),
+        new StringField("geometry_type", REQUIRED)
+    ).addPrimaryKey();
+
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
             new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
             // FLEX TODO: create multi-reference, as this can reference both stops and locations
-            new StringField("stop_id", REQUIRED), //.isReferenceTo(STOPS),
+            new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
 //                    .indexThisColumn(),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are required
             new TimeField("arrival_time", OPTIONAL),
@@ -447,20 +457,10 @@ public class Table {
             new URLField("booking_url", OPTIONAL)
     );
 
-    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#
-    public static final Table LOCATIONS = new Table("locations", Location.class, OPTIONAL,
-            new StringField("location_id", REQUIRED),
-            new StringField("stop_name", OPTIONAL),
-            new StringField("stop_desc", OPTIONAL),
-            new StringField("zone_id", OPTIONAL),
-            new URLField("stop_url", OPTIONAL),
-            new StringField("geometry_type", REQUIRED)
-    ).addPrimaryKey();
-
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
     public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
             new StringField("location_group_id", REQUIRED),
-            //FIXME: location id 'isReferenceTo' stops.stop_id or id from locations.geojson. Both is not an option.
+            //FLEX TODO: location id 'isReferenceTo' stops.stop_id or id from locations.geojson. Both is not an option.
             // Consider addressing as part of conditional checks.
 //            new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
             new StringField("location_id", OPTIONAL),

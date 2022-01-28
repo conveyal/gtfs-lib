@@ -463,54 +463,72 @@ public class JDBCTableWriterTest {
 
     @Test
     public void canCreateUpdateAndDeleteLocation() throws IOException, SQLException, InvalidNamespaceException {
-        // Store Table and Class values for use in test.
-        final Table locationTable = Table.LOCATIONS;
         final Class<LocationDTO> locationDTOClass = LocationDTO.class;
-
         // create new object to be saved
         String locationId = "c342a";
         LocationDTO createdLocation = createSimpleTestLocation(locationId);
         // make sure saved data matches expected data
         assertThat(createdLocation.location_id, equalTo(locationId));
+
+        PatternLocationDTO createdPatternLocation = createSimpleTestPatternLocation(locationId);
+        // make sure saved data matches expected data
+        assertThat(createdPatternLocation.location_id, equalTo(locationId));
+
+        StopTimeDTO createdStopTime = createSimpleTestStopTime(locationId);
+        // make sure saved data matches expected data
+        assertThat(createdStopTime.stop_id, equalTo(locationId));
+
         // Check that location exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocation.id, Table.LOCATIONS), 1);
+
         // try to update record
         String updatedLocationId = "d12ff";
         createdLocation.location_id = updatedLocationId;
 
         // convert object to json and save it
-        JdbcTableWriter updateTableWriter = createTestTableWriter(locationTable);
+        JdbcTableWriter updateTableWriter = createTestTableWriter(Table.LOCATIONS);
         String updateOutput = updateTableWriter.update(
                 createdLocation.id,
                 mapper.writeValueAsString(createdLocation),
                 true
         );
-        LOG.info("update {} output:", locationTable.name);
+        LOG.info("update {} output:", Table.LOCATIONS.name);
         LOG.info(updateOutput);
 
         LocationDTO updatedLocationDTO = mapper.readValue(updateOutput, locationDTOClass);
-
         // make sure saved data matches expected data
         assertThat(updatedLocationDTO.location_id, equalTo(updatedLocationId));
-        // Ensure message is null (not empty string).
-        LOG.info("geometry_type: {}", updatedLocationDTO.geometry_type);
-        // Verify that certain values are correctly set in the database.
-        ResultSet resultSet = getResultSetForId(updatedLocationDTO.id, locationTable);
-        while (resultSet.next()) {
-            assertResultValue(resultSet, "location_id", equalTo(createdLocation.location_id));
-            assertResultValue(resultSet, "stop_name", equalTo(createdLocation.stop_name));
-            assertResultValue(resultSet, "stop_desc", equalTo(createdLocation.stop_desc));
-            assertResultValue(resultSet, "zone_id", equalTo(createdLocation.zone_id));
-            assertResultValue(resultSet, "stop_url", equalTo(createdLocation.stop_url.toString()));
-            assertResultValue(resultSet, "geometry_type", equalTo(createdLocation.geometry_type));
+
+        // Verify that certain values are correctly set in the location table.
+        ResultSet locationResultSet = getResultSetForId(updatedLocationDTO.id, Table.LOCATIONS);
+        while (locationResultSet.next()) {
+            assertResultValue(locationResultSet, "location_id", equalTo(createdLocation.location_id));
+            assertResultValue(locationResultSet, "stop_name", equalTo(createdLocation.stop_name));
+            assertResultValue(locationResultSet, "stop_desc", equalTo(createdLocation.stop_desc));
+            assertResultValue(locationResultSet, "zone_id", equalTo(createdLocation.zone_id));
+            assertResultValue(locationResultSet, "stop_url", equalTo(createdLocation.stop_url.toString()));
+            assertResultValue(locationResultSet, "geometry_type", equalTo(createdLocation.geometry_type));
         }
+
+        // Verify that certain values are correctly set in the pattern location table.
+        ResultSet patternLocationResultSet = getResultSetForId(updatedLocationDTO.id, Table.PATTERN_LOCATION);
+        while (patternLocationResultSet.next()) {
+            assertResultValue(patternLocationResultSet, "location_id", equalTo(createdLocation.location_id));
+        }
+
+        // Verify that certain values are correctly set in the stop times table.
+        ResultSet stopTimesResultSet = getResultSetForId(updatedLocationDTO.id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_id", equalTo(createdLocation.location_id));
+        }
+
         // Delete location record and all child location shape records
-        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationTable);
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(Table.LOCATIONS);
         int deleteOutput = deleteTableWriter.delete(createdLocation.id, true);
-        LOG.info("deleted {} records from {}", deleteOutput, locationTable.name);
+        LOG.info("deleted {} records from {}", deleteOutput, Table.LOCATIONS.name);
 
         // make sure location record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocation.id, locationTable));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocation.id, Table.LOCATIONS));
     }
 
     @Test
@@ -1213,7 +1231,6 @@ public class JDBCTableWriterTest {
         throws InvalidNamespaceException, IOException, SQLException {
 
         LocationShapeDTO locationShape = new LocationShapeDTO();
-//        locationShape.location_shape_id = "1";
         locationShape.location_id = locationId;
         locationShape.geometry_id = "1";
         locationShape.geometry_pt_lat = 45.1111111;
@@ -1237,6 +1254,38 @@ public class JDBCTableWriterTest {
         LOG.info(output);
         // parse output
         return mapper.readValue(output, LocationDTO.class);
+    }
+
+    private static PatternLocationDTO createSimpleTestPatternLocation(String locationId)
+        throws InvalidNamespaceException, IOException, SQLException {
+
+        PatternLocationDTO patternLocation = new PatternLocationDTO();
+        patternLocation.pattern_id = "1";
+        patternLocation.stop_sequence = 1;
+        patternLocation.location_id = locationId;
+        patternLocation.drop_off_type = 1;
+        patternLocation.pickup_type = 1;
+        patternLocation.shape_dist_traveled = 0.0;
+        patternLocation.timepoint = 1;
+        patternLocation.continuous_pickup = 1;
+        patternLocation.continuous_drop_off = 1;
+        patternLocation.pickup_booking_rule_id = "bookid_1";
+        patternLocation.drop_off_booking_rule_id = "bookid_2";
+        patternLocation.flex_default_travel_time = 0;
+        patternLocation.flex_default_zone_time = 0;
+        patternLocation.mean_duration_factor = 1;
+        patternLocation.mean_duration_offset = 1;
+        patternLocation.safe_duration_factor = 1;
+        patternLocation.safe_duration_offset = 1;
+
+        // convert object to json and save it
+        JdbcTableWriter createTableWriter = createTestTableWriter(Table.PATTERN_LOCATION);
+        String output = createTableWriter.create(mapper.writeValueAsString(patternLocation), true);
+        LOG.info("create {} output:", Table.PATTERN_LOCATION.name);
+        LOG.info(output);
+        // parse output
+        return mapper.readValue(output, PatternLocationDTO.class);
+
     }
 
     /**
