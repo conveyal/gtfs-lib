@@ -45,7 +45,6 @@ import java.util.stream.Collectors;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.INSERT_BATCH_SIZE;
 import static com.conveyal.gtfs.util.Util.ensureValidNamespace;
 
-
 /**
  * This wraps a single database table and provides methods to modify GTFS entities.
  */
@@ -289,7 +288,7 @@ public class JdbcTableWriter implements TableWriter {
                     EntityPopulator.PATTERN_LOCATION
             );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
-            List<Object> patternHaltsToNormalize = new ArrayList<>();
+            List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
             for (PatternStop patternStop : patternStops.getOrdered(patternId)) {
                 // Update stop times for any pattern stop with matching stop sequence (or for all pattern stops if the list
                 // is null).
@@ -305,13 +304,13 @@ public class JdbcTableWriter implements TableWriter {
                 }
             }
             // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
-            patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> ((PatternHalt) o).stop_sequence)).collect(Collectors.toList());
-            PatternHalt firstPatternHalt = (PatternHalt) patternHaltsToNormalize.iterator().next();
+            patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> (o).stop_sequence)).collect(Collectors.toList());
+            PatternHalt firstPatternHalt = patternHaltsToNormalize.iterator().next();
             int firstStopSequence = firstPatternHalt.stop_sequence;
             // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
             int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
             String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
-            String getFirstTravelTimeSql = String.format(
+            String getPrevTravelTimeSql = String.format(
                     "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
                             "and t.pattern_id = ? " +
                             "and t.trip_id = st.trip_id",
@@ -319,7 +318,7 @@ public class JdbcTableWriter implements TableWriter {
                     tablePrefix,
                     tablePrefix
             );
-            PreparedStatement statement = connection.prepareStatement(getFirstTravelTimeSql);
+            PreparedStatement statement = connection.prepareStatement(getPrevTravelTimeSql);
             statement.setInt(1, previousStopSequence);
             statement.setString(2, firstPatternHalt.pattern_id);
             LOG.info(statement.toString());
@@ -333,7 +332,7 @@ public class JdbcTableWriter implements TableWriter {
             for (String tripId : timesForTripIds.keySet()) {
                 // Initialize travel time with previous stop time value.
                 int cumulativeTravelTime = timesForTripIds.get(tripId);
-                for (Object patternHalt : patternHaltsToNormalize) {
+                for (PatternHalt patternHalt : patternHaltsToNormalize) {
                     if (patternHalt instanceof PatternStop) {
                         cumulativeTravelTime += updateStopTimesForPatternStop((PatternStop) patternHalt, cumulativeTravelTime, tripId);
                     } else if (patternHalt instanceof PatternLocation) {
@@ -693,7 +692,6 @@ public class JdbcTableWriter implements TableWriter {
             }
             // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
             if ("pattern_stops".equals(subTable.name) || "pattern_locations".equals(subTable.name)) {
-                // FLEX TODO: this ideally is cleaner
                 if (referencedPatternUsesFrequencies) {
                     // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
                     // Default travel and dwell time behave as "linked fields" for associated stop times. In other
@@ -705,16 +703,16 @@ public class JdbcTableWriter implements TableWriter {
                 }
                 // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
                 updateLinkedFields(
-                        subTable,
-                        subEntity,
-                        "stop_times",
-                        "pattern_id",
-                        "timepoint",
-                        "drop_off_type",
-                        "pickup_type",
-                        "continuous_pickup",
-                        "continuous_drop_off",
-                        "shape_dist_traveled"
+                    subTable,
+                    subEntity,
+                    "stop_times",
+                    "pattern_id",
+                    "timepoint",
+                    "drop_off_type",
+                    "pickup_type",
+                    "continuous_pickup",
+                    "continuous_drop_off",
+                    "shape_dist_traveled"
                 );
             }
             setStatementParameters(subEntity, subTable, insertStatement, connection);
@@ -733,11 +731,11 @@ public class JdbcTableWriter implements TableWriter {
                 if (!orderIsUnique || !valuesAreAscending) {
                     throw new SQLException(
                             String.format(
-                                    "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
+                                    "%s %s values must be zero-based, unique, and incrementing. PatternHalt values must be increasing and unique only. Entity at index %d had %s illegal value of %d",
                                     subTable.name,
                                     orderFieldName,
                                     entityCount,
-                                    previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing" : "duplicate",
+                                    previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing/non-increasing" : "duplicate",
                                     orderValue
                             )
                     );
@@ -784,7 +782,6 @@ public class JdbcTableWriter implements TableWriter {
         // FIXME: are there cases when an update should not return zero?
         //   if (result == 0) throw new SQLException("No stop times found for trip ID");
     }
-
 
     /**
      * Updates the stop times that reference the specified pattern stop.
@@ -876,7 +873,7 @@ public class JdbcTableWriter implements TableWriter {
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
         int entitiesUpdated = statement.executeUpdate();
-        LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
+        LOG.debug("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
         return travelTime + timeInLocation;
     }
     private int updateStopTimesForPatternLocation(ObjectNode patternLocation, int previousTravelTime) throws SQLException {

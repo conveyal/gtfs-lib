@@ -462,7 +462,8 @@ public class Table {
             new StringField("location_group_id", REQUIRED),
             //FLEX TODO: location id 'isReferenceTo' stops.stop_id or id from locations.geojson. Both is not an option.
             // Consider addressing as part of conditional checks.
-//            new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
+            // FLEX TODO: This will need to possibly be a multi-reference
+            // new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
             new StringField("location_id", OPTIONAL),
             new StringField("location_group_name", OPTIONAL)
     );

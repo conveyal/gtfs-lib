@@ -31,7 +31,7 @@ public class Feed {
     public final String tablePrefix;
 
     public final TableReader<Agency>        agencies;
-    public final TableReader<BookingRule> bookingRules;
+    public final TableReader<BookingRule>   bookingRules;
     public final TableReader<Calendar>      calendars;
     public final TableReader<CalendarDate>  calendarDates;
     public final TableReader<FareAttribute> fareAttributes;

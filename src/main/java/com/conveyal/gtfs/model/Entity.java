@@ -17,24 +17,18 @@ import com.conveyal.gtfs.error.URLParseError;
 import com.conveyal.gtfs.loader.DateField;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.util.Deduplicator;
-import com.conveyal.gtfs.util.GeoJsonException;
-//import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
 import com.csvreader.CsvWriter;
-
-import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FilterOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
