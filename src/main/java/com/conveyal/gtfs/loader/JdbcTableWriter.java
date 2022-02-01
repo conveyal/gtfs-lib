@@ -677,12 +677,21 @@ public class JdbcTableWriter implements TableWriter {
             // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
             // field statement above.
             for (Field field : subTable.specFields()) {
-                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-                    JsonNode refValueNode = subEntity.get(field.name);
-                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
-                    if (refValueNode.isNull() && !field.isRequired()) continue;
-                    String refValue = refValueNode.asText();
-                    referencesPerTable.put(field.referenceTable, refValue);
+//                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
+//                    JsonNode refValueNode = subEntity.get(field.name);
+//                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
+//                    if (refValueNode.isNull() && !field.isRequired()) continue;
+//                    String refValue = refValueNode.asText();
+//                    referencesPerTable.put(field.referenceTable, refValue);
+//                }
+                for (Table refTable : field.referenceTable) {
+                    if (!refTable.name.equals(specTable.name)) {
+                        JsonNode refValueNode = subEntity.get(field.name);
+                        // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                        if (refValueNode.isNull() && !field.isRequired()) continue;
+                        String refValue = refValueNode.asText();
+                        referencesPerTable.put(refTable, refValue);
+                    }
                 }
             }
             // Insert new sub-entity.
@@ -1508,9 +1517,16 @@ public class JdbcTableWriter implements TableWriter {
             // IMPORTANT: Skip the table for the entity we're modifying or if loop table does not have field.
             if (table.name.equals(gtfsTable.name)) continue;
             for (Field field : gtfsTable.fields) {
-                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                    // If any of the table's fields are foreign references to the specified table, add to the return set.
-                    referencingTables.add(gtfsTable);
+//                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+//                    // If any of the table's fields are foreign references to the specified table, add to the return set.
+//                    referencingTables.add(gtfsTable);
+//                }
+                if (field.isForeignReference()) {
+                    for (Table refTable : field.referenceTable) {
+                        if (refTable.name.equals(table.name)) {
+                            referencingTables.add(gtfsTable);
+                        }
+                    }
                 }
             }
         }
@@ -1572,36 +1588,41 @@ public class JdbcTableWriter implements TableWriter {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
-                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                    if (
-                        Table.TRIPS.name.equals(referencingTable.name) &&
-                        sqlMethod.equals(SqlMethod.DELETE) &&
-                        table.name.equals(Table.PATTERNS.name)
-                    ) {
-                        // If deleting a pattern, cascade delete stop times and frequencies for trips first. This must
-                        // happen before trips are deleted in the block below. Otherwise, the queries to select
-                        // stop_times and frequencies to delete would fail because there would be no trip records to join
-                        // with.
-                        String stopTimesTable = String.join(".", namespace, "stop_times");
-                        String frequenciesTable = String.join(".", namespace, "frequencies");
-                        String tripsTable = String.join(".", namespace, "trips");
-                        // Delete stop times and frequencies for trips for pattern
-                        String deleteStopTimes = String.format(
-                                "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
-                                stopTimesTable, tripsTable, stopTimesTable, tripsTable, tripsTable);
-                        PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deleteStopTimes);
-                        deleteStopTimesStatement.setString(1, keyValue);
-                        LOG.info(deleteStopTimesStatement.toString());
-                        int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
-                        LOG.info("Deleted {} stop times for pattern {}", deletedStopTimes, keyValue);
-                        String deleteFrequencies = String.format(
-                                "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
-                                frequenciesTable, tripsTable, frequenciesTable, tripsTable, tripsTable);
-                        PreparedStatement deleteFrequenciesStatement = connection.prepareStatement(deleteFrequencies);
-                        deleteFrequenciesStatement.setString(1, keyValue);
-                        LOG.info(deleteFrequenciesStatement.toString());
-                        int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
-                        LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
+//                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+                if (field.isForeignReference())  {
+                    for (Table refTable : field.referenceTable) {
+                        if (refTable.name.equals(table.name)) {
+                            if (
+                                Table.TRIPS.name.equals(referencingTable.name) &&
+                                    sqlMethod.equals(SqlMethod.DELETE) &&
+                                    table.name.equals(Table.PATTERNS.name)
+                            ) {
+                                // If deleting a pattern, cascade delete stop times and frequencies for trips first. This must
+                                // happen before trips are deleted in the block below. Otherwise, the queries to select
+                                // stop_times and frequencies to delete would fail because there would be no trip records to join
+                                // with.
+                                String stopTimesTable = String.join(".", namespace, "stop_times");
+                                String frequenciesTable = String.join(".", namespace, "frequencies");
+                                String tripsTable = String.join(".", namespace, "trips");
+                                // Delete stop times and frequencies for trips for pattern
+                                String deleteStopTimes = String.format(
+                                    "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
+                                    stopTimesTable, tripsTable, stopTimesTable, tripsTable, tripsTable);
+                                PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deleteStopTimes);
+                                deleteStopTimesStatement.setString(1, keyValue);
+                                LOG.info(deleteStopTimesStatement.toString());
+                                int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
+                                LOG.info("Deleted {} stop times for pattern {}", deletedStopTimes, keyValue);
+                                String deleteFrequencies = String.format(
+                                    "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
+                                    frequenciesTable, tripsTable, frequenciesTable, tripsTable, tripsTable);
+                                PreparedStatement deleteFrequenciesStatement = connection.prepareStatement(deleteFrequencies);
+                                deleteFrequenciesStatement.setString(1, keyValue);
+                                LOG.info(deleteFrequenciesStatement.toString());
+                                int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
+                                LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
+                            }
+                        }
                     }
                     // Get statement to update or delete entities that reference the key value.
                     PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);

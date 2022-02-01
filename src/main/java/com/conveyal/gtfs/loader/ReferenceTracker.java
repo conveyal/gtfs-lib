@@ -81,17 +81,19 @@ public class ReferenceTracker {
         if (field.isForeignReference()) {
             // Check referential integrity if the field is a foreign reference. Note: the
             // reference table must be loaded before the table/value being currently checked.
-            String referenceField = field.referenceTable.getKeyFieldName();
-            String referenceTransitId = String.join(":", referenceField, value);
+            for (Table refTable : field.referenceTable) {
+                String referenceField = refTable.getKeyFieldName();
+                String referenceTransitId = String.join(":", referenceField, value);
 
-            if (!this.transitIds.contains(referenceTransitId)) {
-                // If the reference tracker does not contain
-                NewGTFSError referentialIntegrityError = NewGTFSError
-                    .forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
-                    .setEntityId(keyValue);
-                // If the field is an order field, set the sequence for the new error.
-                if (isOrderField) referentialIntegrityError.setSequence(value);
-                errors.add(referentialIntegrityError);
+                if (!this.transitIds.contains(referenceTransitId)) {
+                    // If the reference tracker does not contain
+                    NewGTFSError referentialIntegrityError = NewGTFSError
+                        .forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
+                        .setEntityId(keyValue);
+                    // If the field is an order field, set the sequence for the new error.
+                    if (isOrderField) referentialIntegrityError.setSequence(value);
+                    errors.add(referentialIntegrityError);
+                }
             }
         }
         // Next, handle duplicate ID check.
