@@ -282,7 +282,7 @@ public class GTFSTest {
             new PersistenceExpectation(
                 "stop_times",
                 new RecordExpectation[]{
-                    new RecordExpectation("shape_dist_traveled", 341.4491961, 0.0)
+                    new RecordExpectation("shape_dist_traveled", 341.4491961, 0.00001)
                 }
             ),
             new PersistenceExpectation(
