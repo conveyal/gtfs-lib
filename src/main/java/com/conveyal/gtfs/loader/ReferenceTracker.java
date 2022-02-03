@@ -78,7 +78,8 @@ public class ReferenceTracker {
 
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
-        if (field.isForeignReference()) {
+        // FLEX TODO: Check multiple references.
+        if (field.isForeignReference() && field.referenceTable.size() == 1) {
             // Check referential integrity if the field is a foreign reference. Note: the
             // reference table must be loaded before the table/value being currently checked.
             for (Table refTable : field.referenceTable) {

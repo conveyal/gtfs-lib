@@ -1628,35 +1628,35 @@ public class JdbcTableWriter implements TableWriter {
                                 LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
                             }
                         }
-                    }
-                    // Get statement to update or delete entities that reference the key value.
-                    PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
-                    LOG.info(updateStatement.toString());
-                    int result = updateStatement.executeUpdate();
-                    if (result > 0) {
-                        // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
-                        //  deleteEntityHook).
-                        if (sqlMethod.equals(SqlMethod.DELETE)) {
-                            // Check for restrictions on delete.
-                            if (table.isCascadeDeleteRestricted()) {
-                                // The entity must not have any referencing entities in order to delete it.
-                                connection.rollback();
-                                String message = String.format(
-                                    "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                    entityClass.getSimpleName(),
-                                    keyField.name,
-                                    keyValue,
-                                    result,
-                                    referencingTable.name,
-                                    entityClass.getSimpleName()
-                                );
-                                LOG.warn(message);
-                                throw new SQLException(message);
+                        // Get statement to update or delete entities that reference the key value.
+                        PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
+                        LOG.info(updateStatement.toString());
+                        int result = updateStatement.executeUpdate();
+                        if (result > 0) {
+                            // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
+                            //  deleteEntityHook).
+                            if (sqlMethod.equals(SqlMethod.DELETE)) {
+                                // Check for restrictions on delete.
+                                if (table.isCascadeDeleteRestricted()) {
+                                    // The entity must not have any referencing entities in order to delete it.
+                                    connection.rollback();
+                                    String message = String.format(
+                                        "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                        entityClass.getSimpleName(),
+                                        keyField.name,
+                                        keyValue,
+                                        result,
+                                        referencingTable.name,
+                                        entityClass.getSimpleName()
+                                    );
+                                    LOG.warn(message);
+                                    throw new SQLException(message);
+                                }
                             }
+                            LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
+                        } else {
+                            LOG.info("No references in {} found!", refTableName);
                         }
-                        LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
-                    } else {
-                        LOG.info("No references in {} found!", refTableName);
                     }
                 }
             }

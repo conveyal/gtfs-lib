@@ -359,7 +359,7 @@ public class Table {
 
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
-            new StringField("trip_id", REQUIRED),//.isReferenceTo(TRIPS),
+            new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
             // FLEX TODO: create multi-reference, as this can reference both stops and locations
