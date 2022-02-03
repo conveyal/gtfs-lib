@@ -32,7 +32,6 @@ import java.io.FileOutputStream;
 import java.io.IOError;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.sql.PreparedStatement;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentNavigableMap;
@@ -74,7 +73,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final BTreeMap<String, Trip> trips;
     public final Map<String, Translation> translations;
     public final Map<String, Attribution> attributions;
-    public final Map<String, Calendar> calenders;
+    public final Map<String, Calendar> calendars;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -221,7 +220,6 @@ public class GTFSFeed implements Cloneable, Closeable {
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
 
             new Agency.Writer(this).writeTable(zip);
-            new Location.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
             new FareAttribute.Writer(this).writeTable(zip);
@@ -385,7 +383,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
             patternFinder.processTrip(trip, orderedStopTimesForTrip);
         }
-        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null,null);
+        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null, null);
         this.patterns.putAll(patternObjects.values().stream()
                 .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
@@ -665,7 +663,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         shape_points = db.getTreeMap("shape_points");
         translations = db.getTreeMap("translations");
         attributions = db.getTreeMap("attributions");
-        calenders = db.getTreeMap("calenders");
+        calendars = db.getTreeMap("calendars");
 
         // Flex tables.
         bookingRules = db.getTreeMap("booking_rules");

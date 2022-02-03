@@ -78,13 +78,13 @@ public class FeedLoadResult implements Serializable {
      */
     public boolean isGTFSFlex() {
         return
-            bookingRules != null &&
-            locationGroups != null &&
-            locations != null &&
-            locationShapes != null &&
-            bookingRules.rowCount > 0 &&
-            locationGroups.rowCount > 0 &&
-            locations.rowCount > 0 &&
+            bookingRules != null ||
+            locationGroups != null ||
+            locations != null ||
+            locationShapes != null ||
+            bookingRules.rowCount > 0 ||
+            locationGroups.rowCount > 0 ||
+            locations.rowCount > 0 ||
             locationShapes.rowCount > 0;
     }
 }

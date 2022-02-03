@@ -4,7 +4,6 @@ import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.dto.*;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -356,7 +355,7 @@ public class JDBCTableWriterTest {
         final Class<BookingRuleDTO> bookingRuleDTOClass = BookingRuleDTO.class;
 
         // create new object to be saved
-        String bookingRuleId = "9471";
+        final String bookingRuleId = "9471";
         BookingRuleDTO createdBookingRule = createSimpleTestBookingRule(bookingRuleId);
         // Set values to empty strings/null to later verify that they are set to null in the database.
         createdBookingRule.message = "";
@@ -366,7 +365,7 @@ public class JDBCTableWriterTest {
         // Check that booking rule exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdBookingRule.id, Table.BOOKING_RULES), 1);
         // try to update record
-        String updatedBookingRuleId = "1749";
+        final String updatedBookingRuleId = "1749";
         createdBookingRule.booking_rule_id = updatedBookingRuleId;
 
         // convert object to json and save it
@@ -384,7 +383,6 @@ public class JDBCTableWriterTest {
         // make sure saved data matches expected data
         assertThat(updatedBookingRuleDTO.booking_rule_id, equalTo(updatedBookingRuleId));
         // Ensure message is null (not empty string).
-        LOG.info("message: {}", updatedBookingRuleDTO.message);
         assertNull(updatedBookingRuleDTO.message);
         // Verify that certain values are correctly set in the database.
         ResultSet resultSet = getResultSetForId(updatedBookingRuleDTO.id, bookingRuleTable);
@@ -413,7 +411,7 @@ public class JDBCTableWriterTest {
         final Class<LocationGroupDTO> locationGroupDTOClass = LocationGroupDTO.class;
 
         // create new object to be saved
-        String locationGroupId = "4153";
+        final String locationGroupId = "4153";
         LocationGroupDTO createdLocationGroup = createSimpleTestLocationGroup(locationGroupId);
         // Set value to empty strings/null to later verify that it is set to null in the database.
         createdLocationGroup.location_group_name = "";
@@ -422,7 +420,7 @@ public class JDBCTableWriterTest {
         // Check that location group exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationGroup.id, Table.LOCATION_GROUPS), 1);
         // try to update record
-        String updatedLocationGroupId = "3514";
+        final String updatedLocationGroupId = "3514";
         createdLocationGroup.location_group_id = updatedLocationGroupId;
 
         // convert object to json and save it
@@ -465,7 +463,7 @@ public class JDBCTableWriterTest {
     public void canCreateUpdateAndDeleteLocation() throws IOException, SQLException, InvalidNamespaceException {
         final Class<LocationDTO> locationDTOClass = LocationDTO.class;
         // create new object to be saved
-        String locationId = "c342a";
+        final String locationId = "c342a";
         LocationDTO createdLocation = createSimpleTestLocation(locationId);
         // make sure saved data matches expected data
         assertThat(createdLocation.location_id, equalTo(locationId));
@@ -482,7 +480,7 @@ public class JDBCTableWriterTest {
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocation.id, Table.LOCATIONS), 1);
 
         // try to update record
-        String updatedLocationId = "d12ff";
+        final String updatedLocationId = "d12ff";
         createdLocation.location_id = updatedLocationId;
 
         // convert object to json and save it
@@ -538,16 +536,14 @@ public class JDBCTableWriterTest {
         final Class<LocationShapeDTO> locationShapeDTOClass = LocationShapeDTO.class;
 
         // create new object to be saved
-        String shapeId = "adw2";
+        final String shapeId = "adw2";
         LocationShapeDTO createdLocationShape = createSimpleTestLocationShape(shapeId);
-        // Set value to empty strings/null to later verify that it is set to null in the database.
-//        createdLocationShape.location_id = "";
         // make sure saved data matches expected data
         assertThat(createdLocationShape.geometry_id, equalTo(shapeId));
         // Check that location meta data exists.
         assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationShape.id, Table.LOCATION_SHAPES), 1);
         // try to update record
-        String updatedLocationShapeId = "1342";
+        final String updatedLocationShapeId = "1342";
         createdLocationShape.geometry_id = updatedLocationShapeId;
 
         // convert object to json and save it
@@ -564,15 +560,11 @@ public class JDBCTableWriterTest {
 
         // make sure saved data matches expected data
         assertThat(updatedLocationShapeDTO.geometry_id, equalTo(updatedLocationShapeId));
-        // Ensure message is null (not empty string).
-//        LOG.info("location_id: {}", updatedLocationShapeDTO.location_id);
-//        assertNull(updatedLocationShapeDTO.location_id);
         // Verify that certain values are correctly set in the database.
         ResultSet resultSet = getResultSetForId(updatedLocationShapeDTO.id, locationShapeTable);
         while (resultSet.next()) {
             assertResultValue(resultSet, "geometry_pt_lat", equalTo(createdLocationShape.geometry_pt_lat));
             assertResultValue(resultSet, "geometry_pt_lon", equalTo(createdLocationShape.geometry_pt_lon));
-//            assertResultValue(resultSet, "location_id", Matchers.nullValue());
         }
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(locationShapeTable);

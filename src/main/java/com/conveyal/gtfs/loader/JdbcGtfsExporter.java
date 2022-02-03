@@ -92,7 +92,6 @@ public class JdbcGtfsExporter {
             result.agency = export(Table.AGENCY, connection);
             // TODO: No idea if booking rules and location groups need to have a 'fromEditor' option?
             result.bookingRules = export(Table.BOOKING_RULES, connection);
-            result.locations = export(Table.LOCATIONS, connection);
             result.locationGroups = export(Table.LOCATION_GROUPS, connection);
             if (fromEditor) {
                 // only export calendar entries that have at least one day of service set
@@ -308,7 +307,7 @@ public class JdbcGtfsExporter {
                 result.trips = export(Table.TRIPS, connection);
             }
             // Locations and location shapes are exported at the same time. The result will be the same for both.
-            result.locations = exportLocations();
+            result.locations = exportLocationsAndShapes();
             result.locationShapes = result.locations;
 
             zipOutputStream.close();
@@ -429,7 +428,7 @@ public class JdbcGtfsExporter {
     /**
      * Export locations and location shapes to a single locations.geojson file.
      */
-    private TableLoadResult exportLocations() {
+    private TableLoadResult exportLocationsAndShapes() {
         long startTime = System.currentTimeMillis();
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {

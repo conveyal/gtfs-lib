@@ -5,18 +5,12 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.Pattern;
-import com.conveyal.gtfs.model.PatternStop;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateList;
-import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,7 +24,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.util.Util.human;
 
@@ -150,8 +143,8 @@ public class PatternFinder {
             // Stop names, unlike IDs, are not guaranteed to be unique.
             // Therefore we must track used names carefully to avoid duplicates.
 
-            String fromName = getName(pattern, stopById, locationById, true);
-            String toName = getName(pattern, stopById, locationById, false);
+            String fromName = getTerminusName(pattern, stopById, locationById, true);
+            String toName = getTerminusName(pattern, stopById, locationById, false);
 
             namingInfo.fromStops.put(fromName, pattern);
             namingInfo.toStops.put(toName, pattern);
@@ -169,8 +162,8 @@ public class PatternFinder {
         for (PatternNamingInfo info : namingInfoForRoute.values()) {
             for (Pattern pattern : info.patternsOnRoute) {
                 pattern.name = null; // clear this now so we don't get confused later on
-                String fromName = getName(pattern, stopById, locationById, true);
-                String toName = getName(pattern, stopById, locationById, false);
+                String fromName = getTerminusName(pattern, stopById, locationById, true);
+                String toName = getTerminusName(pattern, stopById, locationById, false);
 
                 // check if combination from, to is unique
                 Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
@@ -222,23 +215,23 @@ public class PatternFinder {
     }
 
     /**
-     * Return either the 'from' or 'to' name. Check the list of stops first, if there is no match, then check the
-     * locations. If neither provide a match return a default value.
+     * Return either the 'from' or 'to' terminus name. Check the list of stops first, if there is no match, then check
+     * the locations. If neither provide a match return a default value.
      */
-    private static String getName(
+    private static String getTerminusName(
         Pattern pattern,
         Map<String, Stop> stopById,
         Map<String, Location> locationById,
-        boolean fromName
+        boolean isFrom
     ) {
-        int id = fromName ? 0 : pattern.orderedStops.size() - 1;
+        int id = isFrom ? 0 : pattern.orderedStops.size() - 1;
         String haltId = pattern.orderedStops.get(id);
         if (stopById.containsKey(haltId))
             return stopById.get(haltId).stop_name;
         else if (locationById.containsKey(haltId)) {
             return locationById.get(haltId).stop_name;
         }
-        return fromName ? "fromNameUnknown" : "toNameUnknown";
+        return isFrom ? "fromTerminusNameUnknown" : "toTerminusNameUnknown";
     }
 
     /**

@@ -207,8 +207,8 @@
         } ],
         "stop_desc" : "Dromore West to Templeboy Door-to-door pickup area",
         "stop_name" : "Dromore West to Templeboy",
-        "stop_url" : "null",
-        "zone_id" : "null"
+        "stop_url" : null,
+        "zone_id" : null
       }, {
         "geometry_type" : "polyline",
         "id" : 3,
@@ -234,8 +234,8 @@
         } ],
         "stop_desc" : "Muff to Moville Door-to-door pickup area",
         "stop_name" : "Muff to Moville",
-        "stop_url" : "null",
-        "zone_id" : "null"
+        "stop_url" : null,
+        "zone_id" : null
       } ]
     }
   }

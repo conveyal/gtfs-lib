@@ -151,9 +151,8 @@ public class GTFSGraphQLTest {
     /** Tests that the booking rules of a feed can be fetched. */
     @Test
     public void canFetchBookingRules() throws IOException {
-        Map<String, Object> blah = queryGraphQL("feedBookingRules.txt");
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-            MatcherAssert.assertThat(blah, matchesSnapshot());
+            MatcherAssert.assertThat(queryGraphQL("feedBookingRules.txt"), matchesSnapshot());
         });
     }
 

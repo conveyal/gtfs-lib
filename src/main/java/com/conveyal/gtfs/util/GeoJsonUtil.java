@@ -77,7 +77,7 @@ public class GeoJsonUtil {
                 return "polygon";
             // TODO: Add additional geometry types.
             default:
-                // Effectively, MultiPolygon, Polygon and MultiLineString types which aren't supported yet.
+                // Effectively, MultiPolygon, Polygon and MultiLineString types aren't supported yet.
                 String message = String.format("Geometry type %s unknown or not supported.", geometry_type);
                 LOG.warn(message);
                 if (errors != null) errors.add(message);
@@ -93,8 +93,7 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<Location> locations = new ArrayList<>();
-        List<Feature> features = featureCollection.getFeatures();
-        for (Feature feature : features) {
+        for (Feature feature : featureCollection.getFeatures()) {
             String geometryType = getGeometryType(feature.getGeometryType().getName(), errors);
             if (geometryType == null) continue;
             Location location = new Location();
@@ -148,16 +147,14 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<LocationShape> locationShapes = new ArrayList<>();
-        List<Feature> features = featureCollection.getFeatures();
-        for (Feature feature : features) {
+        for (Feature feature : featureCollection.getFeatures()) {
             Geometry geometry = feature.getFeature().getGeometry();
             String geometryType = getGeometryType(geometry.getGeometryType().getName(), errors);
             if (geometryType == null) continue;
             switch (geometryType) {
                 case "polyline":
                     LineString lineString = (LineString) geometry;
-                    List<Point> points = lineString.getPoints();
-                    for (Point point : points) {
+                    for (Point point : lineString.getPoints()) {
                         locationShapes.add(
                             // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
                             buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
@@ -174,8 +171,7 @@ public class GeoJsonUtil {
                         if (errors != null) errors.add(message);
                     }
                     LineString firstLineString = lineStrings.get(0);
-                    List<Point> p = firstLineString.getPoints();
-                    for (Point point : p) {
+                    for (Point point : firstLineString.getPoints()) {
                         locationShapes.add(
                             // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
                             buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
@@ -253,7 +249,7 @@ public class GeoJsonUtil {
                     LineString ls = buildLineString(getLineStings(location.location_id, locationShapes));
                     LineString lineString = new LineString();
                     lineString.setPoints(ls.getPoints());
-                    mil.nga.sf.geojson.Feature lineStringFeature = new mil.nga.sf.geojson.Feature();
+                    Feature lineStringFeature = new Feature();
                     lineStringFeature.setGeometry(new mil.nga.sf.geojson.LineString(lineString));
                     setFeatureProps(location, lineStringFeature);
                     features.add(lineStringFeature);
@@ -262,7 +258,7 @@ public class GeoJsonUtil {
                     // We are only supporting a polygon with a single line string so this ok for now. If multiple line
                     // strings are to be supported this will need to change.
                     Polygon polygon = buildPolygon(getLineStings(location.location_id, locationShapes));
-                    mil.nga.sf.geojson.Feature polygonFeature = new mil.nga.sf.geojson.Feature();
+                    Feature polygonFeature = new Feature();
                     polygonFeature.setGeometry(new mil.nga.sf.geojson.Polygon(polygon));
                     setFeatureProps(location, polygonFeature);
                     features.add(polygonFeature);

@@ -24,6 +24,7 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.TestUtils.assertThatSqlCountQueryYieldsExpectedCount;
 import static com.conveyal.gtfs.TestUtils.loadFeedAndValidate;
+import static com.conveyal.gtfs.TestUtils.lookThroughFiles;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -157,49 +158,47 @@ public class GtfsFlexTest {
         assertThat(outZip.exists(), is(true));
 
         // assert that rows of data were written to files within the zipfile
-        ZipFile zip = new ZipFile(outZip);
+        try (ZipFile zip = new ZipFile(outZip)) {
+            ZipEntry entry = zip.getEntry("locations.geojson");
+            FeatureCollection featureCollection = GeoJsonUtil.getLocations(zip, entry);
+            List<Feature> features = featureCollection.getFeatures();
+            assertEquals(features.get(0).getId(),"area_275");
+            assertEquals(features.get(1).getId(),"area_276");
 
-        ZipEntry entry = zip.getEntry("locations.geojson");
-        FeatureCollection featureCollection = GeoJsonUtil.getLocations(zip, entry);
-        List<Feature> features = featureCollection.getFeatures();
-        assertEquals(features.get(0).getId(),"area_275");
-        assertEquals(features.get(1).getId(),"area_276");
-
-        TestUtils.FileTestCase[] fileTestCases = {
-            // booking_rules.txt
-            new FileTestCase(
-                "booking_rules.txt",
-                new DataExpectation[]{
-                    new DataExpectation("booking_rule_id", "booking_route_16604"),
-                    new DataExpectation("booking_type", "2"),
-                    new DataExpectation("prior_notice_start_time", "08:00:00")
-                }
-            ),
-            new TestUtils.FileTestCase(
-                "location_groups.txt",
-                new DataExpectation[]{
-                    new DataExpectation("location_group_id", "1"),
-                    new DataExpectation("location_id", "123"),
-                    new DataExpectation("location_group_name", "This is the location group name")
-                }
-            ),
-            new TestUtils.FileTestCase(
-                "stop_times.txt",
-                new DataExpectation[]{
-                    new DataExpectation("pickup_booking_rule_id", "booking_route_16604"),
-                    new DataExpectation("drop_off_booking_rule_id", "booking_route_16604"),
-                    new DataExpectation("start_pickup_dropoff_window", "08:00:00"),
-                    new DataExpectation("end_pickup_dropoff_window", "17:00:00"),
-                    new DataExpectation("mean_duration_factor", "1.0000000"),
-                    new DataExpectation("mean_duration_offset", "15.0000000"),
-                    new DataExpectation("safe_duration_factor", "1.0000000"),
-                    new DataExpectation("safe_duration_offset", "20.0000000")
-                }
-            ),
-        };
-        TestUtils.lookThroughFiles(fileTestCases, zip);
-        // Close the zip file so it can be deleted.
-        zip.close();
+            FileTestCase[] fileTestCases = {
+                // booking_rules.txt
+                new FileTestCase(
+                    "booking_rules.txt",
+                    new DataExpectation[]{
+                        new DataExpectation("booking_rule_id", "booking_route_16604"),
+                        new DataExpectation("booking_type", "2"),
+                        new DataExpectation("prior_notice_start_time", "08:00:00")
+                    }
+                ),
+                new TestUtils.FileTestCase(
+                    "location_groups.txt",
+                    new DataExpectation[]{
+                        new DataExpectation("location_group_id", "1"),
+                        new DataExpectation("location_id", "123"),
+                        new DataExpectation("location_group_name", "This is the location group name")
+                    }
+                ),
+                new TestUtils.FileTestCase(
+                    "stop_times.txt",
+                    new DataExpectation[]{
+                        new DataExpectation("pickup_booking_rule_id", "booking_route_16604"),
+                        new DataExpectation("drop_off_booking_rule_id", "booking_route_16604"),
+                        new DataExpectation("start_pickup_dropoff_window", "08:00:00"),
+                        new DataExpectation("end_pickup_dropoff_window", "17:00:00"),
+                        new DataExpectation("mean_duration_factor", "1.0000000"),
+                        new DataExpectation("mean_duration_offset", "15.0000000"),
+                        new DataExpectation("safe_duration_factor", "1.0000000"),
+                        new DataExpectation("safe_duration_offset", "20.0000000")
+                    }
+                ),
+            };
+            lookThroughFiles(fileTestCases, zip);
+        }
         // delete file to make sure we can assert that this program created the file
         outZip.delete();
     }

@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
@@ -61,7 +60,15 @@ public class Location extends Entity {
         String stopDesc = stop_desc == null ? "" : stop_desc;
         String stopUrl = stop_url == null ? "" : stop_url.toString();
         String zoneId = zone_id == null ? "" : zone_id;
-        return location_id + "," + stopName + "," + stopDesc + "," + zoneId + "," + stopUrl + "," + geometry_type + "\n";
+        return String.join(
+            ",",
+            location_id,
+            stopName,
+            stopDesc,
+            zoneId,
+            stopUrl,
+            geometry_type
+        ) + System.lineSeparator();
     }
 
     public static class Loader extends Entity.Loader<Location> {
@@ -92,33 +99,6 @@ public class Location extends Entity {
             if (location.location_id != null) {
                 feed.locations.put(location.location_id, location);
             }
-        }
-    }
-
-    public static class Writer extends Entity.Writer<Location> {
-        public Writer(GTFSFeed feed) {
-            super(feed, "locations");
-        }
-
-        @Override
-        public void writeHeaders() throws IOException {
-            writer.writeRecord(new String[]{"location_id", "stop_name", "zone_id", "stop_url", "geometry_type"});
-        }
-
-        @Override
-        public void writeOneRow(Location locations) throws IOException {
-            writeStringField(locations.location_id);
-            writeStringField(locations.zone_id);
-            writeStringField(locations.stop_name);
-            writeStringField(locations.stop_desc);
-            writeUrlField(locations.stop_url);
-            writeStringField(locations.geometry_type);
-            endRecord();
-        }
-
-        @Override
-        public Iterator<Location> iterator() {
-            return this.feed.locations.values().iterator();
         }
     }
 

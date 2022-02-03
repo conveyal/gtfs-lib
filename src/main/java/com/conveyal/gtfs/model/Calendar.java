@@ -10,11 +10,9 @@ import com.google.common.collect.Iterators;
 
 import java.io.IOException;
 import java.io.Serializable;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -111,7 +109,7 @@ public class Calendar extends Entity implements Serializable {
                 c.feed_id = feed.feedId;
                 service.calendar = c;
                 // Attempting to put a null key or value will cause an NPE in BTreeMap
-                if (c.service_id != null) feed.calenders.put(c.service_id, c);
+                if (c.service_id != null) feed.calendars.put(c.service_id, c);
 
             }
 

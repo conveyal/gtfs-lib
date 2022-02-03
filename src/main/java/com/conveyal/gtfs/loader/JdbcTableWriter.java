@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Multimap;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -36,6 +37,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -289,18 +291,14 @@ public class JdbcTableWriter implements TableWriter {
             );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
             List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
-            for (PatternStop patternStop : patternStops.getOrdered(patternId)) {
-                // Update stop times for any pattern stop with matching stop sequence (or for all pattern stops if the list
-                // is null).
-                if (patternStop.stop_sequence >= beginWithSequence) {
-                    patternHaltsToNormalize.add(patternStop);
-                }
-            }
-            for (PatternLocation patternLocation : patternLocations.getOrdered(patternId)) {
-                // Update stop times for any pattern location with matching stop sequence (or for all pattern stops if the list
-                // is null).
-                if (patternLocation.stop_sequence >= beginWithSequence) {
-                    patternHaltsToNormalize.add(patternLocation);
+            Iterator<PatternHalt> patternHalts = Iterators.concat(
+                patternStops.getOrdered(patternId).iterator(),
+                patternLocations.getOrdered(patternId).iterator()
+            );
+            while (patternHalts.hasNext()) {
+                PatternHalt patternHalt = patternHalts.next();
+                if (patternHalt.stop_sequence >= beginWithSequence) {
+                    patternHaltsToNormalize.add(patternHalt);
                 }
             }
             // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
@@ -329,14 +327,22 @@ public class JdbcTableWriter implements TableWriter {
             }
 
             int stopTimesUpdated = 0;
-            for (String tripId : timesForTripIds.keySet()) {
+            for (Map.Entry<String, Integer> timesForTripId : timesForTripIds.entrySet()) {
                 // Initialize travel time with previous stop time value.
-                int cumulativeTravelTime = timesForTripIds.get(tripId);
+                int cumulativeTravelTime = timesForTripId.getValue();
                 for (PatternHalt patternHalt : patternHaltsToNormalize) {
                     if (patternHalt instanceof PatternStop) {
-                        cumulativeTravelTime += updateStopTimesForPatternStop((PatternStop) patternHalt, cumulativeTravelTime, tripId);
+                        cumulativeTravelTime += updateStopTimesForPatternStop(
+                            (PatternStop) patternHalt,
+                            cumulativeTravelTime,
+                            timesForTripId.getKey()
+                        );
                     } else if (patternHalt instanceof PatternLocation) {
-                        cumulativeTravelTime += updateStopTimesForPatternLocation((PatternLocation) patternHalt, cumulativeTravelTime, tripId);
+                        cumulativeTravelTime += updateStopTimesForPatternLocation(
+                            (PatternLocation) patternHalt,
+                            cumulativeTravelTime,
+                            timesForTripId.getKey()
+                        );
                     } else {
                         LOG.warn("Pattern with ID {} contained a halt that wasn't a stop or a location!", patternId);
                         continue;
@@ -344,7 +350,6 @@ public class JdbcTableWriter implements TableWriter {
                     stopTimesUpdated++;
                 }
             }
-
             connection.commit();
             return stopTimesUpdated;
         } catch (Exception e) {
