@@ -278,6 +278,13 @@ public class GTFSTest {
                     new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
                 }
             ),
+            // Check that the shape_dist_traveled values in stop_times are not rounded.
+            new PersistenceExpectation(
+                "stop_times",
+                new RecordExpectation[]{
+                    new RecordExpectation("shape_dist_traveled", 341.4491961, 0.0)
+                }
+            ),
             new PersistenceExpectation(
                 "trips",
                 new RecordExpectation[]{
