@@ -211,9 +211,9 @@ public class PatternFinderValidator extends TripValidator {
                         // Stop sequence is zero-based.
                         setIntParameter(insertPatternLocationStatement, 2, i);
                         insertPatternLocationStatement.setString(3, stopOrLocationId); // is actually location id
-                        setDoubleParameter(insertPatternLocationStatement, 4, key.shapeDistances.get(i));
-                        setIntParameter(insertPatternLocationStatement, 5, key.pickupTypes.get(i));
-                        setIntParameter(insertPatternLocationStatement, 6, key.dropoffTypes.get(i));
+                        setIntParameter(insertPatternLocationStatement, 4, key.pickupTypes.get(i));
+                        setIntParameter(insertPatternLocationStatement, 5, key.dropoffTypes.get(i));
+                        setDoubleParameter(insertPatternLocationStatement, 6, key.shapeDistances.get(i));
                         setIntParameter(insertPatternLocationStatement, 7, key.timepoints.get(i));
                         setIntParameter(insertPatternLocationStatement, 8, key.continuous_pickup.get(i));
                         setIntParameter(insertPatternLocationStatement, 9, key.continuous_drop_off.get(i));

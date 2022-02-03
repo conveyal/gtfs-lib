@@ -96,10 +96,10 @@ public class BookingRule extends Entity {
             }
 
             /*
-              Check referential integrity without storing references. BookingRule cannot directly reference Calenders
+              Check referential integrity without storing references. BookingRule cannot directly reference Calendars
               because they would be serialized into the MapDB.
              */
-            getRefField("prior_notice_service_id", true, feed.calenders);
+            getRefField("prior_notice_service_id", true, feed.calendars);
         }
     }
 

@@ -1,16 +1,11 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.util.Util;
-import org.locationtech.jts.geom.Coordinate;
-import org.mapdb.Fun;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -79,22 +74,25 @@ public class LocationShape extends Entity {
     }
 
     /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry, List)} as part
-     * of the unpacking of GeoJson data to CSV.
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry, List)}
+     * as part of the unpacking of GeoJson data to CSV.
      */
     public static String header() {
         return "location_id,geometry_id,geometry_pt_lat,geometry_pt_lon\n";
     }
 
     /**
-     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry, List)} as part
-     * of the unpacking of GeoJson data to CSV.
+     * Required by {@link com.conveyal.gtfs.util.GeoJsonUtil#getCsvReaderFromGeoJson(String, ZipFile, ZipEntry, List)}
+     * as part of the unpacking of GeoJson data to CSV.
      */
     public String toCsvRow() {
-        return location_id + "," +
-                geometry_id + "," +
-                geometry_pt_lat + "," +
-                geometry_pt_lon + "\n";
+        return String.join(
+            ",",
+            location_id,
+            geometry_id,
+            Double.toString(geometry_pt_lat),
+            Double.toString(geometry_pt_lon)
+        ) + System.lineSeparator();
     }
 
     @Override
@@ -111,16 +109,6 @@ public class LocationShape extends Entity {
     @Override
     public int hashCode() {
         return Objects.hash(location_id, geometry_id, geometry_pt_lat, geometry_pt_lon);
-    }
-
-    @Override
-    public String toString() {
-        return "LocationShape{" +
-            "location_id='" + location_id + '\'' +
-            ", geometry_id='" + geometry_id + '\'' +
-            ", geometry_pt_lat=" + geometry_pt_lat +
-            ", geometry_pt_lon=" + geometry_pt_lon +
-            '}';
     }
 }
 
