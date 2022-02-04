@@ -139,7 +139,8 @@ public abstract class Field {
      * a many-to-many reference.
      */
     public boolean isForeignReference () {
-        return this.referenceTable != null;
+        return !this.referenceTable.isEmpty();
+//        return this.referenceTable != null;
     }
 
     /**

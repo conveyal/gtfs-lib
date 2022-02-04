@@ -668,6 +668,7 @@ public class JdbcTableWriter implements TableWriter {
         boolean hasOrderField = orderFieldName != null;
         int previousOrder = -1;
         TIntSet orderValues = new TIntHashSet();
+        Multimap<Table, MultiTableReference> multiReferencesPerTable = HashMultimap.create();
         Multimap<Table, String> referencesPerTable = HashMultimap.create();
         int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
@@ -682,20 +683,29 @@ public class JdbcTableWriter implements TableWriter {
             // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
             // field statement above.
             for (Field field : subTable.specFields()) {
-//                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-//                    JsonNode refValueNode = subEntity.get(field.name);
-//                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
-//                    if (refValueNode.isNull() && !field.isRequired()) continue;
-//                    String refValue = refValueNode.asText();
-//                    referencesPerTable.put(field.referenceTable, refValue);
-//                }
-                for (Table refTable : field.referenceTable) {
-                    if (!refTable.name.equals(specTable.name)) {
+                if (field.referenceTable.isEmpty()) continue;
+                if (field.referenceTable.size() == 1) {
+                    Table referenceTable = field.referenceTable.iterator().next();
+                    if (!referenceTable.name.equals(specTable.name)) {
                         JsonNode refValueNode = subEntity.get(field.name);
                         // Skip over references that are null but not required (e.g., route_id in fare_rules).
                         if (refValueNode.isNull() && !field.isRequired()) continue;
                         String refValue = refValueNode.asText();
-                        referencesPerTable.put(refTable, refValue);
+                        referencesPerTable.put(referenceTable, refValue);
+                    }
+                } else {
+                    Multimap<Table, String> forignReferences = HashMultimap.create();
+                    for (Table referenceTable : field.referenceTable) {
+                        if (!referenceTable.name.equals(specTable.name)) {
+                            JsonNode refValueNode = subEntity.get(field.name);
+                            // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                            if (refValueNode.isNull() && !field.isRequired()) continue;
+                            String refValue = refValueNode.asText();
+                            forignReferences.put(referenceTable, refValue);
+                        }
+                    }
+                    if (!forignReferences.isEmpty()) {
+                        multiReferencesPerTable.put(subTable, new MultiTableReference(field.name, forignReferences));
                     }
                 }
             }
@@ -767,6 +777,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         // Check that accumulated references all exist in reference tables.
         verifyReferencesExist(subTable.name, referencesPerTable);
+        verifyMultiReferencesExist(multiReferencesPerTable);
         // execute any remaining prepared statement calls
         LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
         if (insertStatement != null) {
@@ -945,6 +956,12 @@ public class JdbcTableWriter implements TableWriter {
                 LOG.info("All {} {} {} references are valid.", foundReferences.size(), referencedTable.name, referenceFieldName);
             }
         }
+    }
+
+    private void verifyMultiReferencesExist(Multimap<Table, MultiTableReference> multiReferencesPerTable) {
+        // FLEX TODO: Check multi table references. E.g. stop id in stops and locations, if the cumulative count on both
+        // tables matches the number of stop ids assume references are valid. If not, not sure, some sort of generic
+        // error because we wouldn't know which table should have the ids.
     }
 
     /**
@@ -1522,10 +1539,6 @@ public class JdbcTableWriter implements TableWriter {
             // IMPORTANT: Skip the table for the entity we're modifying or if loop table does not have field.
             if (table.name.equals(gtfsTable.name)) continue;
             for (Field field : gtfsTable.fields) {
-//                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-//                    // If any of the table's fields are foreign references to the specified table, add to the return set.
-//                    referencingTables.add(gtfsTable);
-//                }
                 if (field.isForeignReference()) {
                     for (Table refTable : field.referenceTable) {
                         if (refTable.name.equals(table.name)) {
@@ -1593,7 +1606,6 @@ public class JdbcTableWriter implements TableWriter {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
-//                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
                 if (field.isForeignReference())  {
                     for (Table refTable : field.referenceTable) {
                         if (refTable.name.equals(table.name)) {

@@ -78,24 +78,24 @@ public class ReferenceTracker {
 
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
-        // FLEX TODO: Check multiple references.
-        if (field.isForeignReference() && field.referenceTable.size() == 1) {
+        if (field.isForeignReference() && field.referenceTable.size() <= 1) {
             // Check referential integrity if the field is a foreign reference. Note: the
             // reference table must be loaded before the table/value being currently checked.
-            for (Table refTable : field.referenceTable) {
-                String referenceField = refTable.getKeyFieldName();
-                String referenceTransitId = String.join(":", referenceField, value);
-
-                if (!this.transitIds.contains(referenceTransitId)) {
-                    // If the reference tracker does not contain
-                    NewGTFSError referentialIntegrityError = NewGTFSError
-                        .forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
-                        .setEntityId(keyValue);
-                    // If the field is an order field, set the sequence for the new error.
-                    if (isOrderField) referentialIntegrityError.setSequence(value);
-                    errors.add(referentialIntegrityError);
-                }
+            Table refTable = field.referenceTable.iterator().next();
+            String referenceField = refTable.getKeyFieldName();
+            String referenceTransitId = String.join(":", referenceField, value);
+            if (!this.transitIds.contains(referenceTransitId)) {
+                // If the reference tracker does not contain
+                NewGTFSError referentialIntegrityError = NewGTFSError
+                    .forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
+                    .setEntityId(keyValue);
+                // If the field is an order field, set the sequence for the new error.
+                if (isOrderField) referentialIntegrityError.setSequence(value);
+                errors.add(referentialIntegrityError);
             }
+        } else {
+            // FLEX TODO: Check multiple references (If the foreign reference is present in one of the tables, there is no
+            // need to check the remainder. If no matching reference is found, flag new MULTI_REFERENTIAL_INTEGRITY error).
         }
         // Next, handle duplicate ID check.
         // In most cases there is no need to check for duplicate IDs if the field is a foreign
