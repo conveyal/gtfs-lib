@@ -140,7 +140,6 @@ public abstract class Field {
      */
     public boolean isForeignReference () {
         return !this.referenceTable.isEmpty();
-//        return this.referenceTable != null;
     }
 
     /**
