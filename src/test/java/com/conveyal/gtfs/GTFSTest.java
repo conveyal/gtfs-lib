@@ -106,6 +106,7 @@ public class GTFSTest {
     public void canLoadAndExportSimpleAgency() {
         ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
@@ -226,6 +227,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
@@ -274,6 +276,13 @@ public class GTFSTest {
                     new RecordExpectation("pickup_type", 0),
                     new RecordExpectation("drop_off_type", 0),
                     new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
+                }
+            ),
+            // Check that the shape_dist_traveled values in stop_times are not rounded.
+            new PersistenceExpectation(
+                "stop_times",
+                new RecordExpectation[]{
+                    new RecordExpectation("shape_dist_traveled", 341.4491961, 0.00001)
                 }
             ),
             new PersistenceExpectation(

@@ -348,7 +348,7 @@ public class Table {
             new ShortField("drop_off_type", OPTIONAL, 3),
             new ShortField("continuous_pickup", OPTIONAL, 3),
             new ShortField("continuous_drop_off", OPTIONAL, 3),
-            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
     ).withParentTable(TRIPS);
