@@ -1,9 +1,11 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -958,10 +960,29 @@ public class JdbcTableWriter implements TableWriter {
         }
     }
 
+    /**
+     * Check multiple table references. If the cumulative count on all reference tables match the expected number of ids
+     * the references are valid (albeit potentially across multiple tables). If the count does not match, flag an error
+     * highlighting the values that should be present in one of the multiple table references. We can not be more
+     * precise because we don't know which table should have the reference id.
+     *
+     * E.g. The {@link StopTime#stop_id} can be either a {@link Stop#stop_id} or a {@link Location#location_id}. If the
+     * stop_id is found in the location table, but not the stop table, overall the count will be one i.e. a match. If
+     * the stop_id isn't in either table there will be no match, and we won't know which table it should match with!
+     */
     private void verifyMultiReferencesExist(Multimap<Table, MultiTableReference> multiReferencesPerTable) {
-        // FLEX TODO: Check multi table references. E.g. stop id in stops and locations, if the cumulative count on both
-        // tables matches the number of stop ids assume references are valid. If not, not sure, some sort of generic
-        // error because we wouldn't know which table should have the ids.
+        // FLEX TODO: Check multi table references
+        for (Table parentTable : multiReferencesPerTable.keySet()) {
+            Collection<MultiTableReference> multiTableReferences = multiReferencesPerTable.get(parentTable);
+            Multimap<String, Collection<String>> refTables = HashMultimap.create();
+
+            for (MultiTableReference r : multiTableReferences) {
+                for (Table forignTable : r.referencesPerTable.keySet()) {
+                    refTables.put(forignTable.name, r.referencesPerTable.get(forignTable));
+                }
+            }
+            LOG.info(""+refTables.size());
+        }
     }
 
     /**

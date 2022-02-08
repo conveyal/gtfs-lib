@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.MULTI_REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 /**
@@ -78,7 +79,7 @@ public class ReferenceTracker {
 
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
-        if (field.isForeignReference() && field.referenceTable.size() <= 1) {
+        if (field.isForeignReference() && field.referenceTable.size() == 1) {
             // Check referential integrity if the field is a foreign reference. Note: the
             // reference table must be loaded before the table/value being currently checked.
             Table refTable = field.referenceTable.iterator().next();
@@ -93,9 +94,28 @@ public class ReferenceTracker {
                 if (isOrderField) referentialIntegrityError.setSequence(value);
                 errors.add(referentialIntegrityError);
             }
-        } else {
-            // FLEX TODO: Check multiple references (If the foreign reference is present in one of the tables, there is no
-            // need to check the remainder. If no matching reference is found, flag new MULTI_REFERENTIAL_INTEGRITY error).
+        } else if (field.isForeignReference() && field.referenceTable.size() > 1) {
+            // Check multiple forign references. If the foreign reference is present in one of the tables, there is no
+            // need to check the remainder. If no matching foreign reference is found, flag integrity error.
+            boolean hasMatchingReference = false;
+            StringBuilder badValues = new StringBuilder();
+            for (Table referenceTable : field.referenceTable) {
+                String referenceField = referenceTable.getKeyFieldName();
+                String referenceTransitId = String.join(":", referenceField, value);
+                if (this.transitIds.contains(referenceTransitId)) {
+                    hasMatchingReference = true;
+                    break;
+                } else {
+                    badValues.append(referenceTransitId);
+                }
+            }
+            if (!hasMatchingReference) {
+                // If the reference tracker does not contain a match.
+                NewGTFSError referentialIntegrityError = NewGTFSError
+                    .forLine(table, lineNumber, MULTI_REFERENTIAL_INTEGRITY, badValues.toString())
+                    .setEntityId(keyValue);
+                errors.add(referentialIntegrityError);
+            }
         }
         // Next, handle duplicate ID check.
         // In most cases there is no need to check for duplicate IDs if the field is a foreign
