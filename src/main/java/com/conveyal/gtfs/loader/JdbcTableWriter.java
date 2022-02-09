@@ -670,7 +670,7 @@ public class JdbcTableWriter implements TableWriter {
         boolean hasOrderField = orderFieldName != null;
         int previousOrder = -1;
         TIntSet orderValues = new TIntHashSet();
-        Multimap<Table, MultiTableReference> multiReferencesPerTable = HashMultimap.create();
+        Multimap<Table, Multimap<Table, String>> multiReferencesPerTable = HashMultimap.create();
         Multimap<Table, String> referencesPerTable = HashMultimap.create();
         int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
@@ -707,7 +707,7 @@ public class JdbcTableWriter implements TableWriter {
                         }
                     }
                     if (!forignReferences.isEmpty()) {
-                        multiReferencesPerTable.put(subTable, new MultiTableReference(field.name, forignReferences));
+                        multiReferencesPerTable.put(subTable, forignReferences);
                     }
                 }
             }
@@ -819,37 +819,28 @@ public class JdbcTableWriter implements TableWriter {
      * @throws SQLException
      */
     private int updateStopTimesForPatternStop(PatternStop patternStop, int previousTravelTime, String tripId) throws SQLException {
+        int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+        int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
+
         String sql = String.format(
             "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
                 "where st.trip_id = ? AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
             tablePrefix
         );
-        // Prepare the statement and set statement parameters
-        PreparedStatement statement = connection.prepareStatement(sql);
-        int oneBasedIndex = 1;
-        int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
-        int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
-        int arrivalTime = previousTravelTime + travelTime;
-        statement.setInt(oneBasedIndex++, arrivalTime);
-        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
-        // Set trip id either from params or all
-        if (tripId != null) {
-            statement.setString(oneBasedIndex++, tripId);
-        } else {
-            statement.setString(oneBasedIndex++, "t.trip_id");
-        }
-        // Set "where clause" with value for pattern_id and stop_sequence
-        statement.setString(oneBasedIndex++, patternStop.pattern_id);
-        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
-        // normalize stop sequence values for stop times during snapshotting for the editor.
-        statement.setInt(oneBasedIndex++, patternStop.stop_sequence);
-        // Log query, execute statement, and log result.
-        LOG.debug(statement.toString());
-        int entitiesUpdated = statement.executeUpdate();
+        int entitiesUpdated = updateStopTimes(
+            sql,
+            previousTravelTime,
+            tripId,
+            travelTime,
+            dwellTime,
+            patternStop.pattern_id,
+            patternStop.stop_sequence
+        );
         LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
     }
+
     private int updateStopTimesForPatternStop(ObjectNode patternStop, int previousTravelTime) throws SQLException {
         PatternStop extractedPatternStop = new PatternStop();
         extractedPatternStop.default_travel_time = patternStop.get("default_travel_time").asInt();
@@ -859,7 +850,6 @@ public class JdbcTableWriter implements TableWriter {
         return updateStopTimesForPatternStop(extractedPatternStop, previousTravelTime, null);
     }
 
-
     /**
      * Updates the stop times that reference the specified pattern location.
      * @param patternLocation the pattern stop for which to update stop times
@@ -868,22 +858,50 @@ public class JdbcTableWriter implements TableWriter {
      * @return the travel and dwell time added by this pattern location
      * @throws SQLException
      */
-    private int updateStopTimesForPatternLocation(PatternLocation patternLocation, int previousTravelTime, String tripId) throws SQLException {
-        String sql = String.format(
-                "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
-                        "where st.trip_id = ? AND t.pattern_id = ? AND st.stop_sequence = ?",
-                tablePrefix,
-                tablePrefix
-        );
-        // Prepare the statement and set statement parameters
-        PreparedStatement statement = connection.prepareStatement(sql);
-        int oneBasedIndex = 1;
+    private int updateStopTimesForPatternLocation(PatternLocation patternLocation, int previousTravelTime, String tripId)
+        throws SQLException {
+
         int travelTime = patternLocation.flex_default_travel_time;
         int timeInLocation = patternLocation.flex_default_zone_time;
+
+        String sql = String.format(
+            "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
+                    "where st.trip_id = ? AND t.pattern_id = ? AND st.stop_sequence = ?",
+            tablePrefix,
+            tablePrefix
+        );
+        int entitiesUpdated = updateStopTimes(
+            sql,
+            previousTravelTime,
+            tripId,
+            travelTime,
+            timeInLocation,
+            patternLocation.pattern_id,
+            patternLocation.stop_sequence
+        );
+        LOG.debug("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
+        return travelTime + timeInLocation;
+    }
+
+    /**
+     * Update stop time values depending on caller. If updating stop times for pattern stops, this will update the
+     * arrival_time and departure_time. If updating stop times for pattern locations, this will update the
+     * start_pickup_dropoff_window and end_pickup_dropoff_window.
+     */
+    private int updateStopTimes(
+        String sql,
+        int previousTravelTime,
+        String tripId,
+        int travelTime,
+        int timeInLocation,
+        String pattern_id,
+        int stop_sequence
+    ) throws SQLException {
+
+        PreparedStatement statement = connection.prepareStatement(sql);
+        int oneBasedIndex = 1;
         int arrivalTime = previousTravelTime + travelTime;
-        // Setting start of the pickup window (when the vehicle arrives in the flex location)
         statement.setInt(oneBasedIndex++, arrivalTime);
-        // Set the end of the pickup window (when the vehicle leaves the flex location)
         statement.setInt(oneBasedIndex++, arrivalTime + timeInLocation);
 
         // Set trip id either from params or all
@@ -893,16 +911,15 @@ public class JdbcTableWriter implements TableWriter {
             statement.setString(oneBasedIndex++, "t.trip_id");
         }
         // Set "where clause" with value for pattern_id and stop_sequence
-        statement.setString(oneBasedIndex++, patternLocation.pattern_id);
+        statement.setString(oneBasedIndex++, pattern_id);
         // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
         // normalize stop sequence values for stop times during snapshotting for the editor.
-        statement.setInt(oneBasedIndex++, patternLocation.stop_sequence);
+        statement.setInt(oneBasedIndex, stop_sequence);
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
-        int entitiesUpdated = statement.executeUpdate();
-        LOG.debug("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
-        return travelTime + timeInLocation;
+        return statement.executeUpdate();
     }
+
     private int updateStopTimesForPatternLocation(ObjectNode patternLocation, int previousTravelTime) throws SQLException {
         PatternLocation extractedPatternLocation = new PatternLocation();
         extractedPatternLocation.flex_default_travel_time = patternLocation.get("flex_default_travel_time").asInt();
@@ -925,26 +942,7 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info("Checking {} references to {}", referringTableName, referencedTable.name);
             Collection<String> referenceStrings = referencesPerTable.get(referencedTable);
             String referenceFieldName = referencedTable.getKeyFieldName();
-            String questionMarks = String.join(", ", Collections.nCopies(referenceStrings.size(), "?"));
-            String checkCountSql = String.format(
-                    "select %s from %s.%s where %s in (%s)",
-                    referenceFieldName,
-                    tablePrefix,
-                    referencedTable.name,
-                    referenceFieldName,
-                    questionMarks);
-            PreparedStatement preparedStatement = connection.prepareStatement(checkCountSql);
-            int oneBasedIndex = 1;
-            for (String ref : referenceStrings) {
-                preparedStatement.setString(oneBasedIndex++, ref);
-            }
-            LOG.info(preparedStatement.toString());
-            ResultSet resultSet = preparedStatement.executeQuery();
-            Set<String> foundReferences = new HashSet<>();
-            while (resultSet.next()) {
-                String referenceValue = resultSet.getString(1);
-                foundReferences.add(referenceValue);
-            }
+            Set<String> foundReferences = checkTableForReferences(referenceStrings, referencedTable);
             // Determine if any references were not found.
             referenceStrings.removeAll(foundReferences);
             if (referenceStrings.size() > 0) {
@@ -961,28 +959,101 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Check multiple table references. If the cumulative count on all reference tables match the expected number of ids
-     * the references are valid (albeit potentially across multiple tables). If the count does not match, flag an error
-     * highlighting the values that should be present in one of the multiple table references. We can not be more
-     * precise because we don't know which table should have the reference id.
+     * Check multiple tables for forign references. Working through each forign table check for expected references.
+     * Update a missing reference list by adding missing references and remove all that have been found. If the missing
+     * reference list is not empty after all reference tables have been checked, flag an error highlighting the missing
+     * values and the forign tables where they are expected.
      *
      * E.g. The {@link StopTime#stop_id} can be either a {@link Stop#stop_id} or a {@link Location#location_id}. If the
-     * stop_id is found in the location table, but not the stop table, overall the count will be one i.e. a match. If
-     * the stop_id isn't in either table there will be no match, and we won't know which table it should match with!
+     * stop_id is found in the location table (but not the stop table) the required number of matches has been met. If
+     * the stop_id isn't in either table there will be no match. It is not possible to know which table the
+     * stop_id should be in so all forign tables are listed with expected values.
+     *
+     * @param multiReferencesPerTable    A list of parent tables with a related list of forign tables with reference
+     *                                   values.
+     * @throws SQLException
      */
-    private void verifyMultiReferencesExist(Multimap<Table, MultiTableReference> multiReferencesPerTable) {
-        // FLEX TODO: Check multi table references
-        for (Table parentTable : multiReferencesPerTable.keySet()) {
-            Collection<MultiTableReference> multiTableReferences = multiReferencesPerTable.get(parentTable);
-            Multimap<String, Collection<String>> refTables = HashMultimap.create();
+    private void verifyMultiReferencesExist(Multimap<Table, Multimap<Table, String>> multiReferencesPerTable)
+        throws SQLException {
 
-            for (MultiTableReference r : multiTableReferences) {
-                for (Table forignTable : r.referencesPerTable.keySet()) {
-                    refTables.put(forignTable.name, r.referencesPerTable.get(forignTable));
+        for (Table parentTable : multiReferencesPerTable.keySet()) {
+            Collection<Multimap<Table, String>> multiTableReferences = multiReferencesPerTable.get(parentTable);
+            HashMap<Table, List<String>> refTables = new HashMap<>();
+
+            // Group forign tables and references.
+            for (Multimap<Table, String> tableReference : multiTableReferences) {
+                for (Table forignTable : tableReference.keySet()) {
+                    List<String> values = new ArrayList<>();
+                    if (refTables.containsKey(forignTable)) {
+                        values = refTables.get(forignTable);
+                    }
+                    values.addAll(tableReference.get(forignTable));
+                    refTables.put(forignTable, values);
                 }
             }
-            LOG.info(""+refTables.size());
+
+            Set<String> forignReferencesNotFound = new HashSet<>();
+            Set<String> forignReferencesFieldNames = new HashSet<>();
+            for (Table forignTable: refTables.keySet()) {
+                LOG.info("Checking {} references in {}", parentTable.name, forignTable.name);
+                forignReferencesFieldNames.add(forignTable.getKeyFieldName());
+                Collection<String> referenceStrings = refTables.get(forignTable);
+                Set<String> foundReferences = checkTableForReferences(referenceStrings, forignTable);
+                if (foundReferences.size() == multiTableReferences.size()) {
+                    // No need to check subsequent forign tables if all required matches have been found.
+                    break;
+                } else {
+                    // Determine if any references were not found.
+                    referenceStrings.removeAll(foundReferences);
+                    forignReferencesNotFound.removeAll(foundReferences);
+                    forignReferencesNotFound.addAll(referenceStrings);
+                }
+            }
+            if (forignReferencesNotFound.size() > 0) {
+                throw new SQLException(
+                    String.format(
+                        "%s entities must contain valid %s references. (Invalid references: %s)",
+                        parentTable.name,
+                        String.join("/", forignReferencesFieldNames),
+                        String.join(", ", forignReferencesNotFound)));
+            } else {
+                LOG.info("All {} forign references ({}) are valid.",
+                    String.join("/", forignReferencesFieldNames),
+                    parentTable.name
+                );
+            }
         }
+    }
+
+    /**
+     * Checks a table's key field for matching reference values and returns all matches.
+     */
+    private Set<String> checkTableForReferences(Collection<String> referenceStrings, Table table)
+        throws SQLException {
+
+        String referenceFieldName = table.getKeyFieldName();
+        String questionMarks = String.join(", ", Collections.nCopies(referenceStrings.size(), "?"));
+        String checkCountSql = String.format(
+            "select %s from %s.%s where %s in (%s)",
+            referenceFieldName,
+            tablePrefix,
+            table.name,
+            referenceFieldName,
+            questionMarks
+        );
+        PreparedStatement preparedStatement = connection.prepareStatement(checkCountSql);
+        int oneBasedIndex = 1;
+        for (String ref : referenceStrings) {
+            preparedStatement.setString(oneBasedIndex++, ref);
+        }
+        LOG.info(preparedStatement.toString());
+        ResultSet resultSet = preparedStatement.executeQuery();
+        Set<String> foundReferences = new HashSet<>();
+        while (resultSet.next()) {
+            String referenceValue = resultSet.getString(1);
+            foundReferences.add(referenceValue);
+        }
+        return foundReferences;
     }
 
     /**
