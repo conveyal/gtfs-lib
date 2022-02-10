@@ -717,12 +717,12 @@ public class JdbcTableWriter implements TableWriter {
                 insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
             }
             // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
-            if ("pattern_stops".equals(subTable.name) || "pattern_locations".equals(subTable.name)) {
+            if (Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name)) {
                 if (referencedPatternUsesFrequencies) {
                     // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
                     // Default travel and dwell time behave as "linked fields" for associated stop times. In other
                     // words, frequency trips in the editor must match the pattern stop travel times.
-                    int travelTimeForPatternHalts = "pattern_stops".equals(subTable.name) ?
+                    int travelTimeForPatternHalts = Table.PATTERN_STOP.name.equals(subTable.name) ?
                             updateStopTimesForPatternStop(subEntity, cumulativeTravelTime) :
                             updateStopTimesForPatternLocation(subEntity, cumulativeTravelTime);
                     cumulativeTravelTime += travelTimeForPatternHalts;
@@ -752,18 +752,20 @@ public class JdbcTableWriter implements TableWriter {
                 boolean valuesAreIncreasing = previousOrder <= orderValue;
 
                 // PatternStop and PatternLocations must only increase, not increment
-                boolean valuesAreAscending = (!"pattern_locations".equals(subTable.name) && !"pattern_stops".equals(subTable.name)) ?
-                        valuesAreIncrementing : valuesAreIncreasing;
+                boolean valuesAreAscending =
+                    (!Table.PATTERN_LOCATION.name.equals(subTable.name) && !Table.PATTERN_STOP.name.equals(subTable.name))
+                        ? valuesAreIncrementing
+                        : valuesAreIncreasing;
                 if (!orderIsUnique || !valuesAreAscending) {
                     throw new SQLException(
-                            String.format(
-                                    "%s %s values must be zero-based, unique, and incrementing. PatternHalt values must be increasing and unique only. Entity at index %d had %s illegal value of %d",
-                                    subTable.name,
-                                    orderFieldName,
-                                    entityCount,
-                                    previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing/non-increasing" : "duplicate",
-                                    orderValue
-                            )
+                        String.format(
+                            "%s %s values must be zero-based, unique, and incrementing. PatternHalt values must be increasing and unique only. Entity at index %d had %s illegal value of %d",
+                            subTable.name,
+                            orderFieldName,
+                            entityCount,
+                            previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing/non-increasing" : "duplicate",
+                            orderValue
+                        )
                     );
                 }
             }
