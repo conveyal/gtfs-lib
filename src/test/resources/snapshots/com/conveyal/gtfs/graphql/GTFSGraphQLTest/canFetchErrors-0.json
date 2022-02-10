@@ -23,9 +23,9 @@
         "type" : "MISSING_FIELD"
       }, {
         "count" : 1,
-        "message" : "This line references an ID that does not exist in the target table.",
+        "message" : "This line references an ID that does not exist in a forign table.",
         "priority" : "HIGH",
-        "type" : "REFERENTIAL_INTEGRITY"
+        "type" : "MULTI_REFERENTIAL_INTEGRITY"
       }, {
         "count" : 1,
         "message" : "The long name of a route should complement the short name, not include it.",
@@ -46,12 +46,12 @@
         "error_type" : "MISSING_FIELD",
         "line_number" : 2
       }, {
-        "bad_value" : "stop_id:area_251",
+        "bad_value" : "location_id:area_251stop_id:area_251",
         "entity_id" : "frequency-trip",
         "entity_sequence" : null,
         "entity_type" : "StopTime",
         "error_id" : 1,
-        "error_type" : "REFERENTIAL_INTEGRITY",
+        "error_type" : "MULTI_REFERENTIAL_INTEGRITY",
         "line_number" : 6
       }, {
         "bad_value" : "Geometry type MULTIPOLYGON unknown or not supported.",

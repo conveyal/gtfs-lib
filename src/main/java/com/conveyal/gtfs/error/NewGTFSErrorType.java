@@ -43,6 +43,7 @@ public enum NewGTFSErrorType {
     NUMBER_TOO_SMALL(Priority.MEDIUM, "Number was below the allowed range."),
     OVERLAPPING_TRIP(Priority.MEDIUM, "Blocks?"),
     REFERENTIAL_INTEGRITY(Priority.HIGH, "This line references an ID that does not exist in the target table."),
+    MULTI_REFERENTIAL_INTEGRITY(Priority.HIGH, "This line references an ID that does not exist in a forign table."),
     REQUIRED_TABLE_EMPTY(Priority.MEDIUM, "This table is required by the GTFS specification but is empty."),
     ROUTE_DESCRIPTION_SAME_AS_NAME(Priority.LOW, "The description of a route is identical to its name, so does not add any information."),
     ROUTE_LONG_NAME_CONTAINS_SHORT_NAME(Priority.LOW, "The long name of a route should complement the short name, not include it."),
