@@ -164,11 +164,11 @@ public class JdbcGtfsLoader {
             result.transfers = load(Table.TRANSFERS);
             result.trips = load(Table.TRIPS); // refs routes
             result.frequencies = load(Table.FREQUENCIES); // refs trips
-            result.stopTimes = load(Table.STOP_TIMES);
+            result.locations = load(Table.LOCATIONS);
+            result.stopTimes = load(Table.STOP_TIMES); // refs locations and stops
             result.translations = load(Table.TRANSLATIONS);
             result.attributions = load(Table.ATTRIBUTIONS);
             result.bookingRules = load(Table.BOOKING_RULES);
-            result.locations = load(Table.LOCATIONS);
             result.locationGroups = load(Table.LOCATION_GROUPS);
             result.locationShapes = load(Table.LOCATION_SHAPES);
             result.errorCount = errorStorage.getErrorCount();
