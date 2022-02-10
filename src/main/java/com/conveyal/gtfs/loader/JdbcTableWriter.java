@@ -1001,6 +1001,7 @@ public class JdbcTableWriter implements TableWriter {
                 Set<String> foundReferences = checkTableForReferences(referenceStrings, forignTable);
                 if (foundReferences.size() == multiTableReferences.size()) {
                     // No need to check subsequent forign tables if all required matches have been found.
+                    forignReferencesNotFound.clear();
                     break;
                 } else {
                     // Determine if any references were not found.
