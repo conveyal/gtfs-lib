@@ -696,18 +696,18 @@ public class JdbcTableWriter implements TableWriter {
                         referencesPerTable.put(referenceTable, refValue);
                     }
                 } else {
-                    Multimap<Table, String> forignReferences = HashMultimap.create();
+                    Multimap<Table, String> foreignReferences = HashMultimap.create();
                     for (Table referenceTable : field.referenceTable) {
                         if (!referenceTable.name.equals(specTable.name)) {
                             JsonNode refValueNode = subEntity.get(field.name);
                             // Skip over references that are null but not required (e.g., route_id in fare_rules).
                             if (refValueNode.isNull() && !field.isRequired()) continue;
                             String refValue = refValueNode.asText();
-                            forignReferences.put(referenceTable, refValue);
+                            foreignReferences.put(referenceTable, refValue);
                         }
                     }
-                    if (!forignReferences.isEmpty()) {
-                        multiReferencesPerTable.put(subTable, forignReferences);
+                    if (!foreignReferences.isEmpty()) {
+                        multiReferencesPerTable.put(subTable, foreignReferences);
                     }
                 }
             }
@@ -961,17 +961,17 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Check multiple tables for forign references. Working through each forign table check for expected references.
+     * Check multiple tables for foreign references. Working through each foreign table check for expected references.
      * Update a missing reference list by adding missing references and remove all that have been found. If the missing
      * reference list is not empty after all reference tables have been checked, flag an error highlighting the missing
-     * values and the forign tables where they are expected.
+     * values and the foreign tables where they are expected.
      *
      * E.g. The {@link StopTime#stop_id} can be either a {@link Stop#stop_id} or a {@link Location#location_id}. If the
      * stop_id is found in the location table (but not the stop table) the required number of matches has been met. If
      * the stop_id isn't in either table there will be no match. It is not possible to know which table the
-     * stop_id should be in so all forign tables are listed with expected values.
+     * stop_id should be in so all foreign tables are listed with expected values.
      *
-     * @param multiReferencesPerTable    A list of parent tables with a related list of forign tables with reference
+     * @param multiReferencesPerTable    A list of parent tables with a related list of foreign tables with reference
      *                                   values.
      * @throws SQLException
      */
@@ -982,46 +982,46 @@ public class JdbcTableWriter implements TableWriter {
             Collection<Multimap<Table, String>> multiTableReferences = multiReferencesPerTable.get(parentTable);
             HashMap<Table, List<String>> refTables = new HashMap<>();
 
-            // Group forign tables and references.
+            // Group foreign tables and references.
             for (Multimap<Table, String> tableReference : multiTableReferences) {
-                for (Table forignTable : tableReference.keySet()) {
+                for (Table foreignTable : tableReference.keySet()) {
                     List<String> values = new ArrayList<>();
-                    if (refTables.containsKey(forignTable)) {
-                        values = refTables.get(forignTable);
+                    if (refTables.containsKey(foreignTable)) {
+                        values = refTables.get(foreignTable);
                     }
-                    values.addAll(tableReference.get(forignTable));
-                    refTables.put(forignTable, values);
+                    values.addAll(tableReference.get(foreignTable));
+                    refTables.put(foreignTable, values);
                 }
             }
 
-            Set<String> forignReferencesNotFound = new HashSet<>();
-            Set<String> forignReferencesFieldNames = new HashSet<>();
-            for (Table forignTable: refTables.keySet()) {
-                LOG.info("Checking {} references in {}", parentTable.name, forignTable.name);
-                forignReferencesFieldNames.add(forignTable.getKeyFieldName());
-                Collection<String> referenceStrings = refTables.get(forignTable);
-                Set<String> foundReferences = checkTableForReferences(referenceStrings, forignTable);
+            Set<String> foreignReferencesNotFound = new HashSet<>();
+            Set<String> foreignReferencesFieldNames = new HashSet<>();
+            for (Table foreignTable: refTables.keySet()) {
+                LOG.info("Checking {} references in {}", parentTable.name, foreignTable.name);
+                foreignReferencesFieldNames.add(foreignTable.getKeyFieldName());
+                Collection<String> referenceStrings = refTables.get(foreignTable);
+                Set<String> foundReferences = checkTableForReferences(referenceStrings, foreignTable);
                 if (foundReferences.size() == multiTableReferences.size()) {
-                    // No need to check subsequent forign tables if all required matches have been found.
-                    forignReferencesNotFound.clear();
+                    // No need to check subsequent foreign tables if all required matches have been found.
+                    foreignReferencesNotFound.clear();
                     break;
                 } else {
                     // Determine if any references were not found.
                     referenceStrings.removeAll(foundReferences);
-                    forignReferencesNotFound.removeAll(foundReferences);
-                    forignReferencesNotFound.addAll(referenceStrings);
+                    foreignReferencesNotFound.removeAll(foundReferences);
+                    foreignReferencesNotFound.addAll(referenceStrings);
                 }
             }
-            if (forignReferencesNotFound.size() > 0) {
+            if (foreignReferencesNotFound.size() > 0) {
                 throw new SQLException(
                     String.format(
                         "%s entities must contain valid %s references. (Invalid references: %s)",
                         parentTable.name,
-                        String.join("/", forignReferencesFieldNames),
-                        String.join(", ", forignReferencesNotFound)));
+                        String.join("/", foreignReferencesFieldNames),
+                        String.join(", ", foreignReferencesNotFound)));
             } else {
-                LOG.info("All {} forign references ({}) are valid.",
-                    String.join("/", forignReferencesFieldNames),
+                LOG.info("All {} foreign references ({}) are valid.",
+                    String.join("/", foreignReferencesFieldNames),
                     parentTable.name
                 );
             }

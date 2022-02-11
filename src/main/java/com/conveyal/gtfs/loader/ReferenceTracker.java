@@ -95,7 +95,7 @@ public class ReferenceTracker {
                 errors.add(referentialIntegrityError);
             }
         } else if (field.isForeignReference() && field.referenceTable.size() > 1) {
-            // Check multiple forign references. If the foreign reference is present in one of the tables, there is no
+            // Check multiple foreign references. If the foreign reference is present in one of the tables, there is no
             // need to check the remainder. If no matching foreign reference is found, flag integrity error.
             boolean hasMatchingReference = false;
             StringBuilder badValues = new StringBuilder();
