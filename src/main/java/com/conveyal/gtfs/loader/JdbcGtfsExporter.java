@@ -442,13 +442,13 @@ public class JdbcGtfsExporter {
                 // Only export if data is available.
                 tableLoadResult.rowCount = locations.size() + locationShapes.size();
                 tableLoadResult.errorCount = writeLocationsToFile(zipOutputStream, locations, locationShapes);
-                LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, Table.locationGeoJsonFileName, System.currentTimeMillis() - startTime);
+                LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, Table.LOCATION_GEO_JSON_FILE_NAME, System.currentTimeMillis() - startTime);
             } else {
-                LOG.warn("No locations exported to {} as the {} table is empty!", Table.locationGeoJsonFileName, Table.LOCATIONS.name);
+                LOG.warn("No locations exported to {} as the {} table is empty!", Table.LOCATION_GEO_JSON_FILE_NAME, Table.LOCATIONS.name);
             }
         } catch (IOException | GeoJsonException e) {
             tableLoadResult.fatalException = e.toString();
-            LOG.error("Exception while exporting {}", Table.locationGeoJsonFileName, e);
+            LOG.error("Exception while exporting {}", Table.LOCATION_GEO_JSON_FILE_NAME, e);
         }
         return tableLoadResult;
     }
@@ -462,7 +462,7 @@ public class JdbcGtfsExporter {
         List<LocationShape> locationShapes
     ) throws IOException, GeoJsonException {
         // Create entry for table.
-        zipOutputStream.putNextEntry(new ZipEntry(Table.locationGeoJsonFileName));
+        zipOutputStream.putNextEntry(new ZipEntry(Table.LOCATION_GEO_JSON_FILE_NAME));
         // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
         PrintWriter p = new PrintWriter(zipOutputStream);
         List<String> errors = new ArrayList<>();

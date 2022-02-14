@@ -47,7 +47,7 @@ public abstract class Field {
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
      * integrity when loading a feed.
      * */
-    public HashSet<Table> referenceTable = new HashSet<>();
+    public HashSet<Table> referenceTables = new HashSet<>();
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
     private boolean isConditionallyRequired;
@@ -139,7 +139,7 @@ public abstract class Field {
      * a many-to-many reference.
      */
     public boolean isForeignReference () {
-        return !this.referenceTable.isEmpty();
+        return !this.referenceTables.isEmpty();
     }
 
     /**
@@ -182,7 +182,7 @@ public abstract class Field {
      * @return this same Field instance
      */
     public Field isReferenceTo(Table table) {
-        referenceTable.add(table);
+        referenceTables.add(table);
         return this;
     }
 

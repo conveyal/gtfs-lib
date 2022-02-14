@@ -94,7 +94,8 @@ public interface EntityPopulator<T> {
         patternLocation.mean_duration_factor = getDoubleIfPresent(result, "mean_duration_factor", columnForName);
         patternLocation.mean_duration_offset = getDoubleIfPresent(result, "mean_duration_offset", columnForName);
         patternLocation.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
-        patternLocation.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);        return patternLocation;
+        patternLocation.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);
+        return patternLocation;
     };
 
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;

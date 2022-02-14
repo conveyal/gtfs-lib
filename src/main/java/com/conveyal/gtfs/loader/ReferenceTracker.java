@@ -79,10 +79,10 @@ public class ReferenceTracker {
 
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
-        if (field.isForeignReference() && field.referenceTable.size() == 1) {
+        if (field.isForeignReference() && field.referenceTables.size() == 1) {
             // Check referential integrity if the field is a foreign reference. Note: the
             // reference table must be loaded before the table/value being currently checked.
-            Table refTable = field.referenceTable.iterator().next();
+            Table refTable = field.referenceTables.iterator().next();
             String referenceField = refTable.getKeyFieldName();
             String referenceTransitId = String.join(":", referenceField, value);
             if (!this.transitIds.contains(referenceTransitId)) {
@@ -94,12 +94,12 @@ public class ReferenceTracker {
                 if (isOrderField) referentialIntegrityError.setSequence(value);
                 errors.add(referentialIntegrityError);
             }
-        } else if (field.isForeignReference() && field.referenceTable.size() > 1) {
+        } else if (field.isForeignReference() && field.referenceTables.size() > 1) {
             // Check multiple foreign references. If the foreign reference is present in one of the tables, there is no
             // need to check the remainder. If no matching foreign reference is found, flag integrity error.
             boolean hasMatchingReference = false;
             StringBuilder badValues = new StringBuilder();
-            for (Table referenceTable : field.referenceTable) {
+            for (Table referenceTable : field.referenceTables) {
                 String referenceField = referenceTable.getKeyFieldName();
                 String referenceTransitId = String.join(":", referenceField, value);
                 if (this.transitIds.contains(referenceTransitId)) {

@@ -1,6 +1,5 @@
 package com.conveyal.gtfs.loader;
 
-import com.conveyal.gtfs.error.GeoJsonParseError;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
@@ -35,7 +34,6 @@ import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Translation;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
-import com.conveyal.gtfs.util.GeoJsonException;
 import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
@@ -86,7 +84,7 @@ public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
 
-    public static final String locationGeoJsonFileName = "locations.geojson";
+    public static final String LOCATION_GEO_JSON_FILE_NAME = "locations.geojson";
 
     public final String name;
 
@@ -700,7 +698,7 @@ public class Table {
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
         String tableFileName = this.name + ".txt";
         if (name.equals(Table.LOCATIONS.name) || name.equals(Table.LOCATION_SHAPES.name)) {
-            tableFileName = locationGeoJsonFileName;
+            tableFileName = LOCATION_GEO_JSON_FILE_NAME;
             LOG.info("Loading data for {}, into supporting table {}", tableFileName, name);
         }
         ZipEntry entry = zipFile.getEntry(tableFileName);
@@ -749,7 +747,7 @@ public class Table {
         List<String> errors
     ) throws IOException {
         CsvReader csvReader;
-        if (tableFileName.equals(locationGeoJsonFileName)) {
+        if (tableFileName.equals(LOCATION_GEO_JSON_FILE_NAME)) {
             csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry, errors);
         } else {
             InputStream zipInputStream = zipFile.getInputStream(entry);

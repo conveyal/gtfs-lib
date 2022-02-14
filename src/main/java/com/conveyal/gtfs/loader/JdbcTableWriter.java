@@ -685,30 +685,23 @@ public class JdbcTableWriter implements TableWriter {
             // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
             // field statement above.
             for (Field field : subTable.specFields()) {
-                if (field.referenceTable.isEmpty()) continue;
-                if (field.referenceTable.size() == 1) {
-                    Table referenceTable = field.referenceTable.iterator().next();
+                if (field.referenceTables.isEmpty()) continue;
+                Multimap<Table, String> foreignReferences = HashMultimap.create();
+                for (Table referenceTable : field.referenceTables) {
                     if (!referenceTable.name.equals(specTable.name)) {
                         JsonNode refValueNode = subEntity.get(field.name);
                         // Skip over references that are null but not required (e.g., route_id in fare_rules).
                         if (refValueNode.isNull() && !field.isRequired()) continue;
                         String refValue = refValueNode.asText();
-                        referencesPerTable.put(referenceTable, refValue);
-                    }
-                } else {
-                    Multimap<Table, String> foreignReferences = HashMultimap.create();
-                    for (Table referenceTable : field.referenceTable) {
-                        if (!referenceTable.name.equals(specTable.name)) {
-                            JsonNode refValueNode = subEntity.get(field.name);
-                            // Skip over references that are null but not required (e.g., route_id in fare_rules).
-                            if (refValueNode.isNull() && !field.isRequired()) continue;
-                            String refValue = refValueNode.asText();
+                        if (field.referenceTables.size() == 1) {
+                            referencesPerTable.put(referenceTable, refValue);
+                        } else {
                             foreignReferences.put(referenceTable, refValue);
                         }
                     }
-                    if (!foreignReferences.isEmpty()) {
-                        multiReferencesPerTable.put(subTable, foreignReferences);
-                    }
+                }
+                if (!foreignReferences.isEmpty()) {
+                    multiReferencesPerTable.put(subTable, foreignReferences);
                 }
             }
             // Insert new sub-entity.
@@ -1635,7 +1628,7 @@ public class JdbcTableWriter implements TableWriter {
             if (table.name.equals(gtfsTable.name)) continue;
             for (Field field : gtfsTable.fields) {
                 if (field.isForeignReference()) {
-                    for (Table refTable : field.referenceTable) {
+                    for (Table refTable : field.referenceTables) {
                         if (refTable.name.equals(table.name)) {
                             referencingTables.add(gtfsTable);
                         }
@@ -1702,7 +1695,7 @@ public class JdbcTableWriter implements TableWriter {
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
                 if (field.isForeignReference())  {
-                    for (Table refTable : field.referenceTable) {
+                    for (Table refTable : field.referenceTables) {
                         if (refTable.name.equals(table.name)) {
                             if (
                                 Table.TRIPS.name.equals(referencingTable.name) &&

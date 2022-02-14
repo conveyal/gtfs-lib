@@ -46,7 +46,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
-import static com.conveyal.gtfs.loader.Table.locationGeoJsonFileName;
+import static com.conveyal.gtfs.loader.Table.LOCATION_GEO_JSON_FILE_NAME;
 
 /**
  * An abstract base class that represents a row in a GTFS table, e.g. a Stop, Trip, or Agency.
@@ -285,7 +285,7 @@ public abstract class Entity implements Serializable {
         public void loadTable(ZipFile zip) throws IOException {
             String tableFileName = tableName + ".txt";
             if (tableName.equals(Table.LOCATIONS.name) || tableName.equals(Table.LOCATION_SHAPES.name)) {
-                tableFileName = locationGeoJsonFileName;
+                tableFileName = LOCATION_GEO_JSON_FILE_NAME;
                 LOG.info("Loading data for {}, into supporting table {}", tableFileName, tableName);
             }
             ZipEntry entry = zip.getEntry(tableFileName);
