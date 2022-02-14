@@ -257,12 +257,10 @@
       <scope>test</scope>
     </dependency>
     <!-- Snapshotting library for testing -->
-    <!-- This should only be temporary until https://github.com/Zenika/java-snapshot-matcher is updated to work with
-    the latest version of jackson databind -->
     <dependency>
       <groupId>com.github.ibi-group</groupId>
       <artifactId>ibi-java-snapshot-matcher</artifactId>
-      <version>0820e1a3a2a6c7f845038859d0c4c09bf18c7910</version>
+      <version>v1.0.0</version>
       <scope>test</scope>
     </dependency>
     <!-- Disk-backed storage that looks like a Java map. -->
