@@ -360,7 +360,6 @@ public class Table {
             new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
-            // FLEX TODO: create multi-reference, as this can reference both stops and locations
             new StringField("stop_id", REQUIRED).isReferenceTo(STOPS).isReferenceTo(LOCATIONS),
 //                    .indexThisColumn(),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are required
@@ -458,11 +457,7 @@ public class Table {
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
     public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
             new StringField("location_group_id", REQUIRED),
-            //FLEX TODO: location id 'isReferenceTo' stops.stop_id or id from locations.geojson. Both is not an option.
-            // Consider addressing as part of conditional checks.
-            // FLEX TODO: This will need to possibly be a multi-reference
-            // new StringField("location_id", OPTIONAL).isReferenceTo(STOPS),
-            new StringField("location_id", OPTIONAL),
+            new StringField("location_id", REQUIRED).isReferenceTo(STOPS).isReferenceTo(LOCATIONS),
             new StringField("location_group_name", OPTIONAL)
     );
 

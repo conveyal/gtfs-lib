@@ -8,6 +8,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.MULTI_REFERENTIAL_INTEGRITY;
@@ -98,7 +99,7 @@ public class ReferenceTracker {
             // Check multiple foreign references. If the foreign reference is present in one of the tables, there is no
             // need to check the remainder. If no matching foreign reference is found, flag integrity error.
             boolean hasMatchingReference = false;
-            StringBuilder badValues = new StringBuilder();
+            TreeSet<String> badValues = new TreeSet<>();
             for (Table referenceTable : field.referenceTables) {
                 String referenceField = referenceTable.getKeyFieldName();
                 String referenceTransitId = String.join(":", referenceField, value);
@@ -106,13 +107,18 @@ public class ReferenceTracker {
                     hasMatchingReference = true;
                     break;
                 } else {
-                    badValues.append(referenceTransitId);
+                    badValues.add(referenceTransitId);
                 }
             }
             if (!hasMatchingReference) {
                 // If the reference tracker does not contain a match.
                 NewGTFSError referentialIntegrityError = NewGTFSError
-                    .forLine(table, lineNumber, MULTI_REFERENTIAL_INTEGRITY, badValues.toString())
+                    .forLine(
+                        table,
+                        lineNumber,
+                        MULTI_REFERENTIAL_INTEGRITY,
+                        String.join(", ", badValues)
+                    )
                     .setEntityId(keyValue);
                 errors.add(referentialIntegrityError);
             }

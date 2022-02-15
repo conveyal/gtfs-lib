@@ -10,12 +10,22 @@ import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.DEPARTURE_BEFORE_ARRIVAL;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.SHAPE_DIST_TRAVELED_NOT_INCREASING;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_DISTANCE_ZERO;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TIME_NEGATIVE;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TIME_ZERO;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_FAST;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_SLOW;
 import static com.conveyal.gtfs.util.Util.fastDistance;
 import static com.conveyal.gtfs.validator.NewTripTimesValidator.missingBothTimes;
 
@@ -24,6 +34,7 @@ import static com.conveyal.gtfs.validator.NewTripTimesValidator.missingBothTimes
  */
 public class SpeedTripValidator extends TripValidator {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SpeedTripValidator.class);
     public static final double MIN_SPEED_KPH = 0.5;
     private boolean allTravelTimesAreRounded = true;
     private Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
@@ -35,7 +46,9 @@ public class SpeedTripValidator extends TripValidator {
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
         if (containsFlexLocations(stopTimes, locations)) {
-            // FLEX TODO: The validator needs to be refactored to work with flex locations
+            // FLEX TODO: The validator needs to be refactored to work with flex locations. A stop time -> stop_id can
+            // either be a stop_id or a location id.
+            LOG.warn("Trip speed not validated because it contains flex locations!");
             return;
         }
         // The specific maximum speed for this trip's route's mode of travel.
@@ -57,7 +70,6 @@ public class SpeedTripValidator extends TripValidator {
                 // stop_time allows neither pickup or drop off and is not a timepoint, so it serves no purpose.
                 registerError(currStopTime, NewGTFSErrorType.STOP_TIME_UNUSED);
             }
-            // FLEX TODO: stop times can be either stop or location.
             Stop currStop = stops.get(i);
 
             // Distance is accumulated in case times are not provided for some StopTimes.
