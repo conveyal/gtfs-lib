@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
 import com.google.common.collect.HashMultimap;
 
@@ -11,7 +12,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_ID;
-import static com.conveyal.gtfs.error.NewGTFSErrorType.MULTI_REFERENTIAL_INTEGRITY;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.MISSING_FOREIGN_TABLE_REFERENCE;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 
 /**
@@ -80,24 +81,10 @@ public class ReferenceTracker {
 
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
-        if (field.isForeignReference() && field.referenceTables.size() == 1) {
-            // Check referential integrity if the field is a foreign reference. Note: the
-            // reference table must be loaded before the table/value being currently checked.
-            Table refTable = field.referenceTables.iterator().next();
-            String referenceField = refTable.getKeyFieldName();
-            String referenceTransitId = String.join(":", referenceField, value);
-            if (!this.transitIds.contains(referenceTransitId)) {
-                // If the reference tracker does not contain
-                NewGTFSError referentialIntegrityError = NewGTFSError
-                    .forLine(table, lineNumber, REFERENTIAL_INTEGRITY, referenceTransitId)
-                    .setEntityId(keyValue);
-                // If the field is an order field, set the sequence for the new error.
-                if (isOrderField) referentialIntegrityError.setSequence(value);
-                errors.add(referentialIntegrityError);
-            }
-        } else if (field.isForeignReference() && field.referenceTables.size() > 1) {
-            // Check multiple foreign references. If the foreign reference is present in one of the tables, there is no
+        if (field.isForeignReference()) {
+            // Check foreign references. If the foreign reference is present in one of the tables, there is no
             // need to check the remainder. If no matching foreign reference is found, flag integrity error.
+            // Note: The reference table must be loaded before the table/value being currently checked.
             boolean hasMatchingReference = false;
             TreeSet<String> badValues = new TreeSet<>();
             for (Table referenceTable : field.referenceTables) {
@@ -112,14 +99,19 @@ public class ReferenceTracker {
             }
             if (!hasMatchingReference) {
                 // If the reference tracker does not contain a match.
+                NewGTFSErrorType errorType = (field.referenceTables.size() > 1)
+                    ? MISSING_FOREIGN_TABLE_REFERENCE
+                    : REFERENTIAL_INTEGRITY;
                 NewGTFSError referentialIntegrityError = NewGTFSError
                     .forLine(
                         table,
                         lineNumber,
-                        MULTI_REFERENTIAL_INTEGRITY,
+                        errorType,
                         String.join(", ", badValues)
                     )
                     .setEntityId(keyValue);
+                // If the field is an order field, set the sequence for the new error.
+                if (isOrderField) referentialIntegrityError.setSequence(value);
                 errors.add(referentialIntegrityError);
             }
         }

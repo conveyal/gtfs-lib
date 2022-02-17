@@ -23,9 +23,9 @@
         "type" : "MISSING_FIELD"
       }, {
         "count" : 1,
-        "message" : "This line references an ID that does not exist in a foreign table.",
+        "message" : "This line references an ID that must exist in a single foreign table.",
         "priority" : "HIGH",
-        "type" : "MULTI_REFERENTIAL_INTEGRITY"
+        "type" : "MISSING_FOREIGN_TABLE_REFERENCE"
       }, {
         "count" : 1,
         "message" : "The long name of a route should complement the short name, not include it.",
@@ -67,7 +67,7 @@
         "entity_sequence" : null,
         "entity_type" : "LocationGroup",
         "error_id" : 3,
-        "error_type" : "MULTI_REFERENTIAL_INTEGRITY",
+        "error_type" : "MISSING_FOREIGN_TABLE_REFERENCE",
         "line_number" : 3
       }, {
         "bad_value" : "Geometry type MULTIPOLYGON unknown or not supported.",
