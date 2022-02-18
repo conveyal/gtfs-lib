@@ -857,7 +857,7 @@ public class JdbcTableWriter implements TableWriter {
         throws SQLException {
 
         int travelTime = patternLocation.flex_default_travel_time;
-        int timeInLocation = patternLocation.flex_default_zone_time;
+        int dwellTime = patternLocation.flex_default_zone_time;
 
         String sql = String.format(
             "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
@@ -870,12 +870,12 @@ public class JdbcTableWriter implements TableWriter {
             previousTravelTime,
             tripId,
             travelTime,
-            timeInLocation,
+            dwellTime,
             patternLocation.pattern_id,
             patternLocation.stop_sequence
         );
         LOG.debug("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
-        return travelTime + timeInLocation;
+        return travelTime + dwellTime;
     }
 
     /**
@@ -888,7 +888,7 @@ public class JdbcTableWriter implements TableWriter {
         int previousTravelTime,
         String tripId,
         int travelTime,
-        int timeInLocation,
+        int dwellTime,
         String pattern_id,
         int stop_sequence
     ) throws SQLException {
@@ -897,7 +897,7 @@ public class JdbcTableWriter implements TableWriter {
         int oneBasedIndex = 1;
         int arrivalTime = previousTravelTime + travelTime;
         statement.setInt(oneBasedIndex++, arrivalTime);
-        statement.setInt(oneBasedIndex++, arrivalTime + timeInLocation);
+        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
 
         // Set trip id either from params or all
         if (tripId != null) {
@@ -907,8 +907,8 @@ public class JdbcTableWriter implements TableWriter {
         }
         // Set "where clause" with value for pattern_id and stop_sequence
         statement.setString(oneBasedIndex++, pattern_id);
-        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
-        // normalize stop sequence values for stop times during snapshotting for the editor.
+        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stop/pattern_locations#stop_sequence
+        // because we normalize stop sequence values for stop times during snapshotting for the editor.
         statement.setInt(oneBasedIndex, stop_sequence);
         // Log query, execute statement, and log result.
         LOG.debug(statement.toString());
