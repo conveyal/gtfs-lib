@@ -670,7 +670,7 @@ public class JdbcTableWriter implements TableWriter {
         boolean hasOrderField = orderFieldName != null;
         int previousOrder = -1;
         TIntSet orderValues = new TIntHashSet();
-        Multimap<Table, Multimap<Table, String>> multiReferencesPerTable = HashMultimap.create();
+        Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable = HashMultimap.create();
         Multimap<Table, String> referencesPerTable = HashMultimap.create();
         int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
@@ -701,7 +701,7 @@ public class JdbcTableWriter implements TableWriter {
                     }
                 }
                 if (!foreignReferences.isEmpty()) {
-                    multiReferencesPerTable.put(subTable, foreignReferences);
+                    foreignReferencesPerTable.put(subTable, foreignReferences);
                 }
             }
             // Insert new sub-entity.
@@ -774,7 +774,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         // Check that accumulated references all exist in reference tables.
         verifyReferencesExist(subTable.name, referencesPerTable);
-        verifyMultiReferencesExist(multiReferencesPerTable);
+        verifyForeignReferencesExist(foreignReferencesPerTable);
         // execute any remaining prepared statement calls
         LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
         if (insertStatement != null) {
@@ -900,11 +900,9 @@ public class JdbcTableWriter implements TableWriter {
         statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
 
         // Set trip id either from params or all
-        if (tripId != null) {
-            statement.setString(oneBasedIndex++, tripId);
-        } else {
-            statement.setString(oneBasedIndex++, "t.trip_id");
-        }
+        tripId = (tripId != null) ? tripId : "t.trip_id";
+        statement.setString(oneBasedIndex++, tripId);
+
         // Set "where clause" with value for pattern_id and stop_sequence
         statement.setString(oneBasedIndex++, pattern_id);
         // In the editor, we can depend on stop_times#stop_sequence matching pattern_stop/pattern_locations#stop_sequence
@@ -964,15 +962,15 @@ public class JdbcTableWriter implements TableWriter {
      * the stop_id isn't in either table there will be no match. It is not possible to know which table the
      * stop_id should be in so all foreign tables are listed with expected values.
      *
-     * @param multiReferencesPerTable    A list of parent tables with a related list of foreign tables with reference
+     * @param foreignReferencesPerTable  A list of parent tables with a related list of foreign tables with reference
      *                                   values.
      * @throws SQLException
      */
-    private void verifyMultiReferencesExist(Multimap<Table, Multimap<Table, String>> multiReferencesPerTable)
+    private void verifyForeignReferencesExist(Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable)
         throws SQLException {
 
-        for (Table parentTable : multiReferencesPerTable.keySet()) {
-            Collection<Multimap<Table, String>> multiTableReferences = multiReferencesPerTable.get(parentTable);
+        for (Table parentTable : foreignReferencesPerTable.keySet()) {
+            Collection<Multimap<Table, String>> multiTableReferences = foreignReferencesPerTable.get(parentTable);
             HashMap<Table, List<String>> refTables = new HashMap<>();
 
             // Group foreign tables and references.

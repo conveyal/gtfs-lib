@@ -259,8 +259,8 @@
     <!-- Snapshotting library for testing -->
     <dependency>
       <groupId>com.github.ibi-group</groupId>
-      <artifactId>ibi-java-snapshot-matcher</artifactId>
-      <version>v1.0.0</version>
+      <artifactId>java-snapshot-matcher</artifactId>
+      <version>master</version>
       <scope>test</scope>
     </dependency>
     <!-- Disk-backed storage that looks like a Java map. -->
