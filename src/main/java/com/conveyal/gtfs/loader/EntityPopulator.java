@@ -6,6 +6,7 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.FareAttribute;
+import com.conveyal.gtfs.model.FareRule;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationGroup;
@@ -146,6 +147,16 @@ public interface EntityPopulator<T> {
         fareAttribute.transfers         = getIntIfPresent   (result, "transfers", columnForName);
         fareAttribute.transfer_duration = getIntIfPresent   (result, "transfer_duration", columnForName);
         return fareAttribute;
+    };
+
+    EntityPopulator<FareRule> FARE_RULE = (result, columnForName) -> {
+        FareRule fareRule = new FareRule();
+        fareRule.fare_id = getStringIfPresent(result, "fare_id", columnForName);
+        fareRule.route_id = getStringIfPresent(result, "route_id", columnForName);
+        fareRule.origin_id = getStringIfPresent(result, "origin_id", columnForName);
+        fareRule.destination_id = getStringIfPresent(result, "destination_id", columnForName);
+        fareRule.contains_id = getStringIfPresent(result, "contains_id", columnForName);
+        return fareRule;
     };
 
     EntityPopulator<Frequency> FREQUENCY = (result, columnForName) -> {
