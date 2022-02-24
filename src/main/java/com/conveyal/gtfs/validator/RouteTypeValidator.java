@@ -51,7 +51,6 @@ public class RouteTypeValidator extends FeedValidator {
             if (errorStorage != null) registerError(route, ROUTE_TYPE_INVALID, route.route_type);
             return false;
         }
-
         return true;
     }
 }
