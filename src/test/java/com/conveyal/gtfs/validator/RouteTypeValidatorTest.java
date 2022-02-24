@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class RouteTypeValidatorTest {
@@ -14,7 +15,7 @@ class RouteTypeValidatorTest {
     @Test
     void validateRouteType() {
         assertTrue(ROUTE_TYPE_VALIDATOR.isRouteTypeValid(3)); // Bus
-        assertTrue(ROUTE_TYPE_VALIDATOR.isRouteTypeValid(36)); // Invalid
+        assertFalse(ROUTE_TYPE_VALIDATOR.isRouteTypeValid(36)); // Invalid
         assertTrue(ROUTE_TYPE_VALIDATOR.isRouteTypeValid(101)); // High Speed Rail
     }
 }
