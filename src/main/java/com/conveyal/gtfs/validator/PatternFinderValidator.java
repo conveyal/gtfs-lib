@@ -213,22 +213,21 @@ public class PatternFinderValidator extends TripValidator {
                         insertPatternLocationStatement.setString(3, stopOrLocationId); // is actually location id
                         setIntParameter(insertPatternLocationStatement, 4, key.pickupTypes.get(i));
                         setIntParameter(insertPatternLocationStatement, 5, key.dropoffTypes.get(i));
-                        setDoubleParameter(insertPatternLocationStatement, 6, key.shapeDistances.get(i));
-                        setIntParameter(insertPatternLocationStatement, 7, key.timepoints.get(i));
-                        setIntParameter(insertPatternLocationStatement, 8, key.continuous_pickup.get(i));
-                        setIntParameter(insertPatternLocationStatement, 9, key.continuous_drop_off.get(i));
-                        insertPatternLocationStatement.setString(10, key.pickup_booking_rule_id.get(i));
-                        insertPatternLocationStatement.setString(11, key.drop_off_booking_rule_id.get(i));
+                        setIntParameter(insertPatternLocationStatement, 6, key.timepoints.get(i));
+                        setIntParameter(insertPatternLocationStatement, 7, key.continuous_pickup.get(i));
+                        setIntParameter(insertPatternLocationStatement, 8, key.continuous_drop_off.get(i));
+                        insertPatternLocationStatement.setString(9, key.pickup_booking_rule_id.get(i));
+                        insertPatternLocationStatement.setString(10, key.drop_off_booking_rule_id.get(i));
 
                         // the derived fields
-                        setIntParameter(insertPatternLocationStatement, 12, travelTime);
-                        setIntParameter(insertPatternLocationStatement, 13, timeInLocation);
+                        setIntParameter(insertPatternLocationStatement, 11, travelTime);
+                        setIntParameter(insertPatternLocationStatement, 12, timeInLocation);
 
                         // the copied fields
-                        setDoubleParameter(insertPatternLocationStatement, 14, key.mean_duration_factor.get(i));
-                        setDoubleParameter(insertPatternLocationStatement, 15, key.mean_duration_offset.get(i));
-                        setDoubleParameter(insertPatternLocationStatement, 16, key.safe_duration_factor.get(i));
-                        setDoubleParameter(insertPatternLocationStatement, 17, key.safe_duration_offset.get(i));
+                        setDoubleParameter(insertPatternLocationStatement, 13, key.mean_duration_factor.get(i));
+                        setDoubleParameter(insertPatternLocationStatement, 14, key.mean_duration_offset.get(i));
+                        setDoubleParameter(insertPatternLocationStatement, 15, key.safe_duration_factor.get(i));
+                        setDoubleParameter(insertPatternLocationStatement, 16, key.safe_duration_offset.get(i));
                         patternLocationTracker.addBatch();
                     }
                 }
