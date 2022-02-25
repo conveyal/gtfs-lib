@@ -737,18 +737,38 @@ public class JdbcTableWriter implements TableWriter {
                     cumulativeTravelTime += travelTimeForPatternHalts;
                 }
                 // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
-                updateLinkedFields(
-                    subTable,
-                    subEntity,
-                    "stop_times",
-                    "pattern_id",
-                    "timepoint",
-                    "drop_off_type",
-                    "pickup_type",
-                    "continuous_pickup",
-                    "continuous_drop_off",
-                    "shape_dist_traveled"
-                );
+                if (Table.PATTERN_STOP.name.equals(subTable.name)) {
+                    updateLinkedFields(
+                            subTable,
+                            subEntity,
+                            "stop_times",
+                            "pattern_id",
+                            "timepoint",
+                            "drop_off_type",
+                            "pickup_type",
+                            "continuous_pickup",
+                            "continuous_drop_off",
+                            "shape_dist_traveled",
+                            "pickup_booking_rule_id",
+                            "drop_off_booking_rule_id"
+                    );
+                }
+                if (Table.PATTERN_LOCATION.name.equals(subTable.name)) {
+                    updateLinkedFields(
+                            subTable,
+                            subEntity,
+                            "stop_times",
+                            "pattern_id",
+                            "timepoint",
+                            "drop_off_type",
+                            "pickup_type",
+                            "continuous_pickup",
+                            "continuous_drop_off",
+                            "pickup_booking_rule_id",
+                            "drop_off_booking_rule_id"
+
+                    );
+                }
             }
             setStatementParameters(subEntity, subTable, insertStatement, connection);
             if (hasOrderField) {
@@ -1608,6 +1628,7 @@ public class JdbcTableWriter implements TableWriter {
             stopTime.pickup_type = patternLocation.pickup_type;
             stopTime.drop_off_type = patternLocation.drop_off_type;
             stopTime.timepoint = patternLocation.timepoint;
+
             stopTime.continuous_pickup = patternLocation.continuous_pickup;
             stopTime.continuous_drop_off = patternLocation.continuous_drop_off;
             stopTime.pickup_booking_rule_id = patternLocation.pickup_booking_rule_id;
