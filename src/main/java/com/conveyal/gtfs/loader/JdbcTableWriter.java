@@ -1098,16 +1098,18 @@ public class JdbcTableWriter implements TableWriter {
      */
     private void  reconcilePatternLocations(String patternId, List<PatternLocation> newLocations, Connection connection) throws SQLException {
         LOG.info("Reconciling pattern locations for pattern ID={}", patternId);
+        if (newLocations.isEmpty()) return;
+
         // Collect the original list of pattern stop IDs.
-        String getStopIdsSql = String.format("select location_id from %s.pattern_locations where pattern_id = ? order by stop_sequence",
+        String getLocationIdsSql = String.format("select location_id from %s.pattern_locations where pattern_id = ? order by stop_sequence",
                 tablePrefix);
-        PreparedStatement getStopsStatement = connection.prepareStatement(getStopIdsSql);
-        getStopsStatement.setString(1, patternId);
-        LOG.info(getStopsStatement.toString());
-        ResultSet stopsResults = getStopsStatement.executeQuery();
-        List<String> originalStopIds = new ArrayList<>();
-        while (stopsResults.next()) {
-            originalStopIds.add(stopsResults.getString(1));
+        PreparedStatement getLocationsStatement = connection.prepareStatement(getLocationIdsSql);
+        getLocationsStatement.setString(1, patternId);
+        LOG.info(getLocationsStatement.toString());
+        ResultSet locationsResults = getLocationsStatement.executeQuery();
+        List<String> originalLocationIds = new ArrayList<>();
+        while (locationsResults.next()) {
+            originalLocationIds.add(locationsResults.getString(1));
         }
 
         // Collect all trip IDs so that we can insert new stop times (with the appropriate trip ID value) if a pattern
@@ -1134,20 +1136,20 @@ public class JdbcTableWriter implements TableWriter {
                 tablePrefix, tablePrefix, tablePrefix, patternId);
 
         // ADDITIONS (IF DIFF == 1)
-        if (originalStopIds.size() == newLocations.size() - 1) {
+        if (originalLocationIds.size() == newLocations.size() - 1) {
             // We have an addition; find it.
             int differenceLocation = -1;
             for (int i = 0; i < newLocations.size(); i++) {
                 if (differenceLocation != -1) {
                     // we've already found the addition
-                    if (i < originalStopIds.size() && !originalStopIds.get(i).equals(newLocations.get(i + 1).location_id)) {
+                    if (i < originalLocationIds.size() && !originalLocationIds.get(i).equals(newLocations.get(i + 1).location_id)) {
                         // there's another difference, which we weren't expecting
                         throw new IllegalStateException("Multiple differences found when trying to detect stop addition");
                     }
                 }
 
                 // if we've reached where one trip has an extra stop, or if the stops at this position differ
-                else if (i == newLocations.size() - 1 || !originalStopIds.get(i).equals(newLocations.get(i).location_id)) {
+                else if (i == newLocations.size() - 1 || !originalLocationIds.get(i).equals(newLocations.get(i).location_id)) {
                     // we have found the difference
                     differenceLocation = i;
                 }
@@ -1171,16 +1173,16 @@ public class JdbcTableWriter implements TableWriter {
         }
 
         // DELETIONS
-        else if (originalStopIds.size() == newLocations.size() + 1) {
+        else if (originalLocationIds.size() == newLocations.size() + 1) {
             // We have a deletion; find it
             int differenceLocation = -1;
-            for (int i = 0; i < originalStopIds.size(); i++) {
+            for (int i = 0; i < originalLocationIds.size(); i++) {
                 if (differenceLocation != -1) {
-                    if (!originalStopIds.get(i).equals(newLocations.get(i - 1).location_id)) {
+                    if (!originalLocationIds.get(i).equals(newLocations.get(i - 1).location_id)) {
                         // There is another difference, which we were not expecting
                         throw new IllegalStateException("Multiple differences found when trying to detect stop removal");
                     }
-                } else if (i == originalStopIds.size() - 1 || !originalStopIds.get(i).equals(newLocations.get(i).location_id)) {
+                } else if (i == originalLocationIds.size() - 1 || !originalLocationIds.get(i).equals(newLocations.get(i).location_id)) {
                     // We've reached the end and the only difference is length (so the last stop is the different one)
                     // or we've found the difference.
                     differenceLocation = i;
@@ -1212,7 +1214,7 @@ public class JdbcTableWriter implements TableWriter {
 
             // FIXME: Should we be handling bad stop time delete? I.e., we could query for stop times to be deleted and
             // if any of them have different stop IDs than the pattern stop, we could raise a warning for the user.
-            String removedStopId = originalStopIds.get(differenceLocation);
+            String removedStopId = originalLocationIds.get(differenceLocation);
 //            StopTime removed = trip.stopTimes.remove(differenceLocation);
 //
 //            // the removed stop can be null if it was skipped. trip.stopTimes.remove will throw an exception
@@ -1223,7 +1225,7 @@ public class JdbcTableWriter implements TableWriter {
         }
 
         // TRANSPOSITIONS
-        else if (originalStopIds.size() == newLocations.size()) {
+        else if (originalLocationIds.size() == newLocations.size()) {
             // Imagine the trip patterns pictured below (where . is a stop, and lines indicate the same stop)
             // the original trip pattern is on top, the new below
             // . . . . . . . .
@@ -1236,17 +1238,17 @@ public class JdbcTableWriter implements TableWriter {
 
             // find the left bound of the changed region
             int firstDifferentIndex = 0;
-            while (originalStopIds.get(firstDifferentIndex).equals(newLocations.get(firstDifferentIndex).location_id)) {
+            while (originalLocationIds.get(firstDifferentIndex).equals(newLocations.get(firstDifferentIndex).location_id)) {
                 firstDifferentIndex++;
 
-                if (firstDifferentIndex == originalStopIds.size())
+                if (firstDifferentIndex == originalLocationIds.size())
                     // trip patterns do not differ at all, nothing to do
                     return;
             }
 
             // find the right bound of the changed region
-            int lastDifferentIndex = originalStopIds.size() - 1;
-            while (originalStopIds.get(lastDifferentIndex).equals(newLocations.get(lastDifferentIndex).location_id)) {
+            int lastDifferentIndex = originalLocationIds.size() - 1;
+            while (originalLocationIds.get(lastDifferentIndex).equals(newLocations.get(lastDifferentIndex).location_id)) {
                 lastDifferentIndex--;
             }
 
@@ -1262,12 +1264,11 @@ public class JdbcTableWriter implements TableWriter {
             // because the requisite operations are equivalent
             int from, to;
             // Ensure that only a single stop has been moved (i.e. verify stop IDs inside changed region remain unchanged)
-            if (originalStopIds.get(firstDifferentIndex).equals(newLocations.get(lastDifferentIndex).location_id)) {
+            if (originalLocationIds.get(firstDifferentIndex).equals(newLocations.get(lastDifferentIndex).location_id)) {
                 // Stop was moved from beginning of changed region to end of changed region (-->)
                 from = firstDifferentIndex;
                 to = lastDifferentIndex;
-                // FLEX TODO: verify interior locations are unchanged?
-                // verifyInteriorStopsAreUnchanged(originalStopIds, newLocations, firstDifferentIndex, lastDifferentIndex, true);
+                verifyInteriorLocationsAreUnchanged(originalLocationIds, newLocations, firstDifferentIndex, lastDifferentIndex, true);
                 conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
                                 // if sequence = fromIndex, update to toIndex.
                                 "when stop_sequence = %d then %d " +
@@ -1278,12 +1279,11 @@ public class JdbcTableWriter implements TableWriter {
                                 "end " +
                                 "from %s.trips where %s",
                         tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
-            } else if (newLocations.get(firstDifferentIndex).location_id.equals(originalStopIds.get(lastDifferentIndex))) {
+            } else if (newLocations.get(firstDifferentIndex).location_id.equals(originalLocationIds.get(lastDifferentIndex))) {
                 // Stop was moved from end of changed region to beginning of changed region (<--)
                 from = lastDifferentIndex;
                 to = firstDifferentIndex;
-                // FLEX TODO: verify interior locations are unchanged?
-                // verifyInteriorStopsAreUnchanged(originalStopIds, newLocations, firstDifferentIndex, lastDifferentIndex, true);
+                verifyInteriorLocationsAreUnchanged(originalLocationIds, newLocations, firstDifferentIndex, lastDifferentIndex, true);
                 conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
                                 // if sequence = fromIndex, update to toIndex.
                                 "when stop_sequence = %d then %d " +
@@ -1305,23 +1305,23 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info("Updated {} stop_times.", updated);
         }
         // CHECK IF SET OF STOPS ADDED TO END OF ORIGINAL LIST
-        else if (originalStopIds.size() < newLocations.size()) {
+        else if (originalLocationIds.size() < newLocations.size()) {
             // find the left bound of the changed region to check that no stops have changed in between
             int firstDifferentIndex = 0;
             while (
-                    firstDifferentIndex < originalStopIds.size() &&
-                            originalStopIds.get(firstDifferentIndex).equals(newLocations.get(firstDifferentIndex).location_id)
+                    firstDifferentIndex < originalLocationIds.size() &&
+                            originalLocationIds.get(firstDifferentIndex).equals(newLocations.get(firstDifferentIndex).location_id)
             ) {
                 firstDifferentIndex++;
             }
-            if (firstDifferentIndex != originalStopIds.size())
+            if (firstDifferentIndex != originalLocationIds.size())
                 throw new IllegalStateException("When adding multiple stops to patterns, new stops must all be at the end");
 
             // insert a skipped stop for each new element in newStops
             int stopsToInsert = newLocations.size() - firstDifferentIndex;
             // FIXME: Should we be inserting blank stop times at all?  Shouldn't these just inherit the arrival times
             // from the pattern stops?
-            LOG.info("Adding {} stop times to existing {} stop times. Starting at {}", stopsToInsert, originalStopIds.size(), firstDifferentIndex);
+            LOG.info("Adding {} stop times to existing {} stop times. Starting at {}", stopsToInsert, originalLocationIds.size(), firstDifferentIndex);
             insertBlankStopTimesForLocations(tripsForPattern, newLocations, firstDifferentIndex, stopsToInsert, connection);
         }
         // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
@@ -1341,6 +1341,8 @@ public class JdbcTableWriter implements TableWriter {
      */
     private void  reconcilePatternStops(String patternId, List<PatternStop> newStops, Connection connection) throws SQLException {
         LOG.info("Reconciling pattern stops for pattern ID={}", patternId);
+        if (newStops.isEmpty()) return;
+
         // Collect the original list of pattern stop IDs.
         String getStopIdsSql = String.format("select stop_id from %s.pattern_stops where pattern_id = ? order by stop_sequence",
                 tablePrefix);
@@ -1591,6 +1593,32 @@ public class JdbcTableWriter implements TableWriter {
             int shiftedIndex = movedRight ? i + 1 : i - 1;
             String newStopId = newStopIds.get(i);
             String originalStopId = originalStopIds.get(shiftedIndex);
+            if (!newStopId.equals(originalStopId)) {
+                // If stop ID for new stop at the given index does not match the original stop ID, the order of at least
+                // one stop within the changed region has been changed, which is illegal according to the rule enforcing
+                // only a single addition, deletion, or transposition per update.
+                throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
+            }
+        }
+    }
+    private static void verifyInteriorLocationsAreUnchanged(
+            List<String> originalLocationIds,
+            List<PatternLocation> newLocations,
+            int firstDifferentIndex,
+            int lastDifferentIndex,
+            boolean movedRight
+    ) {
+        //Stops mapped to list of stop IDs simply for easier viewing/comparison with original IDs while debugging with
+        // breakpoints.
+        List<String> newStopIds = newLocations.stream().map(s -> s.location_id).collect(Collectors.toList());
+        // Determine the bounds of the region that should be identical between the two lists.
+        int beginRegion = movedRight ? firstDifferentIndex : firstDifferentIndex + 1;
+        int endRegion = movedRight ? lastDifferentIndex - 1 : lastDifferentIndex;
+        for (int i = beginRegion; i <= endRegion; i++) {
+            // Shift index when selecting stop from original list to account for displaced stop.
+            int shiftedIndex = movedRight ? i + 1 : i - 1;
+            String newStopId = newStopIds.get(i);
+            String originalStopId = originalLocationIds.get(shiftedIndex);
             if (!newStopId.equals(originalStopId)) {
                 // If stop ID for new stop at the given index does not match the original stop ID, the order of at least
                 // one stop within the changed region has been changed, which is illegal according to the rule enforcing
