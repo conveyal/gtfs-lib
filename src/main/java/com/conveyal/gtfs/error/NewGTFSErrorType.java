@@ -52,6 +52,7 @@ public enum NewGTFSErrorType {
     ROUTE_LONG_NAME_CONTAINS_SHORT_NAME(Priority.LOW, "The long name of a route should complement the short name, not include it."),
     ROUTE_SHORT_AND_LONG_NAME_MISSING(Priority.MEDIUM, "A route has neither a long nor a short name."),
     ROUTE_SHORT_NAME_TOO_LONG(Priority.MEDIUM, "The short name of a route is too long for display in standard GTFS consumer applications."),
+    ROUTE_TYPE_INVALID(Priority.MEDIUM, "The route type is not valid."),
     ROUTE_UNUSED(Priority.MEDIUM, "This route is defined but has no trips."),
     SERVICE_NEVER_ACTIVE(Priority.MEDIUM, "A service code was defined, but is never active on any date."),
     SERVICE_UNUSED(Priority.MEDIUM, "A service code was defined, but is never referenced by any trips."),
