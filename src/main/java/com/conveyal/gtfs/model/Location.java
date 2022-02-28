@@ -57,7 +57,10 @@ public class Location extends Entity {
      */
     public String toCsvRow() {
         String stopName = stop_name == null ? "" : stop_name;
-        String stopDesc = stop_desc == null ? "" : stop_desc;
+        String stopDesc = "";
+        if (stop_desc != null ){
+            stopDesc = stop_desc.contains(",") ? "\"" + stop_desc + "\"" : stop_desc;
+        }
         String stopUrl = stop_url == null ? "" : stop_url.toString();
         String zoneId = zone_id == null ? "" : zone_id;
         return String.join(
