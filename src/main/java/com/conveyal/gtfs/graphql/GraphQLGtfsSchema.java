@@ -549,7 +549,6 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("location_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
             .field(MapFetcher.field("pickup_booking_rule_id"))
-            .field(MapFetcher.field("shape_dist_traveled", GraphQLFloat))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
             .field(MapFetcher.field("pickup_type", GraphQLInt))
             .field(MapFetcher.field("continuous_drop_off", GraphQLInt))

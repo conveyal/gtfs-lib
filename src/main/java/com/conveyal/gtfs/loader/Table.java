@@ -483,7 +483,6 @@ public class Table {
             // FLEX TODO: Are all of these needed?
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
-            new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", EDITOR, 1),
             new ShortField("continuous_pickup", OPTIONAL,3),
             new ShortField("continuous_drop_off", OPTIONAL,3),
