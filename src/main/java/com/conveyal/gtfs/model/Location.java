@@ -56,11 +56,11 @@ public class Location extends Entity {
      * of the unpacking of GeoJson data to CSV.
      */
     public String toCsvRow() {
-        String stopName, stopDesc = "";
-        if (stop_name != null){
+        String stopName = "", stopDesc = "";
+        if (stop_name != null) {
             stopName = stop_name.contains(",") ? "\"" + stop_name + "\"" : stop_name;
         }
-        if (stop_desc != null){
+        if (stop_desc != null) {
             stopDesc = stop_desc.contains(",") ? "\"" + stop_desc + "\"" : stop_desc;
         }
         String stopUrl = stop_url == null ? "" : stop_url.toString();
