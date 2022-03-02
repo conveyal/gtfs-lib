@@ -15,6 +15,7 @@ import com.google.common.collect.Lists;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.conveyal.gtfs.model.Entity.DOUBLE_MISSING;
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 import static com.conveyal.gtfs.util.GeoJsonUtil.GEOMETRY_TYPE_POLYGON;
 
@@ -91,8 +92,8 @@ public class FlexValidator extends FeedValidator {
         if (!fareRules.isEmpty() &&
             fareRules.stream().noneMatch(fareRule ->
                 fareRule.contains_id.equals(location.zone_id) ||
-                fareRule.destination_id.equals(location.zone_id) ||
-                fareRule.origin_id.equals(location.zone_id)
+                    fareRule.destination_id.equals(location.zone_id) ||
+                    fareRule.origin_id.equals(location.zone_id)
             )
         ) {
             // zone id is required if fare rules are defined.
@@ -134,8 +135,8 @@ public class FlexValidator extends FeedValidator {
         ) {
             // start_pickup_dropoff_window is forbidden if arrival time or departure time are defined.
             errors.add(NewGTFSError.forEntity(
-                stopTime,
-                NewGTFSErrorType.FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW)
+                    stopTime,
+                    NewGTFSErrorType.FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW)
                 .setBadValue(Integer.toString(stopTime.start_pickup_dropoff_window))
             );
         }
@@ -152,9 +153,14 @@ public class FlexValidator extends FeedValidator {
         }
 
         boolean stopIdRefersToLocationGroupOrLocation =
-            (!locationGroups.isEmpty() && !locations.isEmpty()) &&
-            (locationGroups.stream().anyMatch(locationGroup -> stopTime.stop_id.equals(locationGroup.location_group_id)) ||
-            locations.stream().anyMatch(location -> stopTime.stop_id.equals(location.location_id)));
+            (locationGroups != null &&
+                !locationGroups.isEmpty() &&
+                locationGroups.stream().anyMatch(locationGroup -> stopTime.stop_id.equals(locationGroup.location_group_id)
+                ) ||
+                (locations != null &&
+                    !locations.isEmpty() &&
+                    locations.stream().anyMatch(location -> stopTime.stop_id.equals(location.location_id)))
+            );
 
         if (stopTime.start_pickup_dropoff_window == INT_MISSING &&
             stopIdRefersToLocationGroupOrLocation) {
@@ -182,7 +188,12 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Integer.toString(stopTime.pickup_type))
             );
         }
-        if (stopTime.pickup_type == 3 && stopIdRefersToLocationGroupOrLocation) {
+        boolean stopIdRefersToLocationGroup =
+            (locationGroups != null &&
+                !locationGroups.isEmpty() &&
+                locationGroups.stream().anyMatch(locationGroup -> stopTime.stop_id.equals(locationGroup.location_group_id)
+                ));
+        if (stopTime.pickup_type == 3 && stopIdRefersToLocationGroup) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
             // location group.
             errors.add(NewGTFSError.forEntity(
@@ -192,10 +203,11 @@ public class FlexValidator extends FeedValidator {
             );
         }
         if (stopTime.pickup_type == 3 &&
+            locations != null &&
             !locations.isEmpty() &&
             locations.stream().anyMatch(location ->
                 stopTime.stop_id.equals(location.location_id) &&
-                !location.geometry_type.equals(GEOMETRY_TYPE_POLYGON)
+                    !location.geometry_type.equals(GEOMETRY_TYPE_POLYGON)
             )) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
             // location that is not a single "LineString".
@@ -214,7 +226,7 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Integer.toString(stopTime.drop_off_type))
             );
         }
-        if (stopTime.mean_duration_factor != INT_MISSING && !stopIdRefersToLocationGroupOrLocation) {
+        if (stopTime.mean_duration_factor != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
             // mean_duration_factor is forbidden if stop_id does not refer to a location group or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
@@ -222,7 +234,7 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Double.toString(stopTime.mean_duration_factor))
             );
         }
-        if (stopTime.mean_duration_offset != INT_MISSING && !stopIdRefersToLocationGroupOrLocation) {
+        if (stopTime.mean_duration_offset != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
             // mean_duration_offset is forbidden if stop_id does not refer to a location group or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
@@ -230,7 +242,7 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Double.toString(stopTime.mean_duration_offset))
             );
         }
-        if (stopTime.safe_duration_factor != INT_MISSING && !stopIdRefersToLocationGroupOrLocation) {
+        if (stopTime.safe_duration_factor != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
             // safe_duration_factor is forbidden if stop_id does not refer to a location group or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
@@ -238,7 +250,7 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Double.toString(stopTime.safe_duration_factor))
             );
         }
-        if (stopTime.safe_duration_offset != INT_MISSING && !stopIdRefersToLocationGroupOrLocation) {
+        if (stopTime.safe_duration_offset != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
             // safe_duration_offset is forbidden if stop_id does not refer to a location group or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
