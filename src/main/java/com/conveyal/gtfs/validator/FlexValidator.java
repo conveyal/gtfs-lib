@@ -62,6 +62,8 @@ public class FlexValidator extends FeedValidator {
         errors.forEach(this::registerError);
     }
 
+
+
     public void validateLocationGroups(LocationGroup locationGroup, List<Stop> stops, List<Location> locations) {
         if (!stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(locationGroup.location_group_id))) {
             // Location group id must not match a stop id.
@@ -89,11 +91,13 @@ public class FlexValidator extends FeedValidator {
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_ID).setBadValue(location.location_id)
             );
         }
-        if (!fareRules.isEmpty() &&
-            fareRules.stream().noneMatch(fareRule ->
-                fareRule.contains_id.equals(location.zone_id) ||
-                    fareRule.destination_id.equals(location.zone_id) ||
-                    fareRule.origin_id.equals(location.zone_id)
+        if (fareRules != null &&
+            !fareRules.isEmpty() &&
+            fareRules.stream().anyMatch(fareRule ->
+                (fareRule.contains_id != null && fareRule.destination_id != null && fareRule.origin_id != null) &&
+                !fareRule.contains_id.equals(location.zone_id) &&
+                !fareRule.destination_id.equals(location.zone_id) &&
+                !fareRule.origin_id.equals(location.zone_id)
             )
         ) {
             // zone id is required if fare rules are defined.
@@ -308,7 +312,7 @@ public class FlexValidator extends FeedValidator {
             // prior_notice_start_day is forbidden for booking_type 0 (Real time booking).
             errors.add(NewGTFSError.forEntity(
                     bookingRule,
-                    NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY)
+                    NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY_FOR_BOOKING_TYPE)
                 .setBadValue(Integer.toString(bookingRule.prior_notice_start_day))
             );
         }
@@ -320,7 +324,7 @@ public class FlexValidator extends FeedValidator {
             // prior_notice_duration_max is defined.
             errors.add(NewGTFSError.forEntity(
                     bookingRule,
-                    NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY_2)
+                    NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY)
                 .setBadValue(Integer.toString(bookingRule.prior_notice_start_day))
             );
         }

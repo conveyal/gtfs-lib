@@ -112,6 +112,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
             new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
@@ -241,6 +242,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
             new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
