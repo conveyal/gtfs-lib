@@ -62,8 +62,6 @@ public class FlexValidator extends FeedValidator {
         errors.forEach(this::registerError);
     }
 
-
-
     public void validateLocationGroups(LocationGroup locationGroup, List<Stop> stops, List<Location> locations) {
         if (!stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(locationGroup.location_group_id))) {
             // Location group id must not match a stop id.
@@ -192,11 +190,13 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Integer.toString(stopTime.pickup_type))
             );
         }
+
         boolean stopIdRefersToLocationGroup =
             (locationGroups != null &&
                 !locationGroups.isEmpty() &&
                 locationGroups.stream().anyMatch(locationGroup -> stopTime.stop_id.equals(locationGroup.location_group_id)
                 ));
+
         if (stopTime.pickup_type == 3 && stopIdRefersToLocationGroup) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
             // location group.
