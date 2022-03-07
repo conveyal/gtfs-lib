@@ -175,7 +175,10 @@ public class PatternFinder {
                 }
 
                 // check for unique via stop
-                pattern.orderedStops.stream().map(stopById::get).forEach(stop -> {
+                pattern.orderedStops.stream().map(
+                        stop -> stopById.get(stop) != null ? stopById.get(stop) : locationById.get(stop)
+                ).forEach(stop -> {
+
                     Set<Pattern> viaIntersection = new HashSet<>(intersection);
                     viaIntersection.retainAll(info.vias.get(stop.stop_name));
 
