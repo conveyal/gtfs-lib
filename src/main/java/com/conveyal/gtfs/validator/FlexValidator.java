@@ -32,9 +32,6 @@ import static com.conveyal.gtfs.util.GeoJsonUtil.GEOMETRY_TYPE_POLYGON;
  */
 public class FlexValidator extends FeedValidator {
 
-    // Store all validation errors here so that they can be checked as part of testing.
-    public final List<NewGTFSError> errors = new ArrayList<>();
-
     /**
      * Constructor for testing.
      */
@@ -48,21 +45,35 @@ public class FlexValidator extends FeedValidator {
 
     @Override
     public void validate() {
+        List<NewGTFSError> errors = new ArrayList<>();
         feed.locationGroups.forEach(locationGroup ->
-            validateLocationGroups(locationGroup, Lists.newArrayList(feed.stops), Lists.newArrayList(feed.locations))
+            errors.addAll(
+                validateLocationGroup(locationGroup, Lists.newArrayList(feed.stops), Lists.newArrayList(feed.locations))
+            )
         );
         feed.locations.forEach(location ->
-            validateLocations(location, Lists.newArrayList(feed.stops), Lists.newArrayList(feed.fareRules))
+            errors.addAll(
+                validateLocation(location, Lists.newArrayList(feed.stops), Lists.newArrayList(feed.fareRules))
+            )
         );
         feed.stopTimes.forEach(stopTime ->
-            validateStopTimes(stopTime, Lists.newArrayList(feed.locationGroups), Lists.newArrayList(feed.locations))
+            errors.addAll(
+                validateStopTime(stopTime, Lists.newArrayList(feed.locationGroups), Lists.newArrayList(feed.locations))
+            )
         );
-        feed.bookingRules.forEach(this::validateBookingRules);
+        feed.bookingRules.forEach(bookingRule ->
+            errors.addAll(validateBookingRule(bookingRule))
+        );
         // Register errors, if any, once all checks have been completed.
         errors.forEach(this::registerError);
     }
 
-    public void validateLocationGroups(LocationGroup locationGroup, List<Stop> stops, List<Location> locations) {
+    public static List<NewGTFSError> validateLocationGroup(
+        LocationGroup locationGroup,
+        List<Stop> stops,
+        List<Location> locations
+    ) {
+        List<NewGTFSError> errors = new ArrayList<>();
         if (!stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(locationGroup.location_group_id))) {
             // Location group id must not match a stop id.
             errors.add(NewGTFSError.forEntity(
@@ -78,9 +89,11 @@ public class FlexValidator extends FeedValidator {
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_GROUP_ID).setBadValue(locationGroup.location_group_id)
             );
         }
+        return errors;
     }
 
-    public void validateLocations(Location location, List<Stop> stops, List<FareRule> fareRules) {
+    public static List<NewGTFSError> validateLocation(Location location, List<Stop> stops, List<FareRule> fareRules) {
+        List<NewGTFSError> errors = new ArrayList<>();
         if (!stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(location.location_id))
         ) {
             // Location id must not match a stop id.
@@ -104,12 +117,15 @@ public class FlexValidator extends FeedValidator {
                 NewGTFSErrorType.FLEX_MISSING_FARE_RULE).setBadValue(location.zone_id)
             );
         }
+        return errors;
     }
 
-    public void validateStopTimes(
+    public static List<NewGTFSError> validateStopTime(
         StopTime stopTime,
         List<LocationGroup> locationGroups,
         List<Location> locations) {
+
+        List<NewGTFSError> errors = new ArrayList<>();
 
         if (stopTime.arrival_time != INT_MISSING &&
             (stopTime.start_pickup_dropoff_window != INT_MISSING ||
@@ -220,7 +236,6 @@ public class FlexValidator extends FeedValidator {
                     NewGTFSErrorType.FLEX_FORBIDDEN_PICKUP_TYPE_FOR_LOCATION)
                 .setBadValue(Integer.toString(stopTime.pickup_type))
             );
-            registerError(stopTime, NewGTFSErrorType.FLEX_FORBIDDEN_PICKUP_TYPE_FOR_LOCATION, stopTime.pickup_type);
         }
         if (stopTime.drop_off_type == 0 && stopIdRefersToLocationGroupOrLocation) {
             // drop_off_type 0 (Regularly scheduled pickup) is forbidden if stop_id refers to a location group or location.
@@ -262,9 +277,12 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Double.toString(stopTime.safe_duration_offset))
             );
         }
+        return errors;
     }
 
-    public void validateBookingRules(BookingRule bookingRule) {
+    public static List<NewGTFSError> validateBookingRule(BookingRule bookingRule) {
+        List<NewGTFSError> errors = new ArrayList<>();
+
         if (bookingRule.prior_notice_duration_min == INT_MISSING && bookingRule.booking_type == 1) {
             // prior_notice_duration_min is required for booking_type 1 (Up to same-day booking with advance notice).
             errors.add(NewGTFSError.forEntity(
@@ -354,5 +372,6 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(bookingRule.prior_notice_service_id)
             );
         }
+        return errors;
     }
 }

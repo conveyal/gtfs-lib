@@ -23,18 +23,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class FlexValidatorTest {
-    private static final FlexValidator flexValidator = new FlexValidator();
 
     @ParameterizedTest
     @MethodSource("createLocationGroupChecks")
     void validateLocationGroupTests(LocationGroupArguments locationGroupArguments) {
-        flexValidator.errors.clear();
-        flexValidator.validateLocationGroups(
+        List<NewGTFSError> errors = FlexValidator.validateLocationGroup(
             (LocationGroup) locationGroupArguments.testObject,
             locationGroupArguments.stops,
             locationGroupArguments.locations
         );
-        checkValidationErrorsMatchExpectedErrors(flexValidator.errors, locationGroupArguments.expectedErrors);
+        checkValidationErrorsMatchExpectedErrors(errors, locationGroupArguments.expectedErrors);
     }
 
     private static Stream<Arguments> createLocationGroupChecks() {
@@ -60,13 +58,12 @@ public class FlexValidatorTest {
     @ParameterizedTest
     @MethodSource("createLocationChecks")
     void validateLocationTests(LocationArguments locationArguments) {
-        flexValidator.errors.clear();
-        flexValidator.validateLocations(
+        List<NewGTFSError> errors = FlexValidator.validateLocation(
             (Location) locationArguments.testObject,
             locationArguments.stops,
             locationArguments.fareRules
         );
-        checkValidationErrorsMatchExpectedErrors(flexValidator.errors, locationArguments.expectedErrors);
+        checkValidationErrorsMatchExpectedErrors(errors, locationArguments.expectedErrors);
     }
 
     private static Stream<Arguments> createLocationChecks() {
@@ -115,13 +112,12 @@ public class FlexValidatorTest {
     @ParameterizedTest
     @MethodSource("createStopTimeChecksForArrivalDepartureStartEndPickupDropoff")
     void validateStopTimeArrivalDepartureStartEndPickupDropoffTests(BaseArguments baseArguments) {
-        flexValidator.errors.clear();
-        flexValidator.validateStopTimes(
+        List<NewGTFSError> errors = FlexValidator.validateStopTime(
             (StopTime) baseArguments.testObject,
             null,
             null
         );
-        checkValidationErrorsMatchExpectedErrors(flexValidator.errors, baseArguments.expectedErrors);
+        checkValidationErrorsMatchExpectedErrors(errors, baseArguments.expectedErrors);
     }
 
     private static Stream<Arguments> createStopTimeChecksForArrivalDepartureStartEndPickupDropoff() {
@@ -177,13 +173,12 @@ public class FlexValidatorTest {
     @MethodSource("createStopTimeChecksForStartEndPickupDropoff")
     void validateStopTimeStartEndPickupDropoffTests(StopTimeArguments stopTimeArguments
     ) {
-        flexValidator.errors.clear();
-        flexValidator.validateStopTimes(
+        List<NewGTFSError> errors = FlexValidator.validateStopTime(
             (StopTime) stopTimeArguments.testObject,
             stopTimeArguments.locationGroups,
             stopTimeArguments.locations
         );
-        checkValidationErrorsMatchExpectedErrors(flexValidator.errors, stopTimeArguments.expectedErrors);
+        checkValidationErrorsMatchExpectedErrors(errors, stopTimeArguments.expectedErrors);
     }
 
     private static Stream<Arguments> createStopTimeChecksForStartEndPickupDropoff() {
@@ -254,13 +249,12 @@ public class FlexValidatorTest {
     @ParameterizedTest
     @MethodSource("createStopTimeChecksForMeanAndSafe")
     void validateStopTimeMeanAndSafeTests(StopTimeArguments stopTimeArguments) {
-        flexValidator.errors.clear();
-        flexValidator.validateStopTimes(
+        List<NewGTFSError> errors = FlexValidator.validateStopTime(
             (StopTime) stopTimeArguments.testObject,
             stopTimeArguments.locationGroups,
             stopTimeArguments.locations
         );
-        checkValidationErrorsMatchExpectedErrors(flexValidator.errors, stopTimeArguments.expectedErrors);
+        checkValidationErrorsMatchExpectedErrors(errors, stopTimeArguments.expectedErrors);
     }
 
     private static Stream<Arguments> createStopTimeChecksForMeanAndSafe() {
@@ -321,9 +315,8 @@ public class FlexValidatorTest {
     @ParameterizedTest
     @MethodSource("createBookingRuleChecks")
     void validateBookingRuleTests(BaseArguments baseArguments) {
-        flexValidator.errors.clear();
-        flexValidator.validateBookingRules((BookingRule) baseArguments.testObject);
-        checkValidationErrorsMatchExpectedErrors(flexValidator.errors, baseArguments.expectedErrors);
+        List<NewGTFSError> errors = FlexValidator.validateBookingRule((BookingRule) baseArguments.testObject);
+        checkValidationErrorsMatchExpectedErrors(errors, baseArguments.expectedErrors);
     }
 
     private static Stream<Arguments> createBookingRuleChecks() {
@@ -464,7 +457,7 @@ public class FlexValidatorTest {
             }
         } else {
             // No errors expected, so the reported errors should be empty.
-            assertTrue(flexValidator.errors.isEmpty());
+            assertTrue(validationErrors.isEmpty());
         }
     }
 
