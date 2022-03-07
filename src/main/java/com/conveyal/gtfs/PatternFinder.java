@@ -177,13 +177,13 @@ public class PatternFinder {
                 // check for unique via stop
                 pattern.orderedStops.stream().map(
                         stop -> stopById.get(stop) != null ? stopById.get(stop) : locationById.get(stop)
-                ).forEach(stop -> {
-
+                ).forEach(entity -> {
                     Set<Pattern> viaIntersection = new HashSet<>(intersection);
-                    viaIntersection.retainAll(info.vias.get(stop.stop_name));
+                    String stopName = (entity instanceof Stop) ? ((Stop) entity).stop_name : ((Location) entity).stop_name;
+                    viaIntersection.retainAll(info.vias.get(stopName));
 
                     if (viaIntersection.size() == 1) {
-                        pattern.name = String.format(Locale.US, "from %s to %s via %s", fromName, toName, stop.stop_name);
+                        pattern.name = String.format(Locale.US, "from %s to %s via %s", fromName, toName, stopName);
                     }
                 });
 
