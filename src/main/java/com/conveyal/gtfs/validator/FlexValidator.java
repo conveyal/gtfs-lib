@@ -32,58 +32,59 @@ import static com.conveyal.gtfs.util.GeoJsonUtil.GEOMETRY_TYPE_POLYGON;
  */
 public class FlexValidator extends FeedValidator {
 
-    /**
-     * Constructor for testing.
-     */
-    public FlexValidator() {
-        this(null, null);
-    }
-
     public FlexValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
     }
 
     @Override
     public void validate() {
-        List<NewGTFSError> errors = new ArrayList<>();
-        feed.locationGroups.forEach(locationGroup ->
-            errors.addAll(
-                validateLocationGroup(locationGroup, Lists.newArrayList(feed.stops), Lists.newArrayList(feed.locations))
-            )
-        );
-        feed.locations.forEach(location ->
-            errors.addAll(
-                validateLocation(location, Lists.newArrayList(feed.stops), Lists.newArrayList(feed.fareRules))
-            )
-        );
-        feed.stopTimes.forEach(stopTime ->
-            errors.addAll(
-                validateStopTime(stopTime, Lists.newArrayList(feed.locationGroups), Lists.newArrayList(feed.locations))
-            )
-        );
-        feed.bookingRules.forEach(bookingRule ->
-            errors.addAll(validateBookingRule(bookingRule))
-        );
-        // Register errors, if any, once all checks have been completed.
-        errors.forEach(this::registerError);
+        List<BookingRule> bookingRules = Lists.newArrayList(feed.bookingRules);
+        List<LocationGroup> locationGroups = Lists.newArrayList(feed.locationGroups);
+        List<Location> locations = Lists.newArrayList(feed.locations);
+
+        if (isFlexFeed(bookingRules, locationGroups, locations)) {
+            List<Stop> stops = Lists.newArrayList(feed.stops);
+            List<FareRule> fareRules = Lists.newArrayList(feed.fareRules);
+            List<NewGTFSError> errors = new ArrayList<>();
+            feed.bookingRules.forEach(bookingRule -> errors.addAll(validateBookingRule(bookingRule)));
+            feed.locationGroups.forEach(locationGroup -> errors.addAll(validateLocationGroup(locationGroup, stops, locations)));
+            feed.locations.forEach(location -> errors.addAll(validateLocation(location, stops, fareRules)));
+            feed.stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, locationGroups, locations)));
+            // Register errors, if any, once all checks have been completed.
+            errors.forEach(this::registerError);
+        }
     }
 
+    /**
+     * Determine if the feed is flex.
+     */
+    private static boolean isFlexFeed(
+        List<BookingRule> bookingRules,
+        List<LocationGroup> locationGroups,
+        List<Location> locations
+    ) {
+        return
+            (bookingRules != null && !bookingRules.isEmpty()) ||
+            (locationGroups != null && !locationGroups.isEmpty()) ||
+            (locations != null && !locations.isEmpty());
+    }
+
+    /**
+     * Check location group id conforms to flex specification constraints.
+     */
     public static List<NewGTFSError> validateLocationGroup(
         LocationGroup locationGroup,
         List<Stop> stops,
         List<Location> locations
     ) {
         List<NewGTFSError> errors = new ArrayList<>();
-        if (!stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(locationGroup.location_group_id))) {
-            // Location group id must not match a stop id.
+        if (locationGroupIdOrLocationIdIsStopId(stops, locationGroup.location_group_id)) {
             errors.add(NewGTFSError.forEntity(
                 locationGroup,
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_GROUP_ID).setBadValue(locationGroup.location_group_id)
             );
         }
-        if (!locations.isEmpty() &&
-            locations.stream().anyMatch(location -> location.location_id.equals(locationGroup.location_group_id))) {
-            // Location group id must not match a location id.
+        if (locationGroupIdIsLocationId(locations, locationGroup.location_group_id)) {
             errors.add(NewGTFSError.forEntity(
                 locationGroup,
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_GROUP_ID).setBadValue(locationGroup.location_group_id)
@@ -92,25 +93,19 @@ public class FlexValidator extends FeedValidator {
         return errors;
     }
 
+    /**
+     * Check location id and zone id conforms to flex specification constraints.
+     */
     public static List<NewGTFSError> validateLocation(Location location, List<Stop> stops, List<FareRule> fareRules) {
         List<NewGTFSError> errors = new ArrayList<>();
-        if (!stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(location.location_id))
-        ) {
+        if (locationGroupIdOrLocationIdIsStopId(stops, location.location_id)) {
             // Location id must not match a stop id.
             errors.add(NewGTFSError.forEntity(
                 location,
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_ID).setBadValue(location.location_id)
             );
         }
-        if (fareRules != null &&
-            !fareRules.isEmpty() &&
-            fareRules.stream().anyMatch(fareRule ->
-                (fareRule.contains_id != null && fareRule.destination_id != null && fareRule.origin_id != null) &&
-                !fareRule.contains_id.equals(location.zone_id) &&
-                !fareRule.destination_id.equals(location.zone_id) &&
-                !fareRule.origin_id.equals(location.zone_id)
-            )
-        ) {
+        if (hasFareRules(fareRules, location.zone_id)) {
             // zone id is required if fare rules are defined.
             errors.add(NewGTFSError.forEntity(
                 location,
@@ -120,6 +115,9 @@ public class FlexValidator extends FeedValidator {
         return errors;
     }
 
+    /**
+     * Check that a stop time conforms to flex specification constraints.
+     */
     public static List<NewGTFSError> validateStopTime(
         StopTime stopTime,
         List<LocationGroup> locationGroups,
@@ -170,18 +168,13 @@ public class FlexValidator extends FeedValidator {
             );
         }
 
-        boolean stopIdRefersToLocationGroupOrLocation =
-            (locationGroups != null &&
-                !locationGroups.isEmpty() &&
-                locationGroups.stream().anyMatch(locationGroup -> stopTime.stop_id.equals(locationGroup.location_group_id)
-                ) ||
-                (locations != null &&
-                    !locations.isEmpty() &&
-                    locations.stream().anyMatch(location -> stopTime.stop_id.equals(location.location_id)))
-            );
+        boolean stopIdRefersToLocationGroupOrLocation = stopIdIsLocationGroupOrLocation(
+            stopTime.stop_id,
+            locationGroups,
+            locations
+        );
 
-        if (stopTime.start_pickup_dropoff_window == INT_MISSING &&
-            stopIdRefersToLocationGroupOrLocation) {
+        if (stopTime.start_pickup_dropoff_window == INT_MISSING && stopIdRefersToLocationGroupOrLocation) {
             // start_pickup_dropoff_window is required if stop_id refers to a location group or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
@@ -189,8 +182,7 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Integer.toString(stopTime.start_pickup_dropoff_window))
             );
         }
-        if (stopTime.end_pickup_dropoff_window == INT_MISSING &&
-            stopIdRefersToLocationGroupOrLocation) {
+        if (stopTime.end_pickup_dropoff_window == INT_MISSING && stopIdRefersToLocationGroupOrLocation) {
             // end_pickup_dropoff_window is required if stop_id refers to a location group or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
@@ -207,11 +199,7 @@ public class FlexValidator extends FeedValidator {
             );
         }
 
-        boolean stopIdRefersToLocationGroup =
-            (locationGroups != null &&
-                !locationGroups.isEmpty() &&
-                locationGroups.stream().anyMatch(locationGroup -> stopTime.stop_id.equals(locationGroup.location_group_id)
-                ));
+        boolean stopIdRefersToLocationGroup = stopIdIsLocationGroup(stopTime.stop_id, locationGroups);
 
         if (stopTime.pickup_type == 3 && stopIdRefersToLocationGroup) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
@@ -222,13 +210,8 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Integer.toString(stopTime.pickup_type))
             );
         }
-        if (stopTime.pickup_type == 3 &&
-            locations != null &&
-            !locations.isEmpty() &&
-            locations.stream().anyMatch(location ->
-                stopTime.stop_id.equals(location.location_id) &&
-                    !location.geometry_type.equals(GEOMETRY_TYPE_POLYGON)
-            )) {
+
+        if (stopTime.pickup_type == 3 && stopIdIsNonPolygonLocation(stopTime.stop_id, locations)) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
             // location that is not a single "LineString".
             errors.add(NewGTFSError.forEntity(
@@ -280,6 +263,9 @@ public class FlexValidator extends FeedValidator {
         return errors;
     }
 
+    /**
+     * Check that a booking rule conforms to flex specification constraints.
+     */
     public static List<NewGTFSError> validateBookingRule(BookingRule bookingRule) {
         List<NewGTFSError> errors = new ArrayList<>();
 
@@ -373,5 +359,72 @@ public class FlexValidator extends FeedValidator {
             );
         }
         return errors;
+    }
+
+    /**
+     * Check if a location group id or location id matches any stop ids.
+     */
+    private static boolean locationGroupIdOrLocationIdIsStopId(List<Stop> stops, String id) {
+        return !stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(id));
+    }
+
+    /**
+     * Check if a location group id matches any location ids.
+     */
+    private static boolean locationGroupIdIsLocationId(List<Location> locations, String locationGroupId) {
+        return !locations.isEmpty() &&
+            locations.stream().anyMatch(location -> location.location_id.equals(locationGroupId));
+    }
+
+    /**
+     * If fare rules are defined, check there is a match on zone id.
+     */
+    private static boolean hasFareRules(List<FareRule> fareRules, String zoneId) {
+        return fareRules != null &&
+            !fareRules.isEmpty() &&
+            fareRules.stream().anyMatch(fareRule ->
+                (fareRule.contains_id != null && fareRule.destination_id != null && fareRule.origin_id != null) &&
+                    !fareRule.contains_id.equals(zoneId) &&
+                    !fareRule.destination_id.equals(zoneId) &&
+                    !fareRule.origin_id.equals(zoneId));
+    }
+
+    /**
+     * Check if a stop id matches any location ids or any location group ids.
+     */
+    private static boolean stopIdIsLocationGroupOrLocation(
+        String stopId,
+        List<LocationGroup> locationGroups,
+        List<Location> locations
+    ) {
+        return
+            ((locationGroups != null && !locationGroups.isEmpty() &&
+                locationGroups.stream().anyMatch(locationGroup -> stopId.equals(locationGroup.location_group_id)))
+                ||
+                (locations != null && !locations.isEmpty() &&
+                    locations.stream().anyMatch(location -> stopId.equals(location.location_id))));
+    }
+
+    /**
+     * Check if a stop id matches any location group ids.
+     */
+    private static boolean stopIdIsLocationGroup(String stopId, List<LocationGroup> locationGroups) {
+        return
+            locationGroups != null &&
+                !locationGroups.isEmpty() &&
+                locationGroups.stream().anyMatch(locationGroup -> stopId.equals(locationGroup.location_group_id));
+    }
+
+    /**
+     * Check if a stop id refers to a non polygon (LineString) location.
+     */
+    private static boolean stopIdIsNonPolygonLocation(String stopId, List<Location> locations) {
+        return
+            locations != null &&
+            !locations.isEmpty() &&
+            locations.stream().anyMatch(location ->
+                stopId.equals(location.location_id) &&
+                    !location.geometry_type.equals(GEOMETRY_TYPE_POLYGON)
+            );
     }
 }
