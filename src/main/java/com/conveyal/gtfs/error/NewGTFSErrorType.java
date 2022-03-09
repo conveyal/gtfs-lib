@@ -107,6 +107,7 @@ public enum NewGTFSErrorType {
     TRIP_NEVER_ACTIVE(Priority.MEDIUM, "A trip is defined, but its service is never running on any date."),
     TRIP_OVERLAP_IN_BLOCK(Priority.MEDIUM, "A trip overlaps another trip and shares the same block_id."),
     TRIP_TOO_FEW_STOP_TIMES(Priority.MEDIUM, "A trip must have at least two stop times to represent travel."),
+    TRIP_SPEED_NOT_VALIDATED(Priority.MEDIUM, "Trip speed not validated because it contains at least one flex location."),
     URL_FORMAT(Priority.MEDIUM, "URL format should be <scheme>://<authority><path>?<query>#<fragment>"),
     VALIDATOR_FAILED(Priority.HIGH, "The specified validation stage failed due to an error encountered during loading. This is likely due to an error encountered during loading (e.g., a date or number field is formatted incorrectly.)."),
     WRONG_NUMBER_OF_FIELDS(Priority.MEDIUM, "A row did not have the same number of fields as there are headers in its table."),

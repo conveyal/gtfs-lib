@@ -37,7 +37,7 @@ public class SpeedTripValidator extends TripValidator {
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTripValidator.class);
     public static final double MIN_SPEED_KPH = 0.5;
     private boolean allTravelTimesAreRounded = true;
-    private Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
+    private final Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
 
     public SpeedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
@@ -45,10 +45,11 @@ public class SpeedTripValidator extends TripValidator {
 
     @Override
     public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
-        if (containsFlexLocations(stopTimes, locations)) {
-            // FLEX TODO: The validator needs to be refactored to work with flex locations. A stop time -> stop_id can
-            // either be a stop_id or a location id.
-            LOG.warn("Trip speed not validated because it contains flex locations!");
+        if (hasFlexLocations(stopTimes, locations)) {
+            registerError(NewGTFSError.forFeed(
+                NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED,
+                "Trip speed not validated because it contains at least one flex location.")
+            );
             return;
         }
         // The specific maximum speed for this trip's route's mode of travel.
@@ -117,11 +118,9 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * If any stop time contains a location instead of a stop the trip speed will need to be calculated differently
-     * to work with stops as well as locations.
+     * Check each stop time to determine if it references a location instead of a stop.
      */
-    private boolean containsFlexLocations(List<StopTime> stopTimes, List<Location> locations) {
-        boolean containsFlexLocation = false;
+    private boolean hasFlexLocations(List<StopTime> stopTimes, List<Location> locations) {
         for (StopTime stopTime : stopTimes) {
             for (Location location : locations) {
                 if (stopTime.stop_id.equals(location.location_id)) {
