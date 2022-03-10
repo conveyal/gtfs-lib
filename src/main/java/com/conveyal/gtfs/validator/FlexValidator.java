@@ -99,14 +99,12 @@ public class FlexValidator extends FeedValidator {
     public static List<NewGTFSError> validateLocation(Location location, List<Stop> stops, List<FareRule> fareRules) {
         List<NewGTFSError> errors = new ArrayList<>();
         if (locationGroupIdOrLocationIdIsStopId(stops, location.location_id)) {
-            // Location id must not match a stop id.
             errors.add(NewGTFSError.forEntity(
                 location,
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_ID).setBadValue(location.location_id)
             );
         }
         if (hasFareRules(fareRules, location.zone_id)) {
-            // zone id is required if fare rules are defined.
             errors.add(NewGTFSError.forEntity(
                 location,
                 NewGTFSErrorType.FLEX_MISSING_FARE_RULE).setBadValue(location.zone_id)
@@ -121,7 +119,8 @@ public class FlexValidator extends FeedValidator {
     public static List<NewGTFSError> validateStopTime(
         StopTime stopTime,
         List<LocationGroup> locationGroups,
-        List<Location> locations) {
+        List<Location> locations
+    ) {
 
         List<NewGTFSError> errors = new ArrayList<>();
 
@@ -260,7 +259,25 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Double.toString(stopTime.safe_duration_offset))
             );
         }
+
+        if (!isSafeFactorGreatThanMeanFactor(stopTime)) {
+            errors.add(NewGTFSError.forEntity(
+                    stopTime,
+                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED)
+                .setBadValue(Double.toString(stopTime.safe_duration_offset))
+            );
+        }
+
         return errors;
+    }
+
+    /**
+     * The safe factors must be greater than the mean factors. This includes safe/mean duration offset and
+     * factor.
+     */
+    private static boolean isSafeFactorGreatThanMeanFactor(StopTime stopTime) {
+        return stopTime.safe_duration_factor + stopTime.safe_duration_offset >=
+            stopTime.mean_duration_factor + stopTime.mean_duration_offset;
     }
 
     /**

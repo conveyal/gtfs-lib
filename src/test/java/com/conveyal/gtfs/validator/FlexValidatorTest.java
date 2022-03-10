@@ -231,12 +231,18 @@ public class FlexValidatorTest {
             new StopTimeArguments(
                 createStopTime(1.0, DOUBLE_MISSING, DOUBLE_MISSING, DOUBLE_MISSING),
                 "2", null,
-                Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR)
+                Lists.newArrayList(
+                    NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR,
+                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                )
             ),
             new StopTimeArguments(
                 createStopTime(DOUBLE_MISSING, 1.0, DOUBLE_MISSING, DOUBLE_MISSING),
                 "2", null,
-                Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET)
+                Lists.newArrayList(
+                    NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET,
+                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                )
             ),
             new StopTimeArguments(
                 createStopTime(DOUBLE_MISSING, DOUBLE_MISSING, 1.0, DOUBLE_MISSING),
@@ -252,12 +258,18 @@ public class FlexValidatorTest {
             new StopTimeArguments(
                 createStopTime(1.0, DOUBLE_MISSING, DOUBLE_MISSING, DOUBLE_MISSING),
                 null, "2",
-                Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR)
+                Lists.newArrayList(
+                    NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR,
+                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                )
             ),
             new StopTimeArguments(
                 createStopTime(DOUBLE_MISSING, 1.0, DOUBLE_MISSING, DOUBLE_MISSING),
                 null, "2",
-                Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET)
+                Lists.newArrayList(
+                    NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET,
+                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                )
             ),
             new StopTimeArguments(
                 createStopTime(DOUBLE_MISSING, DOUBLE_MISSING, 1.0, DOUBLE_MISSING),
@@ -268,6 +280,11 @@ public class FlexValidatorTest {
                 createStopTime(DOUBLE_MISSING, DOUBLE_MISSING, DOUBLE_MISSING, 1.0),
                 null, "2",
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_SAFE_DURATION_OFFSET)
+            ),
+            new StopTimeArguments(
+                createStopTime(30.0, 1.0, 20.0, 1.0),
+                null, "1",
+                Lists.newArrayList(NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED)
             )
         );
     }
