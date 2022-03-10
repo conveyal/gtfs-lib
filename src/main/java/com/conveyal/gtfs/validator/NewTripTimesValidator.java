@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -40,6 +41,7 @@ public class NewTripTimesValidator extends FeedValidator {
 //    ListMultimap<String, ShapePoint> shapeById = MultimapBuilder.treeKeys().arrayListValues().build();
     Map<String, Stop> stopById = new HashMap<>();
     Map<String, Location> locationById = new HashMap<>();
+    Map<String, LocationGroup> locationGroupById = new HashMap<>();
     Map<String, Trip> tripById = new HashMap<>();
     Map<String, Route> routeById = new HashMap<>();
 
@@ -66,6 +68,9 @@ public class NewTripTimesValidator extends FeedValidator {
         }
         for (Location location : feed.locations) {
             locationById.put(location.location_id, location);
+        }
+        for (LocationGroup locationGroup : feed.locationGroups) {
+            locationGroupById.put(locationGroup.location_group_id, locationGroup);
         }
         // FIXME: determine a good way to validate shapes without caching them all in memory...
         for (Trip trip: feed.trips) {
@@ -162,6 +167,7 @@ public class NewTripTimesValidator extends FeedValidator {
         // We could ask the SQL server to do the join between stop_times and stops, but we want to check references.
         List<Stop> stops = new ArrayList<>();
         List<Location> locations = new ArrayList<>();
+        List<LocationGroup> locationGroups = new ArrayList<>();
         for (Iterator<StopTime> it = stopTimes.iterator(); it.hasNext(); ) {
             StopTime stopTime = it.next();
             if (hasContinuousBehavior(stopTime.continuous_drop_off, stopTime.continuous_pickup)) {
@@ -169,11 +175,14 @@ public class NewTripTimesValidator extends FeedValidator {
             }
             Stop stop = stopById.get(stopTime.stop_id);
             Location location = locationById.get(stopTime.stop_id);
-            if (stop == null && location == null) {
+            LocationGroup locationGroup = locationGroupById.get(stopTime.stop_id);
+            if (stop == null && location == null && locationGroup == null) {
                 // All bad references should have been recorded at import, we can just remove them from the trips.
                 it.remove();
             } else {
-                if (stop == null) {
+                if (stop == null && location == null) {
+                    locationGroups.add(locationGroup);
+                } else if (stop == null && locationGroup == null) {
                     locations.add(location);
                 } else {
                     stops.add(stop);
@@ -204,8 +213,11 @@ public class NewTripTimesValidator extends FeedValidator {
                 "shape_id is required when a trip has continuous behavior defined."
             );
         }
+
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
-        for (TripValidator tripValidator : tripValidators) tripValidator.validateTrip(trip, route, stopTimes, stops, locations);
+        for (TripValidator tripValidator : tripValidators) {
+            tripValidator.validateTrip(trip, route, stopTimes, stops, locations, locationGroups);
+        }
     }
 
     /**

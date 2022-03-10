@@ -6,6 +6,7 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -44,11 +45,18 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
-        if (hasFlexLocations(stopTimes, locations)) {
+    public void validateTrip(
+        Trip trip,
+        Route route,
+        List<StopTime> stopTimes,
+        List<Stop> stops,
+        List<Location> locations,
+        List<LocationGroup> locationGroups
+    ) {
+        if (hasLocationOrLocationGroupReferences(locations, locationGroups)) {
             registerError(NewGTFSError.forFeed(
                 NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED,
-                "Trip speed not validated because it contains at least one flex location.")
+                "Trip speed not validated because it contains at least one location or location group.")
             );
             return;
         }
@@ -118,18 +126,12 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * Check each stop time to determine if it references a location instead of a stop.
+     * At least one stop time references a location or location group.
      */
-    private boolean hasFlexLocations(List<StopTime> stopTimes, List<Location> locations) {
-        for (StopTime stopTime : stopTimes) {
-            for (Location location : locations) {
-                if (stopTime.stop_id.equals(location.location_id)) {
-                    return true;
-                }
-            }
-        }
-        return false;
+    private boolean hasLocationOrLocationGroupReferences(List<Location> locations, List<LocationGroup> locationGroups) {
+        return !locations.isEmpty() || !locationGroups.isEmpty();
     }
+
 
     /**
      * Register shape dist traveled error if current stop time has a value AND either the previous value is

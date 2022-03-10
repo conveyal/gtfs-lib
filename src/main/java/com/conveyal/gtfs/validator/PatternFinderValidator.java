@@ -8,6 +8,7 @@ import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.loader.Requirement;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
@@ -58,7 +59,14 @@ public class PatternFinderValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
+    public void validateTrip(
+        Trip trip,
+        Route route,
+        List<StopTime> stopTimes,
+        List<Stop> stops,
+        List<Location> locations,
+        List<LocationGroup> locationGroups
+    ) {
         // As we hit each trip, accumulate them into the wrapped PatternFinder object.
         patternFinder.processTrip(trip, stopTimes);
     }

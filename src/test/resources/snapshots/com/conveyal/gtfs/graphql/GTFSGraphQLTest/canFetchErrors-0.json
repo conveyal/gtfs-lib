@@ -103,7 +103,7 @@
         "type" : "STOP_UNUSED"
       }, {
         "count" : 1,
-        "message" : "Trip speed not validated because it contains at least one flex location.",
+        "message" : "Trip speed not validated because it contains at least one location or location group.",
         "priority" : "MEDIUM",
         "type" : "TRIP_SPEED_NOT_VALIDATED"
       } ],
@@ -156,7 +156,7 @@
         "error_type" : "GEO_JSON_PARSING",
         "line_number" : null
       }, {
-        "bad_value" : "Trip speed not validated because it contains at least one flex location.",
+        "bad_value" : "Trip speed not validated because it contains at least one location or location group.",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
