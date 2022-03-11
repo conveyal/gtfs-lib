@@ -169,7 +169,10 @@ public class JdbcTableWriter implements TableWriter {
             // update of stop_times with matching trip_id).
             for (Table referencingTable : referencingTables) {
                 Table parentTable = referencingTable.getParentTable();
-                if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
+                if (parentTable != null && parentTable.name.equals(specTable.name)
+                        || referencingTable.name.equals("shapes")
+                        || referencingTable.name.equals("location_groups")
+                ) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
                     if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
