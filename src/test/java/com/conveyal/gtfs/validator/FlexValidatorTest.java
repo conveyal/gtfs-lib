@@ -8,6 +8,7 @@ import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.Lists;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -233,7 +234,7 @@ public class FlexValidatorTest {
                 "2", null,
                 Lists.newArrayList(
                     NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR,
-                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                    NewGTFSErrorType.FLEX_SAFE_FACTORS_EXCEEDED
                 )
             ),
             new StopTimeArguments(
@@ -241,7 +242,7 @@ public class FlexValidatorTest {
                 "2", null,
                 Lists.newArrayList(
                     NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET,
-                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                    NewGTFSErrorType.FLEX_SAFE_FACTORS_EXCEEDED
                 )
             ),
             new StopTimeArguments(
@@ -260,7 +261,7 @@ public class FlexValidatorTest {
                 null, "2",
                 Lists.newArrayList(
                     NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR,
-                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                    NewGTFSErrorType.FLEX_SAFE_FACTORS_EXCEEDED
                 )
             ),
             new StopTimeArguments(
@@ -268,7 +269,7 @@ public class FlexValidatorTest {
                 null, "2",
                 Lists.newArrayList(
                     NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET,
-                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED
+                    NewGTFSErrorType.FLEX_SAFE_FACTORS_EXCEEDED
                 )
             ),
             new StopTimeArguments(
@@ -284,7 +285,7 @@ public class FlexValidatorTest {
             new StopTimeArguments(
                 createStopTime(30.0, 1.0, 20.0, 1.0),
                 null, "1",
-                Lists.newArrayList(NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED)
+                Lists.newArrayList(NewGTFSErrorType.FLEX_SAFE_FACTORS_EXCEEDED)
             )
         );
     }
@@ -337,6 +338,35 @@ public class FlexValidatorTest {
             new BaseArguments(
                 createBookingRule(INT_MISSING, 0, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, "1"),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID)
+            )
+        );
+    }
+
+    @ParameterizedTest
+    @MethodSource("createTripChecks")
+    void validateTripTests(TripArguments tripArguments) {
+        List<NewGTFSError> errors = FlexValidator.validateTrip(
+            (Trip) tripArguments.testObject,
+            tripArguments.stopTimes,
+            tripArguments.locationGroups,
+            tripArguments.locations
+        );
+        checkValidationErrorsMatchExpectedErrors(errors, tripArguments.expectedErrors);
+    }
+
+    private static Stream<TripArguments> createTripChecks() {
+        return Stream.of(
+            new TripArguments(
+                createTrip(), "1", "0","0",
+                null
+            ),
+            new TripArguments(
+                createTrip(), "1", "1","0",
+                Lists.newArrayList(NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED)
+            ),
+            new TripArguments(
+                createTrip(), "1", "0","1",
+                Lists.newArrayList(NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED)
             )
         );
     }
@@ -407,6 +437,26 @@ public class FlexValidatorTest {
             this.locations = Lists.newArrayList(createLocation(locationId));
         }
     }
+
+    private static class TripArguments extends BaseArguments {
+        public final List<StopTime> stopTimes;
+        public final List<LocationGroup> locationGroups;
+        public final List<Location> locations;
+
+        private TripArguments(
+            Object trip,
+            String stopId,
+            String locationId,
+            String locationGroupId,
+            List<NewGTFSErrorType> expectedErrors
+        ) {
+            super(trip, expectedErrors);
+            this.stopTimes = (stopId != null) ? Lists.newArrayList(createStopTime(stopId, ((Trip)trip).trip_id)) : null;
+            this.locationGroups = (locationGroupId != null) ? Lists.newArrayList(createLocationGroup(locationGroupId)) : null;
+            this.locations = (locationId != null) ? Lists.newArrayList(createLocation(locationId)) : null;
+        }
+    }
+
 
     /**
      * Check that the errors produced by the flex validator match the expected errors. If no errors are expected, check
@@ -518,5 +568,18 @@ public class FlexValidatorTest {
         stopTime.start_pickup_dropoff_window = startPickupDropOffWindow;
         stopTime.end_pickup_dropoff_window = endPickupDropOffWindow;
         return stopTime;
+    }
+
+    private static StopTime createStopTime(String stopId, String tripId) {
+        StopTime stopTime = new StopTime();
+        stopTime.stop_id = stopId;
+        stopTime.trip_id = tripId;
+        return stopTime;
+    }
+
+    private static Trip createTrip() {
+        Trip trip = new Trip();
+        trip.trip_id = "12345";
+        return trip;
     }
 }

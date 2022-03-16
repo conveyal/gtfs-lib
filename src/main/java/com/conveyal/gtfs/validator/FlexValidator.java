@@ -10,6 +10,7 @@ import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.Lists;
 
 import java.util.ArrayList;
@@ -43,6 +44,7 @@ public class FlexValidator extends FeedValidator {
         List<Location> locations = Lists.newArrayList(feed.locations);
 
         if (isFlexFeed(bookingRules, locationGroups, locations)) {
+            List<StopTime> stopTimes = Lists.newArrayList(feed.stopTimes);
             List<Stop> stops = Lists.newArrayList(feed.stops);
             List<FareRule> fareRules = Lists.newArrayList(feed.fareRules);
             List<NewGTFSError> errors = new ArrayList<>();
@@ -50,6 +52,7 @@ public class FlexValidator extends FeedValidator {
             feed.locationGroups.forEach(locationGroup -> errors.addAll(validateLocationGroup(locationGroup, stops, locations)));
             feed.locations.forEach(location -> errors.addAll(validateLocation(location, stops, fareRules)));
             feed.stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, locationGroups, locations)));
+            feed.trips.forEach(trip -> errors.addAll(validateTrip(trip, stopTimes, locationGroups, locations)));
             // Register errors, if any, once all checks have been completed.
             errors.forEach(this::registerError);
         }
@@ -67,6 +70,26 @@ public class FlexValidator extends FeedValidator {
             (bookingRules != null && !bookingRules.isEmpty()) ||
             (locationGroups != null && !locationGroups.isEmpty()) ||
             (locations != null && !locations.isEmpty());
+    }
+
+    /**
+     * Check if a trip contains a stop that references a location or location group. A trip's speed can not be validated
+     * if at least one stop references a location or location group.
+     */
+    public static List<NewGTFSError> validateTrip(
+        Trip trip,
+        List<StopTime> stopTimes,
+        List<LocationGroup> locationGroups,
+        List<Location> locations
+    ) {
+        List<NewGTFSError> errors = new ArrayList<>();
+        if (tripHasLocationGroupOrLocationForStop(trip, stopTimes, locationGroups, locations)) {
+            errors.add(NewGTFSError.forEntity(
+                trip,
+                NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED).setBadValue(trip.trip_id)
+            );
+        }
+        return errors;
     }
 
     /**
@@ -263,7 +286,7 @@ public class FlexValidator extends FeedValidator {
         if (!isSafeFactorGreatThanMeanFactor(stopTime)) {
             errors.add(NewGTFSError.forEntity(
                     stopTime,
-                    NewGTFSErrorType.FLEX_SAVE_FACTORS_EXCEEDED)
+                    NewGTFSErrorType.FLEX_SAFE_FACTORS_EXCEEDED)
                 .setBadValue(Double.toString(stopTime.safe_duration_offset))
             );
         }
@@ -443,5 +466,25 @@ public class FlexValidator extends FeedValidator {
                 stopId.equals(location.location_id) &&
                     !location.geometry_type.equals(GEOMETRY_TYPE_POLYGON)
             );
+    }
+
+    /**
+     * Check if a trip contains at least one stop time that references a stop that is a location or location group.
+     */
+    public static boolean tripHasLocationGroupOrLocationForStop(
+        Trip trip,
+        List<StopTime> stopTimes,
+        List<LocationGroup> locationGroups,
+        List<Location> locations
+    ) {
+        for (StopTime stopTime : stopTimes) {
+            if (
+                trip.trip_id.equals(stopTime.trip_id) &&
+                stopIdIsLocationGroupOrLocation(stopTime.stop_id, locationGroups, locations)
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -53,10 +53,10 @@ public class SpeedTripValidator extends TripValidator {
         List<Location> locations,
         List<LocationGroup> locationGroups
     ) {
-        if (hasLocationOrLocationGroupReferences(locations, locationGroups)) {
-            registerError(NewGTFSError.forFeed(
-                NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED,
-                "Trip speed not validated because it contains at least one location or location group.")
+        if (FlexValidator.tripHasLocationGroupOrLocationForStop(trip, stopTimes, locationGroups, locations)) {
+            LOG.warn(
+                "Trip speed not validated for trip id {} because it contains at least one stop that is a location or location group.",
+                trip.trip_id
             );
             return;
         }
