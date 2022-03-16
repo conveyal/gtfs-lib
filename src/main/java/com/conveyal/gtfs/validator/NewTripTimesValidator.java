@@ -141,7 +141,7 @@ public class NewTripTimesValidator extends FeedValidator {
     }
 
     /**
-     * This validates an ordered list of stopTimes for a single trip.
+     * This validates an ordered list of stopTimes for a single trip. This should only be called with non-null stopTimes.
      * @param stopTimes must all have the same trip_id and be in order of increasing stop_sequence
      */
     private void processTrip (List<StopTime> stopTimes) {
@@ -156,11 +156,7 @@ public class NewTripTimesValidator extends FeedValidator {
             return;
         }
 
-        // Our code should only call this method with non-null stopTimes.
-        if (stopTimes.size() < 2) {
-            registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
-            return;
-        }
+        int originalNumberOfStopTimes = stopTimes.size();
         boolean hasContinuousBehavior = false;
         // Make a parallel list of stops based on the stop_times for this trip.
         // We will remove any stop_times for stops that don't exist in the feed.
@@ -189,8 +185,22 @@ public class NewTripTimesValidator extends FeedValidator {
                 }
             }
         }
-        // StopTimes list may have shrunk due to missing stop references.
-        if (stopTimes.size() < 2) return;
+
+        if (originalNumberOfStopTimes == stopTimes.size() &&
+            stopTimes.size() < 2 &&
+            locations.isEmpty() &&
+            locationGroups.isEmpty()
+        ) {
+            // No bad references were removed and all stop times reference stops, so at least two stop times must be
+            // provided.
+            registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
+            return;
+        } else if (stopTimes.size() < 2) {
+            // Too few stop times to validate trip. Either bad references have been removed or the stop times reference
+            // either locations or location groups.
+            return;
+        }
+
         // Check that first and last stop times are not missing values and repair them.
         // Note that this repair will be seen by the validators but not saved in the database.
         fixInitialFinal(stopTimes.get(0));
