@@ -1024,6 +1024,141 @@ public class JDBCTableWriterTest {
         );
     }
 
+    @Test
+    public void canTranspositionStopsInPatternStop() throws IOException, SQLException, InvalidNamespaceException {
+        StopDTO stopOne = createSimpleStop(newUUID(), "Stop One", 0.0, 0.0);
+        StopDTO stopTwo = createSimpleStop(newUUID(), "Stop Two", 0.0, 0.0);
+        String routeId = newUUID();
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndPattern(
+            routeId,
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternStopDTO[]{
+                new PatternStopDTO(patternId, stopOne.stop_id, 0),
+                new PatternStopDTO(patternId, stopTwo.stop_id, 1)
+            },
+            0
+        );
+        // Make sure saved data matches expected data.
+        assertThat(pattern.route_id, equalTo(routeId));
+
+        // Create trip so we can check that the stop_time values are updated after the patter update.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        // Set trip_id to empty string to verify that it gets overwritten with auto-generated UUID.
+        tripInput.trip_id = "";
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check that trip_id is not empty.
+        assertNotEquals("", createdTrip.trip_id);
+
+        // Verify that certain values are correctly set in the stop times table.
+        ResultSet stopTimesResultSet = getResultSetForId(createdTrip.stop_times[0].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(0));
+        }
+
+        // Verify that certain values are correctly set in the stop times table.
+        stopTimesResultSet = getResultSetForId(createdTrip.stop_times[1].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(1));
+        }
+
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopTwo.stop_id, 0),
+            new PatternStopDTO(patternId, stopOne.stop_id, 1)
+        };
+
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+
+        // Verify that certain values are correctly set in the stop times table.
+        stopTimesResultSet = getResultSetForId(createdTrip.stop_times[1].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(1));
+        }
+
+        // Verify that certain values are correctly set in the stop times table.
+        stopTimesResultSet = getResultSetForId(createdTrip.stop_times[0].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(0));
+        }
+    }
+
+    @Test
+    public void canTranspositionLocationsInPatternLocation() throws IOException, SQLException, InvalidNamespaceException {
+
+        LocationDTO locationOne = createSimpleTestLocation(newUUID());
+        LocationDTO locationTwo = createSimpleTestLocation(newUUID());
+        String routeId = newUUID();
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
+        PatternDTO pattern = createRouteAndPattern(
+            routeId,
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternLocationDTO[]{
+                new PatternLocationDTO(patternId, locationOne.location_id, 0),
+                new PatternLocationDTO(patternId, locationTwo.location_id, 1)
+            },
+            0
+        );
+        // Make sure saved data matches expected data.
+        assertThat(pattern.route_id, equalTo(routeId));
+
+        // Create trip so we can check that the stop_time values are updated after the patter update.
+        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        // Set trip_id to empty string to verify that it gets overwritten with auto-generated UUID.
+        tripInput.trip_id = "";
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        // Check that trip_id is not empty.
+        assertNotEquals("", createdTrip.trip_id);
+
+        // Verify that certain values are correctly set in the stop times table.
+        ResultSet stopTimesResultSet = getResultSetForId(createdTrip.stop_times[0].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(0));
+        }
+
+        // Verify that certain values are correctly set in the stop times table.
+        stopTimesResultSet = getResultSetForId(createdTrip.stop_times[1].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(1));
+        }
+
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationTwo.location_id, 0),
+            new PatternLocationDTO(patternId, locationOne.location_id, 1)
+        };
+
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+
+        // Verify that certain values are correctly set in the stop times table.
+        stopTimesResultSet = getResultSetForId(createdTrip.stop_times[1].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(1));
+        }
+
+        // Verify that certain values are correctly set in the stop times table.
+        stopTimesResultSet = getResultSetForId(createdTrip.stop_times[0].id, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(0));
+        }
+    }
+
+
+
     /*****************************************************************************************************************
      * End tests, begin helpers
      ****************************************************************************************************************/
@@ -1125,6 +1260,38 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
+        // Write the pattern to the database
+        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
+        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.PATTERNS.name);
+        LOG.info(output);
+        // Parse output
+        return mapper.readValue(output, PatternDTO.class);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndPattern(
+        String routeId,
+        String patternId,
+        String name,
+        String shapeId,
+        ShapePointDTO[] shapes,
+        PatternLocationDTO[] patternLocations,
+        int useFrequency
+    ) throws InvalidNamespaceException, SQLException, IOException {        // Create new route
+        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
+        // Create new pattern for route
+        PatternDTO input = new PatternDTO();
+        input.pattern_id = patternId;
+        input.route_id = routeId;
+        input.name = name;
+        input.use_frequency = useFrequency;
+        input.shape_id = shapeId;
+        input.shapes = shapes;
+        input.pattern_stops = new PatternStopDTO[] {};
+        input.pattern_locations = patternLocations;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
@@ -1257,7 +1424,7 @@ public class JDBCTableWriterTest {
         patternLocation.location_id = locationId;
         patternLocation.drop_off_type = 1;
         patternLocation.pickup_type = 1;
-        patternLocation.shape_dist_traveled = 0.0;
+//        patternLocation.shape_dist_traveled = 0.0;
         patternLocation.timepoint = 1;
         patternLocation.continuous_pickup = 1;
         patternLocation.continuous_drop_off = 1;
