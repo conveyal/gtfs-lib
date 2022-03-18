@@ -1021,6 +1021,7 @@ public class JdbcTableWriter implements TableWriter {
                 }
             }
 
+            Set<String> foreignReferencesFound = new HashSet<>();
             Set<String> foreignReferencesNotFound = new HashSet<>();
             Set<String> foreignReferencesFieldNames = new HashSet<>();
             for (Table foreignTable: refTables.keySet()) {
@@ -1033,12 +1034,12 @@ public class JdbcTableWriter implements TableWriter {
                     foreignReferencesNotFound.clear();
                     break;
                 } else {
-                    // Determine if any references were not found.
-                    referenceStrings.removeAll(foundReferences);
-                    foreignReferencesNotFound.removeAll(foundReferences);
+                    // Accumulate all found and expected references.
+                    foreignReferencesFound.addAll(foundReferences);
                     foreignReferencesNotFound.addAll(referenceStrings);
                 }
             }
+            foreignReferencesNotFound.removeAll(foreignReferencesFound);
             if (foreignReferencesNotFound.size() > 0) {
                 throw new SQLException(
                     String.format(
