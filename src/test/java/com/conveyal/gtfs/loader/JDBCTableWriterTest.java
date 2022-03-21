@@ -1232,7 +1232,7 @@ public class JDBCTableWriterTest {
     public void canDeleteStopFromPatternStop() throws IOException, SQLException, InvalidNamespaceException {
         StopDTO stopOne = createSimpleStop(newUUID(), "Stop One", 0.0, 0.0);
         StopDTO stopTwo = createSimpleStop(newUUID(), "Stop Two", 0.0, 0.0);
-        StopDTO stopThree = createSimpleStop(newUUID(), "Stop New", 0.0, 0.0);
+        StopDTO stopThree = createSimpleStop(newUUID(), "Stop Three", 0.0, 0.0);
         String patternId = newUUID();
         int startTime = 6 * 60 * 60; // 6 AM
 
@@ -1263,9 +1263,9 @@ public class JDBCTableWriterTest {
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
 
-        verifyStopTime(createdTrip.stop_times[0].id, stopOne.stop_id, 0);
-        verifyStopTime(createdTrip.stop_times[1].id, stopTwo.stop_id, 1);
-        verifyStopTime(createdTrip.stop_times[2].id, stopTwo.stop_id, 2);
+        verifyStopTime(1, stopOne.stop_id, 0);
+        verifyStopTime(2, stopTwo.stop_id, 1);
+        verifyStopTime(3, stopThree.stop_id, 2);
 
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
         pattern.pattern_stops = new PatternStopDTO[]{
@@ -1662,7 +1662,6 @@ public class JDBCTableWriterTest {
         patternLocation.location_id = locationId;
         patternLocation.drop_off_type = 1;
         patternLocation.pickup_type = 1;
-//        patternLocation.shape_dist_traveled = 0.0;
         patternLocation.timepoint = 1;
         patternLocation.continuous_pickup = 1;
         patternLocation.continuous_drop_off = 1;
