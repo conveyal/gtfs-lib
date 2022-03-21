@@ -58,6 +58,8 @@ public enum NewGTFSErrorType {
     ILLEGAL_FIELD_VALUE(Priority.MEDIUM, "Fields may not contain tabs, carriage returns or new lines."),
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),
+    LOCATION_UNUSED(Priority.MEDIUM, "This location is not referenced by any trips."),
+    LOCATION_GROUP_UNUSED(Priority.MEDIUM, "This location group is not referenced by any trips."),
     MISSING_ARRIVAL_OR_DEPARTURE(Priority.MEDIUM, "First and last stop times are required to have both an arrival and departure time."),
     MISSING_COLUMN(Priority.MEDIUM, "A required column was missing from a table."),
     MISSING_FIELD(Priority.MEDIUM, "A required field was missing or empty in a particular row."),

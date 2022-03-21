@@ -437,22 +437,27 @@ public class FlexValidator extends FeedValidator {
         List<LocationGroup> locationGroups,
         List<Location> locations
     ) {
-        return
-            ((locationGroups != null && !locationGroups.isEmpty() &&
-                locationGroups.stream().anyMatch(locationGroup -> stopId.equals(locationGroup.location_group_id)))
-                ||
-                (locations != null && !locations.isEmpty() &&
-                    locations.stream().anyMatch(location -> stopId.equals(location.location_id))));
+        return stopIdIsLocationGroup(stopId, locationGroups) || stopIdIsLocation(stopId, locations);
     }
 
     /**
      * Check if a stop id matches any location group ids.
      */
-    private static boolean stopIdIsLocationGroup(String stopId, List<LocationGroup> locationGroups) {
+    public static boolean stopIdIsLocationGroup(String stopId, List<LocationGroup> locationGroups) {
         return
             locationGroups != null &&
                 !locationGroups.isEmpty() &&
                 locationGroups.stream().anyMatch(locationGroup -> stopId.equals(locationGroup.location_group_id));
+    }
+
+    /**
+     * Check if a stop id matches any location ids.
+     */
+    public static boolean stopIdIsLocation(String stopId, List<Location> locations) {
+        return
+            locations != null &&
+                !locations.isEmpty() &&
+                locations.stream().anyMatch(location -> stopId.equals(location.location_id));
     }
 
     /**

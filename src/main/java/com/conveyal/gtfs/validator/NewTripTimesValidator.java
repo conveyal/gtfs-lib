@@ -196,8 +196,7 @@ public class NewTripTimesValidator extends FeedValidator {
             registerError(trip, TRIP_TOO_FEW_STOP_TIMES);
             return;
         } else if (stopTimes.size() < 2) {
-            // Too few stop times to validate trip. Either bad references have been removed or the stop times reference
-            // either locations or location groups.
+            LOG.warn("Too few stop times that have references to stops to validate trip.");
             return;
         }
 
