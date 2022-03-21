@@ -14,6 +14,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Update a trip pattern stops/locations and associated stop times.
+ */
 public class PatternReconciliation {
 
     private static final Logger LOG = LoggerFactory.getLogger(PatternReconciliation.class);
@@ -53,14 +56,11 @@ public class PatternReconciliation {
     }
 
     /**
-     * Update the trip pattern locations and the associated stop times.
-     *
      * We assume only one location has changed, either it's been removed, added or moved. The only other case that is
-     * permitted is adding a set of stops to the end of the original list. These conditions are evaluated by simply
-     * checking the lengths of the original and new pattern stops (and ensuring that stop IDs remain the same where
-     * required).
-     *
-     * If the change to pattern stops does not satisfy one of these cases, fail the update operation.
+     * permitted is adding a set of stops/locations to the end of the original list. These conditions are evaluated by
+     * simply checking the lengths of the original and new pattern stops/locations (and ensuring that stop IDs remain
+     * the same where required). If the change to pattern stops/locations does not satisfy one of these cases, fail the
+     * update operation.
      *
      */
     private static void reconcilePattern(
@@ -76,7 +76,7 @@ public class PatternReconciliation {
 
         List<String> tripsForPattern = getTripIdsForPatternId(tablePrefix, patternId, connection);
         if (tripsForPattern.size() == 0) {
-            // If there are no trips for the pattern, there is no need to reconcile stop times to modified pattern stops.
+            // If there are no trips for the pattern, there is no need to reconcile stop times to modified patterns.
             // This permits the creation of patterns without stops, reversing the stops on existing patterns, and
             // duplicating patterns.
             // For new patterns, this short circuit is required to prevent the transposition conditional check from
@@ -97,7 +97,6 @@ public class PatternReconciliation {
             for (int i = 0; i < patterns.size(); i++) {
                 if (differenceLocation != -1) {
                     // we've already found the addition
-                    Object pattern = patterns.get(i + 1);
                     if (i < originalPatternIds.size() &&
                         !originalPatternIds.get(i).equals(patterns.get(i + 1).referenceId)
                     ) {
@@ -209,7 +208,7 @@ public class PatternReconciliation {
             // TODO: write a unit test for this
             if (firstDifferentIndex == lastDifferentIndex) {
                 throw new IllegalStateException(
-                    "Pattern stop substitutions are not supported, region of difference must have length > 1.");
+                    "Pattern substitutions are not supported, region of difference must have length > 1.");
             }
             String conditionalUpdate;
 
@@ -332,7 +331,7 @@ public class PatternReconciliation {
     }
 
     /**
-     * Collect all trip IDs so that we can insert new stop times (with the appropriate trip ID value) if a pattern
+     * Collect all trip IDs so that new stop times can be inserted (with the appropriate trip ID value) if a pattern
      * is added.
      */
     private static List<String> getTripIdsForPatternId(
@@ -359,8 +358,8 @@ public class PatternReconciliation {
     }
 
     /**
-     * You must call this method after updating sequences for any stop times following the starting stop sequence to
-     * avoid overwriting these other stop times.
+     * Insert blank stop times. This must be called after updating sequences for any stop times following the starting
+     * stop sequence to avoid overwriting these other stop times.
      */
     private static void insertBlankStopTimes(
         String tablePrefix,
@@ -405,9 +404,8 @@ public class PatternReconciliation {
         int firstDifferentIndex,
         int lastDifferentIndex
     ) {
-        //Stops mapped to list of stop IDs simply for easier viewing/comparison with original IDs while debugging with
-        // breakpoints.
-        // Determine the bounds of the region that should be identical between the two lists.
+        // Stops mapped to list of stop IDs simply for easier viewing/comparison with original IDs while debugging with
+        // breakpoints. Determine the bounds of the region that should be identical between the two lists.
         int endRegion = lastDifferentIndex - 1;
         for (int i = firstDifferentIndex; i <= endRegion; i++) {
             // Shift index when selecting stop from original list to account for displaced stop.
@@ -424,7 +422,7 @@ public class PatternReconciliation {
     }
 
     /**
-     * Generic pattern class use to hold either pattern stops or pattern location derived data.
+     * Generic pattern class use to hold either a pattern stop or pattern location derived data.
      */
     private static class Pattern {
         public String referenceId;
