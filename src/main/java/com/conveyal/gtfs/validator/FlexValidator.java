@@ -432,7 +432,7 @@ public class FlexValidator extends FeedValidator {
     /**
      * Check if a stop id matches any location ids or any location group ids.
      */
-    private static boolean stopIdIsLocationGroupOrLocation(
+    public static boolean stopIdIsLocationGroupOrLocation(
         String stopId,
         List<LocationGroup> locationGroups,
         List<Location> locations

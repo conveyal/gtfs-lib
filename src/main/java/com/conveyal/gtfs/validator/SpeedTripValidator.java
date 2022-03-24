@@ -126,14 +126,6 @@ public class SpeedTripValidator extends TripValidator {
     }
 
     /**
-     * At least one stop time references a location or location group.
-     */
-    private boolean hasLocationOrLocationGroupReferences(List<Location> locations, List<LocationGroup> locationGroups) {
-        return !locations.isEmpty() || !locationGroups.isEmpty();
-    }
-
-
-    /**
      * Register shape dist traveled error if current stop time has a value AND either the previous value is
      * missing (if at least one stop time has a value, all stop times for the trip should) OR if current value
      * is less than or equal to the previous value. Note: if the previous shape_dist_traveled value is present and the
