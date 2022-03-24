@@ -500,12 +500,12 @@
         "error_type" : "TRIP_SPEED_NOT_VALIDATED",
         "line_number" : 3
       }, {
-        "bad_value" : null,
+        "bad_value" : "20170916",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
         "error_id" : 49,
-        "error_type" : "FEED_TRAVEL_TIMES_ROUNDED",
+        "error_type" : "DATE_NO_SERVICE",
         "line_number" : null
       } ],
       "feed_version" : "1.0"
