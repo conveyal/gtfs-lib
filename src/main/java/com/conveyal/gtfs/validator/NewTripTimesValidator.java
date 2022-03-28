@@ -35,7 +35,7 @@ public class NewTripTimesValidator extends FeedValidator {
     private static final Logger LOG = LoggerFactory.getLogger(NewTripTimesValidator.class);
 
     int tripCount = 0;
-    boolean restrictValidators = false;
+    boolean skipStandardTripValidation = false;
 
     // Caching stops and trips gives a massive speed improvement by avoiding database calls.
     // TODO build this same kind of caching into the table reader class.
@@ -46,17 +46,17 @@ public class NewTripTimesValidator extends FeedValidator {
     Map<String, Route> routeById = new HashMap<>();
 
     // As an optimization, these validators are fed the stoptimes for each trip to avoid repeated iteration and grouping.
-    private final TripValidator[] tripValidators;
-    private final TripValidator[] tripValidatorsWithAdditionalProcesses;
+    private final TripValidator[] standardTripValidators;
+    private final TripValidator[] additionalTripValidators;
 
     public NewTripTimesValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
-        tripValidators = new TripValidator[] {
+        standardTripValidators = new TripValidator[] {
             new SpeedTripValidator(feed, errorStorage),
             new ReferencesTripValidator(feed, errorStorage),
             new ReversedTripValidator(feed, errorStorage),
         };
-        tripValidatorsWithAdditionalProcesses = new TripValidator[] {
+        additionalTripValidators = new TripValidator[] {
             new ServiceValidator(feed, errorStorage),
             new PatternFinderValidator(feed, errorStorage)
         };
@@ -183,7 +183,7 @@ public class NewTripTimesValidator extends FeedValidator {
         // If either of these conditions are true none of the trip validators' validateTrip methods are executed.
         if (hasSingleFlexStop(stopTimes, locations, locationGroups)) {
             LOG.warn("Trip has a single flex stop.");
-            restrictValidators = true;
+            skipStandardTripValidation = true;
             return;
         } else if (hasSingleStop(stopTimes, locations, locationGroups)) {
             LOG.warn("Too few stop times that have references to stops to validate trip.");
@@ -226,10 +226,10 @@ public class NewTripTimesValidator extends FeedValidator {
         }
 
         // Pass these same cleaned lists of stop_times and stops into each trip validator in turn.
-        for (TripValidator tripValidator : tripValidators) {
+        for (TripValidator tripValidator : standardTripValidators) {
             tripValidator.validateTrip(trip, route, stopTimes, stops, locations, locationGroups);
         }
-        for (TripValidator tripValidator : tripValidatorsWithAdditionalProcesses) {
+        for (TripValidator tripValidator : additionalTripValidators) {
             tripValidator.validateTrip(trip, route, stopTimes, stops, locations, locationGroups);
         }
     }
@@ -240,13 +240,13 @@ public class NewTripTimesValidator extends FeedValidator {
      * additional processing beyond validation.
      */
     public void complete (ValidationResult validationResult) {
-        for (TripValidator tripValidator : tripValidatorsWithAdditionalProcesses) {
+        for (TripValidator tripValidator : additionalTripValidators) {
             LOG.info("Running complete stage for {}", tripValidator.getClass().getSimpleName());
             tripValidator.complete(validationResult);
             LOG.info("{} finished", tripValidator.getClass().getSimpleName());
         }
-        if (!restrictValidators) {
-            for (TripValidator tripValidator : tripValidators) {
+        if (!skipStandardTripValidation) {
+            for (TripValidator tripValidator : standardTripValidators) {
                 LOG.info("Running complete stage for {}", tripValidator.getClass().getSimpleName());
                 tripValidator.complete(validationResult);
                 LOG.info("{} finished", tripValidator.getClass().getSimpleName());

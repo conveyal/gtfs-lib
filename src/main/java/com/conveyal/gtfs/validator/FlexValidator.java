@@ -101,13 +101,10 @@ public class FlexValidator extends FeedValidator {
         List<Location> locations
     ) {
         List<NewGTFSError> errors = new ArrayList<>();
-        if (locationGroupIdOrLocationIdIsStopId(stops, locationGroup.location_group_id)) {
-            errors.add(NewGTFSError.forEntity(
-                locationGroup,
-                NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_GROUP_ID).setBadValue(locationGroup.location_group_id)
-            );
-        }
-        if (locationGroupIdIsLocationId(locations, locationGroup.location_group_id)) {
+        if (
+            locationGroupIdOrLocationIdIsStopId(stops, locationGroup.location_group_id) ||
+            locationGroupIdIsLocationId(locations, locationGroup.location_group_id)
+        ) {
             errors.add(NewGTFSError.forEntity(
                 locationGroup,
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_GROUP_ID).setBadValue(locationGroup.location_group_id)
