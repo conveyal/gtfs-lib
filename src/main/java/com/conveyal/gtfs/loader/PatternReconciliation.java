@@ -57,11 +57,10 @@ public class PatternReconciliation {
 
     /**
      * We assume only one stop time has changed, either it's been removed, added or moved. The only other case that is
-     * permitted is adding a set of generic stops to the end of the original list. These conditions are evaluated by
-     * simply checking the lengths of the original and generic stops (and ensuring that stop IDs remain
-     * the same where required). If the change to the generic stops does not satisfy one of these cases, fail the
+     * permitted is adding a set of stops/locations to the end of the original list. These conditions are evaluated by
+     * simply checking the lengths of the original and new pattern stops/locations (and ensuring that stop IDs remain
+     * the same where required). If the change to pattern stops/locations does not satisfy one of these cases, fail the
      * update operation.
-     *
      */
     private static void reconcilePattern(
         String tablePrefix,
