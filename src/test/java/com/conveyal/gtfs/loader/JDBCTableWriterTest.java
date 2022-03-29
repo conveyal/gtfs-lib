@@ -1164,7 +1164,7 @@ public class JDBCTableWriterTest {
         verifyStopTime(1, locationOne.location_id, 1);
         verifyStopTime(2, locationTwo.location_id, 0);
 
-        // Add two stops at the end.
+        // Add two locations at the end.
         patternUpdater = createTestTableWriter(Table.PATTERNS);
         pattern.pattern_locations = new PatternLocationDTO[]{
             new PatternLocationDTO(patternId, locationTwo.location_id, 0),

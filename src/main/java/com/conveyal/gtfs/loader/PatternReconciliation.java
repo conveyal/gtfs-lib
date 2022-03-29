@@ -38,8 +38,8 @@ public class PatternReconciliation {
         List<PatternStop> patternStops,
         Connection connection
     ) throws SQLException {
-        List<Pattern> patterns = patternStops.stream().map(Pattern::new).collect(Collectors.toList());
-        reconcilePattern(tablePrefix, patternId, patterns, connection, PatternType.STOP);
+        List<GenericStop> genericStops = patternStops.stream().map(GenericStop::new).collect(Collectors.toList());
+        reconcilePattern(tablePrefix, patternId, genericStops, connection, PatternType.STOP);
     }
 
     /**
@@ -51,22 +51,22 @@ public class PatternReconciliation {
         List<PatternLocation> patternLocations,
         Connection connection
     ) throws SQLException {
-        List<Pattern> patternStops = patternLocations.stream().map(Pattern::new).collect(Collectors.toList());
-        reconcilePattern(tablePrefix, patternId, patternStops, connection, PatternType.LOCATION);
+        List<GenericStop> genericStops = patternLocations.stream().map(GenericStop::new).collect(Collectors.toList());
+        reconcilePattern(tablePrefix, patternId, genericStops, connection, PatternType.LOCATION);
     }
 
     /**
      * We assume only one stop time has changed, either it's been removed, added or moved. The only other case that is
-     * permitted is adding a set of stops/locations to the end of the original list. These conditions are evaluated by
-     * simply checking the lengths of the original and new pattern stops/locations (and ensuring that stop IDs remain
-     * the same where required). If the change to pattern stops/locations does not satisfy one of these cases, fail the
+     * permitted is adding a set of generic stops to the end of the original list. These conditions are evaluated by
+     * simply checking the lengths of the original and generic stops (and ensuring that stop IDs remain
+     * the same where required). If the change to the generic stops does not satisfy one of these cases, fail the
      * update operation.
      *
      */
     private static void reconcilePattern(
         String tablePrefix,
         String patternId,
-        List<Pattern> genericStops,
+        List<GenericStop> genericStops,
         Connection connection,
         PatternType patternType
     ) throws SQLException {
@@ -83,13 +83,14 @@ public class PatternReconciliation {
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
         String joinToTrips = String.format("%s.trips.trip_id = %s.stop_times.trip_id AND %s.trips.pattern_id = '%s'",
             tablePrefix, tablePrefix, tablePrefix, patternId);
-        if (originalGenericStopIds.size() == genericStops.size() - 1) {
-            addOneStopToPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips, tripsForPattern);
-        } else if (originalGenericStopIds.size() == genericStops.size() + 1) {
+        int sizeDiff = originalGenericStopIds.size() - genericStops.size();
+        if (sizeDiff == -1) {
+            addOneStopToAPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips, tripsForPattern);
+        } else if (sizeDiff == 1) {
             deleteOneStopFromAPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips);
-        } else if (originalGenericStopIds.size() == genericStops.size()) {
+        } else if (sizeDiff == 0) {
             transposeTwoStopsInAPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips);
-        } else if (originalGenericStopIds.size() < genericStops.size()) {
+        } else if (sizeDiff < -1) {
             addOneOrMoreStopsToEndOfPattern(connection, tablePrefix, originalGenericStopIds, genericStops, tripsForPattern);
         } else {
             // Any other type of modification is not supported.
@@ -98,13 +99,13 @@ public class PatternReconciliation {
     }
 
     /**
-     * Add a single stop to a pattern.
+     * Add a single generic stop to a pattern.
      */
-    private static void addOneStopToPattern(
+    private static void addOneStopToAPattern(
         Connection connection,
         String tablePrefix,
         List<String> originalGenericStopIds,
-        List<Pattern> genericStops,
+        List<GenericStop> genericStops,
         String joinToTrips,
         List<String> tripsForPattern
     ) throws SQLException {
@@ -136,13 +137,13 @@ public class PatternReconciliation {
     }
 
     /**
-     * Find and delete one stop from within a pattern.
+     * Find and delete one generic stop from within a pattern.
      */
     private static void deleteOneStopFromAPattern(
         Connection connection,
         String tablePrefix,
         List<String> originalGenericStopIds,
-        List<Pattern> genericStops,
+        List<GenericStop> genericStops,
         String joinToTrips
     ) throws SQLException {
         // We have a deletion; find it.
@@ -173,7 +174,7 @@ public class PatternReconciliation {
     }
 
     /**
-     * Transpose two stops within a pattern.
+     * Transpose two generic stops within a pattern.
      *
      * Imagine the trip patterns pictured below (where . is a stop, and lines indicate the same stop)
      * the original trip pattern is on top, the new below:
@@ -188,7 +189,7 @@ public class PatternReconciliation {
         Connection connection,
         String tablePrefix,
         List<String> originalGenericStopIds,
-        List<Pattern> genericStops,
+        List<GenericStop> genericStops,
         String joinToTrips
     ) throws SQLException {
         // Find the left bound of the changed region.
@@ -250,13 +251,13 @@ public class PatternReconciliation {
     }
 
     /**
-     * Add one or more stops to the end of a pattern.
+     * Add one or more generic stops to the end of a pattern.
      */
     private static void addOneOrMoreStopsToEndOfPattern(
         Connection connection,
         String tablePrefix,
         List<String> originalGenericStopIds,
-        List<Pattern> genericStops,
+        List<GenericStop> genericStops,
         List<String> tripsForPattern
     ) throws SQLException {
         // find the left bound of the changed region to check that no stops have changed in between
@@ -290,11 +291,11 @@ public class PatternReconciliation {
     }
 
     /**
-     * Check the new pattern stop ids for differences against the original pattern stop ids. If only one change has
-     * been made (expected behaviour) return the location with the difference. If more than one difference is found
+     * Check the new generic stop ids for differences against the original generic stop ids. If only one change has
+     * been made (expected behaviour) return the index with the difference. If more than one difference is found
      * throw an exception.
      */
-    private static int checkForGenericStopDifference(List<String> originalStopIds, List<Pattern> genericStops) {
+    private static int checkForGenericStopDifference(List<String> originalStopIds, List<GenericStop> genericStops) {
         int differenceLocation = -1;
         for (int i = 0; i < genericStops.size(); i++) {
             if (differenceLocation != -1) {
@@ -317,11 +318,11 @@ public class PatternReconciliation {
     }
 
     /**
-     * Check the original pattern stop ids for differences against the new pattern stop ids. If only one change has
-     * been made (expected behaviour) return the location with the difference. If more than one difference is found
+     * Check the original generic stop ids for differences against the new generic stop ids. If only one change has
+     * been made (expected behaviour) return the index with the difference. If more than one difference is found
      * throw an exception.
      */
-    private static int checkForOriginalPatternDifference(List<String> originalStopIds, List<Pattern> genericStops) {
+    private static int checkForOriginalPatternDifference(List<String> originalStopIds, List<GenericStop> genericStops) {
         int differenceLocation = -1;
         for (int i = 0; i < originalStopIds.size(); i++) {
             if (differenceLocation != -1) {
@@ -342,8 +343,8 @@ public class PatternReconciliation {
     }
 
     /**
-     * Collect the original list of pattern ids. This will either be from pattern stops or pattern locations depending
-     * on the pattern type.
+     * Collect the original list of generic stop ids. This will either be from pattern stops or pattern locations
+     * depending on the pattern type.
      */
     private static List<String> getOriginalGenericStopIds(
         String tablePrefix,
@@ -400,7 +401,7 @@ public class PatternReconciliation {
     /**
      * Get a list of pattern reference ids.
      */
-    private static List<String> getPatternReferenceIds(List<Pattern> genericStops) {
+    private static List<String> getPatternReferenceIds(List<GenericStop> genericStops) {
         return genericStops.stream().map(pattern -> pattern.referenceId).collect(Collectors.toList());
     }
 
@@ -411,7 +412,7 @@ public class PatternReconciliation {
     private static void insertBlankStopTimes(
         String tablePrefix,
         List<String> tripIds,
-        List<Pattern> genericStops,
+        List<GenericStop> genericStops,
         int startingStopSequence,
         int stopTimesToAdd,
         Connection connection
@@ -465,13 +466,13 @@ public class PatternReconciliation {
     }
 
     /**
-     * Generic pattern class use to hold either a pattern stop or pattern location derived data.
+     * Generic stop class use to hold either a pattern stop or pattern location derived data.
      */
-    private static class Pattern {
+    private static class GenericStop {
         public String referenceId;
         // This stopTime object is a template that will be used to build database statements.
         StopTime stopTime;
-        public Pattern(PatternLocation patternLocation) {
+        public GenericStop(PatternLocation patternLocation) {
             referenceId = patternLocation.location_id;
             stopTime = new StopTime();
             stopTime.stop_id = patternLocation.location_id;
@@ -484,7 +485,7 @@ public class PatternReconciliation {
             stopTime.drop_off_booking_rule_id = patternLocation.drop_off_booking_rule_id;
         }
 
-        public Pattern(PatternStop patternStop) {
+        public GenericStop(PatternStop patternStop) {
             referenceId = patternStop.stop_id;
             stopTime = new StopTime();
             stopTime.stop_id = patternStop.stop_id;
