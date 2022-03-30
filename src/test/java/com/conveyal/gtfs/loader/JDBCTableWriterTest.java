@@ -1024,16 +1024,352 @@ public class JDBCTableWriterTest {
         );
     }
 
-    /*****************************************************************************************************************
-     * End tests, begin helpers
-     ****************************************************************************************************************/
+    @Test
+    public void canUpdatePatternLocations() throws IOException, SQLException, InvalidNamespaceException {
+        LocationDTO locationOne = createSimpleTestLocation(newUUID());
+        LocationDTO locationTwo = createSimpleTestLocation(newUUID());
+        LocationDTO locationThree = createSimpleTestLocation(newUUID());
+        LocationDTO locationFour = createSimpleTestLocation(newUUID());
+        LocationDTO locationFive = createSimpleTestLocation(newUUID());
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
 
+        PatternDTO pattern = createRouteAndPattern(
+            newUUID(),
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternLocationDTO[]{
+                new PatternLocationDTO(patternId, locationOne.location_id, 0),
+                new PatternLocationDTO(patternId, locationTwo.location_id, 1)
+            },
+            0
+        );
+
+        TripDTO tripInput = constructTimetableTrip(
+            pattern.pattern_id,
+            pattern.route_id,
+            locationOne.location_id,
+            locationTwo.location_id,
+            startTime,
+            60
+        );
+
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+
+        verifyStopTime(createdTrip.stop_times[0].id, locationOne.location_id, 0);
+        verifyStopTime(createdTrip.stop_times[1].id, locationTwo.location_id, 1);
+
+        // Change the order of locations.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationTwo.location_id, 0),
+            new PatternLocationDTO(patternId, locationOne.location_id, 1)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(createdTrip.stop_times[1].id, locationOne.location_id, 1);
+        verifyStopTime(createdTrip.stop_times[0].id, locationTwo.location_id, 0);
+
+        // Add a new location to the end.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationTwo.location_id, 0),
+            new PatternLocationDTO(patternId, locationOne.location_id, 1),
+            new PatternLocationDTO(patternId, locationThree.location_id, 2)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, locationOne.location_id, 1);
+        verifyStopTime(2, locationTwo.location_id, 0);
+        verifyStopTime(3, locationThree.location_id, 2);
+
+        // Add a new location to the start.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationFour.location_id, 0),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 1),
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+            new PatternLocationDTO(patternId, locationThree.location_id, 3)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        verifyStopTime(1, locationOne.location_id, 2);
+        verifyStopTime(2, locationTwo.location_id, 1);
+        verifyStopTime(3, locationThree.location_id, 3);
+        verifyStopTime(4, locationFour.location_id, 0);
+
+        // Add a new location to the middle.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationFour.location_id, 0),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 1),
+            new PatternLocationDTO(patternId, locationFive.location_id, 2),
+            new PatternLocationDTO(patternId, locationOne.location_id, 3),
+            new PatternLocationDTO(patternId, locationThree.location_id, 4)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, locationOne.location_id, 3);
+        verifyStopTime(2, locationTwo.location_id, 1);
+        verifyStopTime(3, locationThree.location_id, 4);
+        verifyStopTime(4, locationFour.location_id, 0);
+        verifyStopTime(5, locationFive.location_id, 2);
+
+        // Delete a location from the middle.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationFour.location_id, 0),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 1),
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+            new PatternLocationDTO(patternId, locationThree.location_id, 3)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, locationOne.location_id, 2);
+        verifyStopTime(2, locationTwo.location_id, 1);
+        verifyStopTime(3, locationThree.location_id, 3);
+        verifyStopTime(4, locationFour.location_id, 0);
+
+        // Delete a location from the end.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationFour.location_id, 0),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 1),
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, locationOne.location_id, 2);
+        verifyStopTime(2, locationTwo.location_id, 1);
+        verifyStopTime(4, locationFour.location_id, 0);
+
+        // Delete a location from the beginning.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationTwo.location_id, 1),
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, locationOne.location_id, 1);
+        verifyStopTime(2, locationTwo.location_id, 0);
+
+        // Add two locations at the end.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationTwo.location_id, 0),
+            new PatternLocationDTO(patternId, locationOne.location_id, 1),
+            new PatternLocationDTO(patternId, locationThree.location_id, 2),
+            new PatternLocationDTO(patternId, locationFour.location_id, 3),
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, locationOne.location_id, 1);
+        verifyStopTime(2, locationTwo.location_id, 0);
+        verifyStopTime(3, locationThree.location_id, 2);
+        verifyStopTime(4, locationFour.location_id, 3);
+
+        deletePattern(pattern.id);
+    }
+
+    @Test
+    public void canUpdatePatternStops() throws IOException, SQLException, InvalidNamespaceException {
+        StopDTO stopOne = createSimpleStop(newUUID(), "Stop One", 0.0, 0.0);
+        StopDTO stopTwo = createSimpleStop(newUUID(), "Stop Two", 0.0, 0.0);
+        StopDTO stopThree = createSimpleStop(newUUID(), "Stop Three", 0.0, 0.0);
+        StopDTO stopFour = createSimpleStop(newUUID(), "Stop Four", 0.0, 0.0);
+        StopDTO stopFive = createSimpleStop(newUUID(), "Stop Five", 0.0, 0.0);
+        String patternId = newUUID();
+        int startTime = 6 * 60 * 60; // 6 AM
+
+        PatternDTO pattern = createRouteAndPattern(
+            newUUID(),
+            patternId,
+            "pattern name",
+            null,
+            new ShapePointDTO[]{},
+            new PatternStopDTO[]{
+                new PatternStopDTO(patternId, stopOne.stop_id, 0),
+                new PatternStopDTO(patternId, stopTwo.stop_id, 1)
+            },
+            0
+        );
+
+        TripDTO tripInput = constructTimetableTrip(
+            pattern.pattern_id,
+            pattern.route_id,
+            stopOne.stop_id,
+            stopTwo.stop_id,
+            startTime,
+            60
+        );
+
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+
+        verifyStopTime(createdTrip.stop_times[0].id, stopOne.stop_id, 0);
+        verifyStopTime(createdTrip.stop_times[1].id, stopTwo.stop_id, 1);
+
+        // Change the order of stops.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopTwo.stop_id, 0),
+            new PatternStopDTO(patternId, stopOne.stop_id, 1)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(createdTrip.stop_times[1].id, stopOne.stop_id, 1);
+        verifyStopTime(createdTrip.stop_times[0].id, stopTwo.stop_id, 0);
+
+        // Add a new stop to the end.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopTwo.stop_id, 0),
+            new PatternStopDTO(patternId, stopOne.stop_id, 1),
+            new PatternStopDTO(patternId, stopThree.stop_id, 2)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, stopOne.stop_id, 1);
+        verifyStopTime(2, stopTwo.stop_id, 0);
+        verifyStopTime(3, stopThree.stop_id, 2);
+
+        // Add a new stop to the start.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopFour.stop_id, 0),
+            new PatternStopDTO(patternId, stopTwo.stop_id, 1),
+            new PatternStopDTO(patternId, stopOne.stop_id, 2),
+            new PatternStopDTO(patternId, stopThree.stop_id, 3)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        verifyStopTime(1, stopOne.stop_id, 2);
+        verifyStopTime(2, stopTwo.stop_id, 1);
+        verifyStopTime(3, stopThree.stop_id, 3);
+        verifyStopTime(4, stopFour.stop_id, 0);
+
+        // Add a new stop to the middle.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopFour.stop_id, 0),
+            new PatternStopDTO(patternId, stopTwo.stop_id, 1),
+            new PatternStopDTO(patternId, stopFive.stop_id, 2),
+            new PatternStopDTO(patternId, stopOne.stop_id, 3),
+            new PatternStopDTO(patternId, stopThree.stop_id, 4)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, stopOne.stop_id, 3);
+        verifyStopTime(2, stopTwo.stop_id, 1);
+        verifyStopTime(3, stopThree.stop_id, 4);
+        verifyStopTime(4, stopFour.stop_id, 0);
+        verifyStopTime(5, stopFive.stop_id, 2);
+
+        // Delete a stop from the middle.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopFour.stop_id, 0),
+            new PatternStopDTO(patternId, stopTwo.stop_id, 1),
+            new PatternStopDTO(patternId, stopOne.stop_id, 2),
+            new PatternStopDTO(patternId, stopThree.stop_id, 3)
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, stopOne.stop_id, 2);
+        verifyStopTime(2, stopTwo.stop_id, 1);
+        verifyStopTime(3, stopThree.stop_id, 3);
+        verifyStopTime(4, stopFour.stop_id, 0);
+
+        // Delete a stop from the end.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopFour.stop_id, 0),
+            new PatternStopDTO(patternId, stopTwo.stop_id, 1),
+            new PatternStopDTO(patternId, stopOne.stop_id, 2),
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, stopOne.stop_id, 2);
+        verifyStopTime(2, stopTwo.stop_id, 1);
+        verifyStopTime(4, stopFour.stop_id, 0);
+
+        // Delete a stop from the beginning.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopTwo.stop_id, 1),
+            new PatternStopDTO(patternId, stopOne.stop_id, 2),
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, stopOne.stop_id, 1);
+        verifyStopTime(2, stopTwo.stop_id, 0);
+
+        // Add two stops at the end.
+        patternUpdater = createTestTableWriter(Table.PATTERNS);
+        pattern.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, stopTwo.stop_id, 0),
+            new PatternStopDTO(patternId, stopOne.stop_id, 1),
+            new PatternStopDTO(patternId, stopThree.stop_id, 2),
+            new PatternStopDTO(patternId, stopFour.stop_id, 3),
+        };
+
+        patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+
+        verifyStopTime(1, stopOne.stop_id, 1);
+        verifyStopTime(2, stopTwo.stop_id, 0);
+        verifyStopTime(3, stopThree.stop_id, 2);
+        verifyStopTime(4, stopFour.stop_id, 3);
+
+        deletePattern(pattern.id);
+    }
+
+    /**
+     * Delete pattern (and child entities) matching provided pattern id.
+     */
+    private void deletePattern(Integer patternId) throws InvalidNamespaceException, SQLException {
+        JdbcTableWriter deletePatternWriter = createTestTableWriter(Table.PATTERNS);
+        deletePatternWriter.delete(patternId, true);
+    }
+
+    /**
+     * Verify that the stop id and stop sequence values are correctly set in the stop times table.
+     */
+    private void verifyStopTime(int stopTimeId, String stopId, int stopSequence) throws SQLException {
+        ResultSet stopTimesResultSet = getResultSetForId(stopTimeId, Table.STOP_TIMES);
+        while (stopTimesResultSet.next()) {
+            assertResultValue(stopTimesResultSet, "stop_sequence", equalTo(stopSequence));
+            assertResultValue(stopTimesResultSet, "stop_id", equalTo(stopId));
+        }
+    }
+
+    /**
+     * Create a new random unique id.
+     */
     private static String newUUID() {
         return UUID.randomUUID().toString();
     }
 
     /**
-     * Constructs SQL query for the specified ID and columns and returns the resulting result set.
+     * Constructs an SQL query for the specified ID and columns and returns the resulting result set.
      */
     private String getColumnsForId(int id, Table table, String... columns) {
         String sql = String.format(
@@ -1095,17 +1431,62 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Construct (without writing to the database) a timetable trip.
+     * Construct (without writing to the database) a timetable trip using fixed first and last stop ids.
      */
     private TripDTO constructTimetableTrip(String patternId, String routeId, int startTime, int travelTime) {
+        return constructTimetableTrip(patternId, routeId, firstStopId, lastStopId, startTime, travelTime);
+    }
+
+    /**
+     * Construct (without writing to the database) a timetable trip.
+     */
+    private TripDTO constructTimetableTrip(
+        String patternId,
+        String routeId,
+        String firstStopId,
+        String lastStopId,
+        int startTime,
+        int travelTime
+    ) {
+        StopTimeDTO[] stopTimes = new StopTimeDTO[]{
+            new StopTimeDTO(firstStopId, startTime, startTime, 0),
+            new StopTimeDTO(lastStopId, startTime + travelTime, startTime + travelTime, 1)
+        };
+        return constructTimetableTrip(patternId, routeId, stopTimes);
+    }
+
+    /**
+     * Construct (without writing to the database) a timetable trip.
+     */
+    private TripDTO constructTimetableTrip(
+        String patternId,
+        String routeId,
+        String firstStopId,
+        String secondStopId,
+        String thirdStopId,
+        int startTime
+    ) {
+        StopTimeDTO[] stopTimes = new StopTimeDTO[]{
+            new StopTimeDTO(firstStopId, startTime, startTime, 0),
+            new StopTimeDTO(secondStopId, startTime + 60, startTime + 60, 1),
+            new StopTimeDTO(thirdStopId, startTime + (60 * 2), startTime + (60 * 2), 2)
+        };
+        return constructTimetableTrip(patternId, routeId, stopTimes);
+    }
+
+    /**
+     * Construct (without writing to the database) a timetable trip.
+     */
+    private TripDTO constructTimetableTrip(
+        String patternId,
+        String routeId,
+        StopTimeDTO[] stopTimes
+    ) {
         TripDTO tripInput = new TripDTO();
         tripInput.pattern_id = patternId;
         tripInput.route_id = routeId;
         tripInput.service_id = simpleServiceId;
-        tripInput.stop_times = new StopTimeDTO[]{
-            new StopTimeDTO(firstStopId, startTime, startTime, 0),
-            new StopTimeDTO(lastStopId, startTime + travelTime, startTime + travelTime, 1)
-        };
+        tripInput.stop_times = stopTimes;
         tripInput.frequencies = new FrequencyDTO[]{};
         return tripInput;
     }
@@ -1125,6 +1506,38 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
+        // Write the pattern to the database
+        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
+        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.PATTERNS.name);
+        LOG.info(output);
+        // Parse output
+        return mapper.readValue(output, PatternDTO.class);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndPattern(
+        String routeId,
+        String patternId,
+        String name,
+        String shapeId,
+        ShapePointDTO[] shapes,
+        PatternLocationDTO[] patternLocations,
+        int useFrequency
+    ) throws InvalidNamespaceException, SQLException, IOException {        // Create new route
+        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
+        // Create new pattern for route
+        PatternDTO input = new PatternDTO();
+        input.pattern_id = patternId;
+        input.route_id = routeId;
+        input.name = name;
+        input.use_frequency = useFrequency;
+        input.shape_id = shapeId;
+        input.shapes = shapes;
+        input.pattern_stops = new PatternStopDTO[] {};
+        input.pattern_locations = patternLocations;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
@@ -1257,7 +1670,6 @@ public class JDBCTableWriterTest {
         patternLocation.location_id = locationId;
         patternLocation.drop_off_type = 1;
         patternLocation.pickup_type = 1;
-        patternLocation.shape_dist_traveled = 0.0;
         patternLocation.timepoint = 1;
         patternLocation.continuous_pickup = 1;
         patternLocation.continuous_drop_off = 1;

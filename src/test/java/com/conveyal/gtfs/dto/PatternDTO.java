@@ -9,5 +9,6 @@ public class PatternDTO {
     public Integer use_frequency;
     public String name;
     public PatternStopDTO[] pattern_stops;
+    public PatternLocationDTO[] pattern_locations;
     public ShapePointDTO[] shapes;
 }
