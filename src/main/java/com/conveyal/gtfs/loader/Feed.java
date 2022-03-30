@@ -35,6 +35,7 @@ public class Feed {
     public final TableReader<Calendar>      calendars;
     public final TableReader<CalendarDate>  calendarDates;
     public final TableReader<FareAttribute> fareAttributes;
+    public final TableReader<FareRule>      fareRules;
     public final TableReader<Frequency>     frequencies;
     public final TableReader<Location>      locations;
     public final TableReader<LocationGroup> locationGroups;
@@ -57,6 +58,7 @@ public class Feed {
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
         bookingRules = new JDBCTableReader(Table.BOOKING_RULES, dataSource, tablePrefix, EntityPopulator.BOOKING_RULE);
         fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, tablePrefix, EntityPopulator.FARE_ATTRIBUTE);
+        fareRules = new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
         frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, tablePrefix, EntityPopulator.FREQUENCY);
         locations = new JDBCTableReader(Table.LOCATIONS, dataSource, tablePrefix, EntityPopulator.LOCATION);
         locationGroups = new JDBCTableReader(Table.LOCATION_GROUPS, dataSource, tablePrefix, EntityPopulator.LOCATION_GROUP);
@@ -100,7 +102,8 @@ public class Feed {
             new FrequencyValidator(this, errorStorage),
             new TimeZoneValidator(this, errorStorage),
             new NewTripTimesValidator(this, errorStorage),
-            new NamesValidator(this, errorStorage)
+            new NamesValidator(this, errorStorage),
+            new FlexValidator(this, errorStorage)
         );
         // Create additional validators specified in this method's args and add to list of feed validators to run.
         for (FeedValidatorCreator creator : additionalValidators) {

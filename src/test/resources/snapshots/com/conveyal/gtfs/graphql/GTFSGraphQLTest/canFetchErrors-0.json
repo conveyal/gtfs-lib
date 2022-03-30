@@ -12,6 +12,71 @@
         "priority" : "LOW",
         "type" : "FEED_TRAVEL_TIMES_ROUNDED"
       }, {
+        "count" : 5,
+        "message" : "It is forbidden to define an arrival time when either start pickup drop off window or end pickup drop off window are defined.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_ARRIVAL_TIME"
+      }, {
+        "count" : 5,
+        "message" : "It is forbidden to define a departure time when either start pickup drop off window or end pickup dropoff window are defined.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_DEPARTURE_TIME"
+      }, {
+        "count" : 1,
+        "message" : "It is forbidden to define a drop off type of 0 (Regularly scheduled pickup) when a stop id refers to a location group or location.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_DROP_OFF_TYPE"
+      }, {
+        "count" : 5,
+        "message" : "It is forbidden to define a end pickup drop off window when either an arrive time or departure time are defined.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW"
+      }, {
+        "count" : 4,
+        "message" : "It is forbidden to define a mean duration factor when a stop id does not refer to a location group or location.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR"
+      }, {
+        "count" : 4,
+        "message" : "It is forbidden to define a mean duration offset when a stop id does not refer to a location group or location.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET"
+      }, {
+        "count" : 1,
+        "message" : "It is forbidden to define a pickup type of 0 (Regularly scheduled pickup) when a stop id refers to a location group or location.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_PICKUP_TYPE"
+      }, {
+        "count" : 1,
+        "message" : "It is forbidden to define a prior notice last day for booking type 2 (Up to prior day(s) booking).",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_LAST_DAY"
+      }, {
+        "count" : 1,
+        "message" : "It is forbidden to define a prior notice service id if prior notice start day is not defined.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID"
+      }, {
+        "count" : 1,
+        "message" : "It is forbidden to define a prior notice start day for booking type 1 (Up to same-day booking with advance notice) and if prior notice duration max is defined.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY"
+      }, {
+        "count" : 4,
+        "message" : "It is forbidden to define a safe duration factor when a stop id does not refer to a location group or location.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR"
+      }, {
+        "count" : 4,
+        "message" : "It is forbidden to define a safe duration offset when a stop id does not refer to a location group or location.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET"
+      }, {
+        "count" : 5,
+        "message" : "It is forbidden to define a start pickup drop off window when either an arrive time or departure time are defined.",
+        "priority" : "HIGH",
+        "type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW"
+      }, {
         "count" : 4,
         "message" : "Unable to parse the locations.geojson file. Make sure the file conforms to the GeoJson standard and supported geometry types are used.",
         "priority" : "HIGH",
@@ -36,6 +101,11 @@
         "message" : "This stop is not referenced by any trips.",
         "priority" : "MEDIUM",
         "type" : "STOP_UNUSED"
+      }, {
+        "count" : 1,
+        "message" : "Trip speed not validated because it contains at least one stop which is a location or location group.",
+        "priority" : "LOW",
+        "type" : "TRIP_SPEED_NOT_VALIDATED"
       } ],
       "errors" : [ {
         "bad_value" : "agency_url",
@@ -94,27 +164,347 @@
         "error_type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME",
         "line_number" : 2
       }, {
-        "bad_value" : null,
+        "bad_value" : "1",
         "entity_id" : null,
         "entity_sequence" : null,
-        "entity_type" : null,
+        "entity_type" : "BookingRule",
         "error_id" : 7,
-        "error_type" : "FEED_TRAVEL_TIMES_ROUNDED",
-        "line_number" : null
+        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_LAST_DAY",
+        "line_number" : 2
       }, {
-        "bad_value" : "1234567",
-        "entity_id" : "1234567",
+        "bad_value" : "7",
+        "entity_id" : null,
         "entity_sequence" : null,
-        "entity_type" : "Stop",
+        "entity_type" : "BookingRule",
         "error_id" : 8,
-        "error_type" : "STOP_UNUSED",
+        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY",
+        "line_number" : 2
+      }, {
+        "bad_value" : "04100312-8fe1-46a5-a9f2-556f39478f57",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : "BookingRule",
+        "error_id" : 9,
+        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 10,
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 11,
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 12,
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 13,
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 2
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 14,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
+        "line_number" : 2
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 15,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
+        "line_number" : 2
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 16,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
+        "line_number" : 2
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 17,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25260",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 18,
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "line_number" : 3
+      }, {
+        "bad_value" : "25260",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 19,
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 3
+      }, {
+        "bad_value" : "25260",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 20,
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 3
+      }, {
+        "bad_value" : "25260",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 21,
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 3
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 22,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
+        "line_number" : 3
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 23,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
+        "line_number" : 3
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 24,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
+        "line_number" : 3
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 25,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
+        "line_number" : 3
+      }, {
+        "bad_value" : "28800",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 26,
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "line_number" : 4
+      }, {
+        "bad_value" : "28800",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 27,
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 4
+      }, {
+        "bad_value" : "25320",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 28,
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 4
+      }, {
+        "bad_value" : "25320",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 29,
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 4
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 30,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
+        "line_number" : 4
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 31,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
+        "line_number" : 4
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 32,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
+        "line_number" : 4
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 1,
+        "entity_type" : "StopTime",
+        "error_id" : 33,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
+        "line_number" : 4
+      }, {
+        "bad_value" : "30540",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 34,
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "line_number" : 5
+      }, {
+        "bad_value" : "30540",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 35,
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 5
+      }, {
+        "bad_value" : "25380",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 36,
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 5
+      }, {
+        "bad_value" : "25380",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 37,
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 5
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 38,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
+        "line_number" : 5
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 39,
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
+        "line_number" : 5
+      }, {
+        "bad_value" : "1.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 40,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
+        "line_number" : 5
+      }, {
+        "bad_value" : "60.0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 2,
+        "entity_type" : "StopTime",
+        "error_id" : 41,
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
+        "line_number" : 5
+      }, {
+        "bad_value" : "30660",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 3,
+        "entity_type" : "StopTime",
+        "error_id" : 42,
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
         "line_number" : 6
+      }, {
+        "bad_value" : "30660",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 3,
+        "entity_type" : "StopTime",
+        "error_id" : 43,
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 6
+      }, {
+        "bad_value" : "25380",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 3,
+        "entity_type" : "StopTime",
+        "error_id" : 44,
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 6
+      }, {
+        "bad_value" : "25380",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 3,
+        "entity_type" : "StopTime",
+        "error_id" : 45,
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 6
+      }, {
+        "bad_value" : "0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 3,
+        "entity_type" : "StopTime",
+        "error_id" : 46,
+        "error_type" : "FLEX_FORBIDDEN_PICKUP_TYPE",
+        "line_number" : 6
+      }, {
+        "bad_value" : "0",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 3,
+        "entity_type" : "StopTime",
+        "error_id" : 47,
+        "error_type" : "FLEX_FORBIDDEN_DROP_OFF_TYPE",
+        "line_number" : 6
+      }, {
+        "bad_value" : "frequency-trip",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : null,
+        "entity_type" : "Trip",
+        "error_id" : 48,
+        "error_type" : "TRIP_SPEED_NOT_VALIDATED",
+        "line_number" : 3
       }, {
         "bad_value" : "20170916",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
-        "error_id" : 9,
+        "error_id" : 49,
         "error_type" : "DATE_NO_SERVICE",
         "line_number" : null
       } ],

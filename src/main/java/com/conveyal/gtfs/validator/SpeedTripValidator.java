@@ -6,6 +6,7 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -37,18 +38,26 @@ public class SpeedTripValidator extends TripValidator {
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTripValidator.class);
     public static final double MIN_SPEED_KPH = 0.5;
     private boolean allTravelTimesAreRounded = true;
-    private Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
+    private final Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
 
     public SpeedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops, List<Location> locations) {
-        if (containsFlexLocations(stopTimes, locations)) {
-            // FLEX TODO: The validator needs to be refactored to work with flex locations. A stop time -> stop_id can
-            // either be a stop_id or a location id.
-            LOG.warn("Trip speed not validated because it contains flex locations!");
+    public void validateTrip(
+        Trip trip,
+        Route route,
+        List<StopTime> stopTimes,
+        List<Stop> stops,
+        List<Location> locations,
+        List<LocationGroup> locationGroups
+    ) {
+        if (FlexValidator.tripHasLocationGroupOrLocationForStop(trip, stopTimes, locationGroups, locations)) {
+            LOG.warn(
+                "Trip speed not validated for trip id {} because it contains at least one stop that is a location or location group.",
+                trip.trip_id
+            );
             return;
         }
         // The specific maximum speed for this trip's route's mode of travel.
@@ -114,22 +123,6 @@ public class SpeedTripValidator extends TripValidator {
             // Redefine current stopTime for the next iteration.
             prevStopTime = currStopTime;
         }
-    }
-
-    /**
-     * If any stop time contains a location instead of a stop the trip speed will need to be calculated differently
-     * to work with stops as well as locations.
-     */
-    private boolean containsFlexLocations(List<StopTime> stopTimes, List<Location> locations) {
-        boolean containsFlexLocation = false;
-        for (StopTime stopTime : stopTimes) {
-            for (Location location : locations) {
-                if (stopTime.stop_id.equals(location.location_id)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /**

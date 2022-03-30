@@ -42,6 +42,8 @@ import static java.util.stream.Collectors.toList;
 public class GeoJsonUtil {
 
     private static final Logger LOG = LoggerFactory.getLogger(GeoJsonUtil.class);
+    public static final String GEOMETRY_TYPE_POLYLINE = "polyline";
+    public static final String GEOMETRY_TYPE_POLYGON = "polygon";
 
     /**
      * Takes the content of a zip file entry and converts it into a {@link FeatureCollection} which is a class
@@ -72,9 +74,9 @@ public class GeoJsonUtil {
     private static String getGeometryType(String geometry_type, List<String> errors) {
         switch (geometry_type) {
             case "LINESTRING":
-                return "polyline";
+                return GEOMETRY_TYPE_POLYLINE;
             case "POLYGON":
-                return "polygon";
+                return GEOMETRY_TYPE_POLYGON;
             // TODO: Add additional geometry types.
             default:
                 // Effectively, MultiPolygon, Polygon and MultiLineString types aren't supported yet.
@@ -152,7 +154,7 @@ public class GeoJsonUtil {
             String geometryType = getGeometryType(geometry.getGeometryType().getName(), errors);
             if (geometryType == null) continue;
             switch (geometryType) {
-                case "polyline":
+                case GEOMETRY_TYPE_POLYLINE:
                     LineString lineString = (LineString) geometry;
                     for (Point point : lineString.getPoints()) {
                         locationShapes.add(
@@ -161,7 +163,7 @@ public class GeoJsonUtil {
                         );
                     }
                     break;
-                case "polygon":
+                case GEOMETRY_TYPE_POLYGON:
                     Polygon polygon = (Polygon) geometry;
                     List<LineString> lineStrings = polygon.getRings();
                     if (lineStrings.size() > 1) {
