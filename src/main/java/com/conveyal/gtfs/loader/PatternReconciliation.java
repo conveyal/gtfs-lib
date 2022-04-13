@@ -11,6 +11,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -23,36 +24,86 @@ public class PatternReconciliation {
     private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops or locations must be made one at a time if pattern contains at least one trip.";
 
     /**
+     * Enum containing available reconciliation types.
+     */
+    private enum ReconcileType {
+        ADD_ONE, ADD_MULTIPLE, DELETE, TRANSPOSE, NONE
+    }
+
+    /**
      * Enum containing available pattern types.
      */
-    private enum PatternType {
+    public enum PatternType {
         LOCATION, STOP
     }
 
     /**
-     * Reconcile pattern stops.
+     * Reconcile pattern stops and pattern locations.
      */
-    public static void reconcilePatternStops(
-        String tablePrefix,
-        String patternId,
+    public static void reconcile(
+        List<PatternLocation> patternLocations,
         List<PatternStop> patternStops,
+        List<String> originalGenericStopIds,
+        String patternId,
+        String tablePrefix,
         Connection connection
     ) throws SQLException {
-        List<GenericStop> genericStops = patternStops.stream().map(GenericStop::new).collect(Collectors.toList());
-        reconcilePattern(tablePrefix, patternId, genericStops, connection, PatternType.STOP);
+        List<String> tripsForPattern = getTripIdsForPatternId(tablePrefix, patternId, connection);
+        if ((patternLocations.isEmpty() && patternStops.isEmpty()) || tripsForPattern.isEmpty()) {
+            LOG.info("No pattern stops/locations provided or no associated trips. Pattern reconciliation not required.");
+            return;
+        }
+        List<GenericStop> newGenericStops = getGenericStops(patternLocations, patternStops);
+        ReconcileType reconcileType = getReconcileType(originalGenericStopIds, newGenericStops);
+        if (reconcileType == ReconcileType.NONE) {
+            LOG.info("Pattern stops not changed. Pattern reconciliation not required.");
+            return;
+        }
+        reconcilePattern(
+            tablePrefix,
+            patternId,
+            originalGenericStopIds,
+            newGenericStops,
+            connection,
+            reconcileType,
+            tripsForPattern
+        );
     }
 
     /**
-     * Reconcile pattern locations.
+     * Combine pattern locations and pattern stops then order by stop sequence.
      */
-    public static void reconcilePatternLocations(
-        String tablePrefix,
-        String patternId,
+    public static List<GenericStop> getGenericStops(
         List<PatternLocation> patternLocations,
-        Connection connection
-    ) throws SQLException {
-        List<GenericStop> genericStops = patternLocations.stream().map(GenericStop::new).collect(Collectors.toList());
-        reconcilePattern(tablePrefix, patternId, genericStops, connection, PatternType.LOCATION);
+        List<PatternStop> patternStops
+    ) {
+        List<GenericStop> genericStops = patternStops.stream().map(GenericStop::new).collect(Collectors.toList());
+        genericStops.addAll(patternLocations.stream().map(GenericStop::new).collect(Collectors.toList()));
+        genericStops.sort(Comparator.comparingInt(genericStop -> genericStop.stopTime.stop_sequence));
+        return genericStops;
+    }
+
+    /**
+     * Define the type of update to be applied to stop times. This is done by comparing the size of the original generic
+     * stops against the size of the new generic stops.
+     */
+    private static ReconcileType getReconcileType(List<String> originalGenericStopIds, List<GenericStop> genericStops) {
+        int sizeDiff = originalGenericStopIds.size() - genericStops.size();
+        if (sizeDiff == -1) {
+            return ReconcileType.ADD_ONE;
+        } else if (sizeDiff == 1) {
+            return ReconcileType.DELETE;
+        } else if (sizeDiff == 0) {
+            if (getFirstTripPatternDifference(originalGenericStopIds, genericStops) == -1) {
+                return ReconcileType.NONE;
+            }
+            return ReconcileType.TRANSPOSE;
+        } else if (sizeDiff < -1) {
+            return ReconcileType.ADD_MULTIPLE;
+        } else {
+            // Any other type of modification is not supported.
+            throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
+        }
     }
 
     /**
@@ -65,35 +116,34 @@ public class PatternReconciliation {
     private static void reconcilePattern(
         String tablePrefix,
         String patternId,
-        List<GenericStop> genericStops,
+        List<String> originalGenericStopIds,
+        List<GenericStop> newGenericStops,
         Connection connection,
-        PatternType patternType
+        ReconcileType reconcileType,
+        List<String> tripsForPattern
     ) throws SQLException {
-        LOG.info("Reconciling pattern for pattern ID={} for pattern type={}", patternId, patternType);
-        if (genericStops.isEmpty()) {
-            return;
-        }
-        List<String> tripsForPattern = getTripIdsForPatternId(tablePrefix, patternId, connection);
-        if (tripsForPattern.size() == 0) {
-            // No trips for the pattern, there is no need to reconcile stop times to modified patterns.
-            return;
-        }
-        List<String> originalGenericStopIds = getOriginalGenericStopIds(tablePrefix, patternId, patternType, connection);
+        LOG.info("Reconciling pattern for pattern Id: {}", patternId);
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
-        String joinToTrips = String.format("%s.trips.trip_id = %s.stop_times.trip_id AND %s.trips.pattern_id = '%s'",
-            tablePrefix, tablePrefix, tablePrefix, patternId);
-        int sizeDiff = originalGenericStopIds.size() - genericStops.size();
-        if (sizeDiff == -1) {
-            addOneStopToAPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips, tripsForPattern);
-        } else if (sizeDiff == 1) {
-            deleteOneStopFromAPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips);
-        } else if (sizeDiff == 0) {
-            transposeTwoStopsInAPattern(connection, tablePrefix, originalGenericStopIds, genericStops, joinToTrips);
-        } else if (sizeDiff < -1) {
-            addOneOrMoreStopsToEndOfPattern(connection, tablePrefix, originalGenericStopIds, genericStops, tripsForPattern);
-        } else {
-            // Any other type of modification is not supported.
-            throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
+        String joinToTrips = String.format(
+            "%s.trips.trip_id = %s.stop_times.trip_id AND %s.trips.pattern_id = '%s'",
+            tablePrefix,
+            tablePrefix,
+            tablePrefix,
+            patternId
+        );
+        switch (reconcileType) {
+            case ADD_ONE:
+                addOneStopToAPattern(connection, tablePrefix, originalGenericStopIds, newGenericStops, joinToTrips, tripsForPattern);
+                break;
+            case DELETE:
+                deleteOneStopFromAPattern(connection, tablePrefix, originalGenericStopIds, newGenericStops, joinToTrips);
+                break;
+            case TRANSPOSE:
+                transposeStopInAPattern(connection, tablePrefix, originalGenericStopIds, newGenericStops, joinToTrips);
+                break;
+            case ADD_MULTIPLE:
+                addOneOrMoreStopsToEndOfPattern(connection, tablePrefix, originalGenericStopIds, newGenericStops, tripsForPattern);
+                break;
         }
     }
 
@@ -173,7 +223,7 @@ public class PatternReconciliation {
     }
 
     /**
-     * Transpose two generic stops within a pattern.
+     * Move one generic stops within a pattern.
      *
      * Imagine the trip patterns pictured below (where . is a stop, and lines indicate the same stop)
      * the original trip pattern is on top, the new below:
@@ -184,7 +234,7 @@ public class PatternReconciliation {
      * on my whiteboard). There are three regions: the beginning and end, where stopSequences are the same, and
      * the middle, where they are not. The same is true of trips where stops were moved backwards.
      */
-    private static void transposeTwoStopsInAPattern(
+    private static void transposeStopInAPattern(
         Connection connection,
         String tablePrefix,
         List<String> originalGenericStopIds,
@@ -192,12 +242,10 @@ public class PatternReconciliation {
         String joinToTrips
     ) throws SQLException {
         // Find the left bound of the changed region.
-        int firstDifferentIndex = 0;
-        while (originalGenericStopIds.get(firstDifferentIndex).equals(genericStops.get(firstDifferentIndex).referenceId)) {
-            firstDifferentIndex++;
-            if (firstDifferentIndex == originalGenericStopIds.size())
-                // trip patterns do not differ at all, nothing to do
-                return;
+        int firstDifferentIndex = getFirstTripPatternDifference(originalGenericStopIds, genericStops);
+        if (firstDifferentIndex == -1) {
+            // Trip patterns do not differ at all, nothing to do.
+            return;
         }
         // Find the right bound of the changed region.
         int lastDifferentIndex = originalGenericStopIds.size() - 1;
@@ -290,6 +338,21 @@ public class PatternReconciliation {
     }
 
     /**
+     * Check if there is a difference between the original and new trip patterns. Return the first difference or
+     * -1 if there is no difference.
+     */
+    private static int getFirstTripPatternDifference(List<String> originalGenericStopIds, List<GenericStop> genericStops) {
+        int firstDifferentIndex = 0;
+        while (originalGenericStopIds.get(firstDifferentIndex).equals(genericStops.get(firstDifferentIndex).referenceId)) {
+            firstDifferentIndex++;
+            if (firstDifferentIndex == originalGenericStopIds.size())
+                // Trip patterns do not differ at all, nothing to do.
+                return -1;
+        }
+        return firstDifferentIndex;
+    }
+
+    /**
      * Check the new generic stop ids for differences against the original generic stop ids. If only one change has
      * been made (expected behaviour) return the index with the difference. If more than one difference is found
      * throw an exception.
@@ -339,42 +402,6 @@ public class PatternReconciliation {
             }
         }
         return differenceLocation;
-    }
-
-    /**
-     * Collect the original list of generic stop ids. This will either be from pattern stops or pattern locations
-     * depending on the pattern type.
-     */
-    private static List<String> getOriginalGenericStopIds(
-        String tablePrefix,
-        String patternId,
-        PatternType patternType,
-        Connection connection
-    ) throws SQLException {
-        String sql;
-        switch (patternType) {
-            case LOCATION:
-                sql = String.format("select location_id from %s.pattern_locations where pattern_id = ? order by stop_sequence",
-                    tablePrefix);
-                break;
-            case STOP:
-                sql = String.format("select stop_id from %s.pattern_stops where pattern_id = ? order by stop_sequence",
-                    tablePrefix);
-                break;
-            default:
-                String error = String.format("Unknown pattern type %s. Unable to get original pattern ids.", patternType);
-                LOG.error(error);
-                throw new SQLException(error);
-        }
-        PreparedStatement getLocationsStatement = connection.prepareStatement(sql);
-        getLocationsStatement.setString(1, patternId);
-        LOG.info(getLocationsStatement.toString());
-        ResultSet locationsResults = getLocationsStatement.executeQuery();
-        List<String> originalGenericStopIds = new ArrayList<>();
-        while (locationsResults.next()) {
-            originalGenericStopIds.add(locationsResults.getString(1));
-        }
-        return originalGenericStopIds;
     }
 
     /**
@@ -467,14 +494,17 @@ public class PatternReconciliation {
     /**
      * Generic stop class use to hold either a pattern stop or pattern location derived data.
      */
-    private static class GenericStop {
+    static class GenericStop {
         public String referenceId;
         // This stopTime object is a template that will be used to build database statements.
         StopTime stopTime;
+        PatternType patternType;
         public GenericStop(PatternLocation patternLocation) {
+            patternType = PatternType.LOCATION;
             referenceId = patternLocation.location_id;
             stopTime = new StopTime();
             stopTime.stop_id = patternLocation.location_id;
+            stopTime.stop_sequence = patternLocation.stop_sequence;
             stopTime.drop_off_type = patternLocation.drop_off_type;
             stopTime.pickup_type = patternLocation.pickup_type;
             stopTime.timepoint = patternLocation.timepoint;
@@ -482,12 +512,18 @@ public class PatternReconciliation {
             stopTime.continuous_pickup = patternLocation.continuous_pickup;
             stopTime.pickup_booking_rule_id = patternLocation.pickup_booking_rule_id;
             stopTime.drop_off_booking_rule_id = patternLocation.drop_off_booking_rule_id;
+            stopTime.mean_duration_offset = patternLocation.mean_duration_offset;
+            stopTime.mean_duration_factor = patternLocation.mean_duration_factor;
+            stopTime.safe_duration_offset = patternLocation.safe_duration_offset;
+            stopTime.safe_duration_factor = patternLocation.safe_duration_factor;
         }
 
         public GenericStop(PatternStop patternStop) {
+            patternType = PatternType.STOP;
             referenceId = patternStop.stop_id;
             stopTime = new StopTime();
             stopTime.stop_id = patternStop.stop_id;
+            stopTime.stop_sequence = patternStop.stop_sequence;
             stopTime.drop_off_type = patternStop.drop_off_type;
             stopTime.pickup_type = patternStop.pickup_type;
             stopTime.timepoint = patternStop.timepoint;

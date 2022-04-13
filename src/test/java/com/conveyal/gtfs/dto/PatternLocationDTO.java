@@ -41,4 +41,18 @@ public class PatternLocationDTO {
         stop_sequence = stopSequence;
     }
 
+    public PatternLocationDTO (
+        String patternId,
+        String locationId,
+        int stopSequence,
+        int flexDefaultTravelTime,
+        int flexDefaultZoneTime
+    ) {
+        pattern_id = patternId;
+        location_id = locationId;
+        stop_sequence = stopSequence;
+        flex_default_travel_time = flexDefaultTravelTime;
+        flex_default_zone_time = flexDefaultZoneTime;
+    }
+
 }
