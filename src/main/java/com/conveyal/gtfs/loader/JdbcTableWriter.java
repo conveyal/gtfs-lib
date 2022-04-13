@@ -888,32 +888,25 @@ public class JdbcTableWriter implements TableWriter {
 
         int cumulativeTravelTime = 0;
         for (PatternReconciliation.GenericStop genericStop : genericStops) {
-            PatternStop patternStop = null;
-            PatternLocation patternLocation = null;
-            if (genericStop.patternType == PatternReconciliation.PatternType.STOP) {
-                patternStop = patternStops
-                    .stream()
-                    .filter(ps -> ps.stop_id.equals(genericStop.referenceId))
-                    .findFirst()
-                    .orElse(null);
-            } else {
-                // Pattern type is location
-                patternLocation = patternLocations
-                    .stream()
-                    .filter(pl -> pl.location_id.equals(genericStop.referenceId))
-                    .findFirst()
-                    .orElse(null);
-            }
             // Update stop times linked to pattern stop/location and accumulate time.
             // Default travel and dwell time behave as "linked fields" for associated stop times. In other
             // words, frequency trips in the editor must match the pattern stop travel times.
-            int travelTimeForPatternHalts = 0;
-            if (patternStop != null) {
-                travelTimeForPatternHalts = updateStopTimesForPatternStop(patternStop, cumulativeTravelTime, null);
-            } else if (patternLocation != null) {
-                travelTimeForPatternHalts = updateStopTimesForPatternLocation(patternLocation, cumulativeTravelTime, null);
+            if (genericStop.patternType == PatternReconciliation.PatternType.STOP) {
+                PatternStop patternStop = patternStops
+                    .stream()
+                    .filter(ps -> ps.stop_id.equals(genericStop.referenceId))
+                    .findFirst()
+                    .get();
+                cumulativeTravelTime += updateStopTimesForPatternStop(patternStop, cumulativeTravelTime, null);
+            } else {
+                // Pattern type is location
+                PatternLocation patternLocation = patternLocations
+                    .stream()
+                    .filter(pl -> pl.location_id.equals(genericStop.referenceId))
+                    .findFirst()
+                    .get();
+                cumulativeTravelTime += updateStopTimesForPatternLocation(patternLocation, cumulativeTravelTime, null);
             }
-            cumulativeTravelTime += travelTimeForPatternHalts;
         }
     }
 
