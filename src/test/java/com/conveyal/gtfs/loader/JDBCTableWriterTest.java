@@ -86,7 +86,6 @@ public class JDBCTableWriterTest {
         testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         connection = testDataSource.getConnection();
         LOG.info("creating feeds table because it isn't automatically generated unless you import a feed");
-        Connection connection = testDataSource.getConnection();
         connection.createStatement().execute(JdbcGtfsLoader.getCreateFeedRegistrySQL());
         connection.commit();
         LOG.info("feeds table created");
@@ -150,7 +149,8 @@ public class JDBCTableWriterTest {
     }
 
     @AfterAll
-    public static void tearDownClass() {
+    public static void tearDownClass() throws SQLException {
+        connection.close();
         TestUtils.dropDB(testDBName);
     }
 
@@ -1084,76 +1084,77 @@ public class JDBCTableWriterTest {
      * see {@link JDBCTableWriterTest#patternReconciliationSetUp()} in the order defined.
      */
     private static Stream<PatternArguments> createPatternTests() {
+        String patternId = pattern.pattern_id;
         return Stream.of(
             // Add a new stop to the end.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 0, 10, 10)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 0, 10, 10)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopOne.stop_id, 1, 10, 1),
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 2, 10, 1)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopOne.stop_id, 1, 10, 1),
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 2, 10, 1)
                 },
                 ImmutableMap.of(
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopOne.stop_id, PatternReconciliation.PatternType.STOP,
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP
                 ),
-                10,10,10,1
+                10, 10, 10, 1
             ),
             // Delete stop from the middle.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 0, 20, 20)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 0, 20, 20)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 1, 12, 1)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 1, 12, 1)
                 },
                 ImmutableMap.of(
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP
                 ),
-                20,20,12,1
+                20, 20, 12, 1
             ),
             // Change the order of the location and stop.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 1, 30, 30)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 30, 30)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 0, 11, 1)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 11, 1)
                 },
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION
                 ),
-                30,30,11,1
+                30, 30, 11, 1
             ),
             // Add a new location between the location and stop.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 2, 40, 40),
-                    new PatternLocationDTO(pattern.pattern_id, locationTwo.location_id, 1, 40, 40)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 2, 40, 40),
+                    new PatternLocationDTO(patternId, locationTwo.location_id, 1, 40, 40)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 0, 12, 5)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 12, 5)
                 },
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationTwo.location_id, PatternReconciliation.PatternType.LOCATION,
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION
                 ),
-                40,40,12,5
+                40, 40, 12, 5
             ),
             // Add a new stop at the end.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 2, 50, 50),
-                    new PatternLocationDTO(pattern.pattern_id, locationTwo.location_id, 1, 50, 50)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 2, 50, 50),
+                    new PatternLocationDTO(patternId, locationTwo.location_id, 1, 50, 50)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 0, 14, 3),
-                    new PatternStopDTO(pattern.pattern_id, stopOne.stop_id, 3, 14, 3)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 14, 3),
+                    new PatternStopDTO(patternId, stopOne.stop_id, 3, 14, 3)
                 },
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
@@ -1161,34 +1162,34 @@ public class JDBCTableWriterTest {
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopOne.stop_id, PatternReconciliation.PatternType.STOP
                 ),
-                50,50,14,3
+                50, 50, 14, 3
             ),
             // Delete the first location.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 1, 60, 60)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 60, 60)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 0, 23, 1),
-                    new PatternStopDTO(pattern.pattern_id, stopOne.stop_id, 2, 23, 1)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 23, 1),
+                    new PatternStopDTO(patternId, stopOne.stop_id, 2, 23, 1)
                 },
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopOne.stop_id, PatternReconciliation.PatternType.STOP
                 ),
-                60,60,23,1
+                60, 60, 23, 1
             ),
             // Add a stop and location to the end.
             new PatternArguments(
-                new PatternLocationDTO[]{
-                    new PatternLocationDTO(pattern.pattern_id, locationOne.location_id, 1, 70, 70),
-                    new PatternLocationDTO(pattern.pattern_id, locationThree.location_id, 3, 70, 70)
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
+                    new PatternLocationDTO(patternId, locationThree.location_id, 3, 70, 70)
                 },
-                new PatternStopDTO[]{
-                    new PatternStopDTO(pattern.pattern_id, stopTwo.stop_id, 0, 13, 6),
-                    new PatternStopDTO(pattern.pattern_id, stopOne.stop_id, 2, 13, 6),
-                    new PatternStopDTO(pattern.pattern_id, stopThree.stop_id, 4, 13, 6)
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6),
+                    new PatternStopDTO(patternId, stopOne.stop_id, 2, 13, 6),
+                    new PatternStopDTO(patternId, stopThree.stop_id, 4, 13, 6)
                 },
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
@@ -1197,7 +1198,7 @@ public class JDBCTableWriterTest {
                     locationThree.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopThree.stop_id, PatternReconciliation.PatternType.STOP
                 ),
-                70,70,13,6
+                70, 70, 13, 6
             )
         );
     }
@@ -1257,7 +1258,7 @@ public class JDBCTableWriterTest {
             stopSequence
         );
         LOG.info(sql);
-        ResultSet stopTimesResultSet = connection.prepareStatement(sql).executeQuery();
+        ResultSet stopTimesResultSet = connection.createStatement().executeQuery(sql);
         if (!stopTimesResultSet.isBeforeFirst()) {
             throw new SQLException(
                 String.format(

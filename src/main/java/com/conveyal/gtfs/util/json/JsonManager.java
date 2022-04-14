@@ -115,7 +115,7 @@ public class JsonManager<T> {
                 objectNode.put("id", 0);
             }
             // Accumulate new objects from JSON.
-            list.add(mapper.readValue(objectNode.toString(), target));
+            list.add(mapper.treeToValue(objectNode, target));
         }
         return list;
     }

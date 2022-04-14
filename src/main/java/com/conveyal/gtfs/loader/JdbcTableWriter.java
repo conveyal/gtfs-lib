@@ -9,8 +9,6 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.conveyal.gtfs.util.json.JsonManager;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -61,12 +59,6 @@ public class JdbcTableWriter implements TableWriter {
     private final String tablePrefix;
     private static final ObjectMapper mapper = new ObjectMapper();
     private final Connection connection;
-
-    // The following parameters are for pattern reconciliation.
-    private List<PatternLocation> patternLocations = new ArrayList<>();
-    private List<PatternStop> patternStops = new ArrayList<>();
-    private final List<String> originalGenericStopIds = new ArrayList<>();
-    private String patternIdForReconciliation;
 
     public JdbcTableWriter(Table table, DataSource datasource, String namespace) throws InvalidNamespaceException {
         this(table, datasource, namespace, null);
@@ -171,9 +163,8 @@ public class JdbcTableWriter implements TableWriter {
             if (specTable.name.equals("patterns")) {
                 referencingTables.add(Table.SHAPES);
             }
-
-            boolean referencedPatternUsesFrequencies = referencedPatternUsesFrequencies(connection, jsonObject);
-
+            PatternReconciliation.initialize(connection, tablePrefix);
+            boolean referencedPatternUsesFrequencies = referencedPatternUsesFrequencies(jsonObject);
             // Iterate over referencing (child) tables and update those rows that reference the parent entity with the
             // JSON array for the key that matches the child table's name (e.g., trip.stop_times array will trigger
             // update of stop_times with matching trip_id).
@@ -216,18 +207,9 @@ public class JdbcTableWriter implements TableWriter {
 
             // Pattern stops and pattern locations are processed in series (as part of updateChildTable). The pattern
             // reconciliation requires both in order to correctly update stop times.
-            if (!patternLocations.isEmpty() || !patternStops.isEmpty()) {
-                PatternReconciliation.reconcile(
-                    patternLocations,
-                    patternStops,
-                    originalGenericStopIds,
-                    patternIdForReconciliation,
-                    tablePrefix,
-                    connection
-                );
-                if (referencedPatternUsesFrequencies) {
-                    updatePatternFrequencies(patternLocations, patternStops);
-                }
+            PatternReconciliation.reconcile();
+            if (referencedPatternUsesFrequencies) {
+                updatePatternFrequencies();
             }
 
             // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
@@ -287,8 +269,7 @@ public class JdbcTableWriter implements TableWriter {
      * frequencies because this impacts update behaviors, for example whether stop times are kept in
      * sync with default travel times or whether frequencies are allowed to be nested with a JSON trip.
      */
-    private boolean referencedPatternUsesFrequencies(Connection connection, ObjectNode jsonObject) throws SQLException {
-        boolean referencedPatternUsesFrequencies = false;
+    private boolean referencedPatternUsesFrequencies(ObjectNode jsonObject) throws SQLException {
         if (jsonObject.has("pattern_id") && !jsonObject.get("pattern_id").isNull()) {
             PreparedStatement statement = connection.prepareStatement(String.format(
                 "select use_frequency from %s.%s where pattern_id = ?",
@@ -299,10 +280,10 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info(statement.toString());
             ResultSet selectResults = statement.executeQuery();
             while (selectResults.next()) {
-                referencedPatternUsesFrequencies = selectResults.getBoolean(1);
+                return selectResults.getBoolean(1);
             }
         }
-        return referencedPatternUsesFrequencies;
+        return false;
     }
 
     /**
@@ -638,11 +619,10 @@ public class JdbcTableWriter implements TableWriter {
         if (!referencedPatternUsesFrequencies && subTable.name.equals(Table.FREQUENCIES.name) && subEntities.size() > 0) {
             // Do not permit the illegal state where frequency entries are being added/modified for a timetable pattern.
             throw new IllegalStateException("Cannot create or update frequency entries for a timetable-based pattern.");
-
         }
-        boolean patternTables = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
-        if (patternTables) {
-            stagePatternReconciliation(connection, subTable, subEntities, keyValue);
+        boolean isPatternTable = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
+        if (isPatternTable) {
+            PatternReconciliation.stagePatternReconciliation(mapper, subTable, subEntities, keyValue);
         }
         if (!isCreatingNewEntity) {
             // If not creating a new entity, we will delete the child entities (e.g., shape points or pattern stops) and
@@ -708,7 +688,7 @@ public class JdbcTableWriter implements TableWriter {
                 // If handling first iteration, create the prepared statement (later iterations will add to batch).
                 insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
             }
-            if (patternTables) {
+            if (isPatternTable) {
                 // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
                 // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
                 if (Table.PATTERN_STOP.name.equals(subTable.name)) {
@@ -835,64 +815,19 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Pattern reconciliation requires all new pattern stops and pattern locations as well as the original values of both
-     * to correctly update stop times. Because these entities are processed in series, this method is used to accumulate
-     * all required values when available. The values are then used by {@link PatternReconciliation#reconcile} _after_
-     * all child entities have been processed.
-     */
-    private void stagePatternReconciliation(
-        Connection connection,
-        Table subTable,
-        ArrayNode subEntities,
-        String keyValue
-    ) throws SQLException, JsonProcessingException {
-        patternIdForReconciliation = keyValue;
-        if (originalGenericStopIds.isEmpty()) {
-            // Retrieve all generic stop ids before they are updated.
-            String sql = String.format("select location_id, stop_sequence from %s.pattern_locations pl " +
-                "where pl.pattern_id = ? " +
-                "union " +
-                "select stop_id, stop_sequence from %s.pattern_stops ps " +
-                "where ps.pattern_id = ? " +
-                "order by stop_sequence", tablePrefix, tablePrefix);
-            PreparedStatement getGenericStopIdsStatement = connection.prepareStatement(sql);
-            getGenericStopIdsStatement.setString(1, keyValue);
-            getGenericStopIdsStatement.setString(2, keyValue);
-            LOG.info(getGenericStopIdsStatement.toString());
-            ResultSet locationsResults = getGenericStopIdsStatement.executeQuery();
-            while (locationsResults.next()) {
-                originalGenericStopIds.add(locationsResults.getString(1));
-            }
-        }
-        if (Table.PATTERN_STOP.name.equals(subTable.name)) {
-            // Accumulate new pattern stop objects from JSON.
-            patternStops = JsonManager.read(mapper, subEntities, PatternStop.class);
-        }
-        if (Table.PATTERN_LOCATION.name.equals(subTable.name)) {
-            // Accumulate new pattern location objects from JSON.
-            patternLocations = JsonManager.read(mapper, subEntities, PatternLocation.class);
-        }
-    }
-
-    /**
      * This MUST be called _after_ pattern reconciliation has happened. The pattern stops and pattern locations must be
      * processed based on stop sequence so the correct cumulative travel time is calculated.
      */
-    private void updatePatternFrequencies(
-        List<PatternLocation> patternLocations,
-        List<PatternStop> patternStops
-    ) throws SQLException {
+    private void updatePatternFrequencies() throws SQLException {
         // Convert to generic stops to order pattern stops/locations by stop sequence.
-        List<PatternReconciliation.GenericStop> genericStops =
-            PatternReconciliation.getGenericStops(patternLocations, patternStops);
-
+        List<PatternReconciliation.GenericStop> genericStops = PatternReconciliation.getGenericStops();
         int cumulativeTravelTime = 0;
         for (PatternReconciliation.GenericStop genericStop : genericStops) {
             // Update stop times linked to pattern stop/location and accumulate time.
             // Default travel and dwell time behave as "linked fields" for associated stop times. In other
             // words, frequency trips in the editor must match the pattern stop travel times.
             if (genericStop.patternType == PatternReconciliation.PatternType.STOP) {
-                PatternStop patternStop = patternStops
+                PatternStop patternStop = PatternReconciliation.patternStops
                     .stream()
                     .filter(ps -> ps.stop_id.equals(genericStop.referenceId))
                     .findFirst()
@@ -900,7 +835,7 @@ public class JdbcTableWriter implements TableWriter {
                 cumulativeTravelTime += updateStopTimesForPatternStop(patternStop, cumulativeTravelTime, null);
             } else {
                 // Pattern type is location
-                PatternLocation patternLocation = patternLocations
+                PatternLocation patternLocation = PatternReconciliation.patternLocations
                     .stream()
                     .filter(pl -> pl.location_id.equals(genericStop.referenceId))
                     .findFirst()
