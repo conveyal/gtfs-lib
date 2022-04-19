@@ -26,16 +26,16 @@ public class PatternReconciliation {
 
     private static final Logger LOG = LoggerFactory.getLogger(PatternReconciliation.class);
     private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops or locations must be made one at a time if pattern contains at least one trip.";
-    private static List<String> tripsForPattern;
-    private static List<GenericStop> newGenericStops;
-    private static String joinToTrips;
-    private static PreparedStatement getGenericStopIdsStatement;
-    public static Connection connection;
-    public static String tablePrefix;
-    public static String patternId;
-    public static List<String> originalGenericStopIds = new ArrayList<>();
-    public static List<PatternLocation> patternLocations = new ArrayList<>();
-    public static List<PatternStop> patternStops = new ArrayList<>();
+    private final List<String> originalGenericStopIds = new ArrayList<>();
+    private final PreparedStatement getGenericStopIdsStatement;
+    private final Connection connection;
+    private final String tablePrefix;
+    private String patternId;
+    private String joinToTrips;
+    private List<String> tripsForPattern;
+    private List<GenericStop> newGenericStops;
+    private List<PatternLocation> patternLocations = new ArrayList<>();
+    private List<PatternStop> patternStops = new ArrayList<>();
 
     /**
      * Enum containing available reconciliation types.
@@ -51,22 +51,20 @@ public class PatternReconciliation {
         LOCATION, STOP
     }
 
-    /**
-     * Set required parameters and clear any previously held data to prevent it impacting current processing.
-     */
-    public static void initialize(Connection connection, String tablePrefix) throws SQLException {
-        PatternReconciliation.connection = connection;
-        PatternReconciliation.tablePrefix = tablePrefix;
-        PatternReconciliation.patternStops.clear();
-        PatternReconciliation.patternLocations.clear();
-        PatternReconciliation.originalGenericStopIds.clear();
-        String sql = String.format("select location_id, stop_sequence from %s.pattern_locations pl " +
-            "where pl.pattern_id = ? " +
-            "union " +
-            "select stop_id, stop_sequence from %s.pattern_stops ps " +
-            "where ps.pattern_id = ? " +
-            "order by stop_sequence", tablePrefix, tablePrefix);
-        getGenericStopIdsStatement = connection.prepareStatement(sql);
+    public PatternReconciliation(Connection connection, String tablePrefix) throws SQLException {
+        this.connection = connection;
+        this.tablePrefix = tablePrefix;
+        getGenericStopIdsStatement = connection.prepareStatement(
+            String.format("select location_id, stop_sequence from %s.pattern_locations pl " +
+                    "where pl.pattern_id = ? " +
+                    "union " +
+                    "select stop_id, stop_sequence from %s.pattern_stops ps " +
+                    "where ps.pattern_id = ? " +
+                    "order by stop_sequence",
+                tablePrefix,
+                tablePrefix
+            )
+        );
     }
 
     /**
@@ -75,7 +73,7 @@ public class PatternReconciliation {
      * all required values when available. The values are then used by {@link PatternReconciliation#reconcile} _after_
      * all child entities have been processed.
      */
-    public static void stagePatternReconciliation(
+    public void stagePatternReconciliation(
         ObjectMapper mapper,
         Table subTable,
         ArrayNode subEntities,
@@ -105,7 +103,7 @@ public class PatternReconciliation {
     /**
      * Reconcile pattern stops and pattern locations.
      */
-    public static void reconcile() throws SQLException {
+    public void reconcile() throws SQLException {
         if (patternLocations.isEmpty() && patternStops.isEmpty()) {
             LOG.info("No pattern stops/locations provided. Pattern reconciliation not required.");
             return;
@@ -133,9 +131,31 @@ public class PatternReconciliation {
     }
 
     /**
+     * Return pattern location matching the provided reference id.
+     */
+    public PatternLocation getPatternLocation(String referenceId) {
+        return patternLocations
+            .stream()
+            .filter(pl -> pl.location_id.equals(referenceId))
+            .findFirst()
+            .get();
+    }
+
+    /**
+     * Return pattern stop matching the provided reference id.
+     */
+    public PatternStop getPatternStop(String referenceId) {
+        return patternStops
+            .stream()
+            .filter(ps -> ps.stop_id.equals(referenceId))
+            .findFirst()
+            .get();
+    }
+
+    /**
      * Combine pattern locations and pattern stops then order by stop sequence.
      */
-    public static List<GenericStop> getGenericStops() {
+    public List<GenericStop> getGenericStops() {
         List<GenericStop> genericStops = patternStops.stream().map(GenericStop::new).collect(Collectors.toList());
         genericStops.addAll(patternLocations.stream().map(GenericStop::new).collect(Collectors.toList()));
         genericStops.sort(Comparator.comparingInt(genericStop -> genericStop.stopTime.stop_sequence));
@@ -146,7 +166,7 @@ public class PatternReconciliation {
      * Define the type of update to be applied to stop times. This is done by comparing the size of the original generic
      * stops against the size of the new generic stops.
      */
-    private static ReconcileType getReconcileType(List<String> originalGenericStopIds, List<GenericStop> genericStops) {
+    private ReconcileType getReconcileType(List<String> originalGenericStopIds, List<GenericStop> genericStops) {
         int sizeDiff = genericStops.size() - originalGenericStopIds.size();
         if (sizeDiff == 1) {
             return ReconcileType.ADD_ONE;
@@ -171,7 +191,7 @@ public class PatternReconciliation {
      * the same where required). If the change to pattern stops/locations does not satisfy one of these cases, fail the
      * update operation.
      */
-    private static void reconcilePattern(ReconcileType reconcileType) throws SQLException {
+    private void reconcilePattern(ReconcileType reconcileType) throws SQLException {
         LOG.info("Reconciling pattern for pattern Id: {}", patternId);
         switch (reconcileType) {
             case ADD_ONE:
@@ -192,7 +212,7 @@ public class PatternReconciliation {
     /**
      * Add a single generic stop to a pattern.
      */
-    private static void addOneStopToAPattern() throws SQLException {
+    private void addOneStopToAPattern() throws SQLException {
         // We have an addition; find it.
         int differenceLocation = checkForGenericStopDifference();
         // Increment sequences for stops that follow the inserted location (including the stop at the changed index).
@@ -209,13 +229,13 @@ public class PatternReconciliation {
         int updated = updateStatement.executeUpdate();
         LOG.info("Updated {} stop times", updated);
         // Insert a skipped stop at the difference location
-        insertBlankStopTimes(differenceLocation,  1);
+        insertBlankStopTimes(differenceLocation, 1);
     }
 
     /**
      * Find and delete one generic stop from within a pattern.
      */
-    private static void deleteOneStopFromAPattern() throws SQLException {
+    private void deleteOneStopFromAPattern() throws SQLException {
         // We have a deletion; find it.
         int differenceLocation = checkForOriginalPatternDifference();
         // Delete stop at difference location.
@@ -255,7 +275,7 @@ public class PatternReconciliation {
      * on my whiteboard). There are three regions: the beginning and end, where stopSequences are the same, and
      * the middle, where they are not. The same is true of trips where stops were moved backwards.
      */
-    private static void transposeStopInAPattern() throws SQLException {
+    private void transposeStopInAPattern() throws SQLException {
         // Find the left bound of the changed region.
         int firstDifferentIndex = getFirstTripPatternDifference();
         if (firstDifferentIndex == -1) {
@@ -315,12 +335,12 @@ public class PatternReconciliation {
     /**
      * Add one or more generic stops to the end of a pattern.
      */
-    private static void addOneOrMoreStopsToEndOfPattern() throws SQLException {
+    private void addOneOrMoreStopsToEndOfPattern() throws SQLException {
         // find the left bound of the changed region to check that no stops have changed in between
         int firstDifferentIndex = 0;
         while (
             firstDifferentIndex < originalGenericStopIds.size() &&
-            originalGenericStopIds.get(firstDifferentIndex).equals(newGenericStops.get(firstDifferentIndex).referenceId)
+                originalGenericStopIds.get(firstDifferentIndex).equals(newGenericStops.get(firstDifferentIndex).referenceId)
         ) {
             firstDifferentIndex++;
         }
@@ -343,7 +363,7 @@ public class PatternReconciliation {
      * Check if there is a difference between the original and new trip patterns. Return the first difference or
      * -1 if there is no difference.
      */
-    private static int getFirstTripPatternDifference() {
+    private int getFirstTripPatternDifference() {
         int firstDifferentIndex = 0;
         while (originalGenericStopIds.get(firstDifferentIndex).equals(newGenericStops.get(firstDifferentIndex).referenceId)) {
             firstDifferentIndex++;
@@ -359,20 +379,20 @@ public class PatternReconciliation {
      * been made (expected behaviour) return the index with the difference. If more than one difference is found
      * throw an exception.
      */
-    private static int checkForGenericStopDifference() {
+    private int checkForGenericStopDifference() {
         int differenceLocation = -1;
         for (int i = 0; i < newGenericStops.size(); i++) {
             if (differenceLocation != -1) {
                 if (
                     i < originalGenericStopIds.size() &&
-                    !originalGenericStopIds.get(i).equals(newGenericStops.get(i + 1).referenceId)
+                        !originalGenericStopIds.get(i).equals(newGenericStops.get(i + 1).referenceId)
                 ) {
                     // The addition has already been found and there's another difference, which we weren't expecting
                     throw new IllegalStateException("Multiple differences found when trying to detect stop addition");
                 }
             } else if (
                 i == newGenericStops.size() - 1 ||
-                !originalGenericStopIds.get(i).equals(newGenericStops.get(i).referenceId)
+                    !originalGenericStopIds.get(i).equals(newGenericStops.get(i).referenceId)
             ) {
                 // if we've reached where one trip has an extra stop, or if the stops at this position differ
                 differenceLocation = i;
@@ -386,7 +406,7 @@ public class PatternReconciliation {
      * been made (expected behaviour) return the index with the difference. If more than one difference is found
      * throw an exception.
      */
-    private static int checkForOriginalPatternDifference() {
+    private int checkForOriginalPatternDifference() {
         int differenceLocation = -1;
         for (int i = 0; i < originalGenericStopIds.size(); i++) {
             if (differenceLocation != -1) {
@@ -396,7 +416,7 @@ public class PatternReconciliation {
                 }
             } else if (
                 i == originalGenericStopIds.size() - 1 ||
-                !originalGenericStopIds.get(i).equals(newGenericStops.get(i).referenceId)
+                    !originalGenericStopIds.get(i).equals(newGenericStops.get(i).referenceId)
             ) {
                 // We've reached the end and the only difference is length (so the last stop is the different one)
                 // or we've found the difference.
@@ -410,7 +430,7 @@ public class PatternReconciliation {
      * Collect all trip IDs so that new stop times can be inserted (with the appropriate trip ID value) if a pattern
      * is added.
      */
-    private static List<String> getTripIdsForPatternId() throws SQLException {
+    private List<String> getTripIdsForPatternId() throws SQLException {
         String getTripIdsSql = String.format("select trip_id from %s.trips where pattern_id = ?", tablePrefix);
         PreparedStatement getTripsStatement = connection.prepareStatement(getTripIdsSql);
         getTripsStatement.setString(1, patternId);
@@ -425,7 +445,7 @@ public class PatternReconciliation {
     /**
      * Get a list of pattern reference ids.
      */
-    private static List<String> getPatternReferenceIds(List<GenericStop> genericStops) {
+    private List<String> getPatternReferenceIds(List<GenericStop> genericStops) {
         return genericStops.stream().map(pattern -> pattern.referenceId).collect(Collectors.toList());
     }
 
@@ -433,7 +453,7 @@ public class PatternReconciliation {
      * Insert blank stop times. This must be called after updating sequences for any stop times following the starting
      * stop sequence to avoid overwriting these other stop times.
      */
-    private static void insertBlankStopTimes(
+    private void insertBlankStopTimes(
         int startingStopSequence,
         int stopTimesToAdd
     ) throws SQLException {
@@ -466,7 +486,7 @@ public class PatternReconciliation {
      * Check that the stops in the changed region remain in the same order. If not, throw an exception to cancel the
      * transaction.
      */
-    private static void verifyInteriorStopsAreUnchanged(
+    private void verifyInteriorStopsAreUnchanged(
         List<String> newStopIds,
         int firstDifferentIndex,
         int lastDifferentIndex
@@ -492,6 +512,7 @@ public class PatternReconciliation {
         // This stopTime object is a template that will be used to build database statements.
         StopTime stopTime;
         PatternType patternType;
+
         public GenericStop(PatternLocation patternLocation) {
             patternType = PatternType.LOCATION;
             referenceId = patternLocation.location_id;

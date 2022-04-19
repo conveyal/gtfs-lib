@@ -74,7 +74,7 @@ public class JDBCTableWriterTest {
     private static LocationDTO locationTwo;
     private static LocationDTO locationThree;
 
-    private static JdbcTableWriter createTestTableWriter (Table table) throws InvalidNamespaceException {
+    private static JdbcTableWriter createTestTableWriter(Table table) throws InvalidNamespaceException {
         return new JdbcTableWriter(table, testDataSource, testNamespace);
     }
 
@@ -310,9 +310,9 @@ public class JDBCTableWriterTest {
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(fareTable);
         String updateOutput = updateTableWriter.update(
-                createdFare.id,
-                mapper.writeValueAsString(createdFare),
-                true
+            createdFare.id,
+            mapper.writeValueAsString(createdFare),
+            true
         );
         LOG.info("update {} output:", fareTable.name);
         LOG.info(updateOutput);
@@ -333,8 +333,8 @@ public class JDBCTableWriterTest {
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(fareTable);
         int deleteOutput = deleteTableWriter.delete(
-                createdFare.id,
-                true
+            createdFare.id,
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
@@ -369,9 +369,9 @@ public class JDBCTableWriterTest {
         // convert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(routeTable);
         String updateOutput = updateTableWriter.update(
-                createdRoute.id,
-                mapper.writeValueAsString(createdRoute),
-                true
+            createdRoute.id,
+            mapper.writeValueAsString(createdRoute),
+            true
         );
         LOG.info("update {} output:", routeTable.name);
         LOG.info(updateOutput);
@@ -394,8 +394,8 @@ public class JDBCTableWriterTest {
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(routeTable);
         int deleteOutput = deleteTableWriter.delete(
-                createdRoute.id,
-                true
+            createdRoute.id,
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
@@ -426,9 +426,9 @@ public class JDBCTableWriterTest {
         // convert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(bookingRuleTable);
         String updateOutput = updateTableWriter.update(
-                createdBookingRule.id,
-                mapper.writeValueAsString(createdBookingRule),
-                true
+            createdBookingRule.id,
+            mapper.writeValueAsString(createdBookingRule),
+            true
         );
         LOG.info("update {} output:", bookingRuleTable.name);
         LOG.info(updateOutput);
@@ -450,8 +450,8 @@ public class JDBCTableWriterTest {
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(bookingRuleTable);
         int deleteOutput = deleteTableWriter.delete(
-                createdBookingRule.id,
-                true
+            createdBookingRule.id,
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, bookingRuleTable.name);
 
@@ -482,8 +482,8 @@ public class JDBCTableWriterTest {
         JdbcTableWriter updateTableWriter = createTestTableWriter(locationGroupsTable);
         String updateOutput = updateTableWriter.update(
             createdLocationGroup.id,
-                mapper.writeValueAsString(createdLocationGroup),
-                true
+            mapper.writeValueAsString(createdLocationGroup),
+            true
         );
         LOG.info("update {} output:", locationGroupsTable.name);
         LOG.info(updateOutput);
@@ -506,7 +506,7 @@ public class JDBCTableWriterTest {
         JdbcTableWriter deleteTableWriter = createTestTableWriter(locationGroupsTable);
         int deleteOutput = deleteTableWriter.delete(
             createdLocationGroup.id,
-                true
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, locationGroupsTable.name);
 
@@ -541,9 +541,9 @@ public class JDBCTableWriterTest {
         // convert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(Table.LOCATIONS);
         String updateOutput = updateTableWriter.update(
-                createdLocation.id,
-                mapper.writeValueAsString(createdLocation),
-                true
+            createdLocation.id,
+            mapper.writeValueAsString(createdLocation),
+            true
         );
         LOG.info("update {} output:", Table.LOCATIONS.name);
         LOG.info(updateOutput);
@@ -605,8 +605,8 @@ public class JDBCTableWriterTest {
         JdbcTableWriter updateTableWriter = createTestTableWriter(locationShapeTable);
         String updateOutput = updateTableWriter.update(
             createdLocationShape.id,
-                mapper.writeValueAsString(createdLocationShape),
-                true
+            mapper.writeValueAsString(createdLocationShape),
+            true
         );
         LOG.info("update {} output:", locationShapeTable.name);
         LOG.info(updateOutput);
@@ -625,7 +625,7 @@ public class JDBCTableWriterTest {
         JdbcTableWriter deleteTableWriter = createTestTableWriter(locationShapeTable);
         int deleteOutput = deleteTableWriter.delete(
             createdLocationShape.id,
-                true
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, locationShapeTable.name);
 
@@ -688,7 +688,7 @@ public class JDBCTableWriterTest {
         JdbcTableWriter deleteTableWriter = createTestTableWriter(stopTimesTable);
         int deleteOutput = deleteTableWriter.delete(
             createdStopTime.id,
-                true
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, stopTimesTable.name);
 
@@ -714,7 +714,7 @@ public class JDBCTableWriterTest {
         TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
         String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
         ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput,
-                                                                         scheduleExceptionDTOClass);
+            scheduleExceptionDTOClass);
         // Make sure saved data matches expected data.
         assertThat(scheduleException.removed_service[0], equalTo(simpleServiceId));
         ResultSet resultSet = getResultSetForId(scheduleException.id, scheduleExceptionTable, "removed_service");
@@ -763,7 +763,7 @@ public class JDBCTableWriterTest {
      */
     @Test
     public void shouldUpdateStopTimeOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
-        final String[] STOP_TIMES_LINKED_FIELDS = new String[] {
+        final String[] STOP_TIMES_LINKED_FIELDS = new String[]{
             "shape_dist_traveled",
             "timepoint",
             "drop_off_type",
@@ -1017,12 +1017,12 @@ public class JDBCTableWriterTest {
         };
         patternStops[1].default_travel_time = initialTravelTime;
         PatternDTO pattern = createRouteAndPattern(newUUID(),
-                                                   patternId,
-                                                   "Pattern A",
-                                                   null,
-                                                   new ShapePointDTO[]{},
-                                                   patternStops,
-                                                   0);
+            patternId,
+            "Pattern A",
+            null,
+            new ShapePointDTO[]{},
+            patternStops,
+            0);
         // Create trip with travel times that match pattern stops.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
@@ -1040,9 +1040,9 @@ public class JDBCTableWriterTest {
         updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
         // Read pattern stops from database and check that the arrivals/departures have been updated.
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
-                                                                       testDataSource,
-                                                                       testNamespace + ".",
-                                                                       EntityPopulator.STOP_TIME);
+            testDataSource,
+            testNamespace + ".",
+            EntityPopulator.STOP_TIME);
         int index = 0;
         for (StopTime stopTime : stopTimesTable.getOrdered(createdTrip.trip_id)) {
             LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
@@ -1088,10 +1088,10 @@ public class JDBCTableWriterTest {
         return Stream.of(
             // Add a new stop to the end.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 0, 10, 10)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopOne.stop_id, 1, 10, 1),
                     new PatternStopDTO(patternId, stopTwo.stop_id, 2, 10, 1)
                 },
@@ -1104,10 +1104,10 @@ public class JDBCTableWriterTest {
             ),
             // Delete stop from the middle.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 0, 20, 20)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopTwo.stop_id, 1, 12, 1)
                 },
                 ImmutableMap.of(
@@ -1118,10 +1118,10 @@ public class JDBCTableWriterTest {
             ),
             // Change the order of the location and stop.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 30, 30)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 11, 1)
                 },
                 ImmutableMap.of(
@@ -1132,11 +1132,11 @@ public class JDBCTableWriterTest {
             ),
             // Add a new location between the location and stop.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 2, 40, 40),
                     new PatternLocationDTO(patternId, locationTwo.location_id, 1, 40, 40)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 12, 5)
                 },
                 ImmutableMap.of(
@@ -1148,11 +1148,11 @@ public class JDBCTableWriterTest {
             ),
             // Add a new stop at the end.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 2, 50, 50),
                     new PatternLocationDTO(patternId, locationTwo.location_id, 1, 50, 50)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 14, 3),
                     new PatternStopDTO(patternId, stopOne.stop_id, 3, 14, 3)
                 },
@@ -1166,10 +1166,10 @@ public class JDBCTableWriterTest {
             ),
             // Delete the first location.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 60, 60)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 23, 1),
                     new PatternStopDTO(patternId, stopOne.stop_id, 2, 23, 1)
                 },
@@ -1182,11 +1182,11 @@ public class JDBCTableWriterTest {
             ),
             // Add a stop and location to the end.
             new PatternArguments(
-                new PatternLocationDTO[] {
+                new PatternLocationDTO[]{
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
                     new PatternLocationDTO(patternId, locationThree.location_id, 3, 70, 70)
                 },
-                new PatternStopDTO[] {
+                new PatternStopDTO[]{
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6),
                     new PatternStopDTO(patternId, stopOne.stop_id, 2, 13, 6),
                     new PatternStopDTO(patternId, stopThree.stop_id, 4, 13, 6)
@@ -1249,33 +1249,36 @@ public class JDBCTableWriterTest {
         int end,
         PatternReconciliation.PatternType patternType
     ) throws SQLException {
-        String sql = String.format(
-            "select * from %s.%s where trip_id='%s' and stop_id='%s' and stop_sequence=%s",
-            testNamespace,
-            Table.STOP_TIMES.name,
-            tripId,
-            stopId,
-            stopSequence
-        );
-        LOG.info(sql);
-        ResultSet stopTimesResultSet = connection.createStatement().executeQuery(sql);
-        if (!stopTimesResultSet.isBeforeFirst()) {
-            throw new SQLException(
+        try (
+            ResultSet stopTimesResultSet = connection.createStatement().executeQuery(
                 String.format(
-                    "No stop time matching trip_id: %s, stop_id: %s and stop_sequence: %s.",
+                    "select * from %s.%s where trip_id='%s' and stop_id='%s' and stop_sequence=%s",
+                    testNamespace,
+                    Table.STOP_TIMES.name,
                     tripId,
                     stopId,
                     stopSequence
                 )
-            );
-        }
-        while (stopTimesResultSet.next()) {
-            if (patternType == PatternReconciliation.PatternType.STOP) {
-                assertResultValue(stopTimesResultSet, "arrival_time", equalTo(start));
-                assertResultValue(stopTimesResultSet, "departure_time", equalTo(end));
-            } else {
-                assertResultValue(stopTimesResultSet, "start_pickup_dropoff_window", equalTo(start));
-                assertResultValue(stopTimesResultSet, "end_pickup_dropoff_window", equalTo(end));
+            )
+        ) {
+            if (!stopTimesResultSet.isBeforeFirst()) {
+                throw new SQLException(
+                    String.format(
+                        "No stop time matching trip_id: %s, stop_id: %s and stop_sequence: %s.",
+                        tripId,
+                        stopId,
+                        stopSequence
+                    )
+                );
+            }
+            while (stopTimesResultSet.next()) {
+                if (patternType == PatternReconciliation.PatternType.STOP) {
+                    assertResultValue(stopTimesResultSet, "arrival_time", equalTo(start));
+                    assertResultValue(stopTimesResultSet, "departure_time", equalTo(end));
+                } else {
+                    assertResultValue(stopTimesResultSet, "start_pickup_dropoff_window", equalTo(start));
+                    assertResultValue(stopTimesResultSet, "end_pickup_dropoff_window", equalTo(end));
+                }
             }
         }
     }
@@ -1444,7 +1447,7 @@ public class JDBCTableWriterTest {
         input.use_frequency = useFrequency;
         input.shape_id = shapeId;
         input.shapes = shapes;
-        input.pattern_stops = new PatternStopDTO[] {};
+        input.pattern_stops = new PatternStopDTO[]{};
         input.pattern_locations = patternLocations;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
@@ -1589,7 +1592,7 @@ public class JDBCTableWriterTest {
         location.stop_desc = "Templeboy to Ballisodare Door-to-door pickup area";
         location.zone_id = "1";
         location.stop_url = new URL("https://www.Teststopsite.com");
-        location.location_shapes = new LocationShapeDTO[] {
+        location.location_shapes = new LocationShapeDTO[]{
             locationShape
         };
 

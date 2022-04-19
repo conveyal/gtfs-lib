@@ -71,7 +71,7 @@ public class JdbcTableWriter implements TableWriter {
         DELETE, UPDATE, CREATE
     }
 
-    public JdbcTableWriter (
+    public JdbcTableWriter(
         Table specTable,
         DataSource dataSource,
         String tablePrefix,
@@ -103,7 +103,7 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * Wrapper method to call Jackson to deserialize a JSON string into JsonNode.
      */
-    private static JsonNode getJsonNode (String json) throws IOException {
+    private static JsonNode getJsonNode(String json) throws IOException {
         try {
             return mapper.readTree(json);
         } catch (IOException e) {
@@ -163,7 +163,7 @@ public class JdbcTableWriter implements TableWriter {
             if (specTable.name.equals("patterns")) {
                 referencingTables.add(Table.SHAPES);
             }
-            PatternReconciliation.initialize(connection, tablePrefix);
+            PatternReconciliation reconciliation = new PatternReconciliation(connection, tablePrefix);
             boolean referencedPatternUsesFrequencies = referencedPatternUsesFrequencies(jsonObject);
             // Iterate over referencing (child) tables and update those rows that reference the parent entity with the
             // JSON array for the key that matches the child table's name (e.g., trip.stop_times array will trigger
@@ -175,8 +175,8 @@ public class JdbcTableWriter implements TableWriter {
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
                     if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
                         (childEntities == null ||
-                        childEntities.isNull() ||
-                        !childEntities.isArray())
+                            childEntities.isNull() ||
+                            !childEntities.isArray())
                     ) {
                         // This is a backwards hack to prevent the addition of pattern location breaking existing
                         // pattern functionality. If pattern location is not provided set to an empty array to avoid the
@@ -189,14 +189,15 @@ public class JdbcTableWriter implements TableWriter {
                     }
                     int entityId = isCreating ? (int) newId : id;
                     // Cast child entities to array node to iterate over.
-                    ArrayNode childEntitiesArray = (ArrayNode)childEntities;
+                    ArrayNode childEntitiesArray = (ArrayNode) childEntities;
                     String keyValue = updateChildTable(
                         childEntitiesArray,
                         entityId,
                         referencedPatternUsesFrequencies,
                         isCreating,
                         referencingTable,
-                        connection
+                        connection,
+                        reconciliation
                     );
                     // Ensure JSON return object is updated with referencing table's (potentially) new key value.
                     // Currently, the only case where an update occurs is when a referenced shape is referenced by other
@@ -207,9 +208,9 @@ public class JdbcTableWriter implements TableWriter {
 
             // Pattern stops and pattern locations are processed in series (as part of updateChildTable). The pattern
             // reconciliation requires both in order to correctly update stop times.
-            PatternReconciliation.reconcile();
+            reconciliation.reconcile();
             if (referencedPatternUsesFrequencies) {
-                updatePatternFrequencies();
+                updatePatternFrequencies(reconciliation);
             }
 
             // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
@@ -271,16 +272,21 @@ public class JdbcTableWriter implements TableWriter {
      */
     private boolean referencedPatternUsesFrequencies(ObjectNode jsonObject) throws SQLException {
         if (jsonObject.has("pattern_id") && !jsonObject.get("pattern_id").isNull()) {
-            PreparedStatement statement = connection.prepareStatement(String.format(
-                "select use_frequency from %s.%s where pattern_id = ?",
-                tablePrefix,
-                Table.PATTERNS.name
-            ));
-            statement.setString(1, jsonObject.get("pattern_id").asText());
-            LOG.info(statement.toString());
-            ResultSet selectResults = statement.executeQuery();
-            while (selectResults.next()) {
-                return selectResults.getBoolean(1);
+            try (
+                PreparedStatement statement = connection.prepareStatement(
+                    String.format(
+                        "select use_frequency from %s.%s where pattern_id = ?",
+                        tablePrefix,
+                        Table.PATTERNS.name
+                    )
+                )
+            ) {
+                statement.setString(1, jsonObject.get("pattern_id").asText());
+                LOG.info(statement.toString());
+                ResultSet selectResults = statement.executeQuery();
+                if (selectResults.next()) {
+                    return selectResults.getBoolean(1);
+                }
             }
         }
         return false;
@@ -289,9 +295,10 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * For a given pattern id and starting stop sequence (inclusive), normalize all stop times to match the pattern
      * stops' travel times.
+     *
      * @return number of stop times updated
      */
-    public int normalizeStopTimesForPattern (int id, int beginWithSequence) throws SQLException {
+    public int normalizeStopTimesForPattern(int id, int beginWithSequence) throws SQLException {
         try {
             JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
                 Table.PATTERN_STOP,
@@ -300,10 +307,10 @@ public class JdbcTableWriter implements TableWriter {
                 EntityPopulator.PATTERN_STOP
             );
             JDBCTableReader<PatternLocation> patternLocations = new JDBCTableReader(
-                    Table.PATTERN_LOCATION,
-                    dataSource,
-                    tablePrefix + ".",
-                    EntityPopulator.PATTERN_LOCATION
+                Table.PATTERN_LOCATION,
+                dataSource,
+                tablePrefix + ".",
+                EntityPopulator.PATTERN_LOCATION
             );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
             List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
@@ -325,12 +332,12 @@ public class JdbcTableWriter implements TableWriter {
             int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
             String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
             String getPrevTravelTimeSql = String.format(
-                    "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
-                            "and t.pattern_id = ? " +
-                            "and t.trip_id = st.trip_id",
-                    timeField,
-                    tablePrefix,
-                    tablePrefix
+                "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
+                    "and t.pattern_id = ? " +
+                    "and t.trip_id = st.trip_id",
+                timeField,
+                tablePrefix,
+                tablePrefix
             );
             PreparedStatement statement = connection.prepareStatement(getPrevTravelTimeSql);
             statement.setInt(1, previousStopSequence);
@@ -386,7 +393,7 @@ public class JdbcTableWriter implements TableWriter {
         ObjectNode exemplarEntity,
         String linkedTableName,
         String keyField,
-        String ...linkedFieldsToUpdate
+        String... linkedFieldsToUpdate
     ) throws SQLException {
         boolean updatingStopTimes = "stop_times".equals(linkedTableName);
         // Collect fields, the JSON values for these fields, and the strings to add to the prepared statement into Lists.
@@ -403,14 +410,14 @@ public class JdbcTableWriter implements TableWriter {
         Field orderField = updatingStopTimes ? referenceTable.getFieldForName(referenceTable.getOrderFieldName()) : null;
         String sql = updatingStopTimes
             ? String.format(
-                "update %s.stop_times st set %s from %s.trips t " +
-                    "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
-                tablePrefix,
-                setFields,
-                tablePrefix,
-                keyField,
-                orderField.name
-            )
+            "update %s.stop_times st set %s from %s.trips t " +
+                "where st.trip_id = t.trip_id AND t.%s = ? AND st.%s = ?",
+            tablePrefix,
+            setFields,
+            tablePrefix,
+            keyField,
+            orderField.name
+        )
             : String.format("update %s.%s set %s where %s = ?", tablePrefix, linkedTableName, setFields, keyField);
         // Prepare the statement and set statement parameters
         PreparedStatement statement = connection.prepareStatement(sql);
@@ -458,8 +465,8 @@ public class JdbcTableWriter implements TableWriter {
         // Set the RETURN_GENERATED_KEYS flag on the PreparedStatement because it may be creating new rows, in which
         // case we need to know the auto-generated IDs of those new rows.
         PreparedStatement preparedStatement = connection.prepareStatement(
-                statementString,
-                Statement.RETURN_GENERATED_KEYS);
+            statementString,
+            Statement.RETURN_GENERATED_KEYS);
         if (!batch) {
             setStatementParameters(jsonObject, table, preparedStatement, connection);
         }
@@ -608,7 +615,8 @@ public class JdbcTableWriter implements TableWriter {
         boolean referencedPatternUsesFrequencies,
         boolean isCreatingNewEntity,
         Table subTable,
-        Connection connection
+        Connection connection,
+        PatternReconciliation reconciliation
     ) throws SQLException, IOException {
         // Get parent table's key field. Primary key fields are always referenced by foreign key fields with the same
         // name.
@@ -622,7 +630,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         boolean isPatternTable = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
         if (isPatternTable) {
-            PatternReconciliation.stagePatternReconciliation(mapper, subTable, subEntities, keyValue);
+            reconciliation.stagePatternReconciliation(mapper, subTable, subEntities, keyValue);
         }
         if (!isCreatingNewEntity) {
             // If not creating a new entity, we will delete the child entities (e.g., shape points or pattern stops) and
@@ -676,7 +684,7 @@ public class JdbcTableWriter implements TableWriter {
         int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
             // Cast entity node to ObjectNode to allow mutations (JsonNode is immutable).
-            ObjectNode subEntity = (ObjectNode)entityNode;
+            ObjectNode subEntity = (ObjectNode) entityNode;
             // Always override the key field (shape_id for shapes, pattern_id for patterns) regardless of the entity's
             // actual value.
             subEntity.put(keyField.name, keyValue);
@@ -693,33 +701,33 @@ public class JdbcTableWriter implements TableWriter {
                 // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
                 if (Table.PATTERN_STOP.name.equals(subTable.name)) {
                     updateLinkedFields(
-                            subTable,
-                            subEntity,
-                            "stop_times",
-                            "pattern_id",
-                            "timepoint",
-                            "drop_off_type",
-                            "pickup_type",
-                            "continuous_pickup",
-                            "continuous_drop_off",
-                            "shape_dist_traveled",
-                            "pickup_booking_rule_id",
-                            "drop_off_booking_rule_id"
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "continuous_pickup",
+                        "continuous_drop_off",
+                        "shape_dist_traveled",
+                        "pickup_booking_rule_id",
+                        "drop_off_booking_rule_id"
                     );
                 }
                 if (Table.PATTERN_LOCATION.name.equals(subTable.name)) {
                     updateLinkedFields(
-                            subTable,
-                            subEntity,
-                            "stop_times",
-                            "pattern_id",
-                            "timepoint",
-                            "drop_off_type",
-                            "pickup_type",
-                            "continuous_pickup",
-                            "continuous_drop_off",
-                            "pickup_booking_rule_id",
-                            "drop_off_booking_rule_id"
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "continuous_pickup",
+                        "continuous_drop_off",
+                        "pickup_booking_rule_id",
+                        "drop_off_booking_rule_id"
                     );
                 }
             }
@@ -818,29 +826,29 @@ public class JdbcTableWriter implements TableWriter {
      * This MUST be called _after_ pattern reconciliation has happened. The pattern stops and pattern locations must be
      * processed based on stop sequence so the correct cumulative travel time is calculated.
      */
-    private void updatePatternFrequencies() throws SQLException {
+    private void updatePatternFrequencies(PatternReconciliation reconciliation) throws SQLException {
         // Convert to generic stops to order pattern stops/locations by stop sequence.
-        List<PatternReconciliation.GenericStop> genericStops = PatternReconciliation.getGenericStops();
+        List<PatternReconciliation.GenericStop> genericStops = reconciliation.getGenericStops();
         int cumulativeTravelTime = 0;
         for (PatternReconciliation.GenericStop genericStop : genericStops) {
             // Update stop times linked to pattern stop/location and accumulate time.
             // Default travel and dwell time behave as "linked fields" for associated stop times. In other
             // words, frequency trips in the editor must match the pattern stop travel times.
             if (genericStop.patternType == PatternReconciliation.PatternType.STOP) {
-                PatternStop patternStop = PatternReconciliation.patternStops
-                    .stream()
-                    .filter(ps -> ps.stop_id.equals(genericStop.referenceId))
-                    .findFirst()
-                    .get();
-                cumulativeTravelTime += updateStopTimesForPatternStop(patternStop, cumulativeTravelTime, null);
+                cumulativeTravelTime +=
+                    updateStopTimesForPatternStop(
+                        reconciliation.getPatternStop(genericStop.referenceId),
+                        cumulativeTravelTime,
+                        null
+                    );
             } else {
                 // Pattern type is location
-                PatternLocation patternLocation = PatternReconciliation.patternLocations
-                    .stream()
-                    .filter(pl -> pl.location_id.equals(genericStop.referenceId))
-                    .findFirst()
-                    .get();
-                cumulativeTravelTime += updateStopTimesForPatternLocation(patternLocation, cumulativeTravelTime, null);
+                cumulativeTravelTime +=
+                    updateStopTimesForPatternLocation(
+                        reconciliation.getPatternLocation(genericStop.referenceId),
+                        cumulativeTravelTime,
+                        null
+                    );
             }
         }
     }
@@ -862,7 +870,8 @@ public class JdbcTableWriter implements TableWriter {
 
     /**
      * Updates the stop times that reference the specified pattern stop.
-     * @param patternStop the pattern stop for which to update stop times
+     *
+     * @param patternStop        the pattern stop for which to update stop times
      * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
      *                           previous pattern stop's dwell time)
      * @return the travel and dwell time added by this pattern stop
@@ -897,7 +906,8 @@ public class JdbcTableWriter implements TableWriter {
 
     /**
      * Updates the stop times that reference the specified pattern location.
-     * @param patternLocation the pattern location for which to update stop times
+     *
+     * @param patternLocation    the pattern location for which to update stop times
      * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
      *                           previous pattern stop's dwell time)
      * @return the travel and dwell time added by this pattern location
@@ -913,7 +923,7 @@ public class JdbcTableWriter implements TableWriter {
 
         String sql = String.format(
             "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
-                    "where st.trip_id = %s AND t.pattern_id = ? AND st.stop_sequence = ?",
+                "where st.trip_id = %s AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
             tablePrefix,
             tripId
@@ -964,12 +974,13 @@ public class JdbcTableWriter implements TableWriter {
      * Checks that a set of string references to a set of reference tables are all valid. For each set of references
      * mapped to a reference table, the method queries for all of the references. If there are any references that were
      * not returned in the query, one of the original references was invalid and an exception is thrown.
-     * @param referringTableName    name of the table which contains references for logging/exception message only
-     * @param referencesPerTable    string references mapped to the tables to which they refer
+     *
+     * @param referringTableName name of the table which contains references for logging/exception message only
+     * @param referencesPerTable string references mapped to the tables to which they refer
      * @throws SQLException
      */
     private void verifyReferencesExist(String referringTableName, Multimap<Table, String> referencesPerTable) throws SQLException {
-        for (Table referencedTable: referencesPerTable.keySet()) {
+        for (Table referencedTable : referencesPerTable.keySet()) {
             LOG.info("Checking {} references to {}", referringTableName, referencedTable.name);
             Collection<String> referenceStrings = referencesPerTable.get(referencedTable);
             String referenceFieldName = referencedTable.getKeyFieldName();
@@ -978,11 +989,11 @@ public class JdbcTableWriter implements TableWriter {
             referenceStrings.removeAll(foundReferences);
             if (referenceStrings.size() > 0) {
                 throw new SQLException(
-                        String.format(
-                                "%s entities must contain valid %s references. (Invalid references: %s)",
-                                referringTableName,
-                                referenceFieldName,
-                                String.join(", ", referenceStrings)));
+                    String.format(
+                        "%s entities must contain valid %s references. (Invalid references: %s)",
+                        referringTableName,
+                        referenceFieldName,
+                        String.join(", ", referenceStrings)));
             } else {
                 LOG.info("All {} {} {} references are valid.", foundReferences.size(), referencedTable.name, referenceFieldName);
             }
@@ -1000,8 +1011,8 @@ public class JdbcTableWriter implements TableWriter {
      * the stop_id isn't in either table there will be no match. It is not possible to know which table the
      * stop_id should be in so all foreign tables are listed with expected values.
      *
-     * @param foreignReferencesPerTable  A list of parent tables with a related list of foreign tables with reference
-     *                                   values.
+     * @param foreignReferencesPerTable A list of parent tables with a related list of foreign tables with reference
+     *                                  values.
      * @throws SQLException
      */
     private void verifyForeignReferencesExist(Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable)
@@ -1026,7 +1037,7 @@ public class JdbcTableWriter implements TableWriter {
             Set<String> foreignReferencesFound = new HashSet<>();
             Set<String> foreignReferencesNotFound = new HashSet<>();
             Set<String> foreignReferencesFieldNames = new HashSet<>();
-            for (Table foreignTable: refTables.keySet()) {
+            for (Table foreignTable : refTables.keySet()) {
                 LOG.info("Checking {} references in {}", parentTable.name, foreignTable.name);
                 foreignReferencesFieldNames.add(foreignTable.getKeyFieldName());
                 Collection<String> referenceStrings = refTables.get(foreignTable);
@@ -1270,9 +1281,9 @@ public class JdbcTableWriter implements TableWriter {
                     // Under no circumstance should a new entity have a conflict with existing key field.
                     throw new SQLException(
                         String.format("New %s's %s value (%s) conflicts with an existing record in table.",
-                                      table.entityClass.getSimpleName(),
-                                      keyField,
-                                      keyValue)
+                            table.entityClass.getSimpleName(),
+                            keyField,
+                            keyValue)
                     );
                 }
                 if (!uniqueIds.contains(id)) {
@@ -1285,11 +1296,11 @@ public class JdbcTableWriter implements TableWriter {
                 // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
                 // attempt to rectify bad data.
                 String message = String.format(
-                        "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
-                        size,
-                        table.name,
-                        keyField,
-                        keyValue);
+                    "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
+                    size,
+                    table.name,
+                    keyField,
+                    keyValue);
                 LOG.error(message);
                 throw new SQLException(message);
             }
@@ -1381,11 +1392,11 @@ public class JdbcTableWriter implements TableWriter {
      * referencing the entity being updated.
      *
      * FIXME: add custom logic/hooks. Right now entity table checks are hard-coded in (e.g., if Agency, skip all. OR if
-     *  Calendar, rollback transaction if there are referencing trips).
+     * Calendar, rollback transaction if there are referencing trips).
      *
      * FIXME: Do we need to clarify the impact of the direction of the relationship (e.g., if we delete a trip, that should
-     *  not necessarily delete a shape that is shared by multiple trips)? I think not because we are skipping foreign refs
-     *  found in the table for the entity being updated/deleted. [Leaving this comment in place for now though.]
+     * not necessarily delete a shape that is shared by multiple trips)? I think not because we are skipping foreign refs
+     * found in the table for the entity being updated/deleted. [Leaving this comment in place for now though.]
      */
     private void updateReferencingTables(
         String namespace,
@@ -1410,7 +1421,7 @@ public class JdbcTableWriter implements TableWriter {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
-                if (field.isForeignReference())  {
+                if (field.isForeignReference()) {
                     for (Table refTable : field.referenceTables) {
                         if (refTable.name.equals(table.name)) {
                             if (
@@ -1496,13 +1507,13 @@ public class JdbcTableWriter implements TableWriter {
         switch (sqlMethod) {
             case DELETE:
                 if (isArrayField) {
-                     sql = String.format(
+                    sql = String.format(
                         "delete from %s where %s @> ARRAY[?]::text[]",
                         refTableName,
                         keyField.name
                     );
                 } else {
-                     sql = String.format("delete from %s where %s = ?", refTableName, keyField.name);
+                    sql = String.format("delete from %s where %s = ?", refTableName, keyField.name);
                 }
                 statement = connection.prepareStatement(sql);
                 statement.setString(1, keyValue);
