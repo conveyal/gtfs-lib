@@ -1,8 +1,26 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
-import com.conveyal.gtfs.dto.*;
-import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.dto.BookingRuleDTO;
+import com.conveyal.gtfs.dto.CalendarDTO;
+import com.conveyal.gtfs.dto.FareDTO;
+import com.conveyal.gtfs.dto.FareRuleDTO;
+import com.conveyal.gtfs.dto.FeedInfoDTO;
+import com.conveyal.gtfs.dto.FrequencyDTO;
+import com.conveyal.gtfs.dto.LocationDTO;
+import com.conveyal.gtfs.dto.LocationGroupDTO;
+import com.conveyal.gtfs.dto.LocationShapeDTO;
+import com.conveyal.gtfs.dto.PatternDTO;
+import com.conveyal.gtfs.dto.PatternLocationDTO;
+import com.conveyal.gtfs.dto.PatternStopDTO;
+import com.conveyal.gtfs.dto.RouteDTO;
+import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
+import com.conveyal.gtfs.dto.ShapePointDTO;
+import com.conveyal.gtfs.dto.StopDTO;
+import com.conveyal.gtfs.dto.StopTimeDTO;
+import com.conveyal.gtfs.dto.TripDTO;
+import com.conveyal.gtfs.model.ScheduleException;
+import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
@@ -127,17 +145,17 @@ public class JDBCTableWriterTest {
             patternId,
             "pattern name",
             null,
-            new ShapePointDTO[]{},
-            new PatternLocationDTO[]{
+            new ShapePointDTO[] {},
+            new PatternLocationDTO[] {
                 new PatternLocationDTO(patternId, locationOne.location_id, 0)
             },
-            new PatternStopDTO[]{
+            new PatternStopDTO[] {
                 new PatternStopDTO(patternId, stopOne.stop_id, 1)
             },
             1
         );
 
-        StopTimeDTO[] stopTimes = new StopTimeDTO[]{
+        StopTimeDTO[] stopTimes = new StopTimeDTO[] {
             new StopTimeDTO(locationOne.location_id, 0, 0, 0),
             new StopTimeDTO(stopOne.stop_id, 0, 0, 1)
         };
@@ -273,7 +291,7 @@ public class JDBCTableWriterTest {
         fareRuleInput.contains_id = "any";
         fareRuleInput.origin_id = "value";
         fareRuleInput.destination_id = "permitted";
-        fareInput.fare_rules = new FareRuleDTO[]{fareRuleInput};
+        fareInput.fare_rules = new FareRuleDTO[] {fareRuleInput};
 
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(fareTable);
@@ -708,8 +726,8 @@ public class JDBCTableWriterTest {
         ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
         exceptionInput.name = "Halloween";
         exceptionInput.exemplar = 9; // Add, swap, or remove type
-        exceptionInput.removed_service = new String[]{simpleServiceId};
-        String[] halloweenDate = new String[]{"20191031"};
+        exceptionInput.removed_service = new String[] {simpleServiceId};
+        String[] halloweenDate = new String[] {"20191031"};
         exceptionInput.dates = halloweenDate;
         TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
         String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
@@ -725,7 +743,7 @@ public class JDBCTableWriterTest {
             }
         }
         // try to update record
-        String[] updatedDates = new String[]{"20191031", "20201031"};
+        String[] updatedDates = new String[] {"20191031", "20201031"};
         scheduleException.dates = updatedDates;
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(scheduleExceptionTable);
@@ -763,7 +781,7 @@ public class JDBCTableWriterTest {
      */
     @Test
     public void shouldUpdateStopTimeOnPatternStopUpdate() throws IOException, SQLException, InvalidNamespaceException {
-        final String[] STOP_TIMES_LINKED_FIELDS = new String[]{
+        final String[] STOP_TIMES_LINKED_FIELDS = new String[] {
             "shape_dist_traveled",
             "timepoint",
             "drop_off_type",
@@ -779,8 +797,8 @@ public class JDBCTableWriterTest {
             patternId,
             "pattern name",
             null,
-            new ShapePointDTO[]{},
-            new PatternStopDTO[]{
+            new ShapePointDTO[] {},
+            new PatternStopDTO[] {
                 new PatternStopDTO(patternId, firstStopId, 0),
                 new PatternStopDTO(patternId, lastStopId, 1)
             },
@@ -905,11 +923,11 @@ public class JDBCTableWriterTest {
     @Test
     public void shouldChangeShapeIdOnPatternUpdate() throws IOException, SQLException, InvalidNamespaceException {
         String patternId = "10";
-        ShapePointDTO[] shapes = new ShapePointDTO[]{
+        ShapePointDTO[] shapes = new ShapePointDTO[] {
             new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
             new ShapePointDTO(2, 150.0, sharedShapeId, lastStopLat, lastStopLon, 1)
         };
-        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+        PatternStopDTO[] patternStops = new PatternStopDTO[] {
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
         };
@@ -957,7 +975,7 @@ public class JDBCTableWriterTest {
         // Update pattern with pattern stops, set to use frequencies, and TODO shape points
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
         simplePattern.use_frequency = 1;
-        simplePattern.pattern_stops = new PatternStopDTO[]{
+        simplePattern.pattern_stops = new PatternStopDTO[] {
             new PatternStopDTO(simplePattern.pattern_id, firstStopId, 0),
             new PatternStopDTO(simplePattern.pattern_id, lastStopId, 1)
         };
@@ -1011,7 +1029,7 @@ public class JDBCTableWriterTest {
         int initialTravelTime = 60; // one minute
         int startTime = 6 * 60 * 60; // 6AM
         String patternId = "123456";
-        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+        PatternStopDTO[] patternStops = new PatternStopDTO[] {
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
         };
@@ -1020,7 +1038,7 @@ public class JDBCTableWriterTest {
             patternId,
             "Pattern A",
             null,
-            new ShapePointDTO[]{},
+            new ShapePointDTO[] {},
             patternStops,
             0);
         // Create trip with travel times that match pattern stops.
@@ -1088,10 +1106,10 @@ public class JDBCTableWriterTest {
         return Stream.of(
             // Add a new stop to the end.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 0, 10, 10)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopOne.stop_id, 1, 10, 1),
                     new PatternStopDTO(patternId, stopTwo.stop_id, 2, 10, 1)
                 },
@@ -1104,10 +1122,10 @@ public class JDBCTableWriterTest {
             ),
             // Delete stop from the middle.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 0, 20, 20)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 1, 12, 1)
                 },
                 ImmutableMap.of(
@@ -1118,10 +1136,10 @@ public class JDBCTableWriterTest {
             ),
             // Change the order of the location and stop.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 30, 30)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 11, 1)
                 },
                 ImmutableMap.of(
@@ -1132,11 +1150,11 @@ public class JDBCTableWriterTest {
             ),
             // Add a new location between the location and stop.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 2, 40, 40),
                     new PatternLocationDTO(patternId, locationTwo.location_id, 1, 40, 40)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 12, 5)
                 },
                 ImmutableMap.of(
@@ -1148,11 +1166,11 @@ public class JDBCTableWriterTest {
             ),
             // Add a new stop at the end.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 2, 50, 50),
                     new PatternLocationDTO(patternId, locationTwo.location_id, 1, 50, 50)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 14, 3),
                     new PatternStopDTO(patternId, stopOne.stop_id, 3, 14, 3)
                 },
@@ -1166,10 +1184,10 @@ public class JDBCTableWriterTest {
             ),
             // Delete the first location.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 60, 60)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 23, 1),
                     new PatternStopDTO(patternId, stopOne.stop_id, 2, 23, 1)
                 },
@@ -1182,11 +1200,11 @@ public class JDBCTableWriterTest {
             ),
             // Add a stop and location to the end.
             new PatternArguments(
-                new PatternLocationDTO[]{
+                new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
                     new PatternLocationDTO(patternId, locationThree.location_id, 3, 70, 70)
                 },
-                new PatternStopDTO[]{
+                new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6),
                     new PatternStopDTO(patternId, stopOne.stop_id, 2, 13, 6),
                     new PatternStopDTO(patternId, stopThree.stop_id, 4, 13, 6)
@@ -1340,7 +1358,7 @@ public class JDBCTableWriterTest {
         tripInput.pattern_id = patternId;
         tripInput.route_id = routeId;
         tripInput.service_id = simpleServiceId;
-        tripInput.stop_times = new StopTimeDTO[]{
+        tripInput.stop_times = new StopTimeDTO[] {
             new StopTimeDTO(firstStopId, 0, 0, 0),
             new StopTimeDTO(lastStopId, 60, 60, 1)
         };
@@ -1348,7 +1366,7 @@ public class JDBCTableWriterTest {
         frequency.start_time = startTime;
         frequency.end_time = 9 * 60 * 60;
         frequency.headway_secs = 15 * 60;
-        tripInput.frequencies = new FrequencyDTO[]{frequency};
+        tripInput.frequencies = new FrequencyDTO[] {frequency};
         return tripInput;
     }
 
@@ -1370,7 +1388,7 @@ public class JDBCTableWriterTest {
         int startTime,
         int travelTime
     ) {
-        StopTimeDTO[] stopTimes = new StopTimeDTO[]{
+        StopTimeDTO[] stopTimes = new StopTimeDTO[] {
             new StopTimeDTO(firstStopId, startTime, startTime, 0),
             new StopTimeDTO(lastStopId, startTime + travelTime, startTime + travelTime, 1)
         };
@@ -1390,7 +1408,7 @@ public class JDBCTableWriterTest {
         tripInput.route_id = routeId;
         tripInput.service_id = simpleServiceId;
         tripInput.stop_times = stopTimes;
-        tripInput.frequencies = new FrequencyDTO[]{};
+        tripInput.frequencies = new FrequencyDTO[] {};
         return tripInput;
     }
 
@@ -1447,7 +1465,7 @@ public class JDBCTableWriterTest {
         input.use_frequency = useFrequency;
         input.shape_id = shapeId;
         input.shapes = shapes;
-        input.pattern_stops = new PatternStopDTO[]{};
+        input.pattern_stops = new PatternStopDTO[] {};
         input.pattern_locations = patternLocations;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
@@ -1495,7 +1513,7 @@ public class JDBCTableWriterTest {
      * Creates a pattern by first creating a route and then a pattern for that route.
      */
     private static PatternDTO createRouteAndSimplePattern(String routeId, String patternId, String name) throws InvalidNamespaceException, SQLException, IOException {
-        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[]{}, new PatternStopDTO[]{}, 0);
+        return createRouteAndPattern(routeId, patternId, name, null, new ShapePointDTO[] {}, new PatternStopDTO[] {}, 0);
     }
 
     /**
@@ -1592,7 +1610,7 @@ public class JDBCTableWriterTest {
         location.stop_desc = "Templeboy to Ballisodare Door-to-door pickup area";
         location.zone_id = "1";
         location.stop_url = new URL("https://www.Teststopsite.com");
-        location.location_shapes = new LocationShapeDTO[]{
+        location.location_shapes = new LocationShapeDTO[] {
             locationShape
         };
 

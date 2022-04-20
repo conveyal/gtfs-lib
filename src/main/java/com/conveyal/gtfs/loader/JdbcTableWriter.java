@@ -630,7 +630,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         boolean isPatternTable = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
         if (isPatternTable) {
-            reconciliation.stagePatternReconciliation(mapper, subTable, subEntities, keyValue);
+            reconciliation.stage(mapper, subTable, subEntities, keyValue);
         }
         if (!isCreatingNewEntity) {
             // If not creating a new entity, we will delete the child entities (e.g., shape points or pattern stops) and

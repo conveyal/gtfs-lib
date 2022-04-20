@@ -38,9 +38,9 @@ public class PatternReconciliation {
     private List<PatternStop> patternStops = new ArrayList<>();
 
     /**
-     * Enum containing available reconciliation types.
+     * Enum containing available reconciliation operations.
      */
-    private enum ReconcileType {
+    private enum ReconciliationOperation {
         ADD_ONE, ADD_MULTIPLE, DELETE, TRANSPOSE, NONE
     }
 
@@ -73,7 +73,7 @@ public class PatternReconciliation {
      * all required values when available. The values are then used by {@link PatternReconciliation#reconcile} _after_
      * all child entities have been processed.
      */
-    public void stagePatternReconciliation(
+    public void stage(
         ObjectMapper mapper,
         Table subTable,
         ArrayNode subEntities,
@@ -114,8 +114,8 @@ public class PatternReconciliation {
             return;
         }
         newGenericStops = getGenericStops();
-        ReconcileType reconcileType = getReconcileType(originalGenericStopIds, newGenericStops);
-        if (reconcileType == ReconcileType.NONE) {
+        ReconciliationOperation reconciliationOperation = getOperation(originalGenericStopIds, newGenericStops);
+        if (reconciliationOperation == ReconciliationOperation.NONE) {
             LOG.info("Pattern stops not changed. Pattern reconciliation not required.");
             return;
         }
@@ -127,7 +127,7 @@ public class PatternReconciliation {
             tablePrefix,
             patternId
         );
-        reconcilePattern(reconcileType);
+        reconcilePattern(reconciliationOperation);
     }
 
     /**
@@ -166,18 +166,18 @@ public class PatternReconciliation {
      * Define the type of update to be applied to stop times. This is done by comparing the size of the original generic
      * stops against the size of the new generic stops.
      */
-    private ReconcileType getReconcileType(List<String> originalGenericStopIds, List<GenericStop> genericStops) {
+    private ReconciliationOperation getOperation(List<String> originalGenericStopIds, List<GenericStop> genericStops) {
         int sizeDiff = genericStops.size() - originalGenericStopIds.size();
         if (sizeDiff == 1) {
-            return ReconcileType.ADD_ONE;
+            return ReconciliationOperation.ADD_ONE;
         } else if (sizeDiff == -1) {
-            return ReconcileType.DELETE;
+            return ReconciliationOperation.DELETE;
         } else if (sizeDiff == 0) {
             return getFirstTripPatternDifference() == -1
-                ? ReconcileType.NONE
-                : ReconcileType.TRANSPOSE;
+                ? ReconciliationOperation.NONE
+                : ReconciliationOperation.TRANSPOSE;
         } else if (sizeDiff > 1) {
-            return ReconcileType.ADD_MULTIPLE;
+            return ReconciliationOperation.ADD_MULTIPLE;
         } else {
             // Any other type of modification is not supported.
             throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
@@ -191,9 +191,9 @@ public class PatternReconciliation {
      * the same where required). If the change to pattern stops/locations does not satisfy one of these cases, fail the
      * update operation.
      */
-    private void reconcilePattern(ReconcileType reconcileType) throws SQLException {
+    private void reconcilePattern(ReconciliationOperation reconciliationOperation) throws SQLException {
         LOG.info("Reconciling pattern for pattern Id: {}", patternId);
-        switch (reconcileType) {
+        switch (reconciliationOperation) {
             case ADD_ONE:
                 addOneStopToAPattern();
                 break;
