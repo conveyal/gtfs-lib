@@ -82,10 +82,10 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         statement.setString(oneBasedIndex++, drop_off_booking_rule_id);
         setIntParameter(statement, oneBasedIndex++, start_pickup_dropoff_window);
         setIntParameter(statement, oneBasedIndex++, end_pickup_dropoff_window);
-        statement.setDouble(oneBasedIndex++, mean_duration_factor);
-        statement.setDouble(oneBasedIndex++, mean_duration_offset);
-        statement.setDouble(oneBasedIndex++, safe_duration_factor);
-        statement.setDouble(oneBasedIndex++, safe_duration_offset);
+        setDoubleParameter(statement, oneBasedIndex++, mean_duration_factor);
+        setDoubleParameter(statement, oneBasedIndex++, mean_duration_offset);
+        setDoubleParameter(statement, oneBasedIndex++, safe_duration_factor);
+        setDoubleParameter(statement, oneBasedIndex, safe_duration_offset);
     }
 
     public static class Loader extends Entity.Loader<StopTime> {

@@ -1,20 +1,22 @@
 package com.conveyal.gtfs.util.json;
 
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
 import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
 
 import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -77,16 +79,6 @@ public class JsonManager<T> {
     }
 
     /**
-     * Convert an object to its JSON representation
-     * @param o the object to convert
-     * @return the JSON string
-     * @throws JsonProcessingException
-     */
-    /*public String write (T o) throws JsonProcessingException {
-        return writer.writeValueAsString(o);
-    }*/
-
-    /**
      * Convert a collection of objects to their JSON representation.
      * @param c the collection
      * @return A JsonNode representing the collection
@@ -100,15 +92,31 @@ public class JsonManager<T> {
         return writer.writeValueAsString(map);
     }
 
-    public T read (String s) throws JsonParseException, JsonMappingException, IOException {
+    public T read (String s) throws IOException {
         return mapper.readValue(s, theClass);
     }
 
-    public T read (JsonParser p) throws JsonParseException, JsonMappingException, IOException {
+    public T read (JsonParser p) throws IOException {
         return mapper.readValue(p, theClass);
     }
 
     public T read(JsonNode asJson) {
         return mapper.convertValue(asJson, theClass);
+    }
+
+    public static <T> List<T> read(ObjectMapper mapper, ArrayNode subEntities, Class<T> target)
+        throws JsonProcessingException {
+
+        List<T> list = new ArrayList<>();
+        for (JsonNode node : subEntities) {
+            ObjectNode objectNode = (ObjectNode) node;
+            if (!objectNode.get("id").isNumber()) {
+                // Set ID to zero. ID is ignored entirely here.
+                objectNode.put("id", 0);
+            }
+            // Accumulate new objects from JSON.
+            list.add(mapper.treeToValue(objectNode, target));
+        }
+        return list;
     }
 }
