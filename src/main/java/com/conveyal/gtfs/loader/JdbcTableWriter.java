@@ -1490,32 +1490,13 @@ public class JdbcTableWriter implements TableWriter {
                     if (
                         Table.TRIPS.name.equals(referencingTable.name) &&
                         sqlMethod.equals(SqlMethod.DELETE) &&
-                        table.name.equals(Table.PATTERNS.name)
+                        (table.name.equals(Table.PATTERNS.name) || table.name.equals(Table.ROUTES.name))
                     ) {
-                        // If deleting a pattern, cascade delete stop times and frequencies for trips first. This must
-                        // happen before trips are deleted in the block below. Otherwise, the queries to select
-                        // stop_times and frequencies to delete would fail because there would be no trip records to join
-                        // with.
-                        String stopTimesTable = String.join(".", namespace, "stop_times");
-                        String frequenciesTable = String.join(".", namespace, "frequencies");
-                        String tripsTable = String.join(".", namespace, "trips");
-                        // Delete stop times and frequencies for trips for pattern
-                        String deleteStopTimes = String.format(
-                                "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
-                                stopTimesTable, tripsTable, stopTimesTable, tripsTable, tripsTable);
-                        PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deleteStopTimes);
-                        deleteStopTimesStatement.setString(1, keyValue);
-                        LOG.info(deleteStopTimesStatement.toString());
-                        int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
-                        LOG.info("Deleted {} stop times for pattern {}", deletedStopTimes, keyValue);
-                        String deleteFrequencies = String.format(
-                                "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
-                                frequenciesTable, tripsTable, frequenciesTable, tripsTable, tripsTable);
-                        PreparedStatement deleteFrequenciesStatement = connection.prepareStatement(deleteFrequencies);
-                        deleteFrequenciesStatement.setString(1, keyValue);
-                        LOG.info(deleteFrequenciesStatement.toString());
-                        int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
-                        LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
+                        deleteStopTimesAndFrequencies(
+                            namespace,
+                            keyValue,
+                            (table.name.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id"
+                        );
                     }
                     // Get statement to update or delete entities that reference the key value.
                     PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
@@ -1548,6 +1529,39 @@ public class JdbcTableWriter implements TableWriter {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * If deleting a route or pattern, cascade delete stop times and frequencies for trips first. This must happen
+     * before trips are deleted. Otherwise, the queries to select stop_times and frequencies to delete would fail
+     * because there would be no trip records to join with.
+     */
+    private void deleteStopTimesAndFrequencies(String namespace, String keyValue, String keyColumn) throws SQLException {
+        String stopTimesTable = String.join(".", namespace, "stop_times");
+        String frequenciesTable = String.join(".", namespace, "frequencies");
+        String tripsTable = String.join(".", namespace, "trips");
+
+        // Delete stop times for trips.
+        String deleteStopTimes = String.format(
+            "delete from %s using %s where %s.trip_id = %s.trip_id and %s.%s = ?",
+            stopTimesTable, tripsTable, stopTimesTable, tripsTable, tripsTable, keyColumn);
+        try (PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deleteStopTimes)) {
+            deleteStopTimesStatement.setString(1, keyValue);
+            LOG.info(deleteStopTimesStatement.toString());
+            int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
+            LOG.info("Deleted {} stop times for route {}", deletedStopTimes, keyValue);
+        }
+
+        // Delete frequencies for trips.
+        String deleteFrequencies = String.format(
+            "delete from %s using %s where %s.trip_id = %s.trip_id and %s.%s = ?",
+            frequenciesTable, tripsTable, frequenciesTable, tripsTable, tripsTable, keyColumn);
+        try (PreparedStatement deleteFrequenciesStatement = connection.prepareStatement(deleteFrequencies)) {
+            deleteFrequenciesStatement.setString(1, keyValue);
+            LOG.info(deleteFrequenciesStatement.toString());
+            int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
+            LOG.info("Deleted {} frequencies for route {}", deletedFrequencies, keyValue);
         }
     }
 
