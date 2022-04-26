@@ -1498,6 +1498,14 @@ public class JdbcTableWriter implements TableWriter {
                             (table.name.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id"
                         );
                     }
+                    if (
+                        Table.PATTERNS.name.equals(referencingTable.name) &&
+                        sqlMethod.equals(SqlMethod.DELETE) &&
+                        table.name.equals(Table.ROUTES.name)
+                    ) {
+                        deletePatternStops(namespace, keyValue);
+                        // TODO: Flex delete pattern locations.
+                    }
                     // Get statement to update or delete entities that reference the key value.
                     PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
                     LOG.info(updateStatement.toString());
@@ -1529,6 +1537,28 @@ public class JdbcTableWriter implements TableWriter {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * If deleting a route, cascade delete pattern stops for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_stops to delete would fail because there would be no pattern
+     * records to join with.
+     */
+    private void deletePatternStops(String namespace, String keyValue) throws SQLException {
+        String patternStopsTable = String.join(".", namespace, "pattern_stops");
+        String patternsTable = String.join(".", namespace, "patterns");
+        String routesTable = String.join(".", namespace, "routes");
+
+        // Delete pattern stops for route.
+        String deletePatternStops = String.format(
+            "delete from %s ps using %s p, %s r where ps.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = ?",
+            patternStopsTable, patternsTable, routesTable);
+        try (PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deletePatternStops)) {
+            deleteStopTimesStatement.setString(1, keyValue);
+            LOG.info(deleteStopTimesStatement.toString());
+            int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
+            LOG.info("Deleted {} pattern stops for pattern {}", deletedStopTimes, keyValue);
         }
     }
 
