@@ -600,6 +600,15 @@ public class JDBCTableWriterTest {
                 Table.PATTERN_STOP.name,
                 pattern.pattern_id
             ));
+
+        // Check that shape records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s s, %s p where s.shape_id = p.shape_id and p.pattern_id = '%s'",
+                String.format("%s.%s", testNamespace, Table.SHAPES.name),
+                String.format("%s.%s", testNamespace, Table.PATTERNS.name),
+                pattern.pattern_id
+            ));
     }
 
     /**
@@ -918,7 +927,7 @@ public class JDBCTableWriterTest {
         input.route_id = routeId;
         input.name = name;
         input.use_frequency = 0;
-        input.shape_id = "1";
+        input.shape_id = sharedShapeId;
         input.shapes = new ShapePointDTO[]{
             new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
             new ShapePointDTO(2, 150.0, sharedShapeId, lastStopLat, lastStopLon, 1)

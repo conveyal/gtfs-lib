@@ -1488,24 +1488,22 @@ public class JdbcTableWriter implements TableWriter {
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
                 if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+                    String keyColumn = (table.name.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id";
                     if (
                         Table.TRIPS.name.equals(referencingTable.name) &&
-                            sqlMethod.equals(SqlMethod.DELETE) &&
-                            (table.name.equals(Table.PATTERNS.name) || table.name.equals(Table.ROUTES.name))
+                        sqlMethod.equals(SqlMethod.DELETE) &&
+                        (table.name.equals(Table.PATTERNS.name) || table.name.equals(Table.ROUTES.name))
                     ) {
-                        deleteStopTimesFrequenciesAndShapes(
-                            namespace,
-                            keyValue,
-                            (table.name.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id"
-                        );
-
+                        deleteStopTimesAndFrequencies(namespace, keyValue, keyColumn);
+                        deleteShapes(namespace, keyValue, keyColumn);
                     }
                     if (
                         Table.PATTERNS.name.equals(referencingTable.name) &&
-                            sqlMethod.equals(SqlMethod.DELETE) &&
-                            table.name.equals(Table.ROUTES.name)
+                        sqlMethod.equals(SqlMethod.DELETE) &&
+                        table.name.equals(Table.ROUTES.name)
                     ) {
                         deletePatternStops(namespace, keyValue);
+                        deleteShapes(namespace, keyValue, keyColumn);
                         // TODO: Flex delete pattern locations.
                     }
                     // Get statement to update or delete entities that reference the key value.
@@ -1566,10 +1564,8 @@ public class JdbcTableWriter implements TableWriter {
      * before trips are deleted. Otherwise, the queries to select stop_times and frequencies to delete would fail
      * because there would be no trip records to join with.
      */
-    private void deleteStopTimesFrequenciesAndShapes(String namespace, String keyValue, String keyColumn) throws SQLException {
+    private void deleteStopTimesAndFrequencies(String namespace, String keyValue, String keyColumn) throws SQLException {
         String tripsTable = String.format("%s.trips", namespace);
-        String patternsTable = String.format("%s.patterns", namespace);
-        String shapesTable = String.format("%s.shapes", namespace);
         String parent = (keyColumn.equals("pattern_id")) ? "pattern" : "route";
 
         // Delete stop times for trips.
@@ -1595,6 +1591,16 @@ public class JdbcTableWriter implements TableWriter {
             keyValue
         );
         LOG.info("Deleted {} frequencies for {} {}", deletedFrequencies, parent, keyValue);
+    }
+
+    /**
+     * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
+     * the queries to select shapes to delete would fail because there would be no pattern records to join with.
+     */
+    private void deleteShapes(String namespace, String keyValue, String keyColumn) throws SQLException {
+        String patternsTable = String.format("%s.patterns", namespace);
+        String shapesTable = String.format("%s.shapes", namespace);
+        String parent = (keyColumn.equals("pattern_id")) ? "pattern" : "route";
 
         // Delete shapes for route/pattern.
         String deleteShapes = (keyColumn.equals("pattern_id"))
