@@ -918,8 +918,11 @@ public class JDBCTableWriterTest {
         input.route_id = routeId;
         input.name = name;
         input.use_frequency = 0;
-        input.shape_id = null;
-        input.shapes = new ShapePointDTO[]{};
+        input.shape_id = "1";
+        input.shapes = new ShapePointDTO[]{
+            new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
+            new ShapePointDTO(2, 150.0, sharedShapeId, lastStopLat, lastStopLon, 1)
+        };
         input.pattern_stops = new PatternStopDTO[]{
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
