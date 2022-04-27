@@ -317,7 +317,7 @@ public class GeoJsonUtil {
     private static List<Point> buildPoints(List<LocationShape> locationShapes) {
         List<Point> points = new ArrayList<>();
         locationShapes.forEach(locationShape -> {
-            points.add(new Point(locationShape.geometry_pt_lat, locationShape.geometry_pt_lon));
+            points.add(new Point(locationShape.geometry_pt_lon, locationShape.geometry_pt_lat));
         });
         return points;
     }
