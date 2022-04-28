@@ -198,14 +198,6 @@
       <snapshots><enabled>false</enabled></snapshots>
       <releases><enabled>true</enabled></releases>
     </repository>
-    <repository> <!--Add the snapshot repository here-->
-      <snapshots>
-        <enabled>true</enabled>
-      </snapshots>
-      <id>opengeo</id>
-      <name>OpenGeo Maven Repository</name>
-      <url>http://repo.opengeo.org</url>
-    </repository>
     <!--  used for importing java projects from github -->
     <repository>
       <id>jitpack.io</id>
