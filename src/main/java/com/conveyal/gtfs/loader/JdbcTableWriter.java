@@ -1534,15 +1534,15 @@ public class JdbcTableWriter implements TableWriter {
      * To prevent orphaned descendants, delete them before joining references are deleted. For the relationship
      * route -> pattern -> pattern stop, delete pattern stop before deleting the joining pattern.
      */
-    private void deleteDescendants(String parentTableName, String keyValue) throws SQLException {
+    private void deleteDescendants(String parentTableName, String routeOrPatternId) throws SQLException {
         // Delete child references before joining trips and patterns are deleted.
         String keyColumn = (parentTableName.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id";
-        deleteStopTimesAndFrequencies(keyValue, keyColumn, parentTableName);
-        deleteShapes(keyValue, keyColumn, parentTableName);
+        deleteStopTimesAndFrequencies(routeOrPatternId, keyColumn, parentTableName);
+        deleteShapes(routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
             // Delete pattern stops before joining patterns are deleted.
-            deletePatternStops(keyValue);
+            deletePatternStops(routeOrPatternId);
             // TODO: Flex delete pattern locations.
         }
     }
@@ -1633,7 +1633,7 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Execute the provided sql and return the number of rows effected.
+     * Execute the provided sql and return the number of rows updated.
      */
     private int executeStatement(String sql) throws SQLException {
         try (Statement statement = connection.createStatement()) {
