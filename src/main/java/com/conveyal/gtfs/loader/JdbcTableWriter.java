@@ -1633,11 +1633,11 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Execute the provided sql and return the number of rows updated.
+     * Execute the provided sql and return the number of rows effected.
      */
     private int executeStatement(String sql) throws SQLException {
         try (Statement statement = connection.createStatement()) {
-            LOG.info("{}", statement);
+            LOG.info("{}", sql);
             return statement.executeUpdate(sql);
         }
     }

@@ -560,7 +560,7 @@ public class JDBCTableWriterTest {
         // Make sure saved data matches expected data.
         assertThat(pattern.route_id, equalTo(routeId));
 
-        TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, 60);
+        TripDTO tripInput = constructFrequencyTrip(pattern.pattern_id, pattern.route_id, startTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
         String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
         TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
@@ -608,6 +608,15 @@ public class JDBCTableWriterTest {
                 String.format("%s.%s", testNamespace, Table.SHAPES.name),
                 String.format("%s.%s", testNamespace, Table.PATTERNS.name),
                 pattern.pattern_id
+            ));
+
+        // Check that frequency records for trip do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.FREQUENCIES.name,
+                createdTrip.trip_id
             ));
     }
 
@@ -926,7 +935,7 @@ public class JDBCTableWriterTest {
         input.pattern_id = patternId;
         input.route_id = routeId;
         input.name = name;
-        input.use_frequency = 0;
+        input.use_frequency = 1;
         input.shape_id = sharedShapeId;
         input.shapes = new ShapePointDTO[]{
             new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
