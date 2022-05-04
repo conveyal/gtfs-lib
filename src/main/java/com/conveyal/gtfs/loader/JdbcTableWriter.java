@@ -1021,7 +1021,6 @@ public class JdbcTableWriter implements TableWriter {
         for (Table parentTable : foreignReferencesPerTable.keySet()) {
             Collection<Multimap<Table, String>> multiTableReferences = foreignReferencesPerTable.get(parentTable);
             HashMap<Table, List<String>> refTables = new HashMap<>();
-
             // Group foreign tables and references.
             for (Multimap<Table, String> tableReference : multiTableReferences) {
                 for (Table foreignTable : tableReference.keySet()) {
@@ -1410,12 +1409,19 @@ public class JdbcTableWriter implements TableWriter {
         SqlMethod sqlMethod = newKeyValue != null ? SqlMethod.UPDATE : SqlMethod.DELETE;
         Set<Table> referencingTables = getReferencingTables(table);
         // If there are no referencing tables, there is no need to update any values (e.g., .
-        if (referencingTables.size() == 0) return;
+        if (referencingTables.isEmpty()) return;
         String keyValue = getValueForId(id, keyField.name, namespace, table, connection);
         if (keyValue == null) {
             // FIXME: should we still check referencing tables for null value?
             LOG.warn("Entity {} to {} has null value for {}. Skipping references check.", id, sqlMethod, keyField);
             return;
+        }
+        if (
+            sqlMethod.equals(SqlMethod.DELETE) &&
+            (table.name.equals(Table.PATTERNS.name) || table.name.equals(Table.ROUTES.name))
+        ) {
+            // Delete descendants at the end of the relationship tree.
+            deleteDescendants(table.name, keyValue);
         }
         for (Table referencingTable : referencingTables) {
             // Update/delete foreign references that have match the key value.
@@ -1424,60 +1430,28 @@ public class JdbcTableWriter implements TableWriter {
                 if (field.isForeignReference()) {
                     for (Table refTable : field.referenceTables) {
                         if (refTable.name.equals(table.name)) {
-                            if (
-                                Table.TRIPS.name.equals(referencingTable.name) &&
-                                    sqlMethod.equals(SqlMethod.DELETE) &&
-                                    table.name.equals(Table.PATTERNS.name)
-                            ) {
-                                // If deleting a pattern, cascade delete stop times and frequencies for trips first. This must
-                                // happen before trips are deleted in the block below. Otherwise, the queries to select
-                                // stop_times and frequencies to delete would fail because there would be no trip records to join
-                                // with.
-                                String stopTimesTable = String.join(".", namespace, "stop_times");
-                                String frequenciesTable = String.join(".", namespace, "frequencies");
-                                String tripsTable = String.join(".", namespace, "trips");
-                                // Delete stop times and frequencies for trips for pattern
-                                String deleteStopTimes = String.format(
-                                    "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
-                                    stopTimesTable, tripsTable, stopTimesTable, tripsTable, tripsTable);
-                                PreparedStatement deleteStopTimesStatement = connection.prepareStatement(deleteStopTimes);
-                                deleteStopTimesStatement.setString(1, keyValue);
-                                LOG.info(deleteStopTimesStatement.toString());
-                                int deletedStopTimes = deleteStopTimesStatement.executeUpdate();
-                                LOG.info("Deleted {} stop times for pattern {}", deletedStopTimes, keyValue);
-                                String deleteFrequencies = String.format(
-                                    "delete from %s using %s where %s.trip_id = %s.trip_id and %s.pattern_id = ?",
-                                    frequenciesTable, tripsTable, frequenciesTable, tripsTable, tripsTable);
-                                PreparedStatement deleteFrequenciesStatement = connection.prepareStatement(deleteFrequencies);
-                                deleteFrequenciesStatement.setString(1, keyValue);
-                                LOG.info(deleteFrequenciesStatement.toString());
-                                int deletedFrequencies = deleteFrequenciesStatement.executeUpdate();
-                                LOG.info("Deleted {} frequencies for pattern {}", deletedFrequencies, keyValue);
-                            }
                             // Get statement to update or delete entities that reference the key value.
                             PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
-                            LOG.info(updateStatement.toString());
+                            LOG.info("{}", updateStatement);
                             int result = updateStatement.executeUpdate();
                             if (result > 0) {
                                 // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
                                 //  deleteEntityHook).
-                                if (sqlMethod.equals(SqlMethod.DELETE)) {
-                                    // Check for restrictions on delete.
-                                    if (table.isCascadeDeleteRestricted()) {
-                                        // The entity must not have any referencing entities in order to delete it.
-                                        connection.rollback();
-                                        String message = String.format(
-                                            "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                            entityClass.getSimpleName(),
-                                            keyField.name,
-                                            keyValue,
-                                            result,
-                                            referencingTable.name,
-                                            entityClass.getSimpleName()
-                                        );
-                                        LOG.warn(message);
-                                        throw new SQLException(message);
-                                    }
+                                if (sqlMethod.equals(SqlMethod.DELETE) && table.isCascadeDeleteRestricted()) {
+                                    // Check for restrictions on delete. The entity must not have any referencing
+                                    // entities in order to delete it.
+                                    connection.rollback();
+                                    String message = String.format(
+                                        "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                        entityClass.getSimpleName(),
+                                        keyField.name,
+                                        keyValue,
+                                        result,
+                                        referencingTable.name,
+                                        entityClass.getSimpleName()
+                                    );
+                                    LOG.warn(message);
+                                    throw new SQLException(message);
                                 }
                                 LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
                             } else {
@@ -1487,6 +1461,118 @@ public class JdbcTableWriter implements TableWriter {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * To prevent orphaned descendants, delete them before joining references are deleted. For the relationship
+     * route -> pattern -> pattern stop, delete pattern stop before deleting the joining pattern.
+     */
+    private void deleteDescendants(String parentTableName, String routeOrPatternId) throws SQLException {
+        // Delete child references before joining trips and patterns are deleted.
+        String keyColumn = (parentTableName.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id";
+        deleteStopTimesAndFrequencies(routeOrPatternId, keyColumn, parentTableName);
+        deleteShapes(routeOrPatternId, keyColumn, parentTableName);
+
+        if (parentTableName.equals(Table.ROUTES.name)) {
+            // Delete pattern stops before joining patterns are deleted.
+            deletePatternStops(routeOrPatternId);
+            // TODO: Flex delete pattern locations.
+        }
+    }
+
+    /**
+     * If deleting a route, cascade delete pattern stops for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_stops to delete would fail because there would be no pattern
+     * records to join with.
+     */
+    private void deletePatternStops(String routeId) throws SQLException {
+        // Delete pattern stops for route.
+        int deletedStopTimes = executeStatement(
+            String.format(
+                "delete from %s ps using %s p, %s r where ps.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = '%s'",
+                String.format("%s.pattern_stops", tablePrefix),
+                String.format("%s.patterns", tablePrefix),
+                String.format("%s.routes", tablePrefix),
+                routeId
+            )
+        );
+        LOG.info("Deleted {} pattern stops for pattern {}", deletedStopTimes, routeId );
+    }
+
+    /**
+     * If deleting a route or pattern, cascade delete stop times and frequencies for trips first. This must happen
+     * before trips are deleted. Otherwise, the queries to select stop_times and frequencies to delete would fail
+     * because there would be no trip records to join with.
+     */
+    private void deleteStopTimesAndFrequencies(
+        String routeOrPatternId,
+        String routeOrPatternIdColumn,
+        String referencingTable
+    ) throws SQLException {
+
+        String tripsTable = String.format("%s.trips", tablePrefix);
+
+        // Delete stop times for trips.
+        int deletedStopTimes = executeStatement(
+            String.format(
+                "delete from %s s using %s t where s.trip_id = t.trip_id and t.%s = '%s'",
+                String.format("%s.stop_times", tablePrefix),
+                tripsTable,
+                routeOrPatternIdColumn,
+                routeOrPatternId
+            )
+        );
+        LOG.info("Deleted {} stop times for {} {}", deletedStopTimes, referencingTable , routeOrPatternId);
+
+        // Delete frequencies for trips.
+        int deletedFrequencies = executeStatement(
+            String.format(
+                "delete from %s f using %s t where f.trip_id = t.trip_id and t.%s = '%s'",
+                String.format("%s.frequencies", tablePrefix),
+                tripsTable,
+                routeOrPatternIdColumn,
+                routeOrPatternId
+            )
+        );
+        LOG.info("Deleted {} frequencies for {} {}", deletedFrequencies, referencingTable , routeOrPatternId);
+    }
+
+    /**
+     * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
+     * the queries to select shapes to delete would fail because there would be no pattern records to join with.
+     */
+    private void deleteShapes(String routeOrPatternId, String routeOrPatternIdColumn, String referencingTable)
+        throws SQLException {
+
+        String patternsTable = String.format("%s.patterns", tablePrefix);
+        String shapesTable = String.format("%s.shapes", tablePrefix);
+
+        // Delete shapes for route/pattern.
+        String sql = (routeOrPatternIdColumn.equals("pattern_id"))
+            ? String.format(
+                "delete from %s s using %s p where s.shape_id = p.shape_id and p.pattern_id = '%s'",
+                shapesTable,
+                patternsTable,
+                routeOrPatternId)
+            : String.format(
+                "delete from %s s using %s p, %s r where s.shape_id = p.shape_id and p.route_id = r.route_id and r.route_id = '%s'",
+                shapesTable,
+                patternsTable,
+                String.format("%s.routes", tablePrefix),
+                routeOrPatternId);
+
+        int deletedShapes = executeStatement(sql);
+        LOG.info("Deleted {} shapes for {} {}", deletedShapes, referencingTable , routeOrPatternId);
+    }
+
+    /**
+     * Execute the provided sql and return the number of rows effected.
+     */
+    private int executeStatement(String sql) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            LOG.info("{}", sql);
+            return statement.executeUpdate(sql);
         }
     }
 
@@ -1534,7 +1620,7 @@ public class JdbcTableWriter implements TableWriter {
                     statement = connection.prepareStatement(sql);
                     statement.setString(1, keyValue);
                     statement.setString(2, newKeyValue);
-                    String[] values = new String[]{keyValue};
+                    String[] values = new String[] {keyValue};
                     statement.setArray(3, connection.createArrayOf("text", values));
                 } else {
                     sql = String.format(
