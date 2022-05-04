@@ -549,6 +549,78 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * Deleting a route should cascade delete referencing patterns, trips and stop times.
+     */
+    @Test
+    void shouldCascadeDeleteOnRouteDelete() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = "8472017";
+        int startTime = 6 * 60 * 60; // 6 AM
+        RouteDTO createdRoute = createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
+        PatternDTO pattern = createSimplePattern(routeId, "9901900", "The Line");
+        // Make sure saved data matches expected data.
+        assertThat(pattern.route_id, equalTo(routeId));
+
+        TripDTO tripInput = constructFrequencyTrip(pattern.pattern_id, pattern.route_id, startTime);
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createdTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        TripDTO createdTrip = mapper.readValue(createdTripOutput, TripDTO.class);
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdTrip.id, Table.TRIPS), 1);
+
+        // Delete route record
+        JdbcTableWriter deleteRouteWriter = createTestTableWriter(Table.ROUTES);
+        int deleteOutput = deleteRouteWriter.delete(createdRoute.id, true);
+        LOG.info("deleted {} records from {}", deleteOutput, Table.ROUTES.name);
+
+        // Check that pattern record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(pattern.id, Table.PATTERNS));
+
+        // Check that trip records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.TRIPS.name,
+                pattern.pattern_id
+            ));
+
+        // Check that stop_times records for trip do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.STOP_TIMES.name,
+                createdTrip.trip_id
+            ));
+
+        // Check that pattern_stops records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.PATTERN_STOP.name,
+                pattern.pattern_id
+            ));
+
+        // Check that shape records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s s, %s p where s.shape_id = p.shape_id and p.pattern_id = '%s'",
+                String.format("%s.%s", testNamespace, Table.SHAPES.name),
+                String.format("%s.%s", testNamespace, Table.PATTERNS.name),
+                pattern.pattern_id
+            ));
+
+        // Check that frequency records for trip do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where trip_id='%s'",
+                testNamespace,
+                Table.FREQUENCIES.name,
+                createdTrip.trip_id
+            ));
+    }
+
+    /**
      * Test that a frequency trip entry CANNOT be added for a timetable-based pattern. Expects an exception to be thrown.
      */
     @Test
@@ -844,6 +916,35 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
+        // Write the pattern to the database
+        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
+        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
+        LOG.info("create {} output:", Table.PATTERNS.name);
+        LOG.info(output);
+        // Parse output
+        return mapper.readValue(output, PatternDTO.class);
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createSimplePattern(String routeId, String patternId, String name)
+        throws InvalidNamespaceException, SQLException, IOException {
+        // Create new pattern for route
+        PatternDTO input = new PatternDTO();
+        input.pattern_id = patternId;
+        input.route_id = routeId;
+        input.name = name;
+        input.use_frequency = 1;
+        input.shape_id = sharedShapeId;
+        input.shapes = new ShapePointDTO[]{
+            new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
+            new ShapePointDTO(2, 150.0, sharedShapeId, lastStopLat, lastStopLon, 1)
+        };
+        input.pattern_stops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, firstStopId, 0),
+            new PatternStopDTO(patternId, lastStopId, 1)
+        };
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
