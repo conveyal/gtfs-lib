@@ -22,12 +22,16 @@ public class FeedLoadResult implements Serializable {
     public String fatalException;
 
     public TableLoadResult agency;
+    public TableLoadResult bookingRules;
     public TableLoadResult calendar;
     public TableLoadResult calendarDates;
     public TableLoadResult fareAttributes;
     public TableLoadResult fareRules;
     public TableLoadResult feedInfo;
     public TableLoadResult frequencies;
+    public TableLoadResult locations;
+    public TableLoadResult locationGroups;
+    public TableLoadResult locationShapes;
     public TableLoadResult routes;
     public TableLoadResult shapes;
     public TableLoadResult stops;
@@ -49,12 +53,16 @@ public class FeedLoadResult implements Serializable {
      */
     public FeedLoadResult (boolean constructTableResults) {
         agency = new TableLoadResult();
+        bookingRules = new TableLoadResult();
         calendar = new TableLoadResult();
         calendarDates = new TableLoadResult();
         fareAttributes = new TableLoadResult();
         fareRules = new TableLoadResult();
         feedInfo = new TableLoadResult();
         frequencies = new TableLoadResult();
+        locations = new TableLoadResult();
+        locationGroups = new TableLoadResult();
+        locationShapes = new TableLoadResult();
         routes = new TableLoadResult();
         shapes = new TableLoadResult();
         stops = new TableLoadResult();
@@ -63,5 +71,16 @@ public class FeedLoadResult implements Serializable {
         trips = new TableLoadResult();
         translations = new TableLoadResult();
         attributions = new TableLoadResult();
+    }
+
+    /**
+     * Determine if the feed loaded has GTFS Flex enhancements. Is used in datatools-server -> FeedSource.java.
+     */
+    public boolean isGTFSFlex() {
+        return
+            (bookingRules != null && bookingRules.rowCount > 0) ||
+            (locationGroups != null && locationGroups.rowCount > 0) ||
+            (locations != null && locations.rowCount > 0) ||
+            (locationShapes != null && locationShapes.rowCount > 0);
     }
 }

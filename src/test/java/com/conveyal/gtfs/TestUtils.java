@@ -1,7 +1,10 @@
 package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
+import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.csvreader.CsvReader;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,14 +13,21 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
+import static com.conveyal.gtfs.GTFS.load;
+import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.util.Util.randomIdString;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -42,7 +52,7 @@ public class TestUtils {
         ));
         // drop the db
         if(executeAndClose(String.format("DROP DATABASE %s", dbName))) {
-            LOG.error(String.format("Successfully dropped database: %s", dbName));
+            LOG.debug(String.format("Successfully dropped database: %s", dbName));
         } else {
             LOG.error(String.format("Failed to drop database: %s", dbName));
         }
@@ -211,5 +221,77 @@ public class TestUtils {
         assertThatSqlCountQueryYieldsExpectedCount(testDataSource, sql, expectedNumberOfErrors);
     }
 
+    /**
+     * Load feed from zip file into a database and validate.
+     */
+    public static String loadFeedAndValidate(DataSource dataSource, String zipFolderName) throws IOException {
+        String zipFileName = TestUtils.zipFolderFiles(zipFolderName,  true);
+        FeedLoadResult feedLoadResult = load(zipFileName, dataSource);
+        String namespace = feedLoadResult.uniqueIdentifier;
+        validate(namespace, dataSource);
+        // return name space.
+        return namespace;
+    }
 
+    public static class FileTestCase {
+        public String filename;
+        public DataExpectation[] expectedColumnData;
+
+        public FileTestCase(String filename, DataExpectation[] expectedColumnData) {
+            this.filename = filename;
+            this.expectedColumnData = expectedColumnData;
+        }
+    }
+
+    public static class DataExpectation {
+        public String columnName;
+        public String expectedValue;
+
+        public DataExpectation(String columnName, String expectedValue) {
+            this.columnName = columnName;
+            this.expectedValue = expectedValue;
+        }
+    }
+
+    /**
+     * Look through the list of file test cases provided and confirm correct content in provided zip file.
+     */
+    public static void lookThroughFiles(FileTestCase[] fileTestCases, ZipFile zip) throws IOException {
+        // look through all written files in the zipfile
+        for (FileTestCase fileTestCase: fileTestCases) {
+            ZipEntry entry = zip.getEntry(fileTestCase.filename);
+
+            // make sure the file exists within the zipfile
+            assertThat(entry, notNullValue());
+
+            // create csv reader for file
+            InputStream zis = zip.getInputStream(entry);
+            InputStream bis = new BOMInputStream(zis);
+            CsvReader reader = new CsvReader(bis, ',', StandardCharsets.UTF_8);
+
+            // make sure the file has headers
+            boolean hasHeaders = reader.readHeaders();
+            assertThat(hasHeaders, is(true));
+
+            // make sure that the record matching the expected row exists in this table
+            boolean recordFound = false;
+            while (reader.readRecord() && !recordFound) {
+                boolean allExpectationsMetForThisRecord = true;
+                for (DataExpectation dataExpectation : fileTestCase.expectedColumnData) {
+                    if(!reader.get(dataExpectation.columnName).equals(dataExpectation.expectedValue)) {
+                        allExpectationsMetForThisRecord = false;
+                        break;
+                    }
+                }
+                if (allExpectationsMetForThisRecord) {
+                    recordFound = true;
+                }
+            }
+            assertThat(
+                String.format("Data Expectation record not found in %s", fileTestCase.filename),
+                recordFound,
+                is(true)
+            );
+        }
+    }
 }

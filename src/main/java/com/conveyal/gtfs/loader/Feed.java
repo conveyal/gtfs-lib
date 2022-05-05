@@ -31,10 +31,15 @@ public class Feed {
     public final String tablePrefix;
 
     public final TableReader<Agency>        agencies;
+    public final TableReader<BookingRule>   bookingRules;
     public final TableReader<Calendar>      calendars;
     public final TableReader<CalendarDate>  calendarDates;
     public final TableReader<FareAttribute> fareAttributes;
+    public final TableReader<FareRule>      fareRules;
     public final TableReader<Frequency>     frequencies;
+    public final TableReader<Location>      locations;
+    public final TableReader<LocationGroup> locationGroups;
+    public final TableReader<LocationShape> locationShapes;
     public final TableReader<Route>         routes;
     public final TableReader<Stop>          stops;
     public final TableReader<Trip>          trips;
@@ -51,8 +56,13 @@ public class Feed {
         if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
         this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
         agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
+        bookingRules = new JDBCTableReader(Table.BOOKING_RULES, dataSource, tablePrefix, EntityPopulator.BOOKING_RULE);
         fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, tablePrefix, EntityPopulator.FARE_ATTRIBUTE);
+        fareRules = new JDBCTableReader(Table.FARE_RULES, dataSource, tablePrefix, EntityPopulator.FARE_RULE);
         frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, tablePrefix, EntityPopulator.FREQUENCY);
+        locations = new JDBCTableReader(Table.LOCATIONS, dataSource, tablePrefix, EntityPopulator.LOCATION);
+        locationGroups = new JDBCTableReader(Table.LOCATION_GROUPS, dataSource, tablePrefix, EntityPopulator.LOCATION_GROUP);
+        locationShapes = new JDBCTableReader(Table.LOCATION_SHAPES, dataSource, tablePrefix, EntityPopulator.LOCATION_SHAPES);
         calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
         calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
         routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
@@ -92,7 +102,8 @@ public class Feed {
             new FrequencyValidator(this, errorStorage),
             new TimeZoneValidator(this, errorStorage),
             new NewTripTimesValidator(this, errorStorage),
-            new NamesValidator(this, errorStorage)
+            new NamesValidator(this, errorStorage),
+            new FlexValidator(this, errorStorage)
         );
         // Create additional validators specified in this method's args and add to list of feed validators to run.
         for (FeedValidatorCreator creator : additionalValidators) {

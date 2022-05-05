@@ -1,9 +1,6 @@
 package com.conveyal.gtfs.validator;
 
-import com.conveyal.gtfs.error.MissingShapeError;
-import com.conveyal.gtfs.error.ReversedTripShapeError;
 import com.conveyal.gtfs.error.SQLErrorStorage;
-import com.conveyal.gtfs.error.ShapeMissingCoordinatesError;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.util.Util;
@@ -28,7 +25,14 @@ public class ReversedTripValidator extends TripValidator {
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+    public void validateTrip(
+        Trip trip,
+        Route route,
+        List<StopTime> stopTimes,
+        List<Stop> stops,
+        List<Location> locations,
+        List<LocationGroup> locationGroups
+    ) {
         // TODO implement
     }
 

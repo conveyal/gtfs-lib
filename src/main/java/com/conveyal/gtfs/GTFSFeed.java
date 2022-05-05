@@ -3,8 +3,10 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.GTFSError;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGTFSFeedConverter;
+import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.gtfs.model.Calendar;
+import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.validator.Validator;
 import com.conveyal.gtfs.util.Util;
 import com.conveyal.gtfs.validator.service.GeoUtils;
@@ -58,6 +60,10 @@ public class GTFSFeed implements Cloneable, Closeable {
 
     /* Some of these should be multimaps since they don't have an obvious unique key. */
     public final Map<String, Agency> agency;
+    public final Map<String, BookingRule> bookingRules;
+    public final Map<String, Location> locations;
+    public final Map<String, LocationGroup> locationGroups;
+    public final Map<String, LocationShape> locationShapes;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
@@ -67,6 +73,7 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final BTreeMap<String, Trip> trips;
     public final Map<String, Translation> translations;
     public final Map<String, Attribution> attributions;
+    public final Map<String, Calendar> calendars;
 
     public final Set<String> transitIds = new HashSet<>();
     /** CRC32 of the GTFS file this was loaded from */
@@ -169,6 +176,13 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.fares.putAll(fares);
         fares = null; // free memory
 
+        // Flex tables. These must be loaded before stop times. If any of these tables contain data it is assumed that
+        // we are working with a flex feed.
+        new BookingRule.Loader(this).loadTable(zip);
+        new LocationGroup.Loader(this).loadTable(zip);
+        new Location.Loader(this).loadTable(zip);
+        new LocationShape.Loader(this).loadTable(zip);
+
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
@@ -176,6 +190,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
         new StopTime.Loader(this).loadTable(zip); // comment out this line for quick testing using NL feed
+
         LOG.info("{} errors", errors.size());
         for (GTFSError error : errors) {
             LOG.info("{}", error);
@@ -217,8 +232,17 @@ public class GTFSFeed implements Cloneable, Closeable {
             new Trip.Writer(this).writeTable(zip);
             new StopTime.Writer(this).writeTable(zip);
 
+            if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
+            if (!this.locationGroups.isEmpty()) new LocationGroup.Writer(this).writeTable(zip);
+            if (!this.locations.isEmpty()) {
+                // export locations
+                JdbcGtfsExporter.writeLocationsToFile(
+                    zip,
+                    new ArrayList<>(locations.values()),
+                    new ArrayList<>(locationShapes.values())
+                );
+            }
             zip.close();
-
             LOG.info("GTFS file written");
         } catch (Exception e) {
             LOG.error("Error saving GTFS: {}", e.getMessage());
@@ -359,7 +383,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
             patternFinder.processTrip(trip, orderedStopTimesForTrip);
         }
-        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null);
+        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null, null);
         this.patterns.putAll(patternObjects.values().stream()
                 .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
@@ -639,6 +663,13 @@ public class GTFSFeed implements Cloneable, Closeable {
         shape_points = db.getTreeMap("shape_points");
         translations = db.getTreeMap("translations");
         attributions = db.getTreeMap("attributions");
+        calendars = db.getTreeMap("calendars");
+
+        // Flex tables.
+        bookingRules = db.getTreeMap("booking_rules");
+        locations = db.getTreeMap("locations");
+        locationGroups = db.getTreeMap("location_groups");
+        locationShapes = db.getTreeMap("location_shapes");
 
         feedId = db.getAtomicString("feed_id").get();
         checksum = db.getAtomicLong("checksum").get();
@@ -652,5 +683,17 @@ public class GTFSFeed implements Cloneable, Closeable {
         tripPatternMap = db.getTreeMap("patternForTrip");
 
         errors = db.getTreeSet("errors");
+    }
+
+    /**
+     * If booking rules, location groups or location shapes have been created and contain data, the assumption is that
+     * this is a GTFS Flex feed. These tables must be loaded before this can be referenced. At the moment
+     * {@link StopTime} references this and is loaded after the check is made on these tables.
+     */
+    public boolean isGTFSFlexFeed() {
+        return
+            !bookingRules.isEmpty() ||
+            !locationGroups.isEmpty() ||
+            !locationShapes.isEmpty();
     }
 }

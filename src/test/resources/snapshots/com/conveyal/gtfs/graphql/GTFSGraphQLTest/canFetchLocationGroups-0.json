@@ -1,0 +1,23 @@
+{
+  "data" : {
+    "feed" : {
+      "feed_version" : "1.0",
+      "location_groups" : [ {
+        "id" : 2,
+        "location_group_id" : "1",
+        "location_group_name" : "Location group referencing a stop",
+        "location_id" : "123"
+      }, {
+        "id" : 3,
+        "location_group_id" : "2",
+        "location_group_name" : "Location group referencing an invalid location",
+        "location_id" : "area-999"
+      }, {
+        "id" : 4,
+        "location_group_id" : "3",
+        "location_group_name" : "Location group referencing a location",
+        "location_id" : "area_1469-1"
+      } ]
+    }
+  }
+}

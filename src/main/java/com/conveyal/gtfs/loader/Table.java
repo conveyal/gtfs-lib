@@ -11,6 +11,7 @@ import com.conveyal.gtfs.loader.conditions.ForeignRefExistsCheck;
 import com.conveyal.gtfs.loader.conditions.ReferenceFieldShouldBeProvidedCheck;
 import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Attribution;
+import com.conveyal.gtfs.model.BookingRule;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
@@ -18,7 +19,11 @@ import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.gtfs.model.FareRule;
 import com.conveyal.gtfs.model.FeedInfo;
 import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
+import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.Pattern;
+import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -29,6 +34,7 @@ import com.conveyal.gtfs.model.Transfer;
 import com.conveyal.gtfs.model.Translation;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.gtfs.storage.StorageException;
+import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.csvreader.CsvReader;
 import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
@@ -36,7 +42,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -57,6 +63,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.GEO_JSON_PARSING;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
@@ -76,6 +83,8 @@ import static com.conveyal.gtfs.loader.Requirement.UNKNOWN;
 public class Table {
 
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
+
+    public static final String LOCATION_GEO_JSON_FILE_NAME = "locations.geojson";
 
     public final String name;
 
@@ -303,8 +312,11 @@ public class Table {
             new DoubleField("shape_dist_traveled", EDITOR, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", EDITOR, 1),
             new ShortField("continuous_pickup", OPTIONAL,3),
-            new ShortField("continuous_drop_off", OPTIONAL,3)
+            new ShortField("continuous_drop_off", OPTIONAL,3),
+            new StringField("pickup_booking_rule_id", OPTIONAL),
+            new StringField("drop_off_booking_rule_id", OPTIONAL)
     ).withParentTable(PATTERNS);
+
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
             // FIXME: Do we need an index on from_ and to_stop_id
@@ -333,12 +345,32 @@ public class Table {
         new StringField("pattern_id", EDITOR).isReferenceTo(PATTERNS)
     ).addPrimaryKey();
 
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#
+    public static final Table LOCATIONS = new Table("locations", Location.class, OPTIONAL,
+        new StringField("location_id", REQUIRED),
+        new StringField("stop_name", OPTIONAL),
+        new StringField("stop_desc", OPTIONAL),
+        new StringField("zone_id", OPTIONAL),
+        new URLField("stop_url", OPTIONAL),
+        new StringField("geometry_type", REQUIRED)
+    ).addPrimaryKey();
+
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#location_groupstxt-file-added
+    public static final Table LOCATION_GROUPS = new Table("location_groups", LocationGroup.class, OPTIONAL,
+        new StringField("location_group_id", REQUIRED),
+        new StringField("location_id", OPTIONAL).isReferenceTo(STOPS).isReferenceTo(LOCATIONS),
+        new StringField("location_group_name", OPTIONAL)
+    ).keyFieldIsNotUnique();
+
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
             new StringField("trip_id", REQUIRED).isReferenceTo(TRIPS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
             // FIXME: Do we need an index on stop_id
-            new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
+            new StringField("stop_id", REQUIRED)
+                .isReferenceTo(STOPS)
+                .isReferenceTo(LOCATIONS)
+                .isReferenceTo(LOCATION_GROUPS),
 //                    .indexThisColumn(),
             // TODO verify that we have a special check for arrival and departure times first and last stop_time in a trip, which are required
             new TimeField("arrival_time", OPTIONAL),
@@ -350,7 +382,21 @@ public class Table {
             new ShortField("continuous_drop_off", OPTIONAL, 3),
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", OPTIONAL, 1),
-            new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
+            new IntegerField("fare_units_traveled", EXTENSION), // OpenOV NL extension
+
+            // Additional GTFS Flex booking rule fields.
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended-1
+            new StringField("pickup_booking_rule_id", OPTIONAL),
+            new StringField("drop_off_booking_rule_id", OPTIONAL),
+
+            // Additional GTFS Flex location groups and locations fields
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended
+            new TimeField("start_pickup_dropoff_window", OPTIONAL),
+            new TimeField("end_pickup_dropoff_window", OPTIONAL),
+            new DoubleField("mean_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("mean_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2)
     ).withParentTable(TRIPS);
 
     // Must come after TRIPS table to which it has a reference
@@ -399,6 +445,61 @@ public class Table {
             new StringField("attribution_email", OPTIONAL),
             new StringField("attribution_phone", OPTIONAL));
 
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#gtfs-bookingrules
+    public static final Table BOOKING_RULES = new Table("booking_rules", BookingRule.class, OPTIONAL,
+            new StringField("booking_rule_id", REQUIRED),
+            new ShortField("booking_type", OPTIONAL, 2),
+            new IntegerField("prior_notice_duration_min", OPTIONAL),
+            new IntegerField("prior_notice_duration_max", OPTIONAL),
+            new IntegerField("prior_notice_last_day", OPTIONAL),
+            new TimeField("prior_notice_last_time", OPTIONAL),
+            new IntegerField("prior_notice_start_day", OPTIONAL),
+            new TimeField("prior_notice_start_time", OPTIONAL),
+            new StringField("prior_notice_service_id", OPTIONAL).isReferenceTo(CALENDAR),
+            new StringField("message", OPTIONAL),
+            new StringField("pickup_message", OPTIONAL),
+            new StringField("drop_off_message", OPTIONAL),
+            new StringField("phone_number", OPTIONAL),
+            new URLField("info_url", OPTIONAL),
+            new URLField("booking_url", OPTIONAL)
+    );
+
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#locationsgeojson-file-added
+    public static final Table LOCATION_SHAPES = new Table("location_shapes", LocationShape.class, OPTIONAL,
+        new StringField("location_id", REQUIRED).isReferenceTo(LOCATIONS),
+        new StringField("geometry_id", REQUIRED),
+        new DoubleField("geometry_pt_lat", REQUIRED, -80, 80, 6),
+        new DoubleField("geometry_pt_lon", REQUIRED, -180, 180, 6)
+    )
+    .keyFieldIsNotUnique()
+    .withParentTable(LOCATIONS);
+
+    public static final Table PATTERN_LOCATION = new Table("pattern_locations", PatternLocation.class, OPTIONAL,
+            new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
+            new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
+            // FIXME: Do we need an index on location_id?
+            new StringField("location_id", REQUIRED).isReferenceTo(LOCATIONS),
+            // Editor-specific fields
+            // FLEX TODO: Are all of these needed?
+            new IntegerField("drop_off_type", EDITOR, 2),
+            new IntegerField("pickup_type", EDITOR, 2),
+            new ShortField("timepoint", EDITOR, 1),
+            new ShortField("continuous_pickup", OPTIONAL,3),
+            new ShortField("continuous_drop_off", OPTIONAL,3),
+            new StringField("pickup_booking_rule_id", OPTIONAL),
+            new StringField("drop_off_booking_rule_id", OPTIONAL),
+
+            // Additional GTFS Flex location groups and locations fields
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended
+            new TimeField("flex_default_travel_time", OPTIONAL),
+            new TimeField("flex_default_zone_time", OPTIONAL),
+            new DoubleField("mean_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("mean_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2)
+
+    ).withParentTable(PATTERNS);
+
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
         AGENCY,
@@ -413,12 +514,17 @@ public class Table {
         STOPS,
         FARE_RULES,
         PATTERN_STOP,
+        PATTERN_LOCATION,
         TRANSFERS,
         TRIPS,
         STOP_TIMES,
         FREQUENCIES,
         TRANSLATIONS,
-        ATTRIBUTIONS
+        ATTRIBUTIONS,
+        BOOKING_RULES,
+        LOCATION_GROUPS,
+        LOCATION_SHAPES,
+        LOCATIONS
     };
 
     /**
@@ -587,7 +693,11 @@ public class Table {
      * It then creates a CSV reader for that table if it's found.
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
-        final String tableFileName = this.name + ".txt";
+        String tableFileName = this.name + ".txt";
+        if (name.equals(Table.LOCATIONS.name) || name.equals(Table.LOCATION_SHAPES.name)) {
+            tableFileName = LOCATION_GEO_JSON_FILE_NAME;
+            LOG.info("Loading data for {}, into supporting table {}", tableFileName, name);
+        }
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.
@@ -603,21 +713,47 @@ public class Table {
         }
         if (entry == null) return null;
         try {
-            InputStream zipInputStream = zipFile.getInputStream(entry);
-            // Skip any byte order mark that may be present. Files must be UTF-8,
-            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
-            InputStream bomInputStream = new BOMInputStream(zipInputStream);
-            CsvReader csvReader = new CsvReader(bomInputStream, ',', Charset.forName("UTF8"));
-            // Don't skip empty records (this is set to true by default on CsvReader. We want to check for empty records
+            List<String> geoJsonErrors = new ArrayList<>();
+            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, geoJsonErrors);
+            if (!geoJsonErrors.isEmpty() && sqlErrorStorage != null) {
+                geoJsonErrors.forEach(error ->
+                    sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, error))
+                );
+            }
+            // Don't skip empty records. This is set to true by default on CsvReader. We want to check for empty records
             // during table load, so that they are logged as validation issues (WRONG_NUMBER_OF_FIELDS).
             csvReader.setSkipEmptyRecords(false);
             csvReader.readHeaders();
             return csvReader;
         } catch (IOException e) {
-            LOG.error("Exception while opening zip entry: {}", e);
+            LOG.error("Exception while opening zip entry: {}", entry, e);
             e.printStackTrace();
             return null;
         }
+    }
+
+    /**
+     * Create a CSV reader depending on the table to be loaded. If the table is "locations.geojson" unpack the GeoJson
+     * data first and load into a CSV reader, else, read the table contents directly into the CSV reader.
+     */
+    public static CsvReader getCsvReader(
+        String tableFileName,
+        String name,
+        ZipFile zipFile,
+        ZipEntry entry,
+        List<String> errors
+    ) throws IOException {
+        CsvReader csvReader;
+        if (tableFileName.equals(LOCATION_GEO_JSON_FILE_NAME)) {
+            csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry, errors);
+        } else {
+            InputStream zipInputStream = zipFile.getInputStream(entry);
+            // Skip any byte order mark that may be present. Files must be UTF-8,
+            // but the GTFS spec says that "files that include the UTF byte order mark are acceptable".
+            InputStream bomInputStream = new BOMInputStream(zipInputStream);
+            csvReader = new CsvReader(bomInputStream, ',', StandardCharsets.UTF_8);
+        }
+        return csvReader;
     }
 
     /**

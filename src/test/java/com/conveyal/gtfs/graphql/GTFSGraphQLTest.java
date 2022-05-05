@@ -49,7 +49,7 @@ public class GTFSGraphQLTest {
         String dbConnectionUrl = String.format("jdbc:postgresql://localhost/%s", testDBName);
         testDataSource = TestUtils.createTestDataSource(dbConnectionUrl);
         // zip up test folder into temp zip file
-        String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
+        String zipFileName = TestUtils.zipFolderFiles("fake-agency-with-flex", true);
         // load feed into db
         FeedLoadResult feedLoadResult = load(zipFileName, testDataSource);
         testNamespace = feedLoadResult.uniqueIdentifier;
@@ -148,9 +148,17 @@ public class GTFSGraphQLTest {
         });
     }
 
+    /** Tests that the booking rules of a feed can be fetched. */
+    @Test
+    public void canFetchBookingRules() throws IOException {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedBookingRules.txt"), matchesSnapshot());
+        });
+    }
+
     /** Tests that the attributions of a feed can be fetched. */
     @Test
-    public void canFetchATtributions() {
+    public void canFetchAttributions() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
             MatcherAssert.assertThat(queryGraphQL("feedAttributions.txt"), matchesSnapshot());
         });
@@ -161,6 +169,30 @@ public class GTFSGraphQLTest {
     public void canFetchCalendars() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
             MatcherAssert.assertThat(queryGraphQL("feedCalendars.txt"), matchesSnapshot());
+        });
+    }
+
+    /** Tests that the location groups of a feed can be fetched. */
+    @Test
+    public void canFetchLocationGroups() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedLocationGroups.txt"), matchesSnapshot());
+        });
+    }
+
+    /** Tests that the locations of a feed can be fetched. */
+    @Test
+    public void canFetchLocations() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedLocations.txt"), matchesSnapshot());
+        });
+    }
+
+    /** Tests that the location shapes of a feed can be fetched. */
+    @Test
+    public void canFetchLocationShapes() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedLocationShapes.txt"), matchesSnapshot());
         });
     }
 
@@ -222,6 +254,14 @@ public class GTFSGraphQLTest {
         });
     }
 
+    /** Tests that the stop times with flex additions of a feed can be fetched. */
+    @Test
+    public void canFetchStopTimesWithFlexAdditions() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedStopTimesWithFlex.txt"), matchesSnapshot());
+        });
+    }
+
     /** Tests that the stop times of a feed can be fetched. */
     @Test
     public void canFetchServices() {
@@ -254,7 +294,7 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests whether a graphQL query that has superflous and redundant nesting can find the right result. */
+    /** Tests whether a graphQL query that has superfluous and redundant nesting can find the right result. */
     // if the graphQL dataloader is enabled correctly, there will not be any repeating sql queries in the logs
     @Test
     public void canFetchMultiNestedEntities() {

@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.checkFeedHasExpectedNumberOfErrors;
+import static com.conveyal.gtfs.TestUtils.loadFeedAndValidate;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.CONDITIONALLY_REQUIRED;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.REFERENTIAL_INTEGRITY;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS;
@@ -46,18 +47,6 @@ public class ConditionallyRequiredTest {
         caltrainDBName = TestUtils.generateNewDB();
         caltrainDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", caltrainDBName));
         caltrainNamespace = loadFeedAndValidate(caltrainDataSource, "real-world-gtfs-feeds/caltrain-fare-zones");
-    }
-
-    /**
-     * Load feed from zip file into a database and validate.
-     */
-    private static String loadFeedAndValidate(DataSource dataSource, String zipFolderName) throws IOException {
-        String zipFileName = TestUtils.zipFolderFiles(zipFolderName,  true);
-        FeedLoadResult feedLoadResult = load(zipFileName, dataSource);
-        String namespace = feedLoadResult.uniqueIdentifier;
-        validate(namespace, dataSource);
-        // return name space.
-        return namespace;
     }
 
     @AfterAll

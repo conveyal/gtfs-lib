@@ -100,17 +100,22 @@ public class GTFSTest {
     }
 
     /**
-     * Tests whether or not a super simple 2-stop, 1-route, 1-trip, valid gtfs can be loaded and exported
+     * Tests whether a super simple 2-stop, 1-route, 1-trip, valid gtfs can be loaded and exported
      */
     @Test
     public void canLoadAndExportSimpleAgency() {
         ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
-            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567"))
         );
         assertThat(
             runIntegrationTestOnFolder(
@@ -153,11 +158,11 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
-            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
             new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
             new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
-            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
         );
         assertThat(
             "Integration test passes",
@@ -225,13 +230,22 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
+            new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
-            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED)
         );
         assertThat(
             runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, errorExpectations),
@@ -511,8 +525,8 @@ public class GTFSTest {
     public void canLoadFeedWithServiceWithoutDaysOfWeek() {
         PersistenceExpectation[] expectations = PersistenceExpectation.list();
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
-            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED), // Not related, not worrying about this one.
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_WITHOUT_DAYS_OF_WEEK)
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_WITHOUT_DAYS_OF_WEEK),
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED) // Not related, not worrying about this one.
         );
         assertThat(
             "service-without-days test passes",

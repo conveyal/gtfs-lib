@@ -267,9 +267,9 @@ public class JDBCTableWriterTest {
         // covert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(fareTable);
         String updateOutput = updateTableWriter.update(
-                createdFare.id,
-                mapper.writeValueAsString(createdFare),
-                true
+            createdFare.id,
+            mapper.writeValueAsString(createdFare),
+            true
         );
         LOG.info("update {} output:", fareTable.name);
         LOG.info(updateOutput);
@@ -290,8 +290,8 @@ public class JDBCTableWriterTest {
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(fareTable);
         int deleteOutput = deleteTableWriter.delete(
-                createdFare.id,
-                true
+            createdFare.id,
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, fareTable.name);
 
@@ -326,9 +326,9 @@ public class JDBCTableWriterTest {
         // convert object to json and save it
         JdbcTableWriter updateTableWriter = createTestTableWriter(routeTable);
         String updateOutput = updateTableWriter.update(
-                createdRoute.id,
-                mapper.writeValueAsString(createdRoute),
-                true
+            createdRoute.id,
+            mapper.writeValueAsString(createdRoute),
+            true
         );
         LOG.info("update {} output:", routeTable.name);
         LOG.info(updateOutput);
@@ -351,8 +351,8 @@ public class JDBCTableWriterTest {
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(routeTable);
         int deleteOutput = deleteTableWriter.delete(
-                createdRoute.id,
-                true
+            createdRoute.id,
+            true
         );
         LOG.info("deleted {} records from {}", deleteOutput, routeTable.name);
 
@@ -378,7 +378,7 @@ public class JDBCTableWriterTest {
         TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
         String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
         ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput,
-                                                                         scheduleExceptionDTOClass);
+            scheduleExceptionDTOClass);
         // Make sure saved data matches expected data.
         assertThat(scheduleException.removed_service[0], equalTo(simpleServiceId));
         ResultSet resultSet = getResultSetForId(scheduleException.id, scheduleExceptionTable, "removed_service");
@@ -753,12 +753,12 @@ public class JDBCTableWriterTest {
         };
         patternStops[1].default_travel_time = initialTravelTime;
         PatternDTO pattern = createRouteAndPattern(newUUID(),
-                                                   patternId,
-                                                   "Pattern A",
-                                                   null,
-                                                   new ShapePointDTO[]{},
-                                                   patternStops,
-                                                   0);
+            patternId,
+            "Pattern A",
+            null,
+            new ShapePointDTO[]{},
+            patternStops,
+            0);
         // Create trip with travel times that match pattern stops.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
@@ -776,9 +776,9 @@ public class JDBCTableWriterTest {
         updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
         // Read pattern stops from database and check that the arrivals/departures have been updated.
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
-                                                                       testDataSource,
-                                                                       testNamespace + ".",
-                                                                       EntityPopulator.STOP_TIME);
+            testDataSource,
+            testNamespace + ".",
+            EntityPopulator.STOP_TIME);
         int index = 0;
         for (StopTime stopTime : stopTimesTable.getOrdered(createdTrip.trip_id)) {
             LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);

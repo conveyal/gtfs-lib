@@ -5,16 +5,28 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import static com.conveyal.gtfs.error.NewGTFSErrorType.*;
+
+import static com.conveyal.gtfs.error.NewGTFSErrorType.DEPARTURE_BEFORE_ARRIVAL;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.SHAPE_DIST_TRAVELED_NOT_INCREASING;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_DISTANCE_ZERO;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TIME_NEGATIVE;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TIME_ZERO;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_FAST;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.TRAVEL_TOO_SLOW;
 import static com.conveyal.gtfs.util.Util.fastDistance;
 import static com.conveyal.gtfs.validator.NewTripTimesValidator.missingBothTimes;
 
@@ -23,16 +35,31 @@ import static com.conveyal.gtfs.validator.NewTripTimesValidator.missingBothTimes
  */
 public class SpeedTripValidator extends TripValidator {
 
+    private static final Logger LOG = LoggerFactory.getLogger(SpeedTripValidator.class);
     public static final double MIN_SPEED_KPH = 0.5;
     private boolean allTravelTimesAreRounded = true;
-    private Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
+    private final Set<NewGTFSError> travelTimeZeroErrors = new HashSet<>();
 
     public SpeedTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
     }
 
     @Override
-    public void validateTrip(Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops) {
+    public void validateTrip(
+        Trip trip,
+        Route route,
+        List<StopTime> stopTimes,
+        List<Stop> stops,
+        List<Location> locations,
+        List<LocationGroup> locationGroups
+    ) {
+        if (FlexValidator.tripHasLocationGroupOrLocationForStop(trip, stopTimes, locationGroups, locations)) {
+            LOG.warn(
+                "Trip speed not validated for trip id {} because it contains at least one stop that is a location or location group.",
+                trip.trip_id
+            );
+            return;
+        }
         // The specific maximum speed for this trip's route's mode of travel.
         double maxSpeedKph = getMaxSpeedKph(route);
         // Skip over any initial stop times that won't allow calculating speeds.
@@ -53,6 +80,7 @@ public class SpeedTripValidator extends TripValidator {
                 registerError(currStopTime, NewGTFSErrorType.STOP_TIME_UNUSED);
             }
             Stop currStop = stops.get(i);
+
             // Distance is accumulated in case times are not provided for some StopTimes.
             distanceMeters += fastDistance(currStop.stop_lat, currStop.stop_lon, prevStop.stop_lat, prevStop.stop_lon);
             // Redefine previous stop for next iteration (doing so here ensures the reassignment is not skipped if both

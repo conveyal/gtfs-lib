@@ -1,0 +1,11 @@
+service_id,date,holiday_name,exception_type
+c_20269_b_26965_d_31,20220905,Labor Day,2
+c_20269_b_26965_d_31,20220704,Independence Day,2
+c_20269_b_26965_d_31,20220530,Memorial Day,2
+c_20269_b_26965_d_31,20220221,President's Day,2
+c_20269_b_26965_d_31,20220117,Martin Luther King Jr. Day,2
+c_20269_b_26965_d_31,20211231,New Years Day (observed),2
+c_20269_b_26965_d_31,20211224,Christmas Day (observed),2
+c_20269_b_26965_d_31,20211125,Thanksgiving Day,2
+c_20269_b_26965_d_31,20211111,Veteran's Day,2
+c_20269_b_26965_d_31,20211011,Indigenous People's Day,2

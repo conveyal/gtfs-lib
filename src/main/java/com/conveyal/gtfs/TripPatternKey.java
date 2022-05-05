@@ -28,6 +28,18 @@ public class TripPatternKey {
     public TIntList continuous_drop_off = new TIntArrayList();
     public TDoubleList shapeDistances = new TDoubleArrayList();
 
+    // Flex additions
+    public List<String> pickup_booking_rule_id = new ArrayList<>();
+    public List<String> drop_off_booking_rule_id = new ArrayList<>();
+
+    // Additional GTFS Flex location groups and locations fields
+    public TIntList start_pickup_dropoff_window = new TIntArrayList();
+    public TIntList end_pickup_dropoff_window = new TIntArrayList();
+    public TDoubleList mean_duration_factor = new TDoubleArrayList();
+    public TDoubleList mean_duration_offset = new TDoubleArrayList();
+    public TDoubleList safe_duration_factor = new TDoubleArrayList();
+    public TDoubleList safe_duration_offset = new TDoubleArrayList();
+
     public TripPatternKey (String routeId) {
         this.routeId = routeId;
     }
@@ -43,6 +55,15 @@ public class TripPatternKey {
         shapeDistances.add(st.shape_dist_traveled);
         continuous_pickup.add(st.continuous_pickup);
         continuous_drop_off.add(st.continuous_drop_off);
+        pickup_booking_rule_id.add(st.pickup_booking_rule_id);
+        drop_off_booking_rule_id.add(st.drop_off_booking_rule_id);
+
+        start_pickup_dropoff_window.add(st.start_pickup_dropoff_window);
+        end_pickup_dropoff_window.add(st.end_pickup_dropoff_window);
+        mean_duration_factor.add(st.mean_duration_factor);
+        mean_duration_offset.add(st.mean_duration_offset);
+        safe_duration_factor.add(st.safe_duration_factor);
+        safe_duration_offset.add(st.safe_duration_offset);
     }
 
     @Override

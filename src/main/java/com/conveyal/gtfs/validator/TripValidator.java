@@ -2,6 +2,8 @@ package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -23,7 +25,15 @@ public abstract class TripValidator extends Validator {
      * This method will be called on each trip in the feed.
      * @param trip the trip whose stop_times are provided in the other parameter.
      * @param stopTimes a List of all the stop times in the given trip, in order of increasing stop_sequence.
+     * @param locations
      */
-    public abstract void validateTrip (Trip trip, Route route, List<StopTime> stopTimes, List<Stop> stops);
+    public abstract void validateTrip(
+        Trip trip,
+        Route route,
+        List<StopTime> stopTimes,
+        List<Stop> stops,
+        List<Location> locations,
+        List<LocationGroup> locationGroups
+    );
 
 }

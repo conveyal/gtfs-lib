@@ -3,8 +3,13 @@ package com.conveyal.gtfs.loader;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.util.GeoJsonException;
+import com.conveyal.gtfs.util.GeoJsonUtil;
+import com.google.common.collect.Lists;
 import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -17,6 +22,7 @@ import java.io.FileOutputStream;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.URI;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -84,6 +90,9 @@ public class JdbcGtfsExporter {
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             result.agency = export(Table.AGENCY, connection);
+            // TODO: No idea if booking rules and location groups need to have a 'fromEditor' option?
+            result.bookingRules = export(Table.BOOKING_RULES, connection);
+            result.locationGroups = export(Table.LOCATION_GROUPS, connection);
             if (fromEditor) {
                 // only export calendar entries that have at least one day of service set
                 // this could happen in cases where a feed was imported that only had calendar_dates.txt
@@ -297,6 +306,9 @@ public class JdbcGtfsExporter {
             } else {
                 result.trips = export(Table.TRIPS, connection);
             }
+            // Locations and location shapes are exported at the same time. The result will be the same for both.
+            result.locations = exportLocationsAndShapes();
+            result.locationShapes = result.locations;
 
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
@@ -411,5 +423,52 @@ public class JdbcGtfsExporter {
             LOG.error("Exception while exporting tables", e);
         }
         return tableLoadResult;
+    }
+
+    /**
+     * Export locations and location shapes to a single locations.geojson file.
+     */
+    private TableLoadResult exportLocationsAndShapes() {
+        long startTime = System.currentTimeMillis();
+        TableLoadResult tableLoadResult = new TableLoadResult();
+        try {
+            final TableReader<Location> locationIterator
+                = new JDBCTableReader(Table.LOCATIONS, dataSource, feedIdToExport + ".", EntityPopulator.LOCATION);
+            final TableReader<LocationShape> locationShapesIterator
+                = new JDBCTableReader(Table.LOCATION_SHAPES, dataSource, feedIdToExport + ".", EntityPopulator.LOCATION_SHAPES);
+            List<Location> locations = Lists.newArrayList(locationIterator);
+            List<LocationShape> locationShapes = Lists.newArrayList(locationShapesIterator);
+            if (locations.size() > 0) {
+                // Only export if data is available.
+                tableLoadResult.rowCount = locations.size() + locationShapes.size();
+                tableLoadResult.errorCount = writeLocationsToFile(zipOutputStream, locations, locationShapes);
+                LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, Table.LOCATION_GEO_JSON_FILE_NAME, System.currentTimeMillis() - startTime);
+            } else {
+                LOG.warn("No locations exported to {} as the {} table is empty!", Table.LOCATION_GEO_JSON_FILE_NAME, Table.LOCATIONS.name);
+            }
+        } catch (IOException | GeoJsonException e) {
+            tableLoadResult.fatalException = e.toString();
+            LOG.error("Exception while exporting {}", Table.LOCATION_GEO_JSON_FILE_NAME, e);
+        }
+        return tableLoadResult;
+    }
+
+    /**
+     * Pack the locations data and write to zip file.
+     */
+    public static int writeLocationsToFile(
+        ZipOutputStream zipOutputStream,
+        List<Location> locations,
+        List<LocationShape> locationShapes
+    ) throws IOException, GeoJsonException {
+        // Create entry for table.
+        zipOutputStream.putNextEntry(new ZipEntry(Table.LOCATION_GEO_JSON_FILE_NAME));
+        // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
+        PrintWriter p = new PrintWriter(zipOutputStream);
+        List<String> errors = new ArrayList<>();
+        p.println(GeoJsonUtil.packLocations(locations, locationShapes, errors));
+        p.flush();
+        zipOutputStream.closeEntry();
+        return errors.size();
     }
 }

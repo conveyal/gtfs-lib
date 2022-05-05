@@ -1,7 +1,11 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
+import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.PatternHalt;
+import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -10,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterators;
 import com.google.common.collect.Multimap;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
@@ -31,8 +36,10 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,7 +59,6 @@ public class JdbcTableWriter implements TableWriter {
     private final String tablePrefix;
     private static final ObjectMapper mapper = new ObjectMapper();
     private final Connection connection;
-    private static final String RECONCILE_STOPS_ERROR_MSG = "Changes to trip pattern stops must be made one at a time if pattern contains at least one trip.";
 
     public JdbcTableWriter(Table table, DataSource datasource, String namespace) throws InvalidNamespaceException {
         this(table, datasource, namespace, null);
@@ -157,6 +163,8 @@ public class JdbcTableWriter implements TableWriter {
             if (specTable.name.equals("patterns")) {
                 referencingTables.add(Table.SHAPES);
             }
+            PatternReconciliation reconciliation = new PatternReconciliation(connection, tablePrefix);
+            boolean referencedPatternUsesFrequencies = referencedPatternUsesFrequencies(jsonObject);
             // Iterate over referencing (child) tables and update those rows that reference the parent entity with the
             // JSON array for the key that matches the child table's name (e.g., trip.stop_times array will trigger
             // update of stop_times with matching trip_id).
@@ -165,36 +173,31 @@ public class JdbcTableWriter implements TableWriter {
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
+                    if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
+                        (childEntities == null ||
+                            childEntities.isNull() ||
+                            !childEntities.isArray())
+                    ) {
+                        // This is a backwards hack to prevent the addition of pattern location breaking existing
+                        // pattern functionality. If pattern location is not provided set to an empty array to avoid the
+                        // following exception.
+                        childEntities = mapper.createArrayNode();
+                    }
+
                     if (childEntities == null || childEntities.isNull() || !childEntities.isArray()) {
                         throw new SQLException(String.format("Child entities %s must be an array and not null", referencingTable.name));
                     }
                     int entityId = isCreating ? (int) newId : id;
                     // Cast child entities to array node to iterate over.
                     ArrayNode childEntitiesArray = (ArrayNode) childEntities;
-                    boolean referencedPatternUsesFrequencies = false;
-                    // If an entity references a pattern (e.g., pattern stop or trip), determine whether the pattern uses
-                    // frequencies because this impacts update behaviors, for example whether stop times are kept in
-                    // sync with default travel times or whether frequencies are allowed to be nested with a JSON trip.
-                    if (jsonObject.has("pattern_id") && !jsonObject.get("pattern_id").isNull()) {
-                        PreparedStatement statement = connection.prepareStatement(String.format(
-                            "select use_frequency from %s.%s where pattern_id = ?",
-                            tablePrefix,
-                            Table.PATTERNS.name
-                        ));
-                        statement.setString(1, jsonObject.get("pattern_id").asText());
-                        LOG.info(statement.toString());
-                        ResultSet selectResults = statement.executeQuery();
-                        while (selectResults.next()) {
-                            referencedPatternUsesFrequencies = selectResults.getBoolean(1);
-                        }
-                    }
                     String keyValue = updateChildTable(
                         childEntitiesArray,
                         entityId,
                         referencedPatternUsesFrequencies,
                         isCreating,
                         referencingTable,
-                        connection
+                        connection,
+                        reconciliation
                     );
                     // Ensure JSON return object is updated with referencing table's (potentially) new key value.
                     // Currently, the only case where an update occurs is when a referenced shape is referenced by other
@@ -202,6 +205,14 @@ public class JdbcTableWriter implements TableWriter {
                     jsonObject.put(referencingTable.getKeyFieldName(), keyValue);
                 }
             }
+
+            // Pattern stops and pattern locations are processed in series (as part of updateChildTable). The pattern
+            // reconciliation requires both in order to correctly update stop times.
+            reconciliation.reconcile();
+            if (referencedPatternUsesFrequencies) {
+                updatePatternFrequencies(reconciliation);
+            }
+
             // Iterate over table's fields and apply linked values to any tables. This is to account for "exemplar"
             // fields that exist in one place in our tables, but are duplicated in GTFS. For example, we have a
             // Route#wheelchair_accessible field, which is used to set the Trip#wheelchair_accessible values for all
@@ -255,6 +266,33 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+     * If an entity references a pattern (e.g., pattern stop or trip), determine whether the pattern uses
+     * frequencies because this impacts update behaviors, for example whether stop times are kept in
+     * sync with default travel times or whether frequencies are allowed to be nested with a JSON trip.
+     */
+    private boolean referencedPatternUsesFrequencies(ObjectNode jsonObject) throws SQLException {
+        if (jsonObject.has("pattern_id") && !jsonObject.get("pattern_id").isNull()) {
+            try (
+                PreparedStatement statement = connection.prepareStatement(
+                    String.format(
+                        "select use_frequency from %s.%s where pattern_id = ?",
+                        tablePrefix,
+                        Table.PATTERNS.name
+                    )
+                )
+            ) {
+                statement.setString(1, jsonObject.get("pattern_id").asText());
+                LOG.info(statement.toString());
+                ResultSet selectResults = statement.executeQuery();
+                if (selectResults.next()) {
+                    return selectResults.getBoolean(1);
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * For a given pattern id and starting stop sequence (inclusive), normalize all stop times to match the pattern
      * stops' travel times.
      *
@@ -268,16 +306,73 @@ public class JdbcTableWriter implements TableWriter {
                 tablePrefix + ".",
                 EntityPopulator.PATTERN_STOP
             );
+            JDBCTableReader<PatternLocation> patternLocations = new JDBCTableReader(
+                Table.PATTERN_LOCATION,
+                dataSource,
+                tablePrefix + ".",
+                EntityPopulator.PATTERN_LOCATION
+            );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
-            List<PatternStop> patternStopsToNormalize = new ArrayList<>();
-            for (PatternStop patternStop : patternStops.getOrdered(patternId)) {
-                // Update stop times for any pattern stop with matching stop sequence (or for all pattern stops if the list
-                // is null).
-                if (patternStop.stop_sequence >= beginWithSequence) {
-                    patternStopsToNormalize.add(patternStop);
+            List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
+            Iterator<PatternHalt> patternHalts = Iterators.concat(
+                patternStops.getOrdered(patternId).iterator(),
+                patternLocations.getOrdered(patternId).iterator()
+            );
+            while (patternHalts.hasNext()) {
+                PatternHalt patternHalt = patternHalts.next();
+                if (patternHalt.stop_sequence >= beginWithSequence) {
+                    patternHaltsToNormalize.add(patternHalt);
                 }
             }
-            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize);
+            // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
+            patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> (o).stop_sequence)).collect(Collectors.toList());
+            PatternHalt firstPatternHalt = patternHaltsToNormalize.iterator().next();
+            int firstStopSequence = firstPatternHalt.stop_sequence;
+            // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
+            int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
+            String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
+            String getPrevTravelTimeSql = String.format(
+                "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
+                    "and t.pattern_id = ? " +
+                    "and t.trip_id = st.trip_id",
+                timeField,
+                tablePrefix,
+                tablePrefix
+            );
+            PreparedStatement statement = connection.prepareStatement(getPrevTravelTimeSql);
+            statement.setInt(1, previousStopSequence);
+            statement.setString(2, firstPatternHalt.pattern_id);
+            LOG.info(statement.toString());
+            ResultSet resultSet = statement.executeQuery();
+            Map<String, Integer> timesForTripIds = new HashMap<>();
+            while (resultSet.next()) {
+                timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
+            }
+
+            int stopTimesUpdated = 0;
+            for (Map.Entry<String, Integer> timesForTripId : timesForTripIds.entrySet()) {
+                // Initialize travel time with previous stop time value.
+                int cumulativeTravelTime = timesForTripId.getValue();
+                for (PatternHalt patternHalt : patternHaltsToNormalize) {
+                    if (patternHalt instanceof PatternStop) {
+                        cumulativeTravelTime += updateStopTimesForPatternStop(
+                            (PatternStop) patternHalt,
+                            cumulativeTravelTime,
+                            timesForTripId.getKey()
+                        );
+                    } else if (patternHalt instanceof PatternLocation) {
+                        cumulativeTravelTime += updateStopTimesForPatternLocation(
+                            (PatternLocation) patternHalt,
+                            cumulativeTravelTime,
+                            timesForTripId.getKey()
+                        );
+                    } else {
+                        LOG.warn("Pattern with ID {} contained a halt that wasn't a stop or a location!", patternId);
+                        continue;
+                    }
+                    stopTimesUpdated++;
+                }
+            }
             connection.commit();
             return stopTimesUpdated;
         } catch (Exception e) {
@@ -442,9 +537,13 @@ public class JdbcTableWriter implements TableWriter {
                 }
             } catch (StorageException e) {
                 LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
-                if (field.name.contains("_time")) {
-                    // FIXME: This is a hack to get arrival and departure time into the right format. Because the UI
-                    //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS.
+                if (field.name.contains("_time") ||
+                    field.name.contains("start_pickup_dropoff_window") ||
+                    field.name.contains("end_pickup_dropoff_window")
+                ) {
+                    // FIXME: This is a hack to get time related fields into the right format. Because the UI
+                    //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS
+                    //  and where optional GTFS Flex fields are not defined i.e. the default value of zero is used.
                     try {
                         if (value == null || value.isNull()) {
                             if (field.isRequired()) {
@@ -516,7 +615,8 @@ public class JdbcTableWriter implements TableWriter {
         boolean referencedPatternUsesFrequencies,
         boolean isCreatingNewEntity,
         Table subTable,
-        Connection connection
+        Connection connection,
+        PatternReconciliation reconciliation
     ) throws SQLException, IOException {
         // Get parent table's key field. Primary key fields are always referenced by foreign key fields with the same
         // name.
@@ -528,22 +628,9 @@ public class JdbcTableWriter implements TableWriter {
             // Do not permit the illegal state where frequency entries are being added/modified for a timetable pattern.
             throw new IllegalStateException("Cannot create or update frequency entries for a timetable-based pattern.");
         }
-        // Reconciling pattern stops MUST happen before original pattern stops are deleted in below block (with
-        // #deleteChildEntities)
-        if (Table.PATTERN_STOP.name.equals(subTable.name)) {
-            List<PatternStop> newPatternStops = new ArrayList<>();
-            // Clean up pattern stop ID fields (passed in as string ID from datatools-ui to avoid id collision)
-            for (JsonNode node : subEntities) {
-                ObjectNode objectNode = (ObjectNode) node;
-                if (!objectNode.get("id").isNumber()) {
-                    // Set ID to zero. ID is ignored entirely here. When the pattern stops are stored in the database,
-                    // the ID values are determined by auto-incrementation.
-                    objectNode.put("id", 0);
-                }
-                // Accumulate new pattern stop objects from JSON.
-                newPatternStops.add(mapper.readValue(objectNode.toString(), PatternStop.class));
-            }
-            reconcilePatternStops(keyValue, newPatternStops, connection);
+        boolean isPatternTable = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
+        if (isPatternTable) {
+            reconciliation.stage(mapper, subTable, subEntities, keyValue);
         }
         if (!isCreatingNewEntity) {
             // If not creating a new entity, we will delete the child entities (e.g., shape points or pattern stops) and
@@ -592,6 +679,7 @@ public class JdbcTableWriter implements TableWriter {
         boolean hasOrderField = orderFieldName != null;
         int previousOrder = -1;
         TIntSet orderValues = new TIntHashSet();
+        Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable = HashMultimap.create();
         Multimap<Table, String> referencesPerTable = HashMultimap.create();
         int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
@@ -600,45 +688,48 @@ public class JdbcTableWriter implements TableWriter {
             // Always override the key field (shape_id for shapes, pattern_id for patterns) regardless of the entity's
             // actual value.
             subEntity.put(keyField.name, keyValue);
-            // Check any references the sub entity might have. For example, this checks that stop_id values on
-            // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
-            // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
-            // field statement above.
-            for (Field field : subTable.specFields()) {
-                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-                    JsonNode refValueNode = subEntity.get(field.name);
-                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
-                    if (refValueNode.isNull() && !field.isRequired()) continue;
-                    String refValue = refValueNode.asText();
-                    referencesPerTable.put(field.referenceTable, refValue);
-                }
-            }
+
+            checkTableReferences(foreignReferencesPerTable, referencesPerTable, specTable, subTable, subEntity);
+
             // Insert new sub-entity.
             if (entityCount == 0) {
                 // If handling first iteration, create the prepared statement (later iterations will add to batch).
                 insertStatement = createPreparedUpdate(id, true, subEntity, subTable, connection, true);
             }
-            // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
-            if ("pattern_stops".equals(subTable.name)) {
-                if (referencedPatternUsesFrequencies) {
-                    // Update stop times linked to pattern stop if the pattern uses frequencies and accumulate time.
-                    // Default travel and dwell time behave as "linked fields" for associated stop times. In other
-                    // words, frequency trips in the editor must match the pattern stop travel times.
-                    cumulativeTravelTime += updateStopTimesForPatternStop(subEntity, cumulativeTravelTime);
-                }
+            if (isPatternTable) {
+                // Update linked stop times fields for each updated pattern stop (e.g., timepoint, pickup/drop off type).
                 // These fields should be updated for all patterns (e.g., timepoint, pickup/drop off type).
-                updateLinkedFields(
-                    subTable,
-                    subEntity,
-                    "stop_times",
-                    "pattern_id",
-                    "timepoint",
-                    "drop_off_type",
-                    "pickup_type",
-                    "continuous_pickup",
-                    "continuous_drop_off",
-                    "shape_dist_traveled"
-                );
+                if (Table.PATTERN_STOP.name.equals(subTable.name)) {
+                    updateLinkedFields(
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "continuous_pickup",
+                        "continuous_drop_off",
+                        "shape_dist_traveled",
+                        "pickup_booking_rule_id",
+                        "drop_off_booking_rule_id"
+                    );
+                }
+                if (Table.PATTERN_LOCATION.name.equals(subTable.name)) {
+                    updateLinkedFields(
+                        subTable,
+                        subEntity,
+                        "stop_times",
+                        "pattern_id",
+                        "timepoint",
+                        "drop_off_type",
+                        "pickup_type",
+                        "continuous_pickup",
+                        "continuous_drop_off",
+                        "pickup_booking_rule_id",
+                        "drop_off_booking_rule_id"
+                    );
+                }
             }
             setStatementParameters(subEntity, subTable, insertStatement, connection);
             if (hasOrderField) {
@@ -648,14 +739,21 @@ public class JdbcTableWriter implements TableWriter {
                 int orderValue = subEntity.get(orderFieldName).asInt();
                 boolean orderIsUnique = orderValues.add(orderValue);
                 boolean valuesAreIncrementing = ++previousOrder == orderValue;
-                if (!orderIsUnique || !valuesAreIncrementing) {
+                boolean valuesAreIncreasing = previousOrder <= orderValue;
+
+                // PatternStop and PatternLocations must only increase, not increment
+                boolean valuesAreAscending =
+                    (!Table.PATTERN_LOCATION.name.equals(subTable.name) && !Table.PATTERN_STOP.name.equals(subTable.name))
+                        ? valuesAreIncrementing
+                        : valuesAreIncreasing;
+                if (!orderIsUnique || !valuesAreAscending) {
                     throw new SQLException(
                         String.format(
-                            "%s %s values must be zero-based, unique, and incrementing. Entity at index %d had %s value of %d",
+                            "%s %s values must be zero-based, unique, and incrementing. PatternHalt values must be increasing and unique only. Entity at index %d had %s illegal value of %d",
                             subTable.name,
                             orderFieldName,
                             entityCount,
-                            previousOrder == 0 ? "non-zero" : !valuesAreIncrementing ? "non-incrementing" : "duplicate",
+                            previousOrder == 0 ? "non-zero" : !valuesAreAscending ? "non-incrementing/non-increasing" : "duplicate",
                             orderValue
                         )
                     );
@@ -673,6 +771,7 @@ public class JdbcTableWriter implements TableWriter {
         }
         // Check that accumulated references all exist in reference tables.
         verifyReferencesExist(subTable.name, referencesPerTable);
+        verifyForeignReferencesExist(foreignReferencesPerTable);
         // execute any remaining prepared statement calls
         LOG.info("Executing batch insert ({}/{}) for {}", entityCount, subEntities.size(), childTableName);
         if (insertStatement != null) {
@@ -686,6 +785,72 @@ public class JdbcTableWriter implements TableWriter {
         // Return key value in the case that it was updated (the only case for this would be if the shape was referenced
         // by multiple patterns).
         return keyValue;
+    }
+
+    /**
+     * Check any references the sub entity might have. For example, this checks that stop_id values on
+     * pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
+     * i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
+     * field statement above.
+     */
+    private void checkTableReferences(
+        Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable,
+        Multimap<Table, String> referencesPerTable,
+        Table specTable,
+        Table subTable,
+        ObjectNode subEntity
+    ) {
+        for (Field field : subTable.specFields()) {
+            if (field.referenceTables.isEmpty()) continue;
+            Multimap<Table, String> foreignReferences = HashMultimap.create();
+            for (Table referenceTable : field.referenceTables) {
+                if (!referenceTable.name.equals(specTable.name)) {
+                    JsonNode refValueNode = subEntity.get(field.name);
+                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                    if (refValueNode.isNull() && !field.isRequired()) continue;
+                    String refValue = refValueNode.asText();
+                    if (field.referenceTables.size() == 1) {
+                        referencesPerTable.put(referenceTable, refValue);
+                    } else {
+                        foreignReferences.put(referenceTable, refValue);
+                    }
+                }
+            }
+            if (!foreignReferences.isEmpty()) {
+                foreignReferencesPerTable.put(subTable, foreignReferences);
+            }
+        }
+    }
+
+    /**
+     * This MUST be called _after_ pattern reconciliation has happened. The pattern stops and pattern locations must be
+     * processed based on stop sequence so the correct cumulative travel time is calculated.
+     */
+    private void updatePatternFrequencies(PatternReconciliation reconciliation) throws SQLException {
+        // Convert to generic stops to order pattern stops/locations by stop sequence.
+        List<PatternReconciliation.GenericStop> genericStops = reconciliation.getGenericStops();
+        int cumulativeTravelTime = 0;
+        for (PatternReconciliation.GenericStop genericStop : genericStops) {
+            // Update stop times linked to pattern stop/location and accumulate time.
+            // Default travel and dwell time behave as "linked fields" for associated stop times. In other
+            // words, frequency trips in the editor must match the pattern stop travel times.
+            if (genericStop.patternType == PatternReconciliation.PatternType.STOP) {
+                cumulativeTravelTime +=
+                    updateStopTimesForPatternStop(
+                        reconciliation.getPatternStop(genericStop.referenceId),
+                        cumulativeTravelTime,
+                        null
+                    );
+            } else {
+                // Pattern type is location
+                cumulativeTravelTime +=
+                    updateStopTimesForPatternLocation(
+                        reconciliation.getPatternLocation(genericStop.referenceId),
+                        cumulativeTravelTime,
+                        null
+                    );
+            }
+        }
     }
 
     /**
@@ -712,93 +877,97 @@ public class JdbcTableWriter implements TableWriter {
      * @return the travel and dwell time added by this pattern stop
      * @throws SQLException
      */
-    private int updateStopTimesForPatternStop(ObjectNode patternStop, int previousTravelTime) throws SQLException {
+    private int updateStopTimesForPatternStop(PatternStop patternStop, int previousTravelTime, String tripId)
+        throws SQLException {
+
+        int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+        int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
+        // Set trip id either from params or all
+        tripId = (tripId != null) ? String.format("'%s'", tripId) : "t.trip_id";
+
         String sql = String.format(
             "update %s.stop_times st set arrival_time = ?, departure_time = ? from %s.trips t " +
-                "where st.trip_id = t.trip_id AND t.pattern_id = ? AND st.stop_sequence = ?",
+                "where st.trip_id = %s AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
-            tablePrefix
+            tablePrefix,
+            tripId
         );
-        // Prepare the statement and set statement parameters
-        PreparedStatement statement = connection.prepareStatement(sql);
-        int oneBasedIndex = 1;
-        int travelTime = patternStop.get("default_travel_time").asInt();
-        int arrivalTime = previousTravelTime + travelTime;
-        statement.setInt(oneBasedIndex++, arrivalTime);
-        int dwellTime = patternStop.get("default_dwell_time").asInt();
-        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
-        // Set "where clause" with value for pattern_id and stop_sequence
-        statement.setString(oneBasedIndex++, patternStop.get("pattern_id").asText());
-        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stops#stop_sequence because we
-        // normalize stop sequence values for stop times during snapshotting for the editor.
-        statement.setInt(oneBasedIndex++, patternStop.get("stop_sequence").asInt());
-        // Log query, execute statement, and log result.
-        LOG.debug(statement.toString());
-        int entitiesUpdated = statement.executeUpdate();
-        LOG.debug("{} stop_time arrivals/departures updated", entitiesUpdated);
+        int entitiesUpdated = updateStopTimes(
+            sql,
+            previousTravelTime,
+            travelTime,
+            dwellTime,
+            patternStop.pattern_id,
+            patternStop.stop_sequence
+        );
+        LOG.info("{} stop_time arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
     }
 
     /**
-     * Normalizes all stop times' arrivals and departures for an ordered set of pattern stops. This set can be the full
-     * set of stops for a pattern or just a subset. Typical usage for this method would be to overwrite the arrival and
-     * departure times for existing trips after a pattern stop has been added or inserted into a pattern or if a
-     * pattern stop's default travel or dwell time were updated and the stop times need to reflect this update.
-     * @param patternStops list of pattern stops for which to update stop times (ordered by increasing stop_sequence)
-     * @throws SQLException
+     * Updates the stop times that reference the specified pattern location.
      *
-     * TODO? add param Set<String> serviceIdFilters service_id values to filter trips on
+     * @param patternLocation    the pattern location for which to update stop times
+     * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
+     *                           previous pattern stop's dwell time)
+     * @return the travel and dwell time added by this pattern location
+     * @throws SQLException
      */
-    private int updateStopTimesForPatternStops(List<PatternStop> patternStops) throws SQLException {
-        PatternStop firstPatternStop = patternStops.iterator().next();
-        int firstStopSequence = firstPatternStop.stop_sequence;
-        // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
-        int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
-        String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
-        String getFirstTravelTimeSql = String.format(
-            "select t.trip_id, %s from %s.stop_times st, %s.trips t where stop_sequence = ? " +
-                "and t.pattern_id = ? " +
-                "and t.trip_id = st.trip_id",
-            timeField,
+    private int updateStopTimesForPatternLocation(PatternLocation patternLocation, int previousTravelTime, String tripId)
+        throws SQLException {
+
+        int travelTime = patternLocation.flex_default_travel_time == Entity.INT_MISSING ? 0 : patternLocation.flex_default_travel_time;
+        int dwellTime = patternLocation.flex_default_zone_time == Entity.INT_MISSING ? 0 : patternLocation.flex_default_zone_time;
+        // Set trip id either from params or all
+        tripId = (tripId != null) ? String.format("'%s'", tripId) : "t.trip_id";
+
+        String sql = String.format(
+            "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
+                "where st.trip_id = %s AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
-            tablePrefix
+            tablePrefix,
+            tripId
         );
-        PreparedStatement statement = connection.prepareStatement(getFirstTravelTimeSql);
-        statement.setInt(1, previousStopSequence);
-        statement.setString(2, firstPatternStop.pattern_id);
+        int entitiesUpdated = updateStopTimes(
+            sql,
+            previousTravelTime,
+            travelTime,
+            dwellTime,
+            patternLocation.pattern_id,
+            patternLocation.stop_sequence
+        );
+        LOG.info("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
+        return travelTime + dwellTime;
+    }
+
+    /**
+     * Update stop time values depending on caller. If updating stop times for pattern stops, this will update the
+     * arrival_time and departure_time. If updating stop times for pattern locations, this will update the
+     * start_pickup_dropoff_window and end_pickup_dropoff_window.
+     */
+    private int updateStopTimes(
+        String sql,
+        int previousTravelTime,
+        int travelTime,
+        int dwellTime,
+        String pattern_id,
+        int stop_sequence
+    ) throws SQLException {
+
+        PreparedStatement statement = connection.prepareStatement(sql);
+        int oneBasedIndex = 1;
+        int arrivalTime = previousTravelTime + travelTime;
+        statement.setInt(oneBasedIndex++, arrivalTime);
+        statement.setInt(oneBasedIndex++, arrivalTime + dwellTime);
+
+        // Set "where clause" with value for pattern_id and stop_sequence
+        statement.setString(oneBasedIndex++, pattern_id);
+        // In the editor, we can depend on stop_times#stop_sequence matching pattern_stop/pattern_locations#stop_sequence
+        // because we normalize stop sequence values for stop times during snapshotting for the editor.
+        statement.setInt(oneBasedIndex, stop_sequence);
+        // Log query, execute statement, and log result.
         LOG.info(statement.toString());
-        ResultSet resultSet = statement.executeQuery();
-        Map<String, Integer> timesForTripIds = new HashMap<>();
-        while (resultSet.next()) {
-            timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
-        }
-        // Update stop times for individual trips with normalized travel times.
-        String updateTravelTimeSql = String.format(
-            "update %s.stop_times set arrival_time = ?, departure_time = ? where trip_id = ? and stop_sequence = ?",
-            tablePrefix
-        );
-        PreparedStatement updateStopTimeStatement = connection.prepareStatement(updateTravelTimeSql);
-        LOG.info(updateStopTimeStatement.toString());
-        final BatchTracker stopTimesTracker = new BatchTracker("stop_times", updateStopTimeStatement);
-        for (String tripId : timesForTripIds.keySet()) {
-            // Initialize travel time with previous stop time value.
-            int cumulativeTravelTime = timesForTripIds.get(tripId);
-            for (PatternStop patternStop : patternStops) {
-                // Gather travel/dwell time for pattern stop (being sure to check for missing values).
-                int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
-                int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
-                int oneBasedIndex = 1;
-                // Increase travel time by current pattern stop's travel and dwell times (and set values for update).
-                cumulativeTravelTime += travelTime;
-                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
-                cumulativeTravelTime += dwellTime;
-                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
-                updateStopTimeStatement.setString(oneBasedIndex++, tripId);
-                updateStopTimeStatement.setInt(oneBasedIndex++, patternStop.stop_sequence);
-                stopTimesTracker.addBatch();
-            }
-        }
-        return stopTimesTracker.executeRemaining();
+        return statement.executeUpdate();
     }
 
     /**
@@ -815,26 +984,7 @@ public class JdbcTableWriter implements TableWriter {
             LOG.info("Checking {} references to {}", referringTableName, referencedTable.name);
             Collection<String> referenceStrings = referencesPerTable.get(referencedTable);
             String referenceFieldName = referencedTable.getKeyFieldName();
-            String questionMarks = String.join(", ", Collections.nCopies(referenceStrings.size(), "?"));
-            String checkCountSql = String.format(
-                "select %s from %s.%s where %s in (%s)",
-                referenceFieldName,
-                tablePrefix,
-                referencedTable.name,
-                referenceFieldName,
-                questionMarks);
-            PreparedStatement preparedStatement = connection.prepareStatement(checkCountSql);
-            int oneBasedIndex = 1;
-            for (String ref : referenceStrings) {
-                preparedStatement.setString(oneBasedIndex++, ref);
-            }
-            LOG.info(preparedStatement.toString());
-            ResultSet resultSet = preparedStatement.executeQuery();
-            Set<String> foundReferences = new HashSet<>();
-            while (resultSet.next()) {
-                String referenceValue = resultSet.getString(1);
-                foundReferences.add(referenceValue);
-            }
+            Set<String> foundReferences = checkTableForReferences(referenceStrings, referencedTable);
             // Determine if any references were not found.
             referenceStrings.removeAll(foundReferences);
             if (referenceStrings.size() > 0) {
@@ -851,322 +1001,102 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Update the trip pattern stops and the associated stop times. See extensive discussion in ticket
-     * conveyal/gtfs-editor#102.
+     * Check multiple tables for foreign references. Working through each foreign table check for expected references.
+     * Update a missing reference list by adding missing references and remove all that have been found. If the missing
+     * reference list is not empty after all reference tables have been checked, flag an error highlighting the missing
+     * values and the foreign tables where they are expected.
      *
-     * We assume only one stop has changed---either it's been removed, added or moved. The only other case that is
-     * permitted is adding a set of stops to the end of the original list. These conditions are evaluated by simply
-     * checking the lengths of the original and new pattern stops (and ensuring that stop IDs remain the same where
-     * required).
+     * E.g. The {@link StopTime#stop_id} can be either a {@link Stop#stop_id} or a {@link Location#location_id}. If the
+     * stop_id is found in the location table (but not the stop table) the required number of matches has been met. If
+     * the stop_id isn't in either table there will be no match. It is not possible to know which table the
+     * stop_id should be in so all foreign tables are listed with expected values.
      *
-     * If the change to pattern stops does not satisfy one of these cases, fail the update operation.
+     * @param foreignReferencesPerTable A list of parent tables with a related list of foreign tables with reference
+     *                                  values.
+     * @throws SQLException
      */
-    private void reconcilePatternStops(String patternId, List<PatternStop> newStops, Connection connection) throws SQLException {
-        LOG.info("Reconciling pattern stops for pattern ID={}", patternId);
-        // Collect the original list of pattern stop IDs.
-        String getStopIdsSql = String.format("select stop_id from %s.pattern_stops where pattern_id = ? order by stop_sequence",
-            tablePrefix);
-        PreparedStatement getStopsStatement = connection.prepareStatement(getStopIdsSql);
-        getStopsStatement.setString(1, patternId);
-        LOG.info(getStopsStatement.toString());
-        ResultSet stopsResults = getStopsStatement.executeQuery();
-        List<String> originalStopIds = new ArrayList<>();
-        while (stopsResults.next()) {
-            originalStopIds.add(stopsResults.getString(1));
-        }
+    private void verifyForeignReferencesExist(Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable)
+        throws SQLException {
 
-        // Collect all trip IDs so that we can insert new stop times (with the appropriate trip ID value) if a pattern
-        // stop is added.
-        String getTripIdsSql = String.format("select trip_id from %s.trips where pattern_id = ?", tablePrefix);
-        PreparedStatement getTripsStatement = connection.prepareStatement(getTripIdsSql);
-        getTripsStatement.setString(1, patternId);
-        ResultSet tripsResults = getTripsStatement.executeQuery();
-        List<String> tripsForPattern = new ArrayList<>();
-        while (tripsResults.next()) {
-            tripsForPattern.add(tripsResults.getString(1));
-        }
-
-        if (tripsForPattern.size() == 0) {
-            // If there are no trips for the pattern, there is no need to reconcile stop times to modified pattern stops.
-            // This permits the creation of patterns without stops, reversing the stops on existing patterns, and
-            // duplicating patterns.
-            // For new patterns, this short circuit is required to prevent the transposition conditional check from
-            // throwing an IndexOutOfBoundsException when it attempts to access index 0 of a list with no items.
-            return;
-        }
-        // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
-        String joinToTrips = String.format("%s.trips.trip_id = %s.stop_times.trip_id AND %s.trips.pattern_id = '%s'",
-            tablePrefix, tablePrefix, tablePrefix, patternId);
-
-        // ADDITIONS (IF DIFF == 1)
-        if (originalStopIds.size() == newStops.size() - 1) {
-            // We have an addition; find it.
-            int differenceLocation = -1;
-            for (int i = 0; i < newStops.size(); i++) {
-                if (differenceLocation != -1) {
-                    // we've already found the addition
-                    if (i < originalStopIds.size() && !originalStopIds.get(i).equals(newStops.get(i + 1).stop_id)) {
-                        // there's another difference, which we weren't expecting
-                        throw new IllegalStateException("Multiple differences found when trying to detect stop addition");
+        for (Table parentTable : foreignReferencesPerTable.keySet()) {
+            Collection<Multimap<Table, String>> multiTableReferences = foreignReferencesPerTable.get(parentTable);
+            HashMap<Table, List<String>> refTables = new HashMap<>();
+            // Group foreign tables and references.
+            for (Multimap<Table, String> tableReference : multiTableReferences) {
+                for (Table foreignTable : tableReference.keySet()) {
+                    List<String> values = new ArrayList<>();
+                    if (refTables.containsKey(foreignTable)) {
+                        values = refTables.get(foreignTable);
                     }
-                }
-
-                // if we've reached where one trip has an extra stop, or if the stops at this position differ
-                else if (i == newStops.size() - 1 || !originalStopIds.get(i).equals(newStops.get(i).stop_id)) {
-                    // we have found the difference
-                    differenceLocation = i;
+                    values.addAll(tableReference.get(foreignTable));
+                    refTables.put(foreignTable, values);
                 }
             }
-            // Increment sequences for stops that follow the inserted location (including the stop at the changed index).
-            // NOTE: This should happen before the blank stop time insertion for logical consistency.
-            String updateSql = String.format(
-                "update %s.stop_times set stop_sequence = stop_sequence + 1 from %s.trips where stop_sequence >= %d AND %s",
-                tablePrefix,
-                tablePrefix,
-                differenceLocation,
-                joinToTrips
-            );
-            LOG.info(updateSql);
-            PreparedStatement updateStatement = connection.prepareStatement(updateSql);
-            int updated = updateStatement.executeUpdate();
-            LOG.info("Updated {} stop times", updated);
 
-            // Insert a skipped stop at the difference location
-            insertBlankStopTimes(tripsForPattern, newStops, differenceLocation, 1, connection);
-        }
-
-        // DELETIONS
-        else if (originalStopIds.size() == newStops.size() + 1) {
-            // We have a deletion; find it
-            int differenceLocation = -1;
-            for (int i = 0; i < originalStopIds.size(); i++) {
-                if (differenceLocation != -1) {
-                    if (!originalStopIds.get(i).equals(newStops.get(i - 1).stop_id)) {
-                        // There is another difference, which we were not expecting
-                        throw new IllegalStateException("Multiple differences found when trying to detect stop removal");
-                    }
-                } else if (i == originalStopIds.size() - 1 || !originalStopIds.get(i).equals(newStops.get(i).stop_id)) {
-                    // We've reached the end and the only difference is length (so the last stop is the different one)
-                    // or we've found the difference.
-                    differenceLocation = i;
+            Set<String> foreignReferencesFound = new HashSet<>();
+            Set<String> foreignReferencesNotFound = new HashSet<>();
+            Set<String> foreignReferencesFieldNames = new HashSet<>();
+            for (Table foreignTable : refTables.keySet()) {
+                LOG.info("Checking {} references in {}", parentTable.name, foreignTable.name);
+                foreignReferencesFieldNames.add(foreignTable.getKeyFieldName());
+                Collection<String> referenceStrings = refTables.get(foreignTable);
+                Set<String> foundReferences = checkTableForReferences(referenceStrings, foreignTable);
+                if (foundReferences.size() == multiTableReferences.size()) {
+                    // No need to check subsequent foreign tables if all required matches have been found.
+                    foreignReferencesNotFound.clear();
+                    break;
+                } else {
+                    // Accumulate all found and expected references.
+                    foreignReferencesFound.addAll(foundReferences);
+                    foreignReferencesNotFound.addAll(referenceStrings);
                 }
             }
-            // Delete stop at difference location
-            String deleteSql = String.format(
-                "delete from %s.stop_times using %s.trips where stop_sequence = %d AND %s",
-                tablePrefix,
-                tablePrefix,
-                differenceLocation,
-                joinToTrips
-            );
-            LOG.info(deleteSql);
-            PreparedStatement deleteStatement = connection.prepareStatement(deleteSql);
-            // Decrement all stops with sequence greater than difference location
-            String updateSql = String.format(
-                "update %s.stop_times set stop_sequence = stop_sequence - 1 from %s.trips where stop_sequence > %d AND %s",
-                tablePrefix,
-                tablePrefix,
-                differenceLocation,
-                joinToTrips
-            );
-            LOG.info(updateSql);
-            PreparedStatement updateStatement = connection.prepareStatement(updateSql);
-            int deleted = deleteStatement.executeUpdate();
-            int updated = updateStatement.executeUpdate();
-            LOG.info("Deleted {} stop times, updated sequence for {} stop times", deleted, updated);
-
-            // FIXME: Should we be handling bad stop time delete? I.e., we could query for stop times to be deleted and
-            // if any of them have different stop IDs than the pattern stop, we could raise a warning for the user.
-            String removedStopId = originalStopIds.get(differenceLocation);
-//            StopTime removed = trip.stopTimes.remove(differenceLocation);
-//
-//            // the removed stop can be null if it was skipped. trip.stopTimes.remove will throw an exception
-//            // rather than returning null if we try to do a remove out of bounds.
-//            if (removed != null && !removed.stop_id.equals(removedStopId)) {
-//                throw new IllegalStateException("Attempted to remove wrong stop!");
-//            }
-        }
-
-        // TRANSPOSITIONS
-        else if (originalStopIds.size() == newStops.size()) {
-            // Imagine the trip patterns pictured below (where . is a stop, and lines indicate the same stop)
-            // the original trip pattern is on top, the new below
-            // . . . . . . . .
-            // | |  \ \ \  | |
-            // * * * * * * * *
-            // also imagine that the two that are unmarked are the same
-            // (the limitations of ascii art, this is prettier on my whiteboard)
-            // There are three regions: the beginning and end, where stopSequences are the same, and the middle, where they are not
-            // The same is true of trips where stops were moved backwards
-
-            // find the left bound of the changed region
-            int firstDifferentIndex = 0;
-            while (originalStopIds.get(firstDifferentIndex).equals(newStops.get(firstDifferentIndex).stop_id)) {
-                firstDifferentIndex++;
-
-                if (firstDifferentIndex == originalStopIds.size())
-                    // trip patterns do not differ at all, nothing to do
-                    return;
-            }
-
-            // find the right bound of the changed region
-            int lastDifferentIndex = originalStopIds.size() - 1;
-            while (originalStopIds.get(lastDifferentIndex).equals(newStops.get(lastDifferentIndex).stop_id)) {
-                lastDifferentIndex--;
-            }
-
-            // TODO: write a unit test for this
-            if (firstDifferentIndex == lastDifferentIndex) {
-                throw new IllegalStateException(
-                    "Pattern stop substitutions are not supported, region of difference must have length > 1.");
-            }
-            String conditionalUpdate;
-
-            // figure out whether a stop was moved left or right
-            // note that if the stop was only moved one position, it's impossible to tell, and also doesn't matter,
-            // because the requisite operations are equivalent
-            int from, to;
-            // Ensure that only a single stop has been moved (i.e. verify stop IDs inside changed region remain unchanged)
-            if (originalStopIds.get(firstDifferentIndex).equals(newStops.get(lastDifferentIndex).stop_id)) {
-                // Stop was moved from beginning of changed region to end of changed region (-->)
-                from = firstDifferentIndex;
-                to = lastDifferentIndex;
-                verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, true);
-                conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
-                        // if sequence = fromIndex, update to toIndex.
-                        "when stop_sequence = %d then %d " +
-                        // if sequence is greater than fromIndex and less than or equal to toIndex, decrement
-                        "when stop_sequence > %d AND stop_sequence <= %d then stop_sequence - 1 " +
-                        // Otherwise, sequence remains untouched
-                        "else stop_sequence " +
-                        "end " +
-                        "from %s.trips where %s",
-                    tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
-            } else if (newStops.get(firstDifferentIndex).stop_id.equals(originalStopIds.get(lastDifferentIndex))) {
-                // Stop was moved from end of changed region to beginning of changed region (<--)
-                from = lastDifferentIndex;
-                to = firstDifferentIndex;
-                verifyInteriorStopsAreUnchanged(originalStopIds, newStops, firstDifferentIndex, lastDifferentIndex, false);
-                conditionalUpdate = String.format("update %s.stop_times set stop_sequence = case " +
-                        // if sequence = fromIndex, update to toIndex.
-                        "when stop_sequence = %d then %d " +
-                        // if sequence is less than fromIndex and greater than or equal to toIndex, increment
-                        "when stop_sequence < %d AND stop_sequence >= %d then stop_sequence + 1 " +
-                        // Otherwise, sequence remains untouched
-                        "else stop_sequence " +
-                        "end " +
-                        "from %s.trips where %s",
-                    tablePrefix, from, to, from, to, tablePrefix, joinToTrips);
+            foreignReferencesNotFound.removeAll(foreignReferencesFound);
+            if (foreignReferencesNotFound.size() > 0) {
+                throw new SQLException(
+                    String.format(
+                        "%s entities must contain valid %s references. (Invalid references: %s)",
+                        parentTable.name,
+                        String.join("/", foreignReferencesFieldNames),
+                        String.join(", ", foreignReferencesNotFound)));
             } else {
-                throw new IllegalStateException("not a simple, single move!");
-            }
-
-            // Update the stop sequences for the stop that was moved and the other stops within the changed region.
-            PreparedStatement updateStatement = connection.prepareStatement(conditionalUpdate);
-            LOG.info(updateStatement.toString());
-            int updated = updateStatement.executeUpdate();
-            LOG.info("Updated {} stop_times.", updated);
-        }
-        // CHECK IF SET OF STOPS ADDED TO END OF ORIGINAL LIST
-        else if (originalStopIds.size() < newStops.size()) {
-            // find the left bound of the changed region to check that no stops have changed in between
-            int firstDifferentIndex = 0;
-            while (
-                firstDifferentIndex < originalStopIds.size() &&
-                    originalStopIds.get(firstDifferentIndex).equals(newStops.get(firstDifferentIndex).stop_id)
-            ) {
-                firstDifferentIndex++;
-            }
-            if (firstDifferentIndex != originalStopIds.size())
-                throw new IllegalStateException("When adding multiple stops to patterns, new stops must all be at the end");
-
-            // insert a skipped stop for each new element in newStops
-            int stopsToInsert = newStops.size() - firstDifferentIndex;
-            // FIXME: Should we be inserting blank stop times at all?  Shouldn't these just inherit the arrival times
-            // from the pattern stops?
-            LOG.info("Adding {} stop times to existing {} stop times. Starting at {}", stopsToInsert, originalStopIds.size(), firstDifferentIndex);
-            insertBlankStopTimes(tripsForPattern, newStops, firstDifferentIndex, stopsToInsert, connection);
-        }
-        // ANY OTHER TYPE OF MODIFICATION IS NOT SUPPORTED
-        else throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
-    }
-
-    /**
-     * Check the stops in the changed region to ensure they remain in the same order. If not, throw an exception to
-     * cancel the transaction.
-     */
-    private static void verifyInteriorStopsAreUnchanged(
-        List<String> originalStopIds,
-        List<PatternStop> newStops,
-        int firstDifferentIndex,
-        int lastDifferentIndex,
-        boolean movedRight
-    ) {
-        //Stops mapped to list of stop IDs simply for easier viewing/comparison with original IDs while debugging with
-        // breakpoints.
-        List<String> newStopIds = newStops.stream().map(s -> s.stop_id).collect(Collectors.toList());
-        // Determine the bounds of the region that should be identical between the two lists.
-        int beginRegion = movedRight ? firstDifferentIndex : firstDifferentIndex + 1;
-        int endRegion = movedRight ? lastDifferentIndex - 1 : lastDifferentIndex;
-        for (int i = beginRegion; i <= endRegion; i++) {
-            // Shift index when selecting stop from original list to account for displaced stop.
-            int shiftedIndex = movedRight ? i + 1 : i - 1;
-            String newStopId = newStopIds.get(i);
-            String originalStopId = originalStopIds.get(shiftedIndex);
-            if (!newStopId.equals(originalStopId)) {
-                // If stop ID for new stop at the given index does not match the original stop ID, the order of at least
-                // one stop within the changed region has been changed, which is illegal according to the rule enforcing
-                // only a single addition, deletion, or transposition per update.
-                throw new IllegalStateException(RECONCILE_STOPS_ERROR_MSG);
+                LOG.info("All {} foreign references ({}) are valid.",
+                    String.join("/", foreignReferencesFieldNames),
+                    parentTable.name
+                );
             }
         }
     }
 
     /**
-     * You must call this method after updating sequences for any stop times following the starting stop sequence to
-     * avoid overwriting these other stop times.
+     * Checks a table's key field for matching reference values and returns all matches.
      */
-    private void insertBlankStopTimes(
-        List<String> tripIds,
-        List<PatternStop> newStops,
-        int startingStopSequence,
-        int stopTimesToAdd,
-        Connection connection
-    ) throws SQLException {
-        if (tripIds.isEmpty()) {
-            // There is no need to insert blank stop times if there are no trips for the pattern.
-            return;
+    private Set<String> checkTableForReferences(Collection<String> referenceStrings, Table table)
+        throws SQLException {
+
+        String referenceFieldName = table.getKeyFieldName();
+        String questionMarks = String.join(", ", Collections.nCopies(referenceStrings.size(), "?"));
+        String checkCountSql = String.format(
+            "select %s from %s.%s where %s in (%s)",
+            referenceFieldName,
+            tablePrefix,
+            table.name,
+            referenceFieldName,
+            questionMarks
+        );
+        PreparedStatement preparedStatement = connection.prepareStatement(checkCountSql);
+        int oneBasedIndex = 1;
+        for (String ref : referenceStrings) {
+            preparedStatement.setString(oneBasedIndex++, ref);
         }
-        String insertSql = Table.STOP_TIMES.generateInsertSql(tablePrefix, true);
-        PreparedStatement insertStatement = connection.prepareStatement(insertSql);
-        int count = 0;
-        int totalRowsUpdated = 0;
-        // Create a new stop time for each sequence value (times each trip ID) that needs to be inserted.
-        for (int i = startingStopSequence; i < stopTimesToAdd + startingStopSequence; i++) {
-            PatternStop patternStop = newStops.get(i);
-            StopTime stopTime = new StopTime();
-            stopTime.stop_id = patternStop.stop_id;
-            stopTime.drop_off_type = patternStop.drop_off_type;
-            stopTime.pickup_type = patternStop.pickup_type;
-            stopTime.timepoint = patternStop.timepoint;
-            stopTime.shape_dist_traveled = patternStop.shape_dist_traveled;
-            stopTime.continuous_drop_off = patternStop.continuous_drop_off;
-            stopTime.continuous_pickup = patternStop.continuous_pickup;
-            stopTime.stop_sequence = i;
-            // Update stop time with each trip ID and add to batch.
-            for (String tripId : tripIds) {
-                stopTime.trip_id = tripId;
-                stopTime.setStatementParameters(insertStatement, true);
-                insertStatement.addBatch();
-                if (count % INSERT_BATCH_SIZE == 0) {
-                    int[] rowsUpdated = insertStatement.executeBatch();
-                    totalRowsUpdated += rowsUpdated.length;
-                }
-            }
+        LOG.info(preparedStatement.toString());
+        ResultSet resultSet = preparedStatement.executeQuery();
+        Set<String> foundReferences = new HashSet<>();
+        while (resultSet.next()) {
+            String referenceValue = resultSet.getString(1);
+            foundReferences.add(referenceValue);
         }
-        int[] rowsUpdated = insertStatement.executeBatch();
-        totalRowsUpdated += rowsUpdated.length;
-        LOG.info("{} blank stop times inserted", totalRowsUpdated);
+        return foundReferences;
     }
 
     /**
@@ -1285,8 +1215,7 @@ public class JdbcTableWriter implements TableWriter {
         try (ResultSet generatedKeys = statement.getGeneratedKeys()) {
             if (generatedKeys.next()) {
                 // Get the auto-generated ID from the update execution
-                long newId = generatedKeys.getLong(1);
-                return newId;
+                return generatedKeys.getLong(1);
             } else {
                 throw new SQLException(messageAction + " entity failed, no ID obtained.");
             }
@@ -1424,9 +1353,12 @@ public class JdbcTableWriter implements TableWriter {
             // IMPORTANT: Skip the table for the entity we're modifying or if loop table does not have field.
             if (table.name.equals(gtfsTable.name)) continue;
             for (Field field : gtfsTable.fields) {
-                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                    // If any of the table's fields are foreign references to the specified table, add to the return set.
-                    referencingTables.add(gtfsTable);
+                if (field.isForeignReference()) {
+                    for (Table refTable : field.referenceTables) {
+                        if (refTable.name.equals(table.name)) {
+                            referencingTables.add(gtfsTable);
+                        }
+                    }
                 }
             }
         }
@@ -1477,7 +1409,7 @@ public class JdbcTableWriter implements TableWriter {
         SqlMethod sqlMethod = newKeyValue != null ? SqlMethod.UPDATE : SqlMethod.DELETE;
         Set<Table> referencingTables = getReferencingTables(table);
         // If there are no referencing tables, there is no need to update any values (e.g., .
-        if (referencingTables.size() == 0) return;
+        if (referencingTables.isEmpty()) return;
         String keyValue = getValueForId(id, keyField.name, namespace, table, connection);
         if (keyValue == null) {
             // FIXME: should we still check referencing tables for null value?
@@ -1495,35 +1427,37 @@ public class JdbcTableWriter implements TableWriter {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
             for (Field field : referencingTable.editorFields()) {
-                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                    // Get statement to update or delete entities that reference the key value.
-                    PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
-                    LOG.info(updateStatement.toString());
-                    int result = updateStatement.executeUpdate();
-                    if (result > 0) {
-                        // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
-                        //  deleteEntityHook).
-                        if (sqlMethod.equals(SqlMethod.DELETE)) {
-                            // Check for restrictions on delete.
-                            if (table.isCascadeDeleteRestricted()) {
-                                // The entity must not have any referencing entities in order to delete it.
-                                connection.rollback();
-                                String message = String.format(
-                                    "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                    entityClass.getSimpleName(),
-                                    keyField.name,
-                                    keyValue,
-                                    result,
-                                    referencingTable.name,
-                                    entityClass.getSimpleName()
-                                );
-                                LOG.warn(message);
-                                throw new SQLException(message);
+                if (field.isForeignReference()) {
+                    for (Table refTable : field.referenceTables) {
+                        if (refTable.name.equals(table.name)) {
+                            // Get statement to update or delete entities that reference the key value.
+                            PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
+                            LOG.info("{}", updateStatement);
+                            int result = updateStatement.executeUpdate();
+                            if (result > 0) {
+                                // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
+                                //  deleteEntityHook).
+                                if (sqlMethod.equals(SqlMethod.DELETE) && table.isCascadeDeleteRestricted()) {
+                                    // Check for restrictions on delete. The entity must not have any referencing
+                                    // entities in order to delete it.
+                                    connection.rollback();
+                                    String message = String.format(
+                                        "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                        entityClass.getSimpleName(),
+                                        keyField.name,
+                                        keyValue,
+                                        result,
+                                        referencingTable.name,
+                                        entityClass.getSimpleName()
+                                    );
+                                    LOG.warn(message);
+                                    throw new SQLException(message);
+                                }
+                                LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
+                            } else {
+                                LOG.info("No references in {} found!", refTableName);
                             }
                         }
-                        LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
-                    } else {
-                        LOG.info("No references in {} found!", refTableName);
                     }
                 }
             }
@@ -1610,7 +1544,7 @@ public class JdbcTableWriter implements TableWriter {
      */
     private void deleteShapes(String routeOrPatternId, String routeOrPatternIdColumn, String referencingTable)
         throws SQLException {
-        
+
         String patternsTable = String.format("%s.patterns", tablePrefix);
         String shapesTable = String.format("%s.shapes", tablePrefix);
 
