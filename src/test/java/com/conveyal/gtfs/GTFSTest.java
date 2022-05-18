@@ -194,7 +194,8 @@ public class GTFSTest {
             equalTo(true)
         );
 
-        // The second pattern should not be added to the editor patterns table (it should throw an exception if found).
+        // The second pattern should not be added to the editor patterns table
+        // (there *should* be an assertion error about the second record from expectations2 not found).
         assertThrows(
             AssertionError.class,
             () -> runIntegrationTestOnFolder("fake-ferry-blank-pickups", nullValue(), expectations2, errorExpectations),
