@@ -1,0 +1,5 @@
+fare_id,price,currency_type,payment_method,transfers,agency_id,transfer_duration
+A1,15.00,USD,1,0,AF,
+A2,14.00,USD,1,0,AF,
+A3,13.00,USD,1,0,AF,
+A4,5.00,USD,1,0,AF,
