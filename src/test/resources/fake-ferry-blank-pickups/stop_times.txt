@@ -1,0 +1,5 @@
+trip_id,stop_sequence,stop_id,arrival_time,departure_time,stop_headsign,pickup_type,drop_off_type,continuous_pickup,continuous_drop_off,shape_dist_traveled,timepoint
+1003,0,TBF,15:00:00,15:00:00,,0,0,1,1,0,
+1003,1,AIF,15:15:00,15:15:00,,0,0,1,1,1871.92069611793681,
+1005,0,TBF,10:00:00,10:00:00,,,,1,1,0,0
+1005,1,AIF,10:15:00,10:15:00,,,,1,1,1871.92069611793681,0
