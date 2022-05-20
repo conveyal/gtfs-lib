@@ -4,16 +4,14 @@ import java.sql.PreparedStatement;
 import java.sql.SQLException;
 
 /**
- * A pattern location represents generalized information about a location visited by a pattern, i.e. a collection of trips that
- * all visit the same locations in the same sequence. Some of these characteristics, e.g., location ID, stop sequence, pickup
- * type, and drop off type, help determine a unique pattern. Others (default dwell/travel time, timepoint, and shape dist
- * traveled) are specific to the editor and usually based on values from the first trip encountered in a feed for a
- * given pattern.
+ * A pattern location group represents generalized information about a location or stop visited by a pattern, i.e. a
+ * collection of trips that all visit the same locations/stops in the same sequence. Some of these characteristics,
+ * e.g. location group ID and stop sequence help determine a unique pattern.
  */
-public class PatternLocation extends PatternHalt {
+public class PatternLocationGroup extends PatternHalt {
     private static final long serialVersionUID = 1L;
 
-    public String location_id;
+    public String location_group_id;
 
     public int pickup_type;
     public int drop_off_type;
@@ -33,10 +31,11 @@ public class PatternLocation extends PatternHalt {
     public double safe_duration_factor = DOUBLE_MISSING;
     public double safe_duration_offset = DOUBLE_MISSING;
 
-    public PatternLocation () {}
+    public PatternLocationGroup () {}
 
-    @Override
+     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
         // Not required. Here to satisfy interface.
     }
 }
+

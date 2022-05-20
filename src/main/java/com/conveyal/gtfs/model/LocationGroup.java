@@ -13,6 +13,7 @@ public class LocationGroup extends Entity {
     private static final long serialVersionUID = -4961539668114167098L;
 
     public String location_group_id;
+    // ID referencing stops.stop_id or id from locations.geojson.
     public String location_id;
     public String location_group_name;
 

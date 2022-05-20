@@ -24,6 +24,7 @@ import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternLocation;
+import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -477,10 +478,32 @@ public class Table {
     public static final Table PATTERN_LOCATION = new Table("pattern_locations", PatternLocation.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
-            // FIXME: Do we need an index on location_id?
             new StringField("location_id", REQUIRED).isReferenceTo(LOCATIONS),
             // Editor-specific fields
-            // FLEX TODO: Are all of these needed?
+            new IntegerField("drop_off_type", EDITOR, 2),
+            new IntegerField("pickup_type", EDITOR, 2),
+            new ShortField("timepoint", EDITOR, 1),
+            new ShortField("continuous_pickup", OPTIONAL,3),
+            new ShortField("continuous_drop_off", OPTIONAL,3),
+            new StringField("pickup_booking_rule_id", OPTIONAL),
+            new StringField("drop_off_booking_rule_id", OPTIONAL),
+
+            // Additional GTFS Flex location groups and locations fields
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended
+            new TimeField("flex_default_travel_time", OPTIONAL),
+            new TimeField("flex_default_zone_time", OPTIONAL),
+            new DoubleField("mean_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("mean_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2)
+
+    ).withParentTable(PATTERNS);
+
+    public static final Table PATTERN_LOCATION_GROUP = new Table("pattern_location_groups", PatternLocationGroup.class, OPTIONAL,
+            new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
+            new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
+            new StringField("location_group_id", REQUIRED).isReferenceTo(LOCATION_GROUPS),
+            // Editor-specific fields
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
             new ShortField("timepoint", EDITOR, 1),
@@ -515,6 +538,7 @@ public class Table {
         FARE_RULES,
         PATTERN_STOP,
         PATTERN_LOCATION,
+        PATTERN_LOCATION_GROUP,
         TRANSFERS,
         TRIPS,
         STOP_TIMES,

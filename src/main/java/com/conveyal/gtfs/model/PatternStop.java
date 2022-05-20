@@ -30,12 +30,8 @@ public class PatternStop extends PatternHalt {
 
     public PatternStop () {}
 
-    /**
-     * Sets the parameters for a prepared statement following the parameter order defined in
-     * {@link com.conveyal.gtfs.loader.Table#PATTERN_STOP}. JDBC prepared statement parameters use a one-based index.
-     */
     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
-        // FIXME
+        // Not required. Here to satisfy interface.
     }
 }

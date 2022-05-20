@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
+import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -173,10 +174,9 @@ public class JdbcTableWriter implements TableWriter {
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
-                    if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
-                        (childEntities == null ||
-                            childEntities.isNull() ||
-                            !childEntities.isArray())
+                    if ((referencingTable.name.equals(Table.PATTERN_LOCATION.name) ||
+                        referencingTable.name.equals(Table.PATTERN_LOCATION_GROUP.name)) &&
+                        (childEntities == null || childEntities.isNull() || !childEntities.isArray())
                     ) {
                         // This is a backwards hack to prevent the addition of pattern location breaking existing
                         // pattern functionality. If pattern location is not provided set to an empty array to avoid the
@@ -312,11 +312,18 @@ public class JdbcTableWriter implements TableWriter {
                 tablePrefix + ".",
                 EntityPopulator.PATTERN_LOCATION
             );
+            JDBCTableReader<PatternLocationGroup> patternLocationGroups = new JDBCTableReader(
+                Table.PATTERN_LOCATION_GROUP,
+                dataSource,
+                tablePrefix + ".",
+                EntityPopulator.PATTERN_LOCATION_GROUP
+            );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
             List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
             Iterator<PatternHalt> patternHalts = Iterators.concat(
                 patternStops.getOrdered(patternId).iterator(),
-                patternLocations.getOrdered(patternId).iterator()
+                patternLocations.getOrdered(patternId).iterator(),
+                patternLocationGroups.getOrdered(patternId).iterator()
             );
             while (patternHalts.hasNext()) {
                 PatternHalt patternHalt = patternHalts.next();
@@ -361,8 +368,22 @@ public class JdbcTableWriter implements TableWriter {
                             timesForTripId.getKey()
                         );
                     } else if (patternHalt instanceof PatternLocation) {
-                        cumulativeTravelTime += updateStopTimesForPatternLocation(
-                            (PatternLocation) patternHalt,
+                        PatternLocation patternLocation = (PatternLocation) patternHalt;
+                        cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternLocationGroup(
+                            patternLocation.flex_default_travel_time,
+                            patternLocation.flex_default_zone_time,
+                            patternLocation.pattern_id,
+                            patternLocation.stop_sequence,
+                            cumulativeTravelTime,
+                            timesForTripId.getKey()
+                        );
+                    } else if (patternHalt instanceof PatternLocationGroup) {
+                        PatternLocationGroup patternLocationGroup = (PatternLocationGroup) patternHalt;
+                        cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternLocationGroup(
+                            patternLocationGroup.flex_default_travel_time,
+                            patternLocationGroup.flex_default_zone_time,
+                            patternLocationGroup.pattern_id,
+                            patternLocationGroup.stop_sequence,
                             cumulativeTravelTime,
                             timesForTripId.getKey()
                         );
@@ -628,7 +649,10 @@ public class JdbcTableWriter implements TableWriter {
             // Do not permit the illegal state where frequency entries are being added/modified for a timetable pattern.
             throw new IllegalStateException("Cannot create or update frequency entries for a timetable-based pattern.");
         }
-        boolean isPatternTable = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
+        boolean isPatternTable =
+                Table.PATTERN_STOP.name.equals(subTable.name) ||
+                Table.PATTERN_LOCATION.name.equals(subTable.name) ||
+                Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name);
         if (isPatternTable) {
             reconciliation.stage(mapper, subTable, subEntities, keyValue);
         }
@@ -715,7 +739,9 @@ public class JdbcTableWriter implements TableWriter {
                         "drop_off_booking_rule_id"
                     );
                 }
-                if (Table.PATTERN_LOCATION.name.equals(subTable.name)) {
+                if (Table.PATTERN_LOCATION.name.equals(subTable.name) ||
+                    Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name)
+                ) {
                     updateLinkedFields(
                         subTable,
                         subEntity,
@@ -741,9 +767,12 @@ public class JdbcTableWriter implements TableWriter {
                 boolean valuesAreIncrementing = ++previousOrder == orderValue;
                 boolean valuesAreIncreasing = previousOrder <= orderValue;
 
-                // PatternStop and PatternLocations must only increase, not increment
+                // Patterns must only increase, not increment.
                 boolean valuesAreAscending =
-                    (!Table.PATTERN_LOCATION.name.equals(subTable.name) && !Table.PATTERN_STOP.name.equals(subTable.name))
+                    (!Table.PATTERN_LOCATION.name.equals(subTable.name) &&
+                        !Table.PATTERN_STOP.name.equals(subTable.name) &&
+                        !Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name)
+                    )
                         ? valuesAreIncrementing
                         : valuesAreIncreasing;
                 if (!orderIsUnique || !valuesAreAscending) {
@@ -841,11 +870,26 @@ public class JdbcTableWriter implements TableWriter {
                         cumulativeTravelTime,
                         null
                     );
-            } else {
-                // Pattern type is location
+            } else if (genericStop.patternType == PatternReconciliation.PatternType.LOCATION) {
+                PatternLocation patternLocation = reconciliation.getPatternLocation(genericStop.referenceId);
                 cumulativeTravelTime +=
-                    updateStopTimesForPatternLocation(
-                        reconciliation.getPatternLocation(genericStop.referenceId),
+                    updateStopTimesForPatternLocationOrPatternLocationGroup(
+                        patternLocation.flex_default_travel_time,
+                        patternLocation.flex_default_zone_time,
+                        patternLocation.pattern_id,
+                        patternLocation.stop_sequence,
+                        cumulativeTravelTime,
+                        null
+                    );
+            } else {
+                // Pattern type is location group
+                PatternLocationGroup patternLocationGroup = reconciliation.getPatternLocationGroup(genericStop.referenceId);
+                cumulativeTravelTime +=
+                    updateStopTimesForPatternLocationOrPatternLocationGroup(
+                        patternLocationGroup.flex_default_travel_time,
+                        patternLocationGroup.flex_default_zone_time,
+                        patternLocationGroup.pattern_id,
+                        patternLocationGroup.stop_sequence,
                         cumulativeTravelTime,
                         null
                     );
@@ -905,19 +949,22 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Updates the stop times that reference the specified pattern location.
+     * Updates the stop times that reference the specified pattern location or pattern location group.
      *
-     * @param patternLocation    the pattern location for which to update stop times
-     * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
-     *                           previous pattern stop's dwell time)
-     * @return the travel and dwell time added by this pattern location
+     * @return the travel and dwell time added by this pattern.
      * @throws SQLException
      */
-    private int updateStopTimesForPatternLocation(PatternLocation patternLocation, int previousTravelTime, String tripId)
-        throws SQLException {
+    private int updateStopTimesForPatternLocationOrPatternLocationGroup(
+        int flexDefaultTravelTime,
+        int flexDefaultZoneTime,
+        String patternId,
+        int stopSequence,
+        int previousTravelTime,
+        String tripId
+    ) throws SQLException {
 
-        int travelTime = patternLocation.flex_default_travel_time == Entity.INT_MISSING ? 0 : patternLocation.flex_default_travel_time;
-        int dwellTime = patternLocation.flex_default_zone_time == Entity.INT_MISSING ? 0 : patternLocation.flex_default_zone_time;
+        int travelTime = flexDefaultTravelTime == Entity.INT_MISSING ? 0 : flexDefaultTravelTime;
+        int dwellTime = flexDefaultZoneTime == Entity.INT_MISSING ? 0 : flexDefaultZoneTime;
         // Set trip id either from params or all
         tripId = (tripId != null) ? String.format("'%s'", tripId) : "t.trip_id";
 
@@ -933,8 +980,8 @@ public class JdbcTableWriter implements TableWriter {
             previousTravelTime,
             travelTime,
             dwellTime,
-            patternLocation.pattern_id,
-            patternLocation.stop_sequence
+            patternId,
+            stopSequence
         );
         LOG.info("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
