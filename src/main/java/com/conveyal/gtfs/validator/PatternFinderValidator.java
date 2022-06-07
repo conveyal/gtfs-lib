@@ -92,8 +92,12 @@ public class PatternFinderValidator extends TripValidator {
             locationGroupById.put(locationGroup.location_group_id, locationGroup);
         }
         // FIXME In the editor we need patterns to exist separately from and before trips themselves, so me make another table.
-        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, locationById, errorStorage);
+        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, locationById, locationGroupById, errorStorage);
         Connection connection = null;
+        PreparedStatement insertPatternStatement = null;
+        PreparedStatement insertPatternStopStatement = null;
+        PreparedStatement insertPatternLocationStatement = null;
+        PreparedStatement insertPatternLocationGroupStatement = null;
         try {
             // TODO this assumes gtfs-lib is using an SQL database and not a MapDB.
             //   Maybe we should just create patterns in a separate step, but that would mean iterating over the
@@ -112,11 +116,11 @@ public class PatternFinderValidator extends TripValidator {
             //   be a UUID or something, just to better distinguish it from the int ID?
             Table patternsTable = new Table(patternsTableName, Pattern.class, Requirement.EDITOR, Table.PATTERNS.fields);
             Table patternStopsTable = new Table(patternStopsTableName, PatternStop.class, Requirement.EDITOR,
-                    Table.PATTERN_STOP.fields);
+                Table.PATTERN_STOP.fields);
             Table patternLocationsTable = new Table(patternLocationsTableName, PatternLocation.class, Requirement.EDITOR,
-                    Table.PATTERN_LOCATION.fields);
+                Table.PATTERN_LOCATION.fields);
             Table patternLocationGroupsTable = new Table(patternLocationGroupsTableName, PatternLocationGroup.class, Requirement.EDITOR,
-                    Table.PATTERN_LOCATION_GROUP.fields);
+                Table.PATTERN_LOCATION_GROUP.fields);
 
             // Create pattern tables, each with serial ID fields.
             patternsTable.createSqlTable(connection, null, true);
@@ -125,10 +129,10 @@ public class PatternFinderValidator extends TripValidator {
             patternLocationGroupsTable.createSqlTable(connection, null, true);
 
             // Generate prepared statements for inserts.
-            PreparedStatement insertPatternStatement = connection.prepareStatement(patternsTable.generateInsertSql(true));
-            PreparedStatement insertPatternStopStatement = connection.prepareStatement(patternStopsTable.generateInsertSql(true));
-            PreparedStatement insertPatternLocationStatement = connection.prepareStatement(patternLocationsTable.generateInsertSql(true));
-            PreparedStatement insertPatternLocationGroupStatement = connection.prepareStatement(patternLocationGroupsTable.generateInsertSql(true));
+            insertPatternStatement = connection.prepareStatement(patternsTable.generateInsertSql(true));
+            insertPatternStopStatement = connection.prepareStatement(patternStopsTable.generateInsertSql(true));
+            insertPatternLocationStatement = connection.prepareStatement(patternLocationsTable.generateInsertSql(true));
+            insertPatternLocationGroupStatement = connection.prepareStatement(patternLocationGroupsTable.generateInsertSql(true));
 
             // Generate batch trackers for inserts.
             BatchTracker patternTracker = new BatchTracker("pattern", insertPatternStatement);
@@ -189,13 +193,13 @@ public class PatternFinderValidator extends TripValidator {
                         int arrival = key.arrivalTimes.get(i);
                         if (i > 0) {
                             travelTime = arrival == INT_MISSING || lastValidDeparture == INT_MISSING
-                                    ? INT_MISSING
-                                    : arrival - lastValidDeparture;
+                                ? INT_MISSING
+                                : arrival - lastValidDeparture;
                         }
                         int departure = key.departureTimes.get(i);
                         int dwellTime = arrival == INT_MISSING || departure == INT_MISSING
-                                ? INT_MISSING
-                                : departure - arrival;
+                            ? INT_MISSING
+                            : departure - arrival;
 
                         insertPatternStopStatement.setString(1, pattern.pattern_id);
                         // Stop sequence is zero-based.
@@ -239,7 +243,7 @@ public class PatternFinderValidator extends TripValidator {
                 // Finally, update all trips on this pattern to reference this pattern's ID.
                 String questionMarks = String.join(", ", Collections.nCopies(pattern.associatedTrips.size(), "?"));
                 PreparedStatement updateTripStatement = connection.prepareStatement(
-                        String.format("update %s set pattern_id = ? where trip_id in (%s)", tripsTableName, questionMarks));
+                    String.format("update %s set pattern_id = ? where trip_id in (%s)", tripsTableName, questionMarks));
                 int oneBasedIndex = 1;
                 updateTripStatement.setString(oneBasedIndex++, pattern.pattern_id);
                 // Prepare each trip in pattern to update trips table.
@@ -305,8 +309,12 @@ public class PatternFinderValidator extends TripValidator {
             // This exception will be stored as a validator failure.
             throw new RuntimeException(e);
         } finally {
-            // Close transaction finally.
+            // Close connection and insert statements quietly.
             if (connection != null) DbUtils.closeQuietly(connection);
+            if (insertPatternStatement != null) DbUtils.closeQuietly(insertPatternStatement);
+            if (insertPatternStopStatement != null) DbUtils.closeQuietly(insertPatternStopStatement);
+            if (insertPatternLocationStatement != null) DbUtils.closeQuietly(insertPatternLocationStatement);
+            if (insertPatternLocationGroupStatement != null) DbUtils.closeQuietly(insertPatternLocationGroupStatement);
         }
 
     }
@@ -339,8 +347,8 @@ public class PatternFinderValidator extends TripValidator {
         // Stop sequence is zero-based.
         setIntParameter(insertPreparedStatement, 2, i);
         insertPreparedStatement.setString(3, locationIdOrLocationGroupId);
-        setIntParameter(insertPreparedStatement, 4, key.pickupTypes.get(i));
-        setIntParameter(insertPreparedStatement, 5, key.dropoffTypes.get(i));
+        setIntParameter(insertPreparedStatement, 4, key.dropoffTypes.get(i));
+        setIntParameter(insertPreparedStatement, 5, key.pickupTypes.get(i));
         setIntParameter(insertPreparedStatement, 6, key.timepoints.get(i));
         setIntParameter(insertPreparedStatement, 7, key.continuous_pickup.get(i));
         setIntParameter(insertPreparedStatement, 8, key.continuous_drop_off.get(i));

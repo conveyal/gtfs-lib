@@ -176,15 +176,14 @@ public class JdbcTableWriter implements TableWriter {
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
                     if ((referencingTable.name.equals(Table.PATTERN_LOCATION.name) ||
                         referencingTable.name.equals(Table.PATTERN_LOCATION_GROUP.name)) &&
-                        (childEntities == null || childEntities.isNull() || !childEntities.isArray())
+                        (hasNoChildEntities(childEntities))
                     ) {
                         // This is a backwards hack to prevent the addition of pattern location breaking existing
-                        // pattern functionality. If pattern location is not provided set to an empty array to avoid the
-                        // following exception.
+                        // pattern functionality. If pattern location or pattern location group is not provided set to
+                        // an empty array to avoid the following exception.
                         childEntities = mapper.createArrayNode();
                     }
-
-                    if (childEntities == null || childEntities.isNull() || !childEntities.isArray()) {
+                    if (hasNoChildEntities(childEntities)) {
                         throw new SQLException(String.format("Child entities %s must be an array and not null", referencingTable.name));
                     }
                     int entityId = isCreating ? (int) newId : id;
@@ -263,6 +262,13 @@ public class JdbcTableWriter implements TableWriter {
                 connection.close();
             }
         }
+    }
+
+    /**
+     *  Check if a parent table has no child entities.
+     */
+    private boolean hasNoChildEntities(JsonNode childEntities) {
+        return childEntities == null || childEntities.isNull() || !childEntities.isArray();
     }
 
     /**
@@ -368,22 +374,14 @@ public class JdbcTableWriter implements TableWriter {
                             timesForTripId.getKey()
                         );
                     } else if (patternHalt instanceof PatternLocation) {
-                        PatternLocation patternLocation = (PatternLocation) patternHalt;
-                        cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternLocationGroup(
-                            patternLocation.flex_default_travel_time,
-                            patternLocation.flex_default_zone_time,
-                            patternLocation.pattern_id,
-                            patternLocation.stop_sequence,
+                        cumulativeTravelTime += updateStopTimes(
+                            (PatternLocation) patternHalt,
                             cumulativeTravelTime,
                             timesForTripId.getKey()
                         );
                     } else if (patternHalt instanceof PatternLocationGroup) {
-                        PatternLocationGroup patternLocationGroup = (PatternLocationGroup) patternHalt;
-                        cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternLocationGroup(
-                            patternLocationGroup.flex_default_travel_time,
-                            patternLocationGroup.flex_default_zone_time,
-                            patternLocationGroup.pattern_id,
-                            patternLocationGroup.stop_sequence,
+                        cumulativeTravelTime += updateStopTimes(
+                            (PatternLocationGroup) patternHalt,
                             cumulativeTravelTime,
                             timesForTripId.getKey()
                         );
@@ -768,13 +766,7 @@ public class JdbcTableWriter implements TableWriter {
                 boolean valuesAreIncreasing = previousOrder <= orderValue;
 
                 // Patterns must only increase, not increment.
-                boolean valuesAreAscending =
-                    (!Table.PATTERN_LOCATION.name.equals(subTable.name) &&
-                        !Table.PATTERN_STOP.name.equals(subTable.name) &&
-                        !Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name)
-                    )
-                        ? valuesAreIncrementing
-                        : valuesAreIncreasing;
+                boolean valuesAreAscending = !isPatternTable ? valuesAreIncrementing : valuesAreIncreasing;
                 if (!orderIsUnique || !valuesAreAscending) {
                     throw new SQLException(
                         String.format(
@@ -871,25 +863,17 @@ public class JdbcTableWriter implements TableWriter {
                         null
                     );
             } else if (genericStop.patternType == PatternReconciliation.PatternType.LOCATION) {
-                PatternLocation patternLocation = reconciliation.getPatternLocation(genericStop.referenceId);
                 cumulativeTravelTime +=
-                    updateStopTimesForPatternLocationOrPatternLocationGroup(
-                        patternLocation.flex_default_travel_time,
-                        patternLocation.flex_default_zone_time,
-                        patternLocation.pattern_id,
-                        patternLocation.stop_sequence,
+                    updateStopTimes(
+                        reconciliation.getPatternLocation(genericStop.referenceId),
                         cumulativeTravelTime,
                         null
                     );
             } else {
                 // Pattern type is location group
-                PatternLocationGroup patternLocationGroup = reconciliation.getPatternLocationGroup(genericStop.referenceId);
                 cumulativeTravelTime +=
-                    updateStopTimesForPatternLocationOrPatternLocationGroup(
-                        patternLocationGroup.flex_default_travel_time,
-                        patternLocationGroup.flex_default_zone_time,
-                        patternLocationGroup.pattern_id,
-                        patternLocationGroup.stop_sequence,
+                    updateStopTimes(
+                        reconciliation.getPatternLocationGroup(genericStop.referenceId),
                         cumulativeTravelTime,
                         null
                     );
@@ -946,6 +930,44 @@ public class JdbcTableWriter implements TableWriter {
         );
         LOG.info("{} stop_time arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
+    }
+
+    /**
+     * Updates the stop times that reference the specified pattern location.
+     *
+     * @return the travel and dwell time added by this pattern.
+     * @throws SQLException
+     */
+    private int updateStopTimes(
+        PatternLocation patternLocation,
+        int previousTravelTime,
+        String tripId
+    ) throws SQLException {
+        return updateStopTimesForPatternLocationOrPatternLocationGroup(
+            patternLocation.flex_default_travel_time, patternLocation.flex_default_zone_time,
+            patternLocation.pattern_id,
+            patternLocation.stop_sequence,
+            previousTravelTime,
+            tripId);
+    }
+
+    /**
+     * Updates the stop times that reference the specified pattern location group.
+     *
+     * @return the travel and dwell time added by this pattern.
+     * @throws SQLException
+     */
+    private int updateStopTimes(
+        PatternLocationGroup patternLocationGroup,
+        int previousTravelTime,
+        String tripId
+    ) throws SQLException {
+        return updateStopTimesForPatternLocationOrPatternLocationGroup(
+            patternLocationGroup.flex_default_travel_time, patternLocationGroup.flex_default_zone_time,
+            patternLocationGroup.pattern_id,
+            patternLocationGroup.stop_sequence,
+            previousTravelTime,
+            tripId);
     }
 
     /**

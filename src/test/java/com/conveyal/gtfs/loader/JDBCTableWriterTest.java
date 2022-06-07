@@ -1399,17 +1399,15 @@ public class JDBCTableWriterTest {
 
         int stopSequence = 0;
         for (Map.Entry<String, PatternReconciliation.PatternType> entry : patternArguments.referenceIdAndType.entrySet()) {
+            boolean flex =
+                entry.getValue() == PatternReconciliation.PatternType.LOCATION ||
+                entry.getValue() == PatternReconciliation.PatternType.LOCATION_GROUP;
             verifyStopTime(
                 createdTrip.trip_id,
                 entry.getKey(),
                 stopSequence,
-                (cumulativeTravelTime += (entry.getValue() == PatternReconciliation.PatternType.LOCATION || entry.getValue() == PatternReconciliation.PatternType.LOCATION_GROUP)
-                    ? patternArguments.flexDefaultTravelTime
-                    : patternArguments.defaultTravelTime
-                ),
-                (cumulativeTravelTime += (entry.getValue() == PatternReconciliation.PatternType.LOCATION || entry.getValue() == PatternReconciliation.PatternType.LOCATION_GROUP)
-                    ? patternArguments.flexDefaultZoneTime
-                    : patternArguments.defaultDwellTime),
+                (cumulativeTravelTime += flex ? patternArguments.flexDefaultTravelTime : patternArguments.defaultTravelTime),
+                (cumulativeTravelTime += flex ? patternArguments.flexDefaultZoneTime : patternArguments.defaultDwellTime),
                 entry.getValue()
             );
             stopSequence++;
