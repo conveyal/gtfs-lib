@@ -35,7 +35,29 @@ public class PatternLocationGroup extends PatternHalt {
 
      @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
-        // Not required. Here to satisfy interface.
+         int oneBasedIndex = 1;
+         if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+         statement.setString(oneBasedIndex++, pattern_id);
+         // Stop sequence is zero-based.
+         setIntParameter(statement, oneBasedIndex++, stop_sequence);
+         statement.setString(oneBasedIndex++, location_group_id);
+         setIntParameter(statement, oneBasedIndex++, drop_off_type);
+         setIntParameter(statement, oneBasedIndex++, pickup_type);
+         setIntParameter(statement, oneBasedIndex++, timepoint);
+         setIntParameter(statement, oneBasedIndex++, continuous_pickup);
+         setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
+         statement.setString(oneBasedIndex++, pickup_booking_rule_id);
+         statement.setString(oneBasedIndex++, drop_off_booking_rule_id);
+
+         // the derived fields
+         setIntParameter(statement, oneBasedIndex++, flex_default_travel_time);
+         setIntParameter(statement, oneBasedIndex++, flex_default_zone_time);
+
+         // the copied fields
+         setDoubleParameter(statement, oneBasedIndex++, mean_duration_factor);
+         setDoubleParameter(statement, oneBasedIndex++, mean_duration_offset);
+         setDoubleParameter(statement, oneBasedIndex++, safe_duration_factor);
+         setDoubleParameter(statement, oneBasedIndex, safe_duration_offset);
     }
 }
 

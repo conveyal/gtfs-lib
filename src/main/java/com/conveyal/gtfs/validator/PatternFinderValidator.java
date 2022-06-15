@@ -5,6 +5,7 @@ import com.conveyal.gtfs.TripPatternKey;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.BatchTracker;
 import com.conveyal.gtfs.loader.Feed;
+import com.conveyal.gtfs.loader.PatternReconciliation;
 import com.conveyal.gtfs.loader.Requirement;
 import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.model.Location;
@@ -37,8 +38,6 @@ import java.util.Map;
 
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.copyFromFile;
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
-import static com.conveyal.gtfs.model.Entity.setDoubleParameter;
-import static com.conveyal.gtfs.model.Entity.setIntParameter;
 
 /**
  * Groups trips together into "patterns" that share the same sequence of stops.
@@ -165,14 +164,13 @@ public class PatternFinderValidator extends TripValidator {
                 // Construct pattern stops based on values in trip pattern key.
                 // FIXME: Use pattern stops table here?
                 int lastValidDeparture = key.departureTimes.get(0);
-                for (int i = 0; i < key.stops.size(); i++) {
-                    String stopOrLocationIdOrLocationGroupId = key.stops.get(i);
-                    int travelTime = 0;
+                for (int stopSequence = 0; stopSequence < key.stops.size(); stopSequence++) {
+                    String stopOrLocationIdOrLocationGroupId = key.stops.get(stopSequence);
                     // Calculate previous departure time, needed for both pattern location and pattern stop
                     int prevDeparture = INT_MISSING;
-                    if (i > 0) {
-                        int prevDepartureStop = key.departureTimes.get(i - 1);
-                        int prevDepartureFlex = key.end_pickup_dropoff_window.get(i - 1);
+                    if (stopSequence > 0) {
+                        int prevDepartureStop = key.departureTimes.get(stopSequence - 1);
+                        int prevDepartureFlex = key.end_pickup_dropoff_window.get(stopSequence - 1);
                         if (prevDepartureStop != INT_MISSING) {
                             prevDeparture = prevDepartureStop;
                         }
@@ -190,53 +188,37 @@ public class PatternFinderValidator extends TripValidator {
                         }
                     }
                     if (stopById.containsKey(stopOrLocationIdOrLocationGroupId)) {
-                        int arrival = key.arrivalTimes.get(i);
-                        if (i > 0) {
-                            travelTime = arrival == INT_MISSING || lastValidDeparture == INT_MISSING
-                                ? INT_MISSING
-                                : arrival - lastValidDeparture;
-                        }
-                        int departure = key.departureTimes.get(i);
-                        int dwellTime = arrival == INT_MISSING || departure == INT_MISSING
-                            ? INT_MISSING
-                            : departure - arrival;
-
-                        insertPatternStopStatement.setString(1, pattern.pattern_id);
-                        // Stop sequence is zero-based.
-                        setIntParameter(insertPatternStopStatement, 2, i);
-                        insertPatternStopStatement.setString(3, stopOrLocationIdOrLocationGroupId);
-                        setIntParameter(insertPatternStopStatement, 4, travelTime);
-                        setIntParameter(insertPatternStopStatement, 5, dwellTime);
-                        setIntParameter(insertPatternStopStatement, 6, key.dropoffTypes.get(i));
-                        setIntParameter(insertPatternStopStatement, 7, key.pickupTypes.get(i));
-                        setDoubleParameter(insertPatternStopStatement, 8, key.shapeDistances.get(i));
-                        setIntParameter(insertPatternStopStatement, 9, key.timepoints.get(i));
-                        setIntParameter(insertPatternStopStatement, 10, key.continuous_pickup.get(i));
-                        setIntParameter(insertPatternStopStatement, 11, key.continuous_drop_off.get(i));
-                        insertPatternStopStatement.setString(12, key.pickup_booking_rule_id.get(i));
-                        insertPatternStopStatement.setString(13, key.drop_off_booking_rule_id.get(i));
-                        patternStopTracker.addBatch();
-                    } else if (locationById.containsKey(stopOrLocationIdOrLocationGroupId)) {
-                        addLocationOrLocationGroup(
-                            i,
+                        insertPatternType(
+                            stopSequence,
                             key,
                             lastValidDeparture,
-                            travelTime,
+                            pattern.pattern_id,
+                            insertPatternStopStatement,
+                            patternStopTracker,
+                            stopOrLocationIdOrLocationGroupId,
+                            PatternReconciliation.PatternType.STOP
+                        );
+                    } else if (locationById.containsKey(stopOrLocationIdOrLocationGroupId)) {
+                        insertPatternType(
+                            stopSequence,
+                            key,
+                            lastValidDeparture,
                             pattern.pattern_id,
                             insertPatternLocationStatement,
                             patternLocationTracker,
-                            stopOrLocationIdOrLocationGroupId
+                            stopOrLocationIdOrLocationGroupId,
+                            PatternReconciliation.PatternType.LOCATION
                         );
                     } else if (locationGroupById.containsKey(stopOrLocationIdOrLocationGroupId)) {
-                        addLocationOrLocationGroup(
-                            i,
+                        insertPatternType(
+                            stopSequence,
                             key,
                             lastValidDeparture,
-                            travelTime,
                             pattern.pattern_id,
                             insertPatternLocationGroupStatement,
                             patternLocationGroupTracker,
-                            stopOrLocationIdOrLocationGroupId
+                            stopOrLocationIdOrLocationGroupId,
+                            PatternReconciliation.PatternType.LOCATION_GROUP
                         );
                     }
                 }
@@ -320,50 +302,116 @@ public class PatternFinderValidator extends TripValidator {
     }
 
     /**
-     * Insert either a location or location group depending on the value used for the stop id in stops.
+     * Insert pattern types. This covers pattern stops, locations and location groups.
      */
-    private void addLocationOrLocationGroup(
-        int i,
-        TripPatternKey key,
+    private void insertPatternType(
+        int stopSequence,
+        TripPatternKey tripPattern,
         int lastValidDeparture,
-        int travelTime,
         String patternId,
-        PreparedStatement insertPreparedStatement,
+        PreparedStatement statement,
         BatchTracker batchTracker,
-        String locationIdOrLocationGroupId
+        String patternTypeId,
+        PatternReconciliation.PatternType patternType
     ) throws SQLException {
-        int pickupStart = key.start_pickup_dropoff_window.get(i);
-        if (i > 0) {
+        int travelTime = 0;
+        travelTime = (patternType == PatternReconciliation.PatternType.STOP)
+            ? getTravelTime(
+                travelTime,
+                stopSequence,
+                tripPattern.arrivalTimes.get(stopSequence),
+                lastValidDeparture)
+            : getTravelTime(
+                travelTime,
+                stopSequence,
+                tripPattern.start_pickup_dropoff_window.get(stopSequence),
+                lastValidDeparture);
+
+        int timeInLocation = (patternType == PatternReconciliation.PatternType.STOP)
+            ? getTimeInLocation(
+                tripPattern.arrivalTimes.get(stopSequence),
+                tripPattern.departureTimes.get(stopSequence))
+            : getTimeInLocation(
+                tripPattern.start_pickup_dropoff_window.get(stopSequence),
+                tripPattern.end_pickup_dropoff_window.get(stopSequence));
+
+        if (patternType == PatternReconciliation.PatternType.STOP) {
+            PatternStop patternStop = new PatternStop();
+            patternStop.pattern_id = patternId;
+            patternStop.stop_sequence = stopSequence;
+            patternStop.stop_id = patternTypeId;
+            patternStop.default_travel_time = travelTime;
+            patternStop.default_dwell_time = timeInLocation;
+            patternStop.drop_off_type = tripPattern.dropoffTypes.get(stopSequence);
+            patternStop.pickup_type = tripPattern.pickupTypes.get(stopSequence);
+            patternStop.shape_dist_traveled = tripPattern.shapeDistances.get(stopSequence);
+            patternStop.timepoint = tripPattern.timepoints.get(stopSequence);
+            patternStop.continuous_pickup = tripPattern.continuous_pickup.get(stopSequence);
+            patternStop.continuous_drop_off = tripPattern.continuous_drop_off.get(stopSequence);
+            patternStop.pickup_booking_rule_id = tripPattern.pickup_booking_rule_id.get(stopSequence);
+            patternStop.drop_off_booking_rule_id = tripPattern.drop_off_booking_rule_id.get(stopSequence);
+            patternStop.setStatementParameters(statement, true);
+        } else if (patternType == PatternReconciliation.PatternType.LOCATION) {
+            PatternLocation patternLocation = new PatternLocation();
+            patternLocation.pattern_id = patternId;
+            patternLocation.stop_sequence = stopSequence;
+            patternLocation.location_id = patternTypeId;
+            patternLocation.drop_off_type = tripPattern.dropoffTypes.get(stopSequence);
+            patternLocation.pickup_type = tripPattern.pickupTypes.get(stopSequence);
+            patternLocation.timepoint = tripPattern.timepoints.get(stopSequence);
+            patternLocation.continuous_pickup = tripPattern.continuous_pickup.get(stopSequence);
+            patternLocation.continuous_drop_off = tripPattern.continuous_drop_off.get(stopSequence);
+            patternLocation.pickup_booking_rule_id = tripPattern.pickup_booking_rule_id.get(stopSequence);
+            patternLocation.drop_off_booking_rule_id = tripPattern.drop_off_booking_rule_id.get(stopSequence);
+            patternLocation.flex_default_travel_time = travelTime;
+            patternLocation.flex_default_zone_time = timeInLocation;
+            patternLocation.mean_duration_factor = tripPattern.mean_duration_factor.get(stopSequence);
+            patternLocation.mean_duration_offset = tripPattern.mean_duration_offset.get(stopSequence);
+            patternLocation.safe_duration_factor = tripPattern.safe_duration_factor.get(stopSequence);
+            patternLocation.safe_duration_offset = tripPattern.safe_duration_offset.get(stopSequence);
+            patternLocation.setStatementParameters(statement, true);
+        } else if (patternType == PatternReconciliation.PatternType.LOCATION_GROUP) {
+            PatternLocationGroup patternLocationGroup = new PatternLocationGroup();
+            patternLocationGroup.pattern_id = patternId;
+            patternLocationGroup.stop_sequence = stopSequence;
+            patternLocationGroup.location_group_id = patternTypeId;
+            patternLocationGroup.drop_off_type = tripPattern.dropoffTypes.get(stopSequence);
+            patternLocationGroup.pickup_type = tripPattern.pickupTypes.get(stopSequence);
+            patternLocationGroup.timepoint = tripPattern.timepoints.get(stopSequence);
+            patternLocationGroup.continuous_pickup = tripPattern.continuous_pickup.get(stopSequence);
+            patternLocationGroup.continuous_drop_off = tripPattern.continuous_drop_off.get(stopSequence);
+            patternLocationGroup.pickup_booking_rule_id = tripPattern.pickup_booking_rule_id.get(stopSequence);
+            patternLocationGroup.drop_off_booking_rule_id = tripPattern.drop_off_booking_rule_id.get(stopSequence);
+            patternLocationGroup.flex_default_travel_time = travelTime;
+            patternLocationGroup.flex_default_zone_time = timeInLocation;
+            patternLocationGroup.mean_duration_factor = tripPattern.mean_duration_factor.get(stopSequence);
+            patternLocationGroup.mean_duration_offset = tripPattern.mean_duration_offset.get(stopSequence);
+            patternLocationGroup.safe_duration_factor = tripPattern.safe_duration_factor.get(stopSequence);
+            patternLocationGroup.safe_duration_offset = tripPattern.safe_duration_offset.get(stopSequence);
+            patternLocationGroup.setStatementParameters(statement, true);
+        }
+        batchTracker.addBatch();
+    }
+
+    /**
+     * Get the travel time from previous to current stop for pattern stops or travel time within a flex location or
+     * location group.
+     */
+    private int getTravelTime(int travelTime, int stopSequence, int pickupStart, int lastValidDeparture) {
+        if (stopSequence > 0) {
             travelTime = pickupStart == INT_MISSING || lastValidDeparture == INT_MISSING
                 ? INT_MISSING
                 : pickupStart - lastValidDeparture;
         }
-        int pickupEnd = key.end_pickup_dropoff_window.get(i);
-        int timeInLocation = pickupStart == INT_MISSING || pickupEnd == INT_MISSING
+        return travelTime;
+    }
+
+    /**
+     * Get dwell time for pattern stops or time within a flex location or location group.
+     */
+    private int getTimeInLocation(int pickupStart, int pickupEnd) {
+        return pickupStart == INT_MISSING || pickupEnd == INT_MISSING
             ? INT_MISSING
             : pickupEnd - pickupStart;
-
-        insertPreparedStatement.setString(1, patternId);
-        // Stop sequence is zero-based.
-        setIntParameter(insertPreparedStatement, 2, i);
-        insertPreparedStatement.setString(3, locationIdOrLocationGroupId);
-        setIntParameter(insertPreparedStatement, 4, key.dropoffTypes.get(i));
-        setIntParameter(insertPreparedStatement, 5, key.pickupTypes.get(i));
-        setIntParameter(insertPreparedStatement, 6, key.timepoints.get(i));
-        setIntParameter(insertPreparedStatement, 7, key.continuous_pickup.get(i));
-        setIntParameter(insertPreparedStatement, 8, key.continuous_drop_off.get(i));
-        insertPreparedStatement.setString(9, key.pickup_booking_rule_id.get(i));
-        insertPreparedStatement.setString(10, key.drop_off_booking_rule_id.get(i));
-
-        // the derived fields
-        setIntParameter(insertPreparedStatement, 11, travelTime);
-        setIntParameter(insertPreparedStatement, 12, timeInLocation);
-
-        // the copied fields
-        setDoubleParameter(insertPreparedStatement, 13, key.mean_duration_factor.get(i));
-        setDoubleParameter(insertPreparedStatement, 14, key.mean_duration_offset.get(i));
-        setDoubleParameter(insertPreparedStatement, 15, key.safe_duration_factor.get(i));
-        setDoubleParameter(insertPreparedStatement, 16, key.safe_duration_offset.get(i));
-        batchTracker.addBatch();
     }
 }

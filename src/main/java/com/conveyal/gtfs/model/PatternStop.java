@@ -32,6 +32,21 @@ public class PatternStop extends PatternHalt {
 
     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
-        // Not required. Here to satisfy interface.
+        int oneBasedIndex = 1;
+        if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
+        statement.setString(oneBasedIndex++, pattern_id);
+        // Stop sequence is zero-based.
+        setIntParameter(statement, oneBasedIndex++, stop_sequence);
+        statement.setString(oneBasedIndex++, stop_id);
+        setIntParameter(statement, oneBasedIndex++, default_travel_time);
+        setIntParameter(statement, oneBasedIndex++, default_dwell_time);
+        setIntParameter(statement, oneBasedIndex++, drop_off_type);
+        setIntParameter(statement, oneBasedIndex++, pickup_type);
+        setDoubleParameter(statement, oneBasedIndex++, shape_dist_traveled);
+        setIntParameter(statement, oneBasedIndex++, timepoint);
+        setIntParameter(statement, oneBasedIndex++, continuous_pickup);
+        setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
+        statement.setString(oneBasedIndex++, pickup_booking_rule_id);
+        statement.setString(oneBasedIndex, drop_off_booking_rule_id);
     }
 }
