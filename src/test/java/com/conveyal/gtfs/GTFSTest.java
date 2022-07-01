@@ -41,12 +41,12 @@ import java.util.Iterator;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import static com.conveyal.gtfs.graphql.GTFSGraphQLTest.testDBName;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.core.IsNull.nullValue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
 /**
@@ -168,6 +168,56 @@ public class GTFSTest {
             "Integration test passes",
             runIntegrationTestOnFolder("fake-agency-bad-calendar-date", nullValue(), expectations, errorExpectations),
             equalTo(true)
+        );
+    }
+
+    /**
+     * Tests that a GTFS feed with blank (unspecified) values for pickup and dropoff types in stop_times.txt
+     * is loaded with the blank values resolved, so that the patterns are counted correctly.
+     */
+    @Test
+    public void canLoadFeedAndResolveUnsetPickupDropOffValues () {
+        PersistenceExpectation persistenceExpectation1 = makePickupDropOffPersistenceExpectation(1);
+        PersistenceExpectation persistenceExpectation2 = makePickupDropOffPersistenceExpectation(2);
+
+        PersistenceExpectation[] expectations1 = PersistenceExpectation.list(
+            persistenceExpectation1
+        );
+        PersistenceExpectation[] expectations2 = PersistenceExpectation.list(
+            persistenceExpectation1,
+            // There should be only one pattern, so the record below should not be created after loading the test feed.
+            persistenceExpectation2
+        );
+        ErrorExpectation[] errorExpectations = ErrorExpectation.list(
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
+        );
+
+        // The first pattern should be added to the editor patterns table.
+        assertThat(
+            "There should be one pattern in the patterns table after resolving blank pickup/dropoff values in stop_times.",
+            runIntegrationTestOnFolder("fake-ferry-blank-pickups", nullValue(), expectations1, errorExpectations),
+            equalTo(true)
+        );
+
+        // The second pattern should not be added to the editor patterns table
+        // (there *should* be an assertion error about the second record from expectations2 not found).
+        assertThrows(
+            AssertionError.class,
+            () -> runIntegrationTestOnFolder("fake-ferry-blank-pickups", nullValue(), expectations2, errorExpectations),
+            "There should be *only* one pattern in the patterns table after resolving blank pickup/dropoff values."
+        );
+    }
+
+    private PersistenceExpectation makePickupDropOffPersistenceExpectation(int index) {
+         return new PersistenceExpectation(
+            "patterns",
+            new RecordExpectation[]{
+                new RecordExpectation("pattern_id", String.valueOf(index)),
+                new RecordExpectation("route_id", "Tib-AIF"),
+                new RecordExpectation("direction_id", 1),
+                new RecordExpectation("shape_id", "y7d8"),
+            },
+            true
         );
     }
 
