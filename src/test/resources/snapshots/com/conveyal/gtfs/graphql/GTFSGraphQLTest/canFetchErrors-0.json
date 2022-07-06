@@ -133,7 +133,7 @@
         "line_number" : null
       }, {
         "bad_value" : "location_id:area-999, stop_id:area-999",
-        "entity_id" : "2",
+        "entity_id" : "1",
         "entity_sequence" : null,
         "entity_type" : "LocationGroup",
         "error_id" : 3,

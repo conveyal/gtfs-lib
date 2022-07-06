@@ -1,4 +1,4 @@
 location_group_id,location_id,location_group_name
 1,123,"Location group referencing a stop"
-2,area-999,"Location group referencing an invalid location"
-3,area_1469-1,"Location group referencing a location"
+1,area-999,"Location group referencing an invalid location"
+1,area_1469-1,"Location group referencing a location"
