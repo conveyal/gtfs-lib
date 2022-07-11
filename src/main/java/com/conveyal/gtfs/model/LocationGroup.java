@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
@@ -21,12 +20,6 @@ public class LocationGroup extends Entity {
     @Override
     public String getId() {
         return location_group_id;
-    }
-
-    @Override
-    @JsonIgnore
-    public Integer getSequenceNumber () {
-        return null;
     }
 
     /**

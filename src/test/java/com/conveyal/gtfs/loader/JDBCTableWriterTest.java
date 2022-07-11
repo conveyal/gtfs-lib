@@ -24,10 +24,7 @@ import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.CollectionType;
 import com.google.common.collect.ImmutableMap;
 import org.hamcrest.Matcher;
 import org.hamcrest.Matchers;
@@ -47,8 +44,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -489,64 +484,58 @@ public class JDBCTableWriterTest {
     }
 
     @Test
-    void canCreateUpdateAndDeleteMultipleLocationGroups() throws IOException, SQLException, InvalidNamespaceException {
+    public void canCreateUpdateAndDeleteLocationGroups() throws IOException, SQLException, InvalidNamespaceException {
         // Store Table and Class values for use in test.
         final Table locationGroupsTable = Table.LOCATION_GROUPS;
         final Class<LocationGroupDTO> locationGroupDTOClass = LocationGroupDTO.class;
 
         // create new object to be saved
         final String locationGroupId = "4153";
-        List<LocationGroupDTO> createdLocationGroup = createMultipleTestLocationGroups(locationGroupId);
-        for (LocationGroupDTO locationGroup : createdLocationGroup) {
-            // Set value to empty strings/null to later verify that it is set to null in the database.
-            locationGroup.location_group_name = "";
-            // make sure saved data matches expected data
-            assertThat(locationGroup.location_group_id, equalTo(locationGroupId));
-            // Check that each (six in total) location groups exists.
-            assertThatSqlQueryYieldsRowCount(getColumnsForId(locationGroup.id, Table.LOCATION_GROUPS), 1);
-        }
+        LocationGroupDTO createdLocationGroup = createSimpleTestLocationGroup(locationGroupId);
+        // Set value to empty strings/null to later verify that it is set to null in the database.
+        createdLocationGroup.location_group_name = "";
+        // make sure saved data matches expected data
+        assertThat(createdLocationGroup.location_group_id, equalTo(locationGroupId));
+        // Check that location group exists.
+        assertThatSqlQueryYieldsRowCount(getColumnsForId(createdLocationGroup.id, Table.LOCATION_GROUPS), 1);
         // try to update record
         final String updatedLocationGroupId = "3514";
-        for (LocationGroupDTO locationGroup : createdLocationGroup) {
-            locationGroup.location_group_id = updatedLocationGroupId;
-        }
+        createdLocationGroup.location_group_id = updatedLocationGroupId;
 
         // convert object to json and save it
-        for (LocationGroupDTO locationGroup : createdLocationGroup) {
-            JdbcTableWriter updateTableWriter = createTestTableWriter(locationGroupsTable);
-            String updateOutput = updateTableWriter.update(
-                locationGroup.id,
-                mapper.writeValueAsString(locationGroup),
-                true
-            );
-            LOG.info("update {} output:", locationGroupsTable.name);
-            LOG.info(updateOutput);
+        JdbcTableWriter updateTableWriter = createTestTableWriter(locationGroupsTable);
+        String updateOutput = updateTableWriter.update(
+            createdLocationGroup.id,
+            mapper.writeValueAsString(createdLocationGroup),
+            true
+        );
+        LOG.info("update {} output:", locationGroupsTable.name);
+        LOG.info(updateOutput);
 
-            LocationGroupDTO updatedLocationGroupDTO = mapper.readValue(updateOutput, locationGroupDTOClass);
+        LocationGroupDTO updatedLocationGroupDTO = mapper.readValue(updateOutput, locationGroupDTOClass);
 
-            // make sure saved data matches expected data
-            assertThat(updatedLocationGroupDTO.location_group_id, equalTo(updatedLocationGroupId));
-            // Ensure message is null (not empty string).
-            LOG.info("location_group_name: {}", updatedLocationGroupDTO.location_group_name);
-            assertNull(updatedLocationGroupDTO.location_group_name);
-            // Verify that certain values are correctly set in the database.
-            ResultSet resultSet = getResultSetForId(updatedLocationGroupDTO.id, locationGroupsTable);
-            while (resultSet.next()) {
-                assertResultValue(resultSet, "location_group_id", equalTo(locationGroup.location_group_id));
-                assertResultValue(resultSet, "location_id", equalTo(locationGroup.location_id));
-                assertResultValue(resultSet, "location_group_name", Matchers.nullValue());
-            }
-            // try to delete record
-            JdbcTableWriter deleteTableWriter = createTestTableWriter(locationGroupsTable);
-            int deleteOutput = deleteTableWriter.delete(
-                locationGroup.id,
-                true
-            );
-            LOG.info("deleted {} records from {}", deleteOutput, locationGroupsTable.name);
-
-            // make sure route record does not exist in DB
-            assertThatSqlQueryYieldsZeroRows(getColumnsForId(locationGroup.id, locationGroupsTable));
+        // make sure saved data matches expected data
+        assertThat(updatedLocationGroupDTO.location_group_id, equalTo(updatedLocationGroupId));
+        // Ensure message is null (not empty string).
+        LOG.info("location_group_name: {}", updatedLocationGroupDTO.location_group_name);
+        assertNull(updatedLocationGroupDTO.location_group_name);
+        // Verify that certain values are correctly set in the database.
+        ResultSet resultSet = getResultSetForId(updatedLocationGroupDTO.id, locationGroupsTable);
+        while (resultSet.next()) {
+            assertResultValue(resultSet, "location_group_id", equalTo(createdLocationGroup.location_group_id));
+            assertResultValue(resultSet, "location_id", equalTo(createdLocationGroup.location_id));
+            assertResultValue(resultSet, "location_group_name", Matchers.nullValue());
         }
+        // try to delete record
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(locationGroupsTable);
+        int deleteOutput = deleteTableWriter.delete(
+            createdLocationGroup.id,
+            true
+        );
+        LOG.info("deleted {} records from {}", deleteOutput, locationGroupsTable.name);
+
+        // make sure route record does not exist in DB
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocationGroup.id, locationGroupsTable));
     }
 
     @Test
@@ -1756,33 +1745,6 @@ public class JDBCTableWriterTest {
         LOG.info(output);
         // parse output
         return mapper.readValue(output, LocationGroupDTO.class);
-    }
-
-    /**
-     * Create and store multiple location groups for testing.
-     */
-    private static List<LocationGroupDTO> createMultipleTestLocationGroups(String locationGroupId)
-        throws InvalidNamespaceException, IOException, SQLException {
-
-        LocationGroupDTO locationGroup = new LocationGroupDTO();
-        locationGroup.location_group_id = locationGroupId;
-        locationGroup.location_id = "1,2,3,4,5,6";
-        locationGroup.location_group_name = "Multi location group";
-        // convert object to json and save it
-        JdbcTableWriter createTableWriter = createTestTableWriter(Table.LOCATION_GROUPS);
-        String output = createTableWriter.create(mapper.writeValueAsString(locationGroup), true);
-        // The output returned by JdbcTableWriter after processing an JSON array is a JSON representation of a list of
-        // String objects. This contains additional quotes which prevents the JSON from being turned back into objects.
-        // The following removes the additional characters that are not needed.
-        output = output
-            .replaceAll("\\\\", "")
-            .replaceAll("\"\\{", "{")
-            .replaceAll("}\"", "}");
-        LOG.info("create {} output:", Table.LOCATION_GROUPS.name);
-        LOG.info(output);
-
-        // parse output
-        return Arrays.asList(mapper.readValue(output, LocationGroupDTO[].class));
     }
 
     /**

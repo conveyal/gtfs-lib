@@ -2,7 +2,6 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
-import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternLocationGroup;
@@ -124,28 +123,6 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Extract multiple location groups from a single location group if there is more than one location id. This allows
-     * the UI to provide multiple location ids for a single location group in one submission.
-     */
-    private JsonNode extractLocationGroups(String json) throws IOException {
-        LocationGroup multipleLocationGroups = mapper.readValue(json, LocationGroup.class);
-        String[] locationIds = multipleLocationGroups.location_id.split(",");
-        if (locationIds.length <= 1) {
-            // If there is only one location id, there is no need to extract into an array.
-            return getJsonNode(json);
-        }
-        List<LocationGroup> locationGroups = new ArrayList<>();
-        for (String locationId : locationIds) {
-            LocationGroup locationGroup = new LocationGroup();
-            locationGroup.location_group_id = multipleLocationGroups.location_group_id;
-            locationGroup.location_group_name = multipleLocationGroups.location_group_name;
-            locationGroup.location_id = locationId;
-            locationGroups.add(locationGroup);
-        }
-        return getJsonNode(mapper.writeValueAsString(locationGroups));
-    }
-
-    /**
      * Update entity for a given ID with the provided JSON string. This update and any potential cascading updates to
      * referencing tables all happens in a single transaction. Note, any call to create or update must provide
      * a JSON string with the full set of fields matching the definition of the GTFS table in the Table class.
@@ -154,9 +131,6 @@ public class JdbcTableWriter implements TableWriter {
     public String update(Integer id, String json, boolean autoCommit) throws SQLException, IOException {
         final boolean isCreating = id == null;
         JsonNode jsonNode = getJsonNode(json);
-        if (specTable.name.equals(Table.LOCATION_GROUPS.name)) {
-            jsonNode = extractLocationGroups(json);
-        }
         try {
             if (jsonNode.isArray()) {
                 // If an array of objects is passed in as the JSON input, update them all in a single transaction, only
@@ -1372,18 +1346,13 @@ public class JdbcTableWriter implements TableWriter {
             if (size == 1) {
                 // There was one match found.
                 if (isCreating) {
-                    if (!specTable.name.equals(Table.LOCATION_GROUPS.name)) {
-                        // Under no circumstance should a new entity have a conflict with existing key field.
-                        throw new SQLException(
-                            String.format("New %s's %s value (%s) conflicts with an existing record in table.",
-                                table.entityClass.getSimpleName(),
-                                keyField,
-                                keyValue)
-                        );
-                    } else {
-                        LOG.debug("New {} value ({}) which matches existing record in table", specTable.name, keyValue);
-                        return;
-                    }
+                    // Under no circumstance should a new entity have a conflict with existing key field.
+                    throw new SQLException(
+                        String.format("New %s's %s value (%s) conflicts with an existing record in table.",
+                            table.entityClass.getSimpleName(),
+                            keyField,
+                            keyValue)
+                    );
                 }
                 if (!uniqueIds.contains(id)) {
                     // There are two circumstances we could encounter here.
@@ -1392,20 +1361,16 @@ public class JdbcTableWriter implements TableWriter {
                     throw new SQLException("Key field must be unique and request parameter ID must exist.");
                 }
             } else if (size > 1) {
-                if (!specTable.name.equals(Table.LOCATION_GROUPS.name)) {
-                    // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
-                    // attempt to rectify bad data.
-                    String message = String.format(
-                        "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
-                        size,
-                        table.name,
-                        keyField,
-                        keyValue);
-                    LOG.error(message);
-                    throw new SQLException(message);
-                } else {
-                    LOG.debug("New {} value ({}) which matches existing record in table", specTable.name, keyValue);
-                }
+                // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
+                // attempt to rectify bad data.
+                String message = String.format(
+                    "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
+                    size,
+                    table.name,
+                    keyField,
+                    keyValue);
+                LOG.error(message);
+                throw new SQLException(message);
             }
         }
     }
