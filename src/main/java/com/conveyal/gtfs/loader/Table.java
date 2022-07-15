@@ -88,7 +88,7 @@ public class Table {
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
 
     public static final String LOCATION_GEO_JSON_FILE_NAME = "locations.geojson";
-    public static final String LOCATION_GROUPS_FILE_NAME = Table.LOCATION_GROUPS.name + ".txt";
+    public static final String LOCATION_GROUPS_FILE_NAME = "location_groups.txt";
 
     public final String name;
 
