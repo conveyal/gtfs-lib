@@ -1,21 +1,48 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
+import com.csvreader.CsvReader;
+import org.apache.commons.io.input.BOMInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 public class LocationGroup extends Entity {
 
+    private static final Logger LOG = LoggerFactory.getLogger(LocationGroup.class);
     private static final long serialVersionUID = -4961539668114167098L;
+    private static final int NUMBER_OF_HEADERS = 3;
+    private static final int NUMBER_OF_COLUMNS = 3;
+    private static final String CSV_HEADER = "location_group_id,location_id,location_group_name" + System.lineSeparator();
 
     public String location_group_id;
-    // ID referencing stops.stop_id or id from locations.geojson.
+    /**
+     * A comma separated list of ids referencing stops.stop_id or id from locations.geojson. These are grouped by
+     * {@link LocationGroup#getCsvReader(ZipFile, ZipEntry, List)}.
+     */
     public String location_id;
     public String location_group_name;
+
+    public LocationGroup() {
+    }
+
+    public LocationGroup(String locationGroupId, String locationId, String locationGroupName) {
+        this.location_group_id = locationGroupId;
+        this.location_id = locationId;
+        this.location_group_name = locationGroupName;
+    }
 
     @Override
     public String getId() {
@@ -82,6 +109,118 @@ public class LocationGroup extends Entity {
         public Iterator<LocationGroup> iterator() {
             return this.feed.locationGroups.values().iterator();
         }
+    }
+
+    public String toCsvRow() {
+        return String.join(
+            ",",
+            location_group_id,
+            location_id.contains(",") ? "\"" + location_id + "\"" : location_id,
+            location_group_name
+        ) + System.lineSeparator();
+    }
+
+    /**
+     * Extract the location groups from file and group by location group id. Multiple rows of location groups with the
+     * same location group id will be compressed into a single row with comma separated location ids. This is to allow
+     * for easier CRUD by the DT UI.
+     *
+     * E.g. 1,2,"group 1" and 1,3,"group 1", will become: 1,"2,3","group 1".
+     *
+     * If there are any issues grouping the location groups, null is return. This is to prevent downstream processing
+     * attempting to parse the file again.
+     */
+    public static CsvReader getCsvReader(ZipFile zipFile, ZipEntry entry, List<String> errors) {
+        CsvReader csvReader;
+        int locationGroupIdIndex = 0;
+        int locationIdIndex = 1;
+        int locationGroupNameIndex = 2;
+        HashMap<String, LocationGroup> multiLocationGroups = new HashMap<>();
+        try {
+            InputStream zipInputStream = zipFile.getInputStream(entry);
+            csvReader = new CsvReader(new BOMInputStream(zipInputStream), ',', StandardCharsets.UTF_8);
+            csvReader.setSkipEmptyRecords(false);
+            csvReader.readHeaders();
+            String[] headers = csvReader.getHeaders();
+            if (headers.length != NUMBER_OF_HEADERS) {
+                String message = String.format(
+                    "Wrong number of headers, expected=%d; found=%d in %s.",
+                    NUMBER_OF_HEADERS,
+                    headers.length,
+                    entry.getName()
+                );
+                LOG.warn(message);
+                if (errors != null) errors.add(message);
+                return null;
+            }
+            while (csvReader.readRecord()) {
+                int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
+                if (csvReader.getColumnCount() != NUMBER_OF_COLUMNS) {
+                    String message = String.format("Wrong number of columns for line number=%d; expected=%d; found=%d.",
+                        lineNumber,
+                        NUMBER_OF_COLUMNS,
+                        csvReader.getColumnCount()
+                    );
+                    LOG.warn(message);
+                    if (errors != null) errors.add(message);
+                    continue;
+                }
+                LocationGroup locationGroup = new LocationGroup(
+                    csvReader.get(locationGroupIdIndex),
+                    csvReader.get(locationIdIndex),
+                    csvReader.get(locationGroupNameIndex)
+                );
+                if (multiLocationGroups.containsKey(locationGroup.location_group_id)) {
+                    // Combine location groups with matching location group ids.
+                    LocationGroup multiLocationGroup = multiLocationGroups.get(locationGroup.location_group_id);
+                    multiLocationGroup.location_id += "," + locationGroup.location_id;
+                } else {
+                    multiLocationGroups.put(locationGroup.location_group_id, locationGroup);
+                }
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        return (multiLocationGroups.isEmpty()) ? null : produceCsvPayload(multiLocationGroups);
+    }
+
+    /**
+     * Convert the multiple location groups back into CSV, with header and return a {@link CsvReader} representation.
+     */
+    private static CsvReader produceCsvPayload(HashMap<String, LocationGroup> multiLocationGroupIds) {
+        StringBuilder csvContent = new StringBuilder();
+        csvContent.append(CSV_HEADER);
+        multiLocationGroupIds.forEach((key, value) -> csvContent.append(value.toCsvRow()));
+        return new CsvReader(new StringReader(csvContent.toString()));
+    }
+
+    /**
+     * Expand all location groups which have multiple location ids into a single row for each location id. This is to
+     * conform with the GTFS Flex standard.
+     *
+     * E.g. 1,"2,3","group 1", will become: 1,2,"group 1" and 1,3,"group 1".
+     *
+     */
+    public static String packLocationGroups(List<LocationGroup> locationGroups) {
+        StringBuilder csvContent = new StringBuilder();
+        csvContent.append(CSV_HEADER);
+        locationGroups.forEach(locationGroup -> {
+            if (!locationGroup.location_id.contains(",")) {
+                // Single location id reference.
+                csvContent.append(locationGroup.toCsvRow());
+            } else {
+                for (String locationId : locationGroup.location_id.split(",")) {
+                    csvContent.append(String.join(
+                        ",",
+                        locationGroup.location_group_id,
+                        locationId,
+                        locationGroup.location_group_name
+                    ));
+                    csvContent.append(System.lineSeparator());
+                }
+            }
+        });
+        return csvContent.toString();
     }
 
     @Override
