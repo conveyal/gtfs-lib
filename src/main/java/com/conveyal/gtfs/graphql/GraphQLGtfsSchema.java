@@ -406,6 +406,7 @@ public class GraphQLGtfsSchema {
                             new JDBCFetcher("patterns", "route_id", null, false),
                             new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                             new JDBCFetcher("pattern_locations", "pattern_id", null, false),
+                            new JDBCFetcher("pattern_location_groups", "pattern_id", null, false),
                             new JDBCFetcher("stops", "stop_id")))
                     .build())
             .field(newFieldDefinition()
@@ -474,6 +475,7 @@ public class GraphQLGtfsSchema {
                             // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id"),
+                            new JDBCFetcher("pattern_location_groups", "location_group_id"),
                             new JDBCFetcher("pattern_locations", "location_id")))
                     .build())
             .field(newFieldDefinition()
@@ -488,6 +490,7 @@ public class GraphQLGtfsSchema {
                             // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("pattern_locations", "location_id", null, false),
+                            new JDBCFetcher("pattern_location_groups", "location_group_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id", null, false),
                             new JDBCFetcher("routes", "route_id")))
                     .build())
@@ -679,6 +682,18 @@ public class GraphQLGtfsSchema {
                             false))
                     .build())
             .field(newFieldDefinition()
+                    .name("pattern_location_groups")
+                    .type(new GraphQLList(patternLocationType))
+                    // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
+                    // (i.e., nested types that typically would only be nested under another entity and only make sense
+                    // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
+                    .argument(intArg(LIMIT_ARG))
+                    .dataFetcher(new JDBCFetcher("pattern_location_groups",
+                            "pattern_id",
+                            "stop_sequence",
+                            false))
+                    .build())
+            .field(newFieldDefinition()
                 .name("stops")
                 .description("GTFS stop entities that the pattern serves")
                 // Field type should be equivalent to the final JDBCFetcher table type.
@@ -694,6 +709,7 @@ public class GraphQLGtfsSchema {
                         // will be returned.
                         new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                         new JDBCFetcher("pattern_locations", "location_id", null, false),
+                        new JDBCFetcher("pattern_location_groups", "location_group_id", null, false),
                         new JDBCFetcher("stops", "stop_id")))
                 .build())
             .field(newFieldDefinition()
