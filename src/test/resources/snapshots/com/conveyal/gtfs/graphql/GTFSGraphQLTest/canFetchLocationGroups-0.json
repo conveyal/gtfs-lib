@@ -17,6 +17,11 @@
         "location_group_id" : "3",
         "location_group_name" : "Location group referencing a location",
         "location_id" : "area_1469-1"
+      }, {
+        "id" : 5,
+        "location_group_id" : "4",
+        "location_group_name" : "Multi location group",
+        "location_id" : "123,area_1469-1"
       } ]
     }
   }

@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
 import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
@@ -65,6 +66,7 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.GEO_JSON_PARSING;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.LOCATION_GROUP_PARSING;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
@@ -86,6 +88,7 @@ public class Table {
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
 
     public static final String LOCATION_GEO_JSON_FILE_NAME = "locations.geojson";
+    public static final String LOCATION_GROUPS_FILE_NAME = "location_groups.txt";
 
     public final String name;
 
@@ -737,11 +740,15 @@ public class Table {
         }
         if (entry == null) return null;
         try {
-            List<String> geoJsonErrors = new ArrayList<>();
-            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, geoJsonErrors);
-            if (!geoJsonErrors.isEmpty() && sqlErrorStorage != null) {
-                geoJsonErrors.forEach(error ->
-                    sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, error))
+            List<String> errors = new ArrayList<>();
+            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, errors);
+            if (!errors.isEmpty() && sqlErrorStorage != null) {
+                // Errors will only be populated if parsing locations.geojson or location_groups.txt.
+                NewGTFSErrorType errorType = (tableFileName.equals(LOCATION_GEO_JSON_FILE_NAME))
+                    ? GEO_JSON_PARSING
+                    : LOCATION_GROUP_PARSING;
+                errors.forEach(error ->
+                    sqlErrorStorage.storeError(NewGTFSError.forFeed(errorType, error))
                 );
             }
             // Don't skip empty records. This is set to true by default on CsvReader. We want to check for empty records
@@ -770,6 +777,8 @@ public class Table {
         CsvReader csvReader;
         if (tableFileName.equals(LOCATION_GEO_JSON_FILE_NAME)) {
             csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry, errors);
+        } else if (tableFileName.equals(LOCATION_GROUPS_FILE_NAME)) {
+            csvReader = LocationGroup.getCsvReader(zipFile, entry, errors);
         } else {
             InputStream zipInputStream = zipFile.getInputStream(entry);
             // Skip any byte order mark that may be present. Files must be UTF-8,
