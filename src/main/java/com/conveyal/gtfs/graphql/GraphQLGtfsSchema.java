@@ -580,6 +580,44 @@ public class GraphQLGtfsSchema {
 
 
     /**
+     * Represents each stop in a list of locations within a pattern.
+     * We could return just a list of LocationIDs within the pattern (a JSON array of strings) but
+     * that structure would prevent us from joining tables and returning additional stop details
+     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     */
+    public static final GraphQLObjectType patternLocationGroupType = newObject().name("patternLocationGroup")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("pattern_id"))
+            .field(MapFetcher.field("location_group_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+            .field(MapFetcher.field("pickup_booking_rule_id"))
+            .field(MapFetcher.field("drop_off_type", GraphQLInt))
+            .field(MapFetcher.field("pickup_type", GraphQLInt))
+            .field(MapFetcher.field("continuous_drop_off", GraphQLInt))
+            .field(MapFetcher.field("continuous_pickup", GraphQLInt))
+            .field(MapFetcher.field("stop_sequence", GraphQLInt))
+            .field(MapFetcher.field("timepoint", GraphQLInt))
+            .field(MapFetcher.field("pickup_booking_rule_id"))
+            .field(MapFetcher.field("drop_off_booking_rule_id"))
+
+            // Additional GTFS Flex location groups and locations fields
+            .field(MapFetcher.field("flex_default_travel_time", GraphQLInt))
+            .field(MapFetcher.field("flex_default_zone_time", GraphQLInt))
+            .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
+            .field(MapFetcher.field("mean_duration_offset", GraphQLFloat))
+            .field(MapFetcher.field("safe_duration_factor", GraphQLFloat))
+            .field(MapFetcher.field("safe_duration_offset", GraphQLFloat))
+            // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
+            // Should this be modified to be an object, rather than a list?
+            .field(newFieldDefinition()
+                    .type(new GraphQLList(locationGroupType))
+                    .name("location")
+                    .dataFetcher(new JDBCFetcher("location_groups", "location_group_id"))
+                    .build()
+            )
+            .build();
+
+    /**
      * The GraphQL API type representing entries in the table of errors encountered while loading or validating a feed.
      */
     public static GraphQLObjectType validationErrorType = newObject().name("validationError")
@@ -683,7 +721,7 @@ public class GraphQLGtfsSchema {
                     .build())
             .field(newFieldDefinition()
                     .name("pattern_location_groups")
-                    .type(new GraphQLList(patternLocationType))
+                    .type(new GraphQLList(patternLocationGroupType))
                     // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
                     // (i.e., nested types that typically would only be nested under another entity and only make sense
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
