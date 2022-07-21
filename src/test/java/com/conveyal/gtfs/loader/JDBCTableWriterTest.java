@@ -954,6 +954,22 @@ public class JDBCTableWriterTest {
                 Table.PATTERN_STOP.name,
                 pattern.pattern_id
             ));
+        // Check that pattern_locations records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.PATTERN_LOCATION.name,
+                pattern.pattern_id
+            ));
+        // Check that pattern_locations records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.PATTERN_LOCATION_GROUP.name,
+                pattern.pattern_id
+            ));
         // Check that shape records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
@@ -1590,6 +1606,14 @@ public class JDBCTableWriterTest {
         input.pattern_stops = new PatternStopDTO[]{
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
+        };
+        input.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 3)
+        };
+        input.pattern_location_groups = new PatternLocationGroupDTO[]{
+            new PatternLocationGroupDTO(patternId, locationGroupOne.location_group_id, 4),
+            new PatternLocationGroupDTO(patternId, locationGroupTwo.location_group_id, 5)
         };
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);

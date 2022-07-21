@@ -49,4 +49,9 @@ public class PatternLocationGroupDTO {
         this.flex_default_zone_time = flexDefaultZoneTime;
     }
 
+    public PatternLocationGroupDTO(String pattern_id, String location_group_id, int stop_sequence) {
+        this.pattern_id = pattern_id;
+        this.location_group_id = location_group_id;
+        this.stop_sequence = stop_sequence;
+    }
 }

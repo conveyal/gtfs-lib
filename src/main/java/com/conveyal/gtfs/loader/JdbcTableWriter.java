@@ -1544,9 +1544,10 @@ public class JdbcTableWriter implements TableWriter {
         deleteShapes(routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
-            // Delete pattern stops before joining patterns are deleted.
+            // Delete pattern stops, locations and location groups before joining patterns are deleted.
             deletePatternStops(routeOrPatternId);
-            // TODO: Flex delete pattern locations.
+            deletePatternLocations(routeOrPatternId);
+            deletePatternLocationGroups(routeOrPatternId);
         }
     }
 
@@ -1566,7 +1567,45 @@ public class JdbcTableWriter implements TableWriter {
                 routeId
             )
         );
-        LOG.info("Deleted {} pattern stops for pattern {}", deletedStopTimes, routeId );
+        LOG.info("Deleted {} pattern stops for pattern {}", deletedStopTimes, routeId);
+    }
+
+    /**
+     * If deleting a route, cascade delete pattern locations for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_locations to delete would fail because there would be no pattern
+     * records to join with.
+     */
+    private void deletePatternLocations(String routeId) throws SQLException {
+        // Delete pattern locations for route.
+        int deletedPatternLocations = executeStatement(
+            String.format(
+                "delete from %s pl using %s p, %s r where pl.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = '%s'",
+                String.format("%s.pattern_locations", tablePrefix),
+                String.format("%s.patterns", tablePrefix),
+                String.format("%s.routes", tablePrefix),
+                routeId
+            )
+        );
+        LOG.info("Deleted {} pattern locations for pattern {}", deletedPatternLocations, routeId);
+    }
+
+    /**
+     * If deleting a route, cascade delete pattern location groups for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_location_groups to delete would fail because there would be no pattern
+     * records to join with.
+     */
+    private void deletePatternLocationGroups(String routeId) throws SQLException {
+        // Delete pattern location groups for route.
+        int deletedPatternLocationGroups = executeStatement(
+            String.format(
+                "delete from %s plg using %s p, %s r where plg.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = '%s'",
+                String.format("%s.pattern_location_groups", tablePrefix),
+                String.format("%s.patterns", tablePrefix),
+                String.format("%s.routes", tablePrefix),
+                routeId
+            )
+        );
+        LOG.info("Deleted {} pattern location groups for pattern {}", deletedPatternLocationGroups, routeId);
     }
 
     /**
