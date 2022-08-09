@@ -1664,8 +1664,8 @@ public class JdbcTableWriter implements TableWriter {
      * Execute the provided sql and return the number of rows effected.
      */
     private int executeStatement(String sql) throws SQLException {
-        LOG.info("{}", sql);
         try (Statement statement = connection.createStatement()) {
+            LOG.info("{}", sql);
             return statement.executeUpdate(sql);
         }
     }
