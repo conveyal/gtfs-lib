@@ -18,7 +18,6 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.dbutils.DbUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1540,7 +1539,7 @@ public class JdbcTableWriter implements TableWriter {
         // Delete child references before joining trips and patterns are deleted.
         String keyColumn = (parentTableName.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id";
         deleteStopTimesAndFrequencies(routeOrPatternId, keyColumn, parentTableName);
-        deleteShapes(routeOrPatternId, keyColumn, parentTableName);
+        Shape.deleteShapesRelatedToRouteOrPattern(connection, tablePrefix, routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
             // Delete pattern stops before joining patterns are deleted.
@@ -1604,60 +1603,6 @@ public class JdbcTableWriter implements TableWriter {
             )
         );
         LOG.info("Deleted {} frequencies for {} {}", deletedFrequencies, referencingTable , routeOrPatternId);
-    }
-
-    /**
-     * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
-     * the queries to select shapes to delete would fail because there would be no pattern records to join with. If a
-     * shape is being used by other patterns or trips do not delete.
-     */
-    private void deleteShapes(String routeOrPatternId, String routeOrPatternIdColumn, String referencingTable)
-        throws SQLException {
-        
-        String patternsTable = String.format("%s.patterns", tablePrefix);
-        String shapesTable = String.format("%s.shapes", tablePrefix);
-        String tripsTable = String.format("%s.trips", tablePrefix);
-
-        Set<String> shapeIdsToDelete = new HashSet<>();
-        Set<String> shapeIdsToKeep = new HashSet<>();
-        Set<String> shapeIds =
-            Shape.getShapeIdsForRouteOrPattern(
-                connection,
-                tablePrefix,
-                routeOrPatternIdColumn,
-                patternsTable,
-                shapesTable,
-                routeOrPatternId
-            );
-        if (!shapeIds.isEmpty()) {
-            Set<String> patternShapeIds = Shape.getShapeIdsUsedMoreThanOnce(connection, patternsTable);
-            Set<String> tripShapeIds = Shape.getShapeIdsUsedMoreThanOnce(connection, tripsTable);
-            shapeIds.forEach(shapeId -> {
-                if (!patternShapeIds.contains(shapeId) && !tripShapeIds.contains(shapeId)) {
-                    shapeIdsToDelete.add(shapeId);
-                } else {
-                    shapeIdsToKeep.add(shapeId);
-                }
-            });
-        }
-
-        if (!shapeIdsToDelete.isEmpty()) {
-            String sql = String.format(
-                "delete from %s where shape_id in (%s)",
-                shapesTable,
-                StringUtils.wrap(String.join(",", shapeIdsToDelete), "'")
-            );
-            int deletedShapes = executeStatement(sql);
-            LOG.info("Deleted {} shapes for {} {}", deletedShapes, referencingTable , routeOrPatternId);
-        }
-
-        if (!shapeIdsToKeep.isEmpty()) {
-            String shapeIdsNotDeleted = String.join(",", shapeIdsToKeep);
-            LOG.info(
-                "Shape ids kept as they are being used by other patterns/trips: ({})",
-                shapeIdsNotDeleted
-            );
-        }
     }
 
     /**
