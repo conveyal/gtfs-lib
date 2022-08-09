@@ -944,7 +944,8 @@ public class JdbcTableWriter implements TableWriter {
         String tripId
     ) throws SQLException {
         return updateStopTimesForPatternLocationOrPatternLocationGroup(
-            patternLocation.flex_default_travel_time, patternLocation.flex_default_zone_time,
+            patternLocation.flex_default_travel_time,
+            patternLocation.flex_default_zone_time,
             patternLocation.pattern_id,
             patternLocation.stop_sequence,
             previousTravelTime,
@@ -963,7 +964,8 @@ public class JdbcTableWriter implements TableWriter {
         String tripId
     ) throws SQLException {
         return updateStopTimesForPatternLocationOrPatternLocationGroup(
-            patternLocationGroup.flex_default_travel_time, patternLocationGroup.flex_default_zone_time,
+            patternLocationGroup.flex_default_travel_time,
+            patternLocationGroup.flex_default_zone_time,
             patternLocationGroup.pattern_id,
             patternLocationGroup.stop_sequence,
             previousTravelTime,
