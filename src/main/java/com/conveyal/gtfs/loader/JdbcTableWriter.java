@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -17,6 +18,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.dbutils.DbUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1606,38 +1608,64 @@ public class JdbcTableWriter implements TableWriter {
 
     /**
      * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
-     * the queries to select shapes to delete would fail because there would be no pattern records to join with.
+     * the queries to select shapes to delete would fail because there would be no pattern records to join with. If a
+     * shape is being used by other patterns or trips do not delete.
      */
     private void deleteShapes(String routeOrPatternId, String routeOrPatternIdColumn, String referencingTable)
         throws SQLException {
         
         String patternsTable = String.format("%s.patterns", tablePrefix);
         String shapesTable = String.format("%s.shapes", tablePrefix);
+        String tripsTable = String.format("%s.trips", tablePrefix);
 
-        // Delete shapes for route/pattern.
-        String sql = (routeOrPatternIdColumn.equals("pattern_id"))
-            ? String.format(
-                "delete from %s s using %s p where s.shape_id = p.shape_id and p.pattern_id = '%s'",
-                shapesTable,
+        Set<String> shapeIdsToDelete = new HashSet<>();
+        Set<String> shapeIdsToKeep = new HashSet<>();
+        Set<String> shapeIds =
+            Shape.getShapeIdsForRouteOrPattern(
+                connection,
+                tablePrefix,
+                routeOrPatternIdColumn,
                 patternsTable,
-                routeOrPatternId)
-            : String.format(
-                "delete from %s s using %s p, %s r where s.shape_id = p.shape_id and p.route_id = r.route_id and r.route_id = '%s'",
                 shapesTable,
-                patternsTable,
-                String.format("%s.routes", tablePrefix),
-                routeOrPatternId);
+                routeOrPatternId
+            );
+        if (!shapeIds.isEmpty()) {
+            Set<String> patternShapeIds = Shape.getShapeIdsUsedMoreThanOnce(connection, patternsTable);
+            Set<String> tripShapeIds = Shape.getShapeIdsUsedMoreThanOnce(connection, tripsTable);
+            shapeIds.forEach(shapeId -> {
+                if (!patternShapeIds.contains(shapeId) && !tripShapeIds.contains(shapeId)) {
+                    shapeIdsToDelete.add(shapeId);
+                } else {
+                    shapeIdsToKeep.add(shapeId);
+                }
+            });
+        }
 
-        int deletedShapes = executeStatement(sql);
-        LOG.info("Deleted {} shapes for {} {}", deletedShapes, referencingTable , routeOrPatternId);
+        if (!shapeIdsToDelete.isEmpty()) {
+            String sql = String.format(
+                "delete from %s where shape_id in (%s)",
+                shapesTable,
+                StringUtils.wrap(String.join(",", shapeIdsToDelete), "'")
+            );
+            int deletedShapes = executeStatement(sql);
+            LOG.info("Deleted {} shapes for {} {}", deletedShapes, referencingTable , routeOrPatternId);
+        }
+
+        if (!shapeIdsToKeep.isEmpty()) {
+            String shapeIdsNotDeleted = String.join(",", shapeIdsToKeep);
+            LOG.info(
+                "Shape ids kept as they are being used by other patterns/trips: ({})",
+                shapeIdsNotDeleted
+            );
+        }
     }
 
     /**
      * Execute the provided sql and return the number of rows effected.
      */
     private int executeStatement(String sql) throws SQLException {
+        LOG.info("{}", sql);
         try (Statement statement = connection.createStatement()) {
-            LOG.info("{}", sql);
             return statement.executeUpdate(sql);
         }
     }
