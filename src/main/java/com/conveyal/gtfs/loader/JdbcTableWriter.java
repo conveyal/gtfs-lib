@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -1538,7 +1539,7 @@ public class JdbcTableWriter implements TableWriter {
         // Delete child references before joining trips and patterns are deleted.
         String keyColumn = (parentTableName.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id";
         deleteStopTimesAndFrequencies(routeOrPatternId, keyColumn, parentTableName);
-        deleteShapes(routeOrPatternId, keyColumn, parentTableName);
+        Shape.deleteShapesRelatedToRouteOrPattern(connection, tablePrefix, routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
             // Delete pattern stops before joining patterns are deleted.
@@ -1602,34 +1603,6 @@ public class JdbcTableWriter implements TableWriter {
             )
         );
         LOG.info("Deleted {} frequencies for {} {}", deletedFrequencies, referencingTable , routeOrPatternId);
-    }
-
-    /**
-     * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
-     * the queries to select shapes to delete would fail because there would be no pattern records to join with.
-     */
-    private void deleteShapes(String routeOrPatternId, String routeOrPatternIdColumn, String referencingTable)
-        throws SQLException {
-        
-        String patternsTable = String.format("%s.patterns", tablePrefix);
-        String shapesTable = String.format("%s.shapes", tablePrefix);
-
-        // Delete shapes for route/pattern.
-        String sql = (routeOrPatternIdColumn.equals("pattern_id"))
-            ? String.format(
-                "delete from %s s using %s p where s.shape_id = p.shape_id and p.pattern_id = '%s'",
-                shapesTable,
-                patternsTable,
-                routeOrPatternId)
-            : String.format(
-                "delete from %s s using %s p, %s r where s.shape_id = p.shape_id and p.route_id = r.route_id and r.route_id = '%s'",
-                shapesTable,
-                patternsTable,
-                String.format("%s.routes", tablePrefix),
-                routeOrPatternId);
-
-        int deletedShapes = executeStatement(sql);
-        LOG.info("Deleted {} shapes for {} {}", deletedShapes, referencingTable , routeOrPatternId);
     }
 
     /**
