@@ -510,7 +510,7 @@ public class JdbcGtfsExporter {
         zipOutputStream.putNextEntry(new ZipEntry(LOCATION_GROUPS_FILE_NAME));
         // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
         PrintWriter p = new PrintWriter(zipOutputStream);
-        p.println(LocationGroup.packLocationGroups(locationGroups));
+        p.print(LocationGroup.packLocationGroups(locationGroups));
         p.flush();
         zipOutputStream.closeEntry();
     }
