@@ -88,7 +88,7 @@ public class Shape {
                 StringUtils.wrap(String.join(",", shapeIdsToDelete), "'")
             );
             try (Statement statement = connection.createStatement()) {
-                LOG.info("{}", sql);
+                LOG.info(sql);
                 int deletedShapes = statement.executeUpdate(sql);
                 LOG.info("Deleted {} shapes for {} {}", deletedShapes, referencingTable , routeOrPatternId);
             }
@@ -131,18 +131,18 @@ public class Shape {
 
         String sql = (routeOrPatternIdColumn.equals("pattern_id"))
             ? String.format(
-            "select shape_id from %s s join %s p using (shape_id) where s.shape_id = p.shape_id and p.pattern_id = '%s'",
-            shapesTable,
-            patternsTable,
-            routeOrPatternId
-        )
+                "select shape_id from %s s join %s p using (shape_id) where s.shape_id = p.shape_id and p.pattern_id = '%s'",
+                shapesTable,
+                patternsTable,
+                routeOrPatternId
+            )
             : String.format(
-            "select s.shape_id from %s s inner join %s p on s.shape_id = p.shape_id inner join %s r on p.route_id = r.route_id and r.route_id = '%s'",
-            shapesTable,
-            patternsTable,
-            String.format("%s.routes", tablePrefix),
-            routeOrPatternId
-        );
+                "select s.shape_id from %s s inner join %s p on s.shape_id = p.shape_id inner join %s r on p.route_id = r.route_id and r.route_id = '%s'",
+                shapesTable,
+                patternsTable,
+                String.format("%s.routes", tablePrefix),
+                routeOrPatternId
+            );
 
         return getListOfShapeIds(connection, sql);
     }
@@ -151,15 +151,15 @@ public class Shape {
      * Extract and return a list of shape ids from the provided sql.
      */
     private static Set<String> getListOfShapeIds(Connection connection, String sql) throws SQLException {
-        PreparedStatement statement = connection.prepareStatement(sql);
-        LOG.info("{}", statement);
-        ResultSet resultSet = statement.executeQuery();
-        Set<String> shapeIds = new HashSet<>();
-        while (resultSet.next()) {
-            String shapeId = resultSet.getString(1);
-            shapeIds.add(shapeId);
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            ResultSet resultSet = statement.executeQuery();
+            Set<String> shapeIds = new HashSet<>();
+            while (resultSet.next()) {
+                String shapeId = resultSet.getString(1);
+                shapeIds.add(shapeId);
+            }
+            return shapeIds;
         }
-        return shapeIds;
     }
 
 }

@@ -549,10 +549,10 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Deleting a route should cascade delete referencing patterns, trips, stop times and shapes.
+     * Deleting a route should also delete related shapes because they are unique to this route.
      */
     @Test
-    void shouldCascadeDeleteOnRouteDelete() throws IOException, SQLException, InvalidNamespaceException {
+    void shouldDeleteRouteShapes() throws IOException, SQLException, InvalidNamespaceException {
         String routeId = "8472017";
         String shapeId = "uniqueShapeId";
 
@@ -568,11 +568,10 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Deleting a route using a shared shape, should cascade delete referencing patterns, trips and stop times, but not
-     * shapes.
+     * Deleting a route should retain shapes that are shared by multiple patterns.
      */
     @Test
-    void shouldKeepShapeOnCascadeDeleteOfRoute() throws IOException, SQLException, InvalidNamespaceException {
+    void shouldRetainSharedShapes() throws IOException, SQLException, InvalidNamespaceException {
         String routeId = "8472017";
         String shapeId = "sharedShapeId";
 
@@ -587,13 +586,14 @@ public class JDBCTableWriterTest {
             String.format(
                 "select * from %s where shape_id = '%s'",
                 String.format("%s.%s", testNamespace, Table.SHAPES.name),
-                sharedShapeId
-            ), 4);
+                shapeId
+            ), 4); // Two shapes are created per pattern. Two patterns equals four shapes.
     }
 
     /**
      * Create a route with related pattern, trip and stop times. Confirm entities have been created successfully, then
-     * delete the route to trigger cascade delete.
+     * delete the route to trigger cascade deleting of patterns, trips, stop times and shapes.
+     *
      */
     private void createThenDeleteRoute(String routeId, String shapeId)
         throws InvalidNamespaceException, SQLException, IOException {
