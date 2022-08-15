@@ -1,0 +1,3 @@
+trip_id,route_id,service_id,trip_headsign,trip_short_name,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed
+1003,Tib-AIF,03,Angel Island Ferry Terminal,,1,100,y7d8,,
+1005,Tib-AIF,01,Angel Island Ferry Terminal,,1,100,y7d8,,

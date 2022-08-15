@@ -1,0 +1,3 @@
+shape_id,shape_pt_sequence,shape_pt_lat,shape_pt_lon,shape_dist_traveled
+y7d8,0,37.872572,-122.455719,0
+y7d8,1,37.868307,-122.435089,1871.92069611793681

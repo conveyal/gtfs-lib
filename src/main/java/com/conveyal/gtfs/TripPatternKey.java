@@ -9,6 +9,8 @@ import gnu.trove.list.array.TIntArrayList;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.conveyal.gtfs.model.Entity.INT_MISSING;
+
 /**
  * Used as a map key when grouping trips by stop pattern. Note that this includes the routeId, so the same sequence of
  * stops on two different routes makes two different patterns.
@@ -46,8 +48,8 @@ public class TripPatternKey {
 
     public void addStopTime (StopTime st) {
         stops.add(st.stop_id);
-        pickupTypes.add(st.pickup_type);
-        dropoffTypes.add(st.drop_off_type);
+        pickupTypes.add(resolvePickupOrDropOffType(st.pickup_type));
+        dropoffTypes.add(resolvePickupOrDropOffType(st.drop_off_type));
         // Note, the items listed below are not used in the equality check.
         arrivalTimes.add(st.arrival_time);
         departureTimes.add(st.departure_time);
@@ -64,6 +66,16 @@ public class TripPatternKey {
         mean_duration_offset.add(st.mean_duration_offset);
         safe_duration_factor.add(st.safe_duration_factor);
         safe_duration_offset.add(st.safe_duration_offset);
+    }
+
+    /**
+     * Resolves omitted (INT_MISSING) values for pickup and drop-off types to the default value (0 - regular)
+     * for the purposes of determining whether entries in stop_times correspond to the same trip pattern(s).
+     * @param pickupOrDropOffType the pickup or drop-off type to resolve.
+     * @return 0 if pickupOrDropOffType is 0 or INT_MISSING, else pickupOrDropOffType.
+     */
+    private int resolvePickupOrDropOffType(int pickupOrDropOffType) {
+        return pickupOrDropOffType == INT_MISSING ? 0 : pickupOrDropOffType;
     }
 
     @Override
