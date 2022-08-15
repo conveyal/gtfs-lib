@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.sql.PreparedStatement;
@@ -16,6 +18,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class LocationShape extends Entity {
+
+    private static final Logger LOG = LoggerFactory.getLogger(LocationShape.class);
 
     private static final long serialVersionUID = -972419107947161195L;
     public static final String shapeCountErrorMessage =
@@ -130,8 +134,7 @@ public class LocationShape extends Entity {
         int count = 0;
         while (shapes.hasNext()) {
             JsonNode shape = shapes.next();
-            count++;
-            if (count == 1) {
+            if (++count == 1) {
                 firstShape = getLocationShape(shape);
             } else {
                 lastShape = getLocationShape(shape);
@@ -152,6 +155,7 @@ public class LocationShape extends Entity {
             firstShape.put("id", ++lastShapeId);
             locationShapes.add(firstShape);
             ((ObjectNode) jsonNode).set("location_shapes", locationShapes);
+            LOG.warn("An additional shape was added to close a polygon: ({}).", firstShape);
         }
         return jsonNode;
     }
