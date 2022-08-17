@@ -50,7 +50,7 @@ import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
-import static com.conveyal.gtfs.model.LocationShape.shapeCountErrorMessage;
+import static com.conveyal.gtfs.model.LocationShape.polygonCornerCountErrorMessage;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
@@ -538,7 +538,7 @@ public class JDBCTableWriterTest {
         try {
             createSimpleTestLocation("zf423j", 3, true);
         } catch (IOException e) {
-            assertEquals(shapeCountErrorMessage, e.getMessage());
+            assertEquals(polygonCornerCountErrorMessage, e.getMessage());
         }
         LocationDTO createdLocation = createSimpleTestLocation("c342a", 4, true);
         assertEquals(createdLocation.location_shapes[0].geometry_pt_lat, createdLocation.location_shapes[3].geometry_pt_lat);
@@ -1566,7 +1566,8 @@ public class JDBCTableWriterTest {
         PatternLocationDTO[] patternLocations,
         PatternStopDTO[] patternStops,
         int useFrequency
-    ) throws InvalidNamespaceException, SQLException, IOException {        // Create new route
+    ) throws InvalidNamespaceException, SQLException, IOException {
+        // Create new route
         createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
         // Create new pattern for route
         PatternDTO input = new PatternDTO();
@@ -1701,7 +1702,7 @@ public class JDBCTableWriterTest {
 
     private static LocationShapeDTO[] getLocationShapes(String locationId, int numberOfShapes, boolean firstAndLastMatch) {
         LocationShapeDTO[] locationShapes = new LocationShapeDTO[numberOfShapes];
-        for (int i=0; i < numberOfShapes; i++) {
+        for (int i = 0; i < numberOfShapes; i++) {
             if (i == numberOfShapes - 1 && !firstAndLastMatch) {
                 locationShapes[i] = createLocationShape(locationId, i, 89.243334, -10.74333);
             } else {

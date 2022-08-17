@@ -22,8 +22,8 @@ public class LocationShape extends Entity {
     private static final Logger LOG = LoggerFactory.getLogger(LocationShape.class);
 
     private static final long serialVersionUID = -972419107947161195L;
-    public static final String shapeCountErrorMessage =
-        "Polygon does not have the required number of shapes. Four shapes are required as a minimum.";
+    public static final String polygonCornerCountErrorMessage =
+        "Polygon does not have the required number of corners. Four corners are required as a minimum.";
 
     public String location_id;
     public String geometry_id;
@@ -122,66 +122,68 @@ public class LocationShape extends Entity {
     }
 
     /**
-     * A valid polygon must have at least four shapes and the first and last shapes must be the same. If only three
-     * shapes are provided and the first and last shapes match an error is thrown. If more than three shapes are
-     * provided and the first and last shapes do not match an additional shape matching the first is added to the end.
+     * A valid polygon must have at least four corners and the first and last corner must be the same. If only three
+     * corners are provided and the first and last corners match an error is thrown. If more than three corners are
+     * provided and the first and last corners do not match, an additional corner matching the first is added to the end
+     * to close the polygon. If four or more corners are provided and the first and last corners match, the location
+     * shape is returned unaltered.
      */
     private static JsonNode validatePolygon(JsonNode jsonNode) throws IOException {
         ArrayNode locationShapes = (ArrayNode) jsonNode.get("location_shapes");
-        Iterator<JsonNode> shapes = locationShapes.elements();
-        ObjectNode firstShape = null;
-        ObjectNode lastShape = null;
+        Iterator<JsonNode> corners = locationShapes.elements();
+        ObjectNode firstCorner = null;
+        ObjectNode lastCorner = null;
         int count = 0;
-        while (shapes.hasNext()) {
-            JsonNode shape = shapes.next();
+        while (corners.hasNext()) {
+            JsonNode corner = corners.next();
             if (++count == 1) {
-                firstShape = getLocationShape(shape);
+                firstCorner = getCorner(corner);
             } else {
-                lastShape = getLocationShape(shape);
+                lastCorner = getCorner(corner);
             }
         }
         if (count <= 2) {
-            throw new IOException(shapeCountErrorMessage);
+            throw new IOException(polygonCornerCountErrorMessage);
         }
 
-        boolean shapesAreTheSame = shapesMatch(firstShape, lastShape);
-        if (shapesAreTheSame && count == 3) {
-            // Polygon has been closed, but there are not enough shapes provided.
-            throw new IOException(shapeCountErrorMessage);
-        } else if (!shapesAreTheSame) {
-            // Add a new shape to the end of the array matching the first shape. Increment the last shape id by one to
-            // create a unique id for this shape.
-            int lastShapeId = lastShape.get("id").asInt();
-            firstShape.put("id", ++lastShapeId);
-            locationShapes.add(firstShape);
+        boolean cornersMatch = areMatchingCorners(firstCorner, lastCorner);
+        if (cornersMatch && count == 3) {
+            // Polygon has been closed, but there are not enough corners provided.
+            throw new IOException(polygonCornerCountErrorMessage);
+        } else if (!cornersMatch) {
+            // Add a new corner to the end of the array matching the first corner. Increment the last corner id by one
+            // to create a unique id for this corner.
+            int lastCornerId = lastCorner.get("id").asInt();
+            firstCorner.put("id", ++lastCornerId);
+            locationShapes.add(firstCorner);
             ((ObjectNode) jsonNode).set("location_shapes", locationShapes);
-            LOG.warn("An additional shape was added to close a polygon: ({}).", firstShape);
+            LOG.warn("An additional corner was added to close a polygon: ({}).", firstCorner);
         }
         return jsonNode;
     }
 
     /**
-     * Compare two shapes. Shapes are considered the same if the lat/lon values match.
+     * Compare two shape corners. Corners are considered the same if the lat/lon values match.
      */
-    private static boolean shapesMatch(ObjectNode firstShape, ObjectNode lastShape) {
+    private static boolean areMatchingCorners(ObjectNode firstCorner, ObjectNode lastCorner) {
         return
-            firstShape != null && lastShape != null &&
-            firstShape.get("geometry_pt_lat").asText().equals(lastShape.get("geometry_pt_lat").asText()) &&
-            firstShape.get("geometry_pt_lon").asText().equals(lastShape.get("geometry_pt_lon").asText());
+            firstCorner != null && lastCorner != null &&
+            firstCorner.get("geometry_pt_lat").asText().equals(lastCorner.get("geometry_pt_lat").asText()) &&
+            firstCorner.get("geometry_pt_lon").asText().equals(lastCorner.get("geometry_pt_lon").asText());
     }
 
     /**
-     * Extract and hold the location shape values in an {@link ObjectNode}. An {@link ObjectNode} is preferred over an
-     * {@link JsonNode} because it is mutable.
+     * Extract and hold a corner in an {@link ObjectNode}. An {@link ObjectNode} is preferred over an {@link JsonNode}
+     * because it is mutable.
      */
-    private static ObjectNode getLocationShape(JsonNode shape) {
-        ObjectNode locationShape = JsonNodeFactory.instance.objectNode();
-        locationShape.put("id", shape.get("id").asText());
-        locationShape.put("location_id", shape.get("location_id").asText());
-        locationShape.put("geometry_id", shape.get("geometry_id").asText());
-        locationShape.put("geometry_pt_lat", shape.get("geometry_pt_lat").asText());
-        locationShape.put("geometry_pt_lon", shape.get("geometry_pt_lon").asText());
-        return locationShape;
+    private static ObjectNode getCorner(JsonNode shape) {
+        ObjectNode corner = JsonNodeFactory.instance.objectNode();
+        corner.put("id", shape.get("id").asText());
+        corner.put("location_id", shape.get("location_id").asText());
+        corner.put("geometry_id", shape.get("geometry_id").asText());
+        corner.put("geometry_pt_lat", shape.get("geometry_pt_lat").asText());
+        corner.put("geometry_pt_lon", shape.get("geometry_pt_lon").asText());
+        return corner;
     }
 
     @Override
