@@ -146,7 +146,7 @@ public class LocationShape extends Entity {
             throw new IOException(polygonCornerCountErrorMessage);
         }
 
-        boolean cornersMatch = areMatchingCorners(firstCorner, lastCorner);
+        boolean cornersMatch = areCornersMatching(firstCorner, lastCorner);
         if (cornersMatch && count == 3) {
             // Polygon has been closed, but there are not enough corners provided.
             throw new IOException(polygonCornerCountErrorMessage);
@@ -165,7 +165,7 @@ public class LocationShape extends Entity {
     /**
      * Compare two shape corners. Corners are considered the same if the lat/lon values match.
      */
-    private static boolean areMatchingCorners(ObjectNode firstCorner, ObjectNode lastCorner) {
+    private static boolean areCornersMatching(ObjectNode firstCorner, ObjectNode lastCorner) {
         return
             firstCorner != null && lastCorner != null &&
             firstCorner.get("geometry_pt_lat").asText().equals(lastCorner.get("geometry_pt_lat").asText()) &&
