@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternLocationGroup;
@@ -132,6 +133,9 @@ public class JdbcTableWriter implements TableWriter {
         final boolean isCreating = id == null;
         JsonNode jsonNode = getJsonNode(json);
         try {
+            if (specTable.name.equals("locations")) {
+                jsonNode = LocationShape.validate(jsonNode);
+            }
             if (jsonNode.isArray()) {
                 // If an array of objects is passed in as the JSON input, update them all in a single transaction, only
                 // committing once all entities have been updated.

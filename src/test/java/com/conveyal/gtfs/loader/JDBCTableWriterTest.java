@@ -52,6 +52,7 @@ import static com.conveyal.gtfs.GTFS.load;
 import static com.conveyal.gtfs.GTFS.makeSnapshot;
 import static com.conveyal.gtfs.GTFS.validate;
 import static com.conveyal.gtfs.TestUtils.getResourceFileName;
+import static com.conveyal.gtfs.model.LocationShape.polygonCornerCountErrorMessage;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
@@ -536,6 +537,22 @@ public class JDBCTableWriterTest {
 
         // make sure route record does not exist in DB
         assertThatSqlQueryYieldsZeroRows(getColumnsForId(createdLocationGroup.id, locationGroupsTable));
+    }
+
+    @Test
+    void canValidateLocationShapes() throws IOException, SQLException, InvalidNamespaceException {
+        try {
+            createSimpleTestLocation("zf423j", 3, true);
+        } catch (IOException e) {
+            assertEquals(polygonCornerCountErrorMessage, e.getMessage());
+        }
+        LocationDTO createdLocation = createSimpleTestLocation("c342a", 4, true);
+        assertEquals(createdLocation.location_shapes[0].geometry_pt_lat, createdLocation.location_shapes[3].geometry_pt_lat);
+        assertEquals(createdLocation.location_shapes[0].geometry_pt_lon, createdLocation.location_shapes[3].geometry_pt_lon);
+
+        createdLocation = createSimpleTestLocation("d7433h", 4, false);
+        assertEquals(createdLocation.location_shapes[0].geometry_pt_lat, createdLocation.location_shapes[4].geometry_pt_lat);
+        assertEquals(createdLocation.location_shapes[0].geometry_pt_lon, createdLocation.location_shapes[4].geometry_pt_lon);
     }
 
     @Test
@@ -1668,7 +1685,8 @@ public class JDBCTableWriterTest {
         PatternLocationDTO[] patternLocations,
         PatternStopDTO[] patternStops,
         int useFrequency
-    ) throws InvalidNamespaceException, SQLException, IOException {        // Create new route
+    ) throws InvalidNamespaceException, SQLException, IOException {
+        // Create new route
         createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
         // Create new pattern for route
         PatternDTO input = new PatternDTO();
@@ -1771,17 +1789,17 @@ public class JDBCTableWriterTest {
         return mapper.readValue(output, LocationGroupDTO.class);
     }
 
-    /**
-     * Create and store a simple location meta data for testing.
-     */
     private static LocationDTO createSimpleTestLocation(String locationId)
         throws InvalidNamespaceException, IOException, SQLException {
 
-        LocationShapeDTO locationShape = new LocationShapeDTO();
-        locationShape.location_id = locationId;
-        locationShape.geometry_id = "1";
-        locationShape.geometry_pt_lat = 45.1111111;
-        locationShape.geometry_pt_lon = -80.432222;
+        return createSimpleTestLocation(locationId, 4, true);
+    }
+
+    /**
+     * Create and store a simple location meta data for testing.
+     */
+    private static LocationDTO createSimpleTestLocation(String locationId, int numberOfShapes, boolean firstAndLastMatch)
+        throws InvalidNamespaceException, IOException, SQLException {
 
         LocationDTO location = new LocationDTO();
         location.location_id = locationId;
@@ -1790,9 +1808,7 @@ public class JDBCTableWriterTest {
         location.stop_desc = "Templeboy to Ballisodare Door-to-door pickup area";
         location.zone_id = "1";
         location.stop_url = new URL("https://www.Teststopsite.com");
-        location.location_shapes = new LocationShapeDTO[] {
-            locationShape
-        };
+        location.location_shapes = getLocationShapes(locationId, numberOfShapes, firstAndLastMatch);
 
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(Table.LOCATIONS);
@@ -1801,6 +1817,28 @@ public class JDBCTableWriterTest {
         LOG.info(output);
         // parse output
         return mapper.readValue(output, LocationDTO.class);
+    }
+
+    private static LocationShapeDTO[] getLocationShapes(String locationId, int numberOfShapes, boolean firstAndLastMatch) {
+        LocationShapeDTO[] locationShapes = new LocationShapeDTO[numberOfShapes];
+        for (int i = 0; i < numberOfShapes; i++) {
+            if (i == numberOfShapes - 1 && !firstAndLastMatch) {
+                locationShapes[i] = createLocationShape(locationId, i, 89.243334, -10.74333);
+            } else {
+                locationShapes[i] = createLocationShape(locationId, i, 45.1111111, -80.432222);
+            }
+        }
+        return locationShapes;
+    }
+
+    private static LocationShapeDTO createLocationShape(String locationId, int id, Double lat, Double lon) {
+        LocationShapeDTO locationShape = new LocationShapeDTO();
+        locationShape.id = id;
+        locationShape.location_id = locationId;
+        locationShape.geometry_id = "1";
+        locationShape.geometry_pt_lat = lat;
+        locationShape.geometry_pt_lon = lon;
+        return locationShape;
     }
 
     private static PatternLocationDTO createSimpleTestPatternLocation(String locationId)
