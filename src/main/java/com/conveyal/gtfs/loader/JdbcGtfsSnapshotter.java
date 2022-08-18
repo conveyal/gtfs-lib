@@ -103,10 +103,11 @@ public class JdbcGtfsSnapshotter {
             result.locationGroups = copy(Table.LOCATION_GROUPS, true);
             result.locationShapes = copy(Table.LOCATION_SHAPES, true);
             result.routes = copy(Table.ROUTES, true);
-            // FIXME: Find some place to store errors encountered on copy for patterns and pattern stops.
+            // FIXME: Find some place to store errors encountered after copying various patterns.
             copy(Table.PATTERNS, true);
             copy(Table.PATTERN_STOP, true);
             copy(Table.PATTERN_LOCATION, true);
+            copy(Table.PATTERN_LOCATION_GROUP, true);
             // see method comments fo why different logic is needed for this table
             result.scheduleExceptions = createScheduleExceptionsTable();
             result.shapes = copy(Table.SHAPES, true);

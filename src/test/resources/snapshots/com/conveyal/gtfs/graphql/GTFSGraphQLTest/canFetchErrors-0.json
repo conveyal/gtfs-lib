@@ -83,6 +83,11 @@
         "type" : "GEO_JSON_PARSING"
       }, {
         "count" : 1,
+        "message" : "This location group is not referenced by any trips.",
+        "priority" : "MEDIUM",
+        "type" : "LOCATION_GROUP_UNUSED"
+      }, {
+        "count" : 1,
         "message" : "A required field was missing or empty in a particular row.",
         "priority" : "MEDIUM",
         "type" : "MISSING_FIELD"

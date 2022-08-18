@@ -233,7 +233,10 @@ public class GTFSFeed implements Cloneable, Closeable {
             new StopTime.Writer(this).writeTable(zip);
 
             if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
-            if (!this.locationGroups.isEmpty()) new LocationGroup.Writer(this).writeTable(zip);
+            if (!this.locationGroups.isEmpty()) {
+                // export location groups
+                JdbcGtfsExporter.writeLocationGroupsToFile(zip, new ArrayList<>(locationGroups.values()));
+            }
             if (!this.locations.isEmpty()) {
                 // export locations
                 JdbcGtfsExporter.writeLocationsToFile(
@@ -383,7 +386,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
             patternFinder.processTrip(trip, orderedStopTimesForTrip);
         }
-        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null, null);
+        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null, null, null);
         this.patterns.putAll(patternObjects.values().stream()
                 .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }

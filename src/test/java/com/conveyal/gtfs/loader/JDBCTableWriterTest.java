@@ -12,6 +12,7 @@ import com.conveyal.gtfs.dto.LocationGroupDTO;
 import com.conveyal.gtfs.dto.LocationShapeDTO;
 import com.conveyal.gtfs.dto.PatternDTO;
 import com.conveyal.gtfs.dto.PatternLocationDTO;
+import com.conveyal.gtfs.dto.PatternLocationGroupDTO;
 import com.conveyal.gtfs.dto.PatternStopDTO;
 import com.conveyal.gtfs.dto.RouteDTO;
 import com.conveyal.gtfs.dto.ScheduleExceptionDTO;
@@ -19,6 +20,7 @@ import com.conveyal.gtfs.dto.ShapePointDTO;
 import com.conveyal.gtfs.dto.StopDTO;
 import com.conveyal.gtfs.dto.StopTimeDTO;
 import com.conveyal.gtfs.dto.TripDTO;
+import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -91,6 +93,8 @@ public class JDBCTableWriterTest {
     private static LocationDTO locationOne;
     private static LocationDTO locationTwo;
     private static LocationDTO locationThree;
+    private static LocationGroupDTO locationGroupOne;
+    private static LocationGroupDTO locationGroupTwo;
 
     private static JdbcTableWriter createTestTableWriter(Table table) throws InvalidNamespaceException {
         return new JdbcTableWriter(table, testDataSource, testNamespace);
@@ -138,6 +142,8 @@ public class JDBCTableWriterTest {
         locationOne = createSimpleTestLocation(newUUID());
         locationTwo = createSimpleTestLocation(newUUID());
         locationThree = createSimpleTestLocation(newUUID());
+        locationGroupOne = createSimpleTestLocationGroup(newUUID());
+        locationGroupTwo = createSimpleTestLocationGroup(newUUID());
 
         String patternId = newUUID();
         pattern = createRouteAndPattern(
@@ -948,6 +954,22 @@ public class JDBCTableWriterTest {
                 Table.PATTERN_STOP.name,
                 pattern.pattern_id
             ));
+        // Check that pattern_locations records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.PATTERN_LOCATION.name,
+                pattern.pattern_id
+            ));
+        // Check that pattern_locations records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s.%s where pattern_id='%s'",
+                testNamespace,
+                Table.PATTERN_LOCATION_GROUP.name,
+                pattern.pattern_id
+            ));
         // Check that shape records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
@@ -1177,6 +1199,7 @@ public class JDBCTableWriterTest {
                     new PatternStopDTO(patternId, stopOne.stop_id, 1, 10, 1),
                     new PatternStopDTO(patternId, stopTwo.stop_id, 2, 10, 1)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopOne.stop_id, PatternReconciliation.PatternType.STOP,
@@ -1192,6 +1215,7 @@ public class JDBCTableWriterTest {
                 new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 1, 12, 1)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP
@@ -1206,6 +1230,7 @@ public class JDBCTableWriterTest {
                 new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 11, 1)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION
@@ -1221,6 +1246,7 @@ public class JDBCTableWriterTest {
                 new PatternStopDTO[] {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 12, 5)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationTwo.location_id, PatternReconciliation.PatternType.LOCATION,
@@ -1238,6 +1264,7 @@ public class JDBCTableWriterTest {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 14, 3),
                     new PatternStopDTO(patternId, stopOne.stop_id, 3, 14, 3)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationTwo.location_id, PatternReconciliation.PatternType.LOCATION,
@@ -1255,6 +1282,7 @@ public class JDBCTableWriterTest {
                     new PatternStopDTO(patternId, stopTwo.stop_id, 0, 23, 1),
                     new PatternStopDTO(patternId, stopOne.stop_id, 2, 23, 1)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
@@ -1273,12 +1301,96 @@ public class JDBCTableWriterTest {
                     new PatternStopDTO(patternId, stopOne.stop_id, 2, 13, 6),
                     new PatternStopDTO(patternId, stopThree.stop_id, 4, 13, 6)
                 },
+                new PatternLocationGroupDTO[] {},
                 ImmutableMap.of(
                     stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
                     locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopOne.stop_id, PatternReconciliation.PatternType.STOP,
                     locationThree.location_id, PatternReconciliation.PatternType.LOCATION,
                     stopThree.stop_id, PatternReconciliation.PatternType.STOP
+                ),
+                70, 70, 13, 6
+            ),
+            // Delete the last stop.
+            new PatternArguments(
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
+                    new PatternLocationDTO(patternId, locationThree.location_id, 3, 70, 70)
+                },
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6),
+                    new PatternStopDTO(patternId, stopOne.stop_id, 2, 13, 6)
+                },
+                new PatternLocationGroupDTO[] {},
+                ImmutableMap.of(
+                    stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
+                    locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
+                    stopOne.stop_id, PatternReconciliation.PatternType.STOP,
+                    locationThree.location_id, PatternReconciliation.PatternType.LOCATION
+                ),
+                70, 70, 13, 6
+            ),
+            // Add a location group to the end.
+            new PatternArguments(
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
+                    new PatternLocationDTO(patternId, locationThree.location_id, 3, 70, 70)
+                },
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6),
+                    new PatternStopDTO(patternId, stopOne.stop_id, 2, 13, 6),
+                },
+                new PatternLocationGroupDTO[] {
+                    new PatternLocationGroupDTO(patternId, locationGroupOne.location_group_id, 4, 70, 70)
+                },
+                ImmutableMap.of(
+                    stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
+                    locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
+                    stopOne.stop_id, PatternReconciliation.PatternType.STOP,
+                    locationThree.location_id, PatternReconciliation.PatternType.LOCATION,
+                    locationGroupOne.location_group_id, PatternReconciliation.PatternType.LOCATION_GROUP
+                ),
+                70, 70, 13, 6
+            ),
+            // Delete stop from middle.
+            new PatternArguments(
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
+                    new PatternLocationDTO(patternId, locationThree.location_id, 2, 70, 70)
+                },
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6)
+                },
+                new PatternLocationGroupDTO[] {
+                    new PatternLocationGroupDTO(patternId, locationGroupOne.location_group_id, 3, 70, 70)
+                },
+                ImmutableMap.of(
+                    stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
+                    locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
+                    locationThree.location_id, PatternReconciliation.PatternType.LOCATION,
+                    locationGroupOne.location_group_id, PatternReconciliation.PatternType.LOCATION_GROUP
+                ),
+                70, 70, 13, 6
+            ),
+            // Add location group to middle.
+            new PatternArguments(
+                new PatternLocationDTO[] {
+                    new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
+                    new PatternLocationDTO(patternId, locationThree.location_id, 3, 70, 70)
+                },
+                new PatternStopDTO[] {
+                    new PatternStopDTO(patternId, stopTwo.stop_id, 0, 13, 6)
+                },
+                new PatternLocationGroupDTO[] {
+                    new PatternLocationGroupDTO(patternId, locationGroupOne.location_group_id, 4, 70, 70),
+                    new PatternLocationGroupDTO(patternId, locationGroupTwo.location_group_id, 2, 70, 70)
+                },
+                ImmutableMap.of(
+                    stopTwo.stop_id, PatternReconciliation.PatternType.STOP,
+                    locationOne.location_id, PatternReconciliation.PatternType.LOCATION,
+                    locationGroupTwo.location_group_id, PatternReconciliation.PatternType.LOCATION_GROUP,
+                    locationThree.location_id, PatternReconciliation.PatternType.LOCATION,
+                    locationGroupOne.location_group_id, PatternReconciliation.PatternType.LOCATION_GROUP
                 ),
                 70, 70, 13, 6
             )
@@ -1298,21 +1410,20 @@ public class JDBCTableWriterTest {
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
         pattern.pattern_locations = patternArguments.patternLocations;
         pattern.pattern_stops = patternArguments.patternStops;
+        pattern.pattern_location_groups = patternArguments.patternLocationGroups;
         patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
 
         int stopSequence = 0;
         for (Map.Entry<String, PatternReconciliation.PatternType> entry : patternArguments.referenceIdAndType.entrySet()) {
+            boolean flex =
+                entry.getValue() == PatternReconciliation.PatternType.LOCATION ||
+                entry.getValue() == PatternReconciliation.PatternType.LOCATION_GROUP;
             verifyStopTime(
                 createdTrip.trip_id,
                 entry.getKey(),
                 stopSequence,
-                (cumulativeTravelTime += entry.getValue() == PatternReconciliation.PatternType.LOCATION
-                    ? patternArguments.flexDefaultTravelTime
-                    : patternArguments.defaultTravelTime
-                ),
-                (cumulativeTravelTime += entry.getValue() == PatternReconciliation.PatternType.LOCATION
-                    ? patternArguments.flexDefaultZoneTime
-                    : patternArguments.defaultDwellTime),
+                (cumulativeTravelTime += flex ? patternArguments.flexDefaultTravelTime : patternArguments.defaultTravelTime),
+                (cumulativeTravelTime += flex ? patternArguments.flexDefaultZoneTime : patternArguments.defaultDwellTime),
                 entry.getValue()
             );
             stopSequence++;
@@ -1495,6 +1606,14 @@ public class JDBCTableWriterTest {
         input.pattern_stops = new PatternStopDTO[]{
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
+        };
+        input.pattern_locations = new PatternLocationDTO[]{
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 3)
+        };
+        input.pattern_location_groups = new PatternLocationGroupDTO[]{
+            new PatternLocationGroupDTO(patternId, locationGroupOne.location_group_id, 4),
+            new PatternLocationGroupDTO(patternId, locationGroupTwo.location_group_id, 5)
         };
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
@@ -1787,6 +1906,7 @@ public class JDBCTableWriterTest {
     private static class PatternArguments {
         PatternLocationDTO[] patternLocations;
         PatternStopDTO[] patternStops;
+        PatternLocationGroupDTO[] patternLocationGroups;
         // pattern stop/location id and pattern type. Items must be added in sequence order.
         ImmutableMap<String, PatternReconciliation.PatternType> referenceIdAndType;
         int flexDefaultTravelTime;
@@ -1797,6 +1917,7 @@ public class JDBCTableWriterTest {
         public PatternArguments(
             PatternLocationDTO[] patternLocations,
             PatternStopDTO[] patternStops,
+            PatternLocationGroupDTO[] patternLocationGroups,
             ImmutableMap<String, PatternReconciliation.PatternType> referenceIdAndType,
             int flexDefaultTravelTime,
             int flexDefaultZoneTime,
@@ -1805,6 +1926,7 @@ public class JDBCTableWriterTest {
         ) {
             this.patternLocations = patternLocations;
             this.patternStops = patternStops;
+            this.patternLocationGroups = patternLocationGroups;
             this.referenceIdAndType = referenceIdAndType;
             this.flexDefaultTravelTime = flexDefaultTravelTime;
             this.flexDefaultZoneTime = flexDefaultZoneTime;

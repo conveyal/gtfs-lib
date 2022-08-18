@@ -12,6 +12,7 @@ import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.PatternLocation;
+import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -97,6 +98,28 @@ public interface EntityPopulator<T> {
         patternLocation.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
         patternLocation.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);
         return patternLocation;
+    };
+
+    EntityPopulator<PatternLocationGroup> PATTERN_LOCATION_GROUP = (result, columnForName) -> {
+        PatternLocationGroup patternLocationGroup = new PatternLocationGroup();
+        patternLocationGroup.location_group_id = getStringIfPresent(result, "location_group_id", columnForName);
+        patternLocationGroup.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        patternLocationGroup.drop_off_type = getIntIfPresent(result, "drop_off_type", columnForName);
+        patternLocationGroup.pickup_type = getIntIfPresent(result, "pickup_type", columnForName);
+        patternLocationGroup.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
+        patternLocationGroup.timepoint = getIntIfPresent(result, "timepoint", columnForName);
+        patternLocationGroup.continuous_pickup   = getIntIfPresent(result, "continuous_pickup",   columnForName);
+        patternLocationGroup.continuous_drop_off = getIntIfPresent(result, "continuous_drop_off", columnForName);
+
+        patternLocationGroup.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
+        patternLocationGroup.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
+        patternLocationGroup.flex_default_travel_time = getIntIfPresent(result, "flex_default_travel_time", columnForName);
+        patternLocationGroup.flex_default_zone_time = getIntIfPresent(result, "flex_default_zone_time", columnForName);
+        patternLocationGroup.mean_duration_factor = getDoubleIfPresent(result, "mean_duration_factor", columnForName);
+        patternLocationGroup.mean_duration_offset = getDoubleIfPresent(result, "mean_duration_offset", columnForName);
+        patternLocationGroup.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
+        patternLocationGroup.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);
+        return patternLocationGroup;
     };
 
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;

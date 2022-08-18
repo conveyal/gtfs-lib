@@ -57,6 +57,17 @@
         "stop_sequence" : 3,
         "timepoint" : 1,
         "trip_id" : "frequency-trip"
+      }, {
+        "arrival_time" : null,
+        "departure_time" : null,
+        "drop_off_type" : 1,
+        "pickup_type" : 1,
+        "shape_dist_traveled" : 341.4491961,
+        "stop_headsign" : null,
+        "stop_id" : "3",
+        "stop_sequence" : 4,
+        "timepoint" : 1,
+        "trip_id" : "frequency-trip"
       } ]
     }
   }
