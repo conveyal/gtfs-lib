@@ -926,14 +926,59 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Deleting a route should cascade delete referencing patterns, trips and stop times.
+     * Deleting a route should also delete related shapes because they are unique to this route.
      */
     @Test
-    void shouldCascadeDeleteOnRouteDelete() throws IOException, SQLException, InvalidNamespaceException {
+    void shouldDeleteRouteShapes() throws IOException, SQLException, InvalidNamespaceException {
         String routeId = "8472017";
+        String shapeId = "uniqueShapeId";
+
+        createThenDeleteRoute(routeId, shapeId);
+
+        // Check that shape records for pattern do not exist in DB
+        assertThatSqlQueryYieldsZeroRows(
+            String.format(
+                "select * from %s where shape_id = '%s'",
+                String.format("%s.%s", testNamespace, Table.SHAPES.name),
+                shapeId
+            ));
+    }
+
+    /**
+     * Deleting a route should retain shapes that are shared by multiple patterns.
+     */
+    @Test
+    void shouldRetainSharedShapes() throws IOException, SQLException, InvalidNamespaceException {
+        String routeId = "8472017";
+        String shapeId = "sharedShapeId";
+
+        // Create a pattern which uses the same shape as the pattern that will be deleted. This is to prevent the shape
+        // from being deleted.
+        createSimplePattern("111222", "8802800", "The Line", shapeId);
+
+        createThenDeleteRoute(routeId, shapeId);
+
+        // Check that shape records persist in DB
+        assertThatSqlQueryYieldsRowCount(
+            String.format(
+                "select * from %s where shape_id = '%s'",
+                String.format("%s.%s", testNamespace, Table.SHAPES.name),
+                shapeId
+            ), 4); // Two shapes are created per pattern. Two patterns equals four shapes.
+    }
+
+    /**
+     * Create a route with related pattern, trip and stop times. Confirm entities have been created successfully, then
+     * delete the route to trigger cascade deleting of patterns, trips, stop times and shapes.
+     *
+     */
+    private void createThenDeleteRoute(String routeId, String shapeId)
+        throws InvalidNamespaceException, SQLException, IOException {
+
         int startTime = 6 * 60 * 60; // 6 AM
+
         RouteDTO createdRoute = createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
-        PatternDTO pattern = createSimplePattern(routeId, "9901900", "The Line");
+        PatternDTO pattern = createSimplePattern(routeId, "9901900", "The Line", shapeId);
         // Make sure saved data matches expected data.
         assertThat(pattern.route_id, equalTo(routeId));
         TripDTO tripInput = constructFrequencyTrip(pattern.pattern_id, pattern.route_id, startTime);
@@ -945,64 +990,56 @@ public class JDBCTableWriterTest {
         JdbcTableWriter deleteRouteWriter = createTestTableWriter(Table.ROUTES);
         int deleteOutput = deleteRouteWriter.delete(createdRoute.id, true);
         LOG.info("deleted {} records from {}", deleteOutput, Table.ROUTES.name);
+
+        confirmRemovalOfRouteRelatedData(pattern.id, pattern.pattern_id, createdTrip.trip_id);
+    }
+
+    /**
+     * Confirm that items related to a route no longer exist after a cascade delete.
+     */
+    private void confirmRemovalOfRouteRelatedData(Integer id, String patternId, String tripId) throws SQLException {
         // Check that pattern record does not exist in DB
-        assertThatSqlQueryYieldsZeroRows(getColumnsForId(pattern.id, Table.PATTERNS));
+        assertThatSqlQueryYieldsZeroRows(getColumnsForId(id, Table.PATTERNS));
+
         // Check that trip records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where pattern_id='%s'",
                 testNamespace,
                 Table.TRIPS.name,
-                pattern.pattern_id
-            ));
+                patternId
+            )
+        );
+
         // Check that stop_times records for trip do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where trip_id='%s'",
                 testNamespace,
                 Table.STOP_TIMES.name,
-                createdTrip.trip_id
-            ));
+                tripId
+            )
+        );
+
         // Check that pattern_stops records for pattern do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where pattern_id='%s'",
                 testNamespace,
                 Table.PATTERN_STOP.name,
-                pattern.pattern_id
-            ));
-        // Check that pattern_locations records for pattern do not exist in DB
-        assertThatSqlQueryYieldsZeroRows(
-            String.format(
-                "select * from %s.%s where pattern_id='%s'",
-                testNamespace,
-                Table.PATTERN_LOCATION.name,
-                pattern.pattern_id
-            ));
-        // Check that pattern_locations records for pattern do not exist in DB
-        assertThatSqlQueryYieldsZeroRows(
-            String.format(
-                "select * from %s.%s where pattern_id='%s'",
-                testNamespace,
-                Table.PATTERN_LOCATION_GROUP.name,
-                pattern.pattern_id
-            ));
-        // Check that shape records for pattern do not exist in DB
-        assertThatSqlQueryYieldsZeroRows(
-            String.format(
-                "select * from %s s, %s p where s.shape_id = p.shape_id and p.pattern_id = '%s'",
-                String.format("%s.%s", testNamespace, Table.SHAPES.name),
-                String.format("%s.%s", testNamespace, Table.PATTERNS.name),
-                pattern.pattern_id
-            ));
+                patternId
+            )
+        );
+
         // Check that frequency records for trip do not exist in DB
         assertThatSqlQueryYieldsZeroRows(
             String.format(
                 "select * from %s.%s where trip_id='%s'",
                 testNamespace,
                 Table.FREQUENCIES.name,
-                createdTrip.trip_id
-            ));
+                tripId
+            )
+        );
     }
 
     /**
@@ -1607,7 +1644,7 @@ public class JDBCTableWriterTest {
     /**
      * Creates a pattern by first creating a route and then a pattern for that route.
      */
-    private static PatternDTO createSimplePattern(String routeId, String patternId, String name)
+    private static PatternDTO createSimplePattern(String routeId, String patternId, String name, String shapeId)
         throws InvalidNamespaceException, SQLException, IOException {
         // Create new pattern for route
         PatternDTO input = new PatternDTO();
@@ -1615,10 +1652,10 @@ public class JDBCTableWriterTest {
         input.route_id = routeId;
         input.name = name;
         input.use_frequency = 1;
-        input.shape_id = sharedShapeId;
+        input.shape_id = shapeId;
         input.shapes = new ShapePointDTO[]{
-            new ShapePointDTO(2, 0.0, sharedShapeId, firstStopLat, firstStopLon, 0),
-            new ShapePointDTO(2, 150.0, sharedShapeId, lastStopLat, lastStopLon, 1)
+            new ShapePointDTO(2, 0.0, shapeId, firstStopLat, firstStopLon, 0),
+            new ShapePointDTO(2, 150.0, shapeId, lastStopLat, lastStopLon, 1)
         };
         input.pattern_stops = new PatternStopDTO[]{
             new PatternStopDTO(patternId, firstStopId, 0),

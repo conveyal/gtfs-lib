@@ -8,6 +8,7 @@ import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
 import com.conveyal.gtfs.util.InvalidNamespaceException;
@@ -1547,7 +1548,7 @@ public class JdbcTableWriter implements TableWriter {
         // Delete child references before joining trips and patterns are deleted.
         String keyColumn = (parentTableName.equals(Table.PATTERNS.name)) ? "pattern_id" : "route_id";
         deleteStopTimesAndFrequencies(routeOrPatternId, keyColumn, parentTableName);
-        deleteShapes(routeOrPatternId, keyColumn, parentTableName);
+        Shape.deleteShapesRelatedToRouteOrPattern(connection, tablePrefix, routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
             // Delete pattern stops, locations and location groups before joining patterns are deleted.
@@ -1653,6 +1654,7 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+<<<<<<< HEAD
      * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
      * the queries to select shapes to delete would fail because there would be no pattern records to join with.
      */
@@ -1681,6 +1683,8 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+=======
+>>>>>>> dev
      * Execute the provided sql and return the number of rows effected.
      */
     private int executeStatement(String sql) throws SQLException {
