@@ -4,6 +4,7 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Location;
+import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -81,6 +82,7 @@ public class PatternFinder {
     public Map<TripPatternKey, Pattern> createPatternObjects(
         Map<String, Stop> stopById,
         Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById,
         SQLErrorStorage errorStorage
     ) {
         // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
@@ -109,7 +111,7 @@ public class PatternFinder {
             patterns.put(key, pattern);
         }
         // Name patterns before storing in SQL database.
-        renamePatterns(patterns.values(), stopById, locationById);
+        renamePatterns(patterns.values(), stopById, locationById, locationGroupById);
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
         return patterns;
     }
@@ -122,7 +124,8 @@ public class PatternFinder {
     public static void renamePatterns(
         Collection<Pattern> patterns,
         Map<String, Stop> stopById,
-        Map<String, Location> locationById
+        Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById
     ) {
         LOG.info("Generating unique names for patterns");
 
@@ -143,8 +146,8 @@ public class PatternFinder {
             // Stop names, unlike IDs, are not guaranteed to be unique.
             // Therefore we must track used names carefully to avoid duplicates.
 
-            String fromName = getTerminusName(pattern, stopById, locationById, true);
-            String toName = getTerminusName(pattern, stopById, locationById, false);
+            String fromName = getTerminusName(pattern, stopById, locationById, locationGroupById, true);
+            String toName = getTerminusName(pattern, stopById, locationById, locationGroupById, false);
 
             namingInfo.fromStops.put(fromName, pattern);
             namingInfo.toStops.put(toName, pattern);
@@ -162,8 +165,8 @@ public class PatternFinder {
         for (PatternNamingInfo info : namingInfoForRoute.values()) {
             for (Pattern pattern : info.patternsOnRoute) {
                 pattern.name = null; // clear this now so we don't get confused later on
-                String fromName = getTerminusName(pattern, stopById, locationById, true);
-                String toName = getTerminusName(pattern, stopById, locationById, false);
+                String fromName = getTerminusName(pattern, stopById, locationById, locationGroupById, true);
+                String toName = getTerminusName(pattern, stopById, locationById, locationGroupById, false);
 
                 // check if combination from, to is unique
                 Set<Pattern> intersection = new HashSet<>(info.fromStops.get(fromName));
@@ -219,20 +222,23 @@ public class PatternFinder {
 
     /**
      * Return either the 'from' or 'to' terminus name. Check the list of stops first, if there is no match, then check
-     * the locations. If neither provide a match return a default value.
+     * the locations or location groups. If neither provide a match return a default value.
      */
     private static String getTerminusName(
         Pattern pattern,
         Map<String, Stop> stopById,
         Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById,
         boolean isFrom
     ) {
         int id = isFrom ? 0 : pattern.orderedStops.size() - 1;
         String haltId = pattern.orderedStops.get(id);
-        if (stopById.containsKey(haltId))
+        if (stopById.containsKey(haltId)) {
             return stopById.get(haltId).stop_name;
-        else if (locationById.containsKey(haltId)) {
+        } else if (locationById.containsKey(haltId)) {
             return locationById.get(haltId).stop_name;
+        } else if (locationGroupById.containsKey(haltId)) {
+            return locationGroupById.get(haltId).location_group_name;
         }
         return isFrom ? "fromTerminusNameUnknown" : "toTerminusNameUnknown";
     }

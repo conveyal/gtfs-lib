@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.conditions.AgencyHasMultipleRowsCheck;
 import com.conveyal.gtfs.loader.conditions.ConditionalRequirement;
@@ -24,6 +25,7 @@ import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternLocation;
+import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -64,6 +66,7 @@ import java.util.zip.ZipFile;
 
 import static com.conveyal.gtfs.error.NewGTFSErrorType.DUPLICATE_HEADER;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.GEO_JSON_PARSING;
+import static com.conveyal.gtfs.error.NewGTFSErrorType.LOCATION_GROUP_PARSING;
 import static com.conveyal.gtfs.error.NewGTFSErrorType.TABLE_IN_SUBDIRECTORY;
 import static com.conveyal.gtfs.loader.JdbcGtfsLoader.sanitize;
 import static com.conveyal.gtfs.loader.Requirement.EDITOR;
@@ -85,6 +88,7 @@ public class Table {
     private static final Logger LOG = LoggerFactory.getLogger(Table.class);
 
     public static final String LOCATION_GEO_JSON_FILE_NAME = "locations.geojson";
+    public static final String LOCATION_GROUPS_FILE_NAME = "location_groups.txt";
 
     public final String name;
 
@@ -477,10 +481,32 @@ public class Table {
     public static final Table PATTERN_LOCATION = new Table("pattern_locations", PatternLocation.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
             new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
-            // FIXME: Do we need an index on location_id?
             new StringField("location_id", REQUIRED).isReferenceTo(LOCATIONS),
             // Editor-specific fields
-            // FLEX TODO: Are all of these needed?
+            new IntegerField("drop_off_type", EDITOR, 2),
+            new IntegerField("pickup_type", EDITOR, 2),
+            new ShortField("timepoint", EDITOR, 1),
+            new ShortField("continuous_pickup", OPTIONAL,3),
+            new ShortField("continuous_drop_off", OPTIONAL,3),
+            new StringField("pickup_booking_rule_id", OPTIONAL),
+            new StringField("drop_off_booking_rule_id", OPTIONAL),
+
+            // Additional GTFS Flex location groups and locations fields
+            // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended
+            new TimeField("flex_default_travel_time", OPTIONAL),
+            new TimeField("flex_default_zone_time", OPTIONAL),
+            new DoubleField("mean_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("mean_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
+            new DoubleField("safe_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2)
+
+    ).withParentTable(PATTERNS);
+
+    public static final Table PATTERN_LOCATION_GROUP = new Table("pattern_location_groups", PatternLocationGroup.class, OPTIONAL,
+            new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),
+            new IntegerField("stop_sequence", REQUIRED, 0, Integer.MAX_VALUE),
+            new StringField("location_group_id", REQUIRED).isReferenceTo(LOCATION_GROUPS),
+            // Editor-specific fields
             new IntegerField("drop_off_type", EDITOR, 2),
             new IntegerField("pickup_type", EDITOR, 2),
             new ShortField("timepoint", EDITOR, 1),
@@ -515,6 +541,7 @@ public class Table {
         FARE_RULES,
         PATTERN_STOP,
         PATTERN_LOCATION,
+        PATTERN_LOCATION_GROUP,
         TRANSFERS,
         TRIPS,
         STOP_TIMES,
@@ -713,11 +740,15 @@ public class Table {
         }
         if (entry == null) return null;
         try {
-            List<String> geoJsonErrors = new ArrayList<>();
-            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, geoJsonErrors);
-            if (!geoJsonErrors.isEmpty() && sqlErrorStorage != null) {
-                geoJsonErrors.forEach(error ->
-                    sqlErrorStorage.storeError(NewGTFSError.forFeed(GEO_JSON_PARSING, error))
+            List<String> errors = new ArrayList<>();
+            CsvReader csvReader = getCsvReader(tableFileName, name, zipFile, entry, errors);
+            if (!errors.isEmpty() && sqlErrorStorage != null) {
+                // Errors will only be populated if parsing locations.geojson or location_groups.txt.
+                NewGTFSErrorType errorType = (tableFileName.equals(LOCATION_GEO_JSON_FILE_NAME))
+                    ? GEO_JSON_PARSING
+                    : LOCATION_GROUP_PARSING;
+                errors.forEach(error ->
+                    sqlErrorStorage.storeError(NewGTFSError.forFeed(errorType, error))
                 );
             }
             // Don't skip empty records. This is set to true by default on CsvReader. We want to check for empty records
@@ -746,6 +777,8 @@ public class Table {
         CsvReader csvReader;
         if (tableFileName.equals(LOCATION_GEO_JSON_FILE_NAME)) {
             csvReader = GeoJsonUtil.getCsvReaderFromGeoJson(name, zipFile, entry, errors);
+        } else if (tableFileName.equals(LOCATION_GROUPS_FILE_NAME)) {
+            csvReader = LocationGroup.getCsvReader(zipFile, entry, errors);
         } else {
             InputStream zipInputStream = zipFile.getInputStream(entry);
             // Skip any byte order mark that may be present. Files must be UTF-8,

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
+import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
@@ -173,18 +174,16 @@ public class JdbcTableWriter implements TableWriter {
                 if (parentTable != null && parentTable.name.equals(specTable.name) || referencingTable.name.equals("shapes")) {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
-                    if (referencingTable.name.equals(Table.PATTERN_LOCATION.name) &&
-                        (childEntities == null ||
-                            childEntities.isNull() ||
-                            !childEntities.isArray())
+                    if ((referencingTable.name.equals(Table.PATTERN_LOCATION.name) ||
+                        referencingTable.name.equals(Table.PATTERN_LOCATION_GROUP.name)) &&
+                        (hasNoChildEntities(childEntities))
                     ) {
                         // This is a backwards hack to prevent the addition of pattern location breaking existing
-                        // pattern functionality. If pattern location is not provided set to an empty array to avoid the
-                        // following exception.
+                        // pattern functionality. If pattern location or pattern location group is not provided set to
+                        // an empty array to avoid the following exception.
                         childEntities = mapper.createArrayNode();
                     }
-
-                    if (childEntities == null || childEntities.isNull() || !childEntities.isArray()) {
+                    if (hasNoChildEntities(childEntities)) {
                         throw new SQLException(String.format("Child entities %s must be an array and not null", referencingTable.name));
                     }
                     int entityId = isCreating ? (int) newId : id;
@@ -266,6 +265,13 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+     *  Check if a parent table has no child entities.
+     */
+    private boolean hasNoChildEntities(JsonNode childEntities) {
+        return childEntities == null || childEntities.isNull() || !childEntities.isArray();
+    }
+
+    /**
      * If an entity references a pattern (e.g., pattern stop or trip), determine whether the pattern uses
      * frequencies because this impacts update behaviors, for example whether stop times are kept in
      * sync with default travel times or whether frequencies are allowed to be nested with a JSON trip.
@@ -312,11 +318,18 @@ public class JdbcTableWriter implements TableWriter {
                 tablePrefix + ".",
                 EntityPopulator.PATTERN_LOCATION
             );
+            JDBCTableReader<PatternLocationGroup> patternLocationGroups = new JDBCTableReader(
+                Table.PATTERN_LOCATION_GROUP,
+                dataSource,
+                tablePrefix + ".",
+                EntityPopulator.PATTERN_LOCATION_GROUP
+            );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
             List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
             Iterator<PatternHalt> patternHalts = Iterators.concat(
                 patternStops.getOrdered(patternId).iterator(),
-                patternLocations.getOrdered(patternId).iterator()
+                patternLocations.getOrdered(patternId).iterator(),
+                patternLocationGroups.getOrdered(patternId).iterator()
             );
             while (patternHalts.hasNext()) {
                 PatternHalt patternHalt = patternHalts.next();
@@ -361,8 +374,14 @@ public class JdbcTableWriter implements TableWriter {
                             timesForTripId.getKey()
                         );
                     } else if (patternHalt instanceof PatternLocation) {
-                        cumulativeTravelTime += updateStopTimesForPatternLocation(
+                        cumulativeTravelTime += updateStopTimes(
                             (PatternLocation) patternHalt,
+                            cumulativeTravelTime,
+                            timesForTripId.getKey()
+                        );
+                    } else if (patternHalt instanceof PatternLocationGroup) {
+                        cumulativeTravelTime += updateStopTimes(
+                            (PatternLocationGroup) patternHalt,
                             cumulativeTravelTime,
                             timesForTripId.getKey()
                         );
@@ -628,7 +647,10 @@ public class JdbcTableWriter implements TableWriter {
             // Do not permit the illegal state where frequency entries are being added/modified for a timetable pattern.
             throw new IllegalStateException("Cannot create or update frequency entries for a timetable-based pattern.");
         }
-        boolean isPatternTable = Table.PATTERN_STOP.name.equals(subTable.name) || Table.PATTERN_LOCATION.name.equals(subTable.name);
+        boolean isPatternTable =
+                Table.PATTERN_STOP.name.equals(subTable.name) ||
+                Table.PATTERN_LOCATION.name.equals(subTable.name) ||
+                Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name);
         if (isPatternTable) {
             reconciliation.stage(mapper, subTable, subEntities, keyValue);
         }
@@ -715,7 +737,9 @@ public class JdbcTableWriter implements TableWriter {
                         "drop_off_booking_rule_id"
                     );
                 }
-                if (Table.PATTERN_LOCATION.name.equals(subTable.name)) {
+                if (Table.PATTERN_LOCATION.name.equals(subTable.name) ||
+                    Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name)
+                ) {
                     updateLinkedFields(
                         subTable,
                         subEntity,
@@ -741,11 +765,8 @@ public class JdbcTableWriter implements TableWriter {
                 boolean valuesAreIncrementing = ++previousOrder == orderValue;
                 boolean valuesAreIncreasing = previousOrder <= orderValue;
 
-                // PatternStop and PatternLocations must only increase, not increment
-                boolean valuesAreAscending =
-                    (!Table.PATTERN_LOCATION.name.equals(subTable.name) && !Table.PATTERN_STOP.name.equals(subTable.name))
-                        ? valuesAreIncrementing
-                        : valuesAreIncreasing;
+                // Patterns must only increase, not increment.
+                boolean valuesAreAscending = !isPatternTable ? valuesAreIncrementing : valuesAreIncreasing;
                 if (!orderIsUnique || !valuesAreAscending) {
                     throw new SQLException(
                         String.format(
@@ -841,11 +862,18 @@ public class JdbcTableWriter implements TableWriter {
                         cumulativeTravelTime,
                         null
                     );
-            } else {
-                // Pattern type is location
+            } else if (genericStop.patternType == PatternReconciliation.PatternType.LOCATION) {
                 cumulativeTravelTime +=
-                    updateStopTimesForPatternLocation(
+                    updateStopTimes(
                         reconciliation.getPatternLocation(genericStop.referenceId),
+                        cumulativeTravelTime,
+                        null
+                    );
+            } else {
+                // Pattern type is location group
+                cumulativeTravelTime +=
+                    updateStopTimes(
+                        reconciliation.getPatternLocationGroup(genericStop.referenceId),
                         cumulativeTravelTime,
                         null
                     );
@@ -907,17 +935,60 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * Updates the stop times that reference the specified pattern location.
      *
-     * @param patternLocation    the pattern location for which to update stop times
-     * @param previousTravelTime the travel time accumulated up to the previous stop_time's departure time (or the
-     *                           previous pattern stop's dwell time)
-     * @return the travel and dwell time added by this pattern location
+     * @return the travel and dwell time added by this pattern.
      * @throws SQLException
      */
-    private int updateStopTimesForPatternLocation(PatternLocation patternLocation, int previousTravelTime, String tripId)
-        throws SQLException {
+    private int updateStopTimes(
+        PatternLocation patternLocation,
+        int previousTravelTime,
+        String tripId
+    ) throws SQLException {
+        return updateStopTimesForPatternLocationOrPatternLocationGroup(
+            patternLocation.flex_default_travel_time,
+            patternLocation.flex_default_zone_time,
+            patternLocation.pattern_id,
+            patternLocation.stop_sequence,
+            previousTravelTime,
+            tripId);
+    }
 
-        int travelTime = patternLocation.flex_default_travel_time == Entity.INT_MISSING ? 0 : patternLocation.flex_default_travel_time;
-        int dwellTime = patternLocation.flex_default_zone_time == Entity.INT_MISSING ? 0 : patternLocation.flex_default_zone_time;
+    /**
+     * Updates the stop times that reference the specified pattern location group.
+     *
+     * @return the travel and dwell time added by this pattern.
+     * @throws SQLException
+     */
+    private int updateStopTimes(
+        PatternLocationGroup patternLocationGroup,
+        int previousTravelTime,
+        String tripId
+    ) throws SQLException {
+        return updateStopTimesForPatternLocationOrPatternLocationGroup(
+            patternLocationGroup.flex_default_travel_time,
+            patternLocationGroup.flex_default_zone_time,
+            patternLocationGroup.pattern_id,
+            patternLocationGroup.stop_sequence,
+            previousTravelTime,
+            tripId);
+    }
+
+    /**
+     * Updates the stop times that reference the specified pattern location or pattern location group.
+     *
+     * @return the travel and dwell time added by this pattern.
+     * @throws SQLException
+     */
+    private int updateStopTimesForPatternLocationOrPatternLocationGroup(
+        int flexDefaultTravelTime,
+        int flexDefaultZoneTime,
+        String patternId,
+        int stopSequence,
+        int previousTravelTime,
+        String tripId
+    ) throws SQLException {
+
+        int travelTime = flexDefaultTravelTime == Entity.INT_MISSING ? 0 : flexDefaultTravelTime;
+        int dwellTime = flexDefaultZoneTime == Entity.INT_MISSING ? 0 : flexDefaultZoneTime;
         // Set trip id either from params or all
         tripId = (tripId != null) ? String.format("'%s'", tripId) : "t.trip_id";
 
@@ -933,8 +1004,8 @@ public class JdbcTableWriter implements TableWriter {
             previousTravelTime,
             travelTime,
             dwellTime,
-            patternLocation.pattern_id,
-            patternLocation.stop_sequence
+            patternId,
+            stopSequence
         );
         LOG.info("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
         return travelTime + dwellTime;
@@ -1475,9 +1546,10 @@ public class JdbcTableWriter implements TableWriter {
         deleteShapes(routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
-            // Delete pattern stops before joining patterns are deleted.
+            // Delete pattern stops, locations and location groups before joining patterns are deleted.
             deletePatternStops(routeOrPatternId);
-            // TODO: Flex delete pattern locations.
+            deletePatternLocations(routeOrPatternId);
+            deletePatternLocationGroups(routeOrPatternId);
         }
     }
 
@@ -1497,7 +1569,45 @@ public class JdbcTableWriter implements TableWriter {
                 routeId
             )
         );
-        LOG.info("Deleted {} pattern stops for pattern {}", deletedStopTimes, routeId );
+        LOG.info("Deleted {} pattern stops for pattern {}", deletedStopTimes, routeId);
+    }
+
+    /**
+     * If deleting a route, cascade delete pattern locations for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_locations to delete would fail because there would be no pattern
+     * records to join with.
+     */
+    private void deletePatternLocations(String routeId) throws SQLException {
+        // Delete pattern locations for route.
+        int deletedPatternLocations = executeStatement(
+            String.format(
+                "delete from %s pl using %s p, %s r where pl.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = '%s'",
+                String.format("%s.pattern_locations", tablePrefix),
+                String.format("%s.patterns", tablePrefix),
+                String.format("%s.routes", tablePrefix),
+                routeId
+            )
+        );
+        LOG.info("Deleted {} pattern locations for pattern {}", deletedPatternLocations, routeId);
+    }
+
+    /**
+     * If deleting a route, cascade delete pattern location groups for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_location_groups to delete would fail because there would be no pattern
+     * records to join with.
+     */
+    private void deletePatternLocationGroups(String routeId) throws SQLException {
+        // Delete pattern location groups for route.
+        int deletedPatternLocationGroups = executeStatement(
+            String.format(
+                "delete from %s plg using %s p, %s r where plg.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = '%s'",
+                String.format("%s.pattern_location_groups", tablePrefix),
+                String.format("%s.patterns", tablePrefix),
+                String.format("%s.routes", tablePrefix),
+                routeId
+            )
+        );
+        LOG.info("Deleted {} pattern location groups for pattern {}", deletedPatternLocationGroups, routeId);
     }
 
     /**

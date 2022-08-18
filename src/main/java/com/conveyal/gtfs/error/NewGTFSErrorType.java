@@ -59,6 +59,7 @@ public enum NewGTFSErrorType {
     INTEGER_FORMAT(Priority.MEDIUM, "Incorrect integer format."),
     LANGUAGE_FORMAT(Priority.LOW, "Language should be specified with a valid BCP47 tag."),
     LOCATION_UNUSED(Priority.MEDIUM, "This location is not referenced by any trips."),
+    LOCATION_GROUP_PARSING(Priority.HIGH, "Unable to parse the location_groups.txt file. Make sure the file conforms to the GTFS Flex standard."),
     LOCATION_GROUP_UNUSED(Priority.MEDIUM, "This location group is not referenced by any trips."),
     MISSING_ARRIVAL_OR_DEPARTURE(Priority.MEDIUM, "First and last stop times are required to have both an arrival and departure time."),
     MISSING_COLUMN(Priority.MEDIUM, "A required column was missing from a table."),

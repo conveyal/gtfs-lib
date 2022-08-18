@@ -149,6 +149,10 @@
           "stop_id" : "area_251",
           "stop_sequence" : 3,
           "trip_id" : "frequency-trip"
+        }, {
+          "stop_id" : "3",
+          "stop_sequence" : 4,
+          "trip_id" : "frequency-trip"
         } ],
         "trip_headsign" : null,
         "trip_id" : "frequency-trip",

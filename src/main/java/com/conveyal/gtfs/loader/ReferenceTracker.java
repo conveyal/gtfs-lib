@@ -89,12 +89,19 @@ public class ReferenceTracker {
             TreeSet<String> badValues = new TreeSet<>();
             for (Table referenceTable : field.referenceTables) {
                 String referenceField = referenceTable.getKeyFieldName();
-                String referenceTransitId = String.join(":", referenceField, value);
-                if (this.transitIds.contains(referenceTransitId)) {
-                    hasMatchingReference = true;
-                    break;
+                if (table.name.equals(Table.LOCATION_GROUPS.name) && field.name.equals("location_id") && value.contains(",")) {
+                    // Special case for location groups as the location id can be an array of location and stop ids.
+                    for (String reference : value.split(",")) {
+                        if (checkReference(referenceField, reference, badValues)) {
+                            hasMatchingReference = true;
+                            break;
+                        }
+                    }
                 } else {
-                    badValues.add(referenceTransitId);
+                    if (checkReference(referenceField, value, badValues)) {
+                        hasMatchingReference = true;
+                        break;
+                    }
                 }
             }
             if (!hasMatchingReference) {
@@ -167,6 +174,19 @@ public class ReferenceTracker {
             listOfUniqueIds.add(uniqueId);
         }
         return errors;
+    }
+
+    /**
+     * Check that a reference is valid.
+     */
+    private boolean checkReference(String referenceField, String reference, TreeSet<String> badValues) {
+        String referenceTransitId = String.join(":", referenceField, reference);
+        if (this.transitIds.contains(referenceTransitId)) {
+            return true;
+        } else {
+            badValues.add(referenceTransitId);
+        }
+        return false;
     }
 
 
