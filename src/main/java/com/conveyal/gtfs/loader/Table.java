@@ -79,6 +79,8 @@ public class Table {
 
     public final String name;
 
+    public final String fileName;
+
     final Class<? extends Entity> entityClass;
 
     final Requirement required;
@@ -101,6 +103,7 @@ public class Table {
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
         this.name = name;
+        this.fileName = name + ".txt";
         this.entityClass = entityClass;
         this.required = required;
         this.fields = fields;

@@ -5,6 +5,7 @@ import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
+import com.google.common.collect.Lists;
 import org.apache.commons.dbutils.DbUtils;
 import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
@@ -319,7 +320,7 @@ public class JdbcGtfsExporter {
     }
 
     /**
-     * Removes any empty zip files from the final zip file.
+     * Removes any empty zip files from the final zip file unless they are required files.
      */
     private void cleanUpZipFile() {
         long startTime = System.currentTimeMillis();
@@ -332,14 +333,29 @@ public class JdbcGtfsExporter {
         // (File#toURI allows this to work across different operating systems, including Windows)
         URI zip_disk = URI.create("jar:" + new File(outFile).toURI());
 
+        // These files, even if empty, are required as part of the GTFS specification.
+        List<String> mandatoryFileList = Lists.newArrayList(
+            Table.AGENCY.fileName,
+            Table.STOPS.fileName,
+            Table.ROUTES.fileName,
+            Table.TRIPS.fileName,
+            Table.STOP_TIMES.fileName,
+            Table.CALENDAR.fileName
+        );
+
         // Create ZIP file System
         try (FileSystem fileSystem = FileSystems.newFileSystem(zip_disk, zip_properties)) {
             // Get the Path inside ZIP File to delete the ZIP Entry
             for (String fileName : emptyTableList) {
-                Path filePath = fileSystem.getPath(fileName);
-                // Execute Delete
-                Files.delete(filePath);
-                LOG.info("Empty file {} successfully deleted", fileName);
+                if (!mandatoryFileList.contains(fileName)) {
+                    // Table is empty and not a required file.
+                    Path filePath = fileSystem.getPath(fileName);
+                    // Execute Delete
+                    Files.delete(filePath);
+                    LOG.info("Empty file {} successfully deleted.", fileName);
+                } else {
+                    LOG.info("Empty mandatory file {} not deleted.", fileName);
+                }
             }
         } catch (IOException e) {
             LOG.error("Could not remove empty zip files");
