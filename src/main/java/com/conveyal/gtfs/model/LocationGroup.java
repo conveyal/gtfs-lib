@@ -127,11 +127,11 @@ public class LocationGroup extends Entity {
      *
      * E.g. 1,2,"group 1" and 1,3,"group 1", will become: 1,"2,3","group 1".
      *
-     * If there are any issues grouping the location groups, null is return. This is to prevent downstream processing
-     * attempting to parse the file again.
+     * If there are any issues grouping the location groups or there are no location groups, return the default CSV
+     * reader. This is to prevent downstream processing from failing where a CSV reader is expected.
      */
     public static CsvReader getCsvReader(ZipFile zipFile, ZipEntry entry, List<String> errors) {
-        CsvReader csvReader;
+        CsvReader csvReader = new CsvReader(new StringReader(""));
         int locationGroupIdIndex = 0;
         int locationIdIndex = 1;
         int locationGroupNameIndex = 2;
@@ -151,7 +151,7 @@ public class LocationGroup extends Entity {
                 );
                 LOG.warn(message);
                 if (errors != null) errors.add(message);
-                return null;
+                return csvReader;
             }
             while (csvReader.readRecord()) {
                 int lineNumber = ((int) csvReader.getCurrentRecord()) + 2;
@@ -179,9 +179,11 @@ public class LocationGroup extends Entity {
                 }
             }
         } catch (IOException e) {
-            return null;
+            return csvReader;
         }
-        return (multiLocationGroups.isEmpty()) ? null : produceCsvPayload(multiLocationGroups);
+        return (multiLocationGroups.isEmpty())
+            ? csvReader
+            : produceCsvPayload(multiLocationGroups);
     }
 
     /**
