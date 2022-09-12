@@ -115,7 +115,9 @@ public class LocationGroup extends Entity {
         return String.join(
             ",",
             location_group_id,
-            location_id.contains(",") ? "\"" + location_id + "\"" : location_id,
+            (location_id != null)
+                ? location_id.contains(",") ? "\"" + location_id + "\"" : location_id
+                : "",
             location_group_name
         ) + System.lineSeparator();
     }
@@ -207,7 +209,7 @@ public class LocationGroup extends Entity {
         StringBuilder csvContent = new StringBuilder();
         csvContent.append(CSV_HEADER);
         locationGroups.forEach(locationGroup -> {
-            if (!locationGroup.location_id.contains(",")) {
+            if (locationGroup.location_id == null || !locationGroup.location_id.contains(",")) {
                 // Single location id reference.
                 csvContent.append(locationGroup.toCsvRow());
             } else {
