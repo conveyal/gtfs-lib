@@ -49,6 +49,16 @@ public class JdbcGtfsExporter {
     // The reference feed ID (namespace) to copy.
     private final String feedIdToExport;
     private List<String> emptyTableList = new ArrayList<>();
+    // These files, even if empty, are required as part of the GTFS specification.
+    public static final List<String> mandatoryFileList = Lists.newArrayList(
+        Table.AGENCY.fileName,
+        Table.CALENDAR.fileName,
+        Table.ROUTES.fileName,
+        Table.STOP_TIMES.fileName,
+        Table.STOPS.fileName,
+        Table.TRIPS.fileName
+    );
+
 
     public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
         this.feedIdToExport = feedId;
@@ -333,29 +343,18 @@ public class JdbcGtfsExporter {
         // (File#toURI allows this to work across different operating systems, including Windows)
         URI zip_disk = URI.create("jar:" + new File(outFile).toURI());
 
-        // These files, even if empty, are required as part of the GTFS specification.
-        List<String> mandatoryFileList = Lists.newArrayList(
-            Table.AGENCY.fileName,
-            Table.STOPS.fileName,
-            Table.ROUTES.fileName,
-            Table.TRIPS.fileName,
-            Table.STOP_TIMES.fileName,
-            Table.CALENDAR.fileName
-        );
+        // Removed mandatory files from the empty table list, so they are not deleted from the exported zip file.
+        emptyTableList.removeAll(mandatoryFileList);
 
         // Create ZIP file System
         try (FileSystem fileSystem = FileSystems.newFileSystem(zip_disk, zip_properties)) {
             // Get the Path inside ZIP File to delete the ZIP Entry
             for (String fileName : emptyTableList) {
-                if (!mandatoryFileList.contains(fileName)) {
-                    // Table is empty and not a required file.
-                    Path filePath = fileSystem.getPath(fileName);
-                    // Execute Delete
-                    Files.delete(filePath);
-                    LOG.info("Empty file {} successfully deleted.", fileName);
-                } else {
-                    LOG.info("Empty mandatory file {} not deleted.", fileName);
-                }
+                // Table is empty and not a required file.
+                Path filePath = fileSystem.getPath(fileName);
+                // Execute Delete
+                Files.delete(filePath);
+                LOG.info("Empty file {} successfully deleted.", fileName);
             }
         } catch (IOException e) {
             LOG.error("Could not remove empty zip files");
