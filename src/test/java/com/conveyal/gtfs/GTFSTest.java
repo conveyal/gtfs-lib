@@ -639,17 +639,11 @@ public class GTFSTest {
                 Assert.assertNotNull(gtfsZipFile.getEntry(fileName));
             }
         } catch (IOException | SQLException e) {
-            tidyUpEmptyMandatoryFilesTest(testDBName, tempFile);
+            LOG.error("An error occurred while attempting to test exporting of mandatory files.", e);
+        } finally {
+            TestUtils.dropDB(testDBName);
+            if (tempFile != null) tempFile.deleteOnExit();
         }
-        tidyUpEmptyMandatoryFilesTest(testDBName, tempFile);
-    }
-
-    /**
-     * Drop the test database and remove the exported zip file.
-     */
-    private void tidyUpEmptyMandatoryFilesTest(String testDBName, File tempFile) {
-        TestUtils.dropDB(testDBName);
-        if (tempFile != null) tempFile.deleteOnExit();
     }
 
     /**
