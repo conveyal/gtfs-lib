@@ -331,7 +331,7 @@
     <dependency>
       <groupId>com.graphql-java</groupId>
       <artifactId>graphql-java</artifactId>
-      <version>11.0</version>
+      <version>17.4</version>
     </dependency>
     <!--  Contains special utils for things like converting escaped strings to unescaped strings for logging.  -->
     <dependency>
