@@ -3,6 +3,7 @@ package com.conveyal.gtfs;
 
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
+import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.SnapshotResult;
 import com.conveyal.gtfs.storage.ErrorExpectation;
 import com.conveyal.gtfs.storage.ExpectedFieldType;
@@ -16,6 +17,7 @@ import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.io.Files;
+import graphql.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
 import org.hamcrest.Matcher;
@@ -617,6 +619,45 @@ public class GTFSTest {
             errorExpectations,
             customValidators
         );
+    }
+
+    /**
+     * Load a feed and remove all data from the tables that match the mandatory file list. Confirm that the export
+     * contains the mandatory files which will be exported even though the matching table has no data.
+     */
+    @Test
+    void canExportEmptyMandatoryFiles() {
+        String testDBName = TestUtils.generateNewDB();
+        File tempFile = null;
+        try {
+            String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
+            String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
+            DataSource dataSource = TestUtils.createTestDataSource(dbConnectionUrl);
+            FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
+            String namespace = loadResult.uniqueIdentifier;
+
+            // Remove data from tables that match the mandatory files.
+            for (String fileName : JdbcGtfsExporter.mandatoryFileList) {
+                try (Connection connection = dataSource.getConnection()) {
+                    String tableName = fileName.split("\\.")[0];
+                    String sql = String.format("delete from %s.%s", namespace, tableName);
+                    LOG.info(sql);
+                    connection.prepareStatement(sql).execute();
+                }
+            }
+
+            // Confirm that the mandatory files are present in the zip file.
+            tempFile = exportGtfs(namespace, dataSource, false);
+            ZipFile gtfsZipFile = new ZipFile(tempFile.getAbsolutePath());
+            for (String fileName : JdbcGtfsExporter.mandatoryFileList) {
+                Assert.assertNotNull(gtfsZipFile.getEntry(fileName));
+            }
+        } catch (IOException | SQLException e) {
+            LOG.error("An error occurred while attempting to test exporting of mandatory files.", e);
+        } finally {
+            TestUtils.dropDB(testDBName);
+            if (tempFile != null) tempFile.deleteOnExit();
+        }
     }
 
     /**
