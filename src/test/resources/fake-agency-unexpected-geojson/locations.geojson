@@ -1,0 +1,53 @@
+{
+   "type":"FeatureCollection",
+   "UnexpectedValue":1,
+   "UnexpectedValue2":"1",
+   "features":[
+      {
+         "type":"Feature",
+         "UnexpectedValue":1,
+         "UnexpectedValue2":"1",
+         "id":"loc_1",
+         "geometry":{
+            "UnexpectedValue":1,
+            "type":"Polygon",
+            "coordinates":[
+               [
+                  [
+                     -93.44548431449634,
+                     45.06571194105988
+                  ],
+                  [
+                     -93.44163440565146,
+                     45.064792697671706
+                  ],
+                  [
+                     -93.44429813752824,
+                     45.065486386989825
+                  ],
+                  [
+                     -93.44468553843242,
+                     45.065610101797546
+                  ],
+                  [
+                     -93.44513598361605,
+                     45.065607686263526
+                  ],
+                  [
+                     -93.44548431449634,
+                     45.06571194105988
+                  ]
+               ]
+            ]
+         },
+         "properties":{
+            "UnexpectedValue":1,
+            "STOP_name":"Plymouth Metrolink",
+            "stop_desc":null,
+            "UnexpectedValue2":92337510.098108,
+            "zone_id":743,
+            "stop_URL": "http://www.test.com"
+         }
+      }
+   ]
+}

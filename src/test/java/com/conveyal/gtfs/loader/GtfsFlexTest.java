@@ -28,6 +28,7 @@ import static com.conveyal.gtfs.TestUtils.lookThroughFiles;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Load in a GTFS feed with GTFS flex features, and ensure all needed fields are imported correctly.
@@ -41,6 +42,7 @@ public class GtfsFlexTest {
     private static DataSource doloresCountyTestDataSource;
     private static String doloresCountyTestNamespace;
     private static String doloresCountyGtfsZipFileName;
+    private static String unexpectGeoJsonZipFileName;
 
     @BeforeAll
     public static void setUpClass() throws IOException {
@@ -56,6 +58,13 @@ public class GtfsFlexTest {
         doloresCountyGtfsZipFileName = null;
         try {
             doloresCountyGtfsZipFileName = TestUtils.zipFolderFiles("real-world-gtfs-feeds/dolorescounty-co-us--flex-v2", true);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        unexpectGeoJsonZipFileName = null;
+        try {
+            unexpectGeoJsonZipFileName = TestUtils.zipFolderFiles("fake-agency-unexpected-geojson", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -142,6 +151,19 @@ public class GtfsFlexTest {
                 tableName,
                 columnName,
                 columnValue);
+    }
+
+    /**
+     * Make sure that unexpected geo json values are handled gracefully.
+     */
+    @Test
+    void canHandleUnexpectedGeoJsonValues() {
+        GTFSFeed feed = GTFSFeed.fromFile(unexpectGeoJsonZipFileName);
+        assertEquals("loc_1", feed.locations.entrySet().iterator().next().getKey());
+        assertEquals("Plymouth Metrolink", feed.locations.values().iterator().next().stop_name);
+        assertEquals("743", feed.locations.values().iterator().next().zone_id);
+        assertEquals("http://www.test.com", feed.locations.values().iterator().next().stop_url.toString());
+        assertNull(feed.locations.values().iterator().next().stop_desc);
     }
 
     /**
