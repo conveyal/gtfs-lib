@@ -157,10 +157,7 @@ public class GeoJsonUtil {
                         break;
                 }
             } else {
-                logErrorMessage(
-                    String.format("Unsupported property %s.", propertyName),
-                    errors
-                );
+                LOG.warn("Unsupported property {}.", propertyName);
             }
         }
     }
