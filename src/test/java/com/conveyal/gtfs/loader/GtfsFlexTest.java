@@ -42,7 +42,7 @@ public class GtfsFlexTest {
     private static DataSource doloresCountyTestDataSource;
     private static String doloresCountyTestNamespace;
     private static String doloresCountyGtfsZipFileName;
-    private static String unexpectGeoJsonZipFileName;
+    private static String unexpectedGeoJsonZipFileName;
 
     @BeforeAll
     public static void setUpClass() throws IOException {
@@ -62,9 +62,9 @@ public class GtfsFlexTest {
             e.printStackTrace();
         }
 
-        unexpectGeoJsonZipFileName = null;
+        unexpectedGeoJsonZipFileName = null;
         try {
-            unexpectGeoJsonZipFileName = TestUtils.zipFolderFiles("fake-agency-unexpected-geojson", true);
+            unexpectedGeoJsonZipFileName = TestUtils.zipFolderFiles("fake-agency-unexpected-geojson", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -158,7 +158,7 @@ public class GtfsFlexTest {
      */
     @Test
     void canHandleUnexpectedGeoJsonValues() {
-        GTFSFeed feed = GTFSFeed.fromFile(unexpectGeoJsonZipFileName);
+        GTFSFeed feed = GTFSFeed.fromFile(unexpectedGeoJsonZipFileName);
         assertEquals("loc_1", feed.locations.entrySet().iterator().next().getKey());
         assertEquals("Plymouth Metrolink", feed.locations.values().iterator().next().stop_name);
         assertEquals("743", feed.locations.values().iterator().next().zone_id);
