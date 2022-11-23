@@ -46,7 +46,6 @@ public class GtfsFlexTest {
 
     @BeforeAll
     public static void setUpClass() throws IOException {
-
         washingtonTestDBName = TestUtils.generateNewDB();
         washingtonTestDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", washingtonTestDBName));
         washingtonTestNamespace = loadFeedAndValidate(washingtonTestDataSource, "real-world-gtfs-feeds/washington-park-shuttle-with-flex-additions");
@@ -55,20 +54,8 @@ public class GtfsFlexTest {
         doloresCountyTestDataSource = TestUtils.createTestDataSource(String.format("jdbc:postgresql://localhost/%s", doloresCountyTestDBName));
         doloresCountyTestNamespace = loadFeedAndValidate(doloresCountyTestDataSource, "real-world-gtfs-feeds/dolorescounty-co-us--flex-v2");
 
-        doloresCountyGtfsZipFileName = null;
-        try {
-            doloresCountyGtfsZipFileName = TestUtils.zipFolderFiles("real-world-gtfs-feeds/dolorescounty-co-us--flex-v2", true);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        unexpectedGeoJsonZipFileName = null;
-        try {
-            unexpectedGeoJsonZipFileName = TestUtils.zipFolderFiles("fake-agency-unexpected-geojson", true);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        doloresCountyGtfsZipFileName = TestUtils.zipFolderFiles("real-world-gtfs-feeds/dolorescounty-co-us--flex-v2", true);
+        unexpectedGeoJsonZipFileName = TestUtils.zipFolderFiles("fake-agency-unexpected-geojson", true);
     }
 
     @AfterAll
