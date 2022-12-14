@@ -6,10 +6,14 @@ import org.mapdb.Fun;
 
 import java.io.IOException;
 import java.io.Serializable;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -204,6 +208,76 @@ public class StopTime extends Entity implements Cloneable, Serializable {
         }
 
 
+    }
+
+    /**
+     * Check that the flex column 'start_pickup_dropoff_window' existing in the stop time table. If this column exists
+     * it is assumed that the other flex columns do to. This is to guard against cases where booking rules, location
+     * groups or locations are defined in a feed but flex specific stop time columns are not.
+     */
+    private static boolean flexColumnExist(Connection connection, String tablePrefix) throws SQLException {
+        boolean exists = false;
+        String sql = String.format(
+            "SELECT EXISTS (SELECT 1 " +
+            "FROM information_schema.columns " +
+            "WHERE table_schema='%s' " +
+            "AND table_name='stop_times' " +
+            "AND column_name='start_pickup_dropoff_window')",
+            tablePrefix.replace(".", "")
+        );
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            ResultSet resultSet = statement.executeQuery();
+            while (resultSet.next()) {
+                exists = resultSet.getBoolean(1);
+            }
+        }
+        return exists;
+    }
+
+    /**
+     * Extract stop times which are required for flex validation. To qualify, one of the flex fields must not be null.
+     * To match the expected import values, where applicable, integers and doubles that are null are set to INT_MISSING
+     * and DOUBLE_MISSING respectively.
+     */
+    public static List<StopTime> getFlexStopTimesForValidation(Connection connection, String tablePrefix) throws SQLException {
+        List<StopTime> stopTimes = new ArrayList<>();
+        if (!flexColumnExist(connection, tablePrefix)) {
+            return stopTimes;
+        }
+        String sql = String.format(
+            "select id, trip_id, stop_id, arrival_time, departure_time, pickup_type, drop_off_type, " +
+            "start_pickup_dropoff_window, end_pickup_dropoff_window, mean_duration_factor, mean_duration_offset, " +
+            "safe_duration_factor, safe_duration_offset " +
+            "from %sstop_times where " +
+            "start_pickup_dropoff_window IS NOT NULL " +
+            "or end_pickup_dropoff_window IS NOT NULL " +
+            "or mean_duration_factor IS NOT NULL " +
+            "or mean_duration_offset IS NOT NULL " +
+            "or safe_duration_factor IS NOT NULL " +
+            "or safe_duration_offset IS NOT NULL ",
+            tablePrefix
+        );
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            ResultSet resultSet = statement.executeQuery();
+            while (resultSet.next()) {
+                StopTime stopTime = new StopTime();
+                stopTime.id = resultSet.getInt(1);
+                stopTime.trip_id  = resultSet.getString(2);
+                stopTime.stop_id  = resultSet.getString(3);
+                stopTime.arrival_time  = getIntValue(resultSet.getString(4));
+                stopTime.departure_time  = getIntValue(resultSet.getString(5));
+                stopTime.pickup_type  = resultSet.getInt(6);
+                stopTime.drop_off_type  = resultSet.getInt(7);
+                stopTime.start_pickup_dropoff_window  = getIntValue(resultSet.getString(8));
+                stopTime.end_pickup_dropoff_window  = getIntValue(resultSet.getString(9));
+                stopTime.mean_duration_factor  = getDoubleValue(resultSet.getString(10));
+                stopTime.mean_duration_offset  = getDoubleValue(resultSet.getString(11));
+                stopTime.safe_duration_factor  = getDoubleValue(resultSet.getString(12));
+                stopTime.safe_duration_offset  = getDoubleValue(resultSet.getString(13));
+                stopTimes.add(stopTime);
+            }
+        }
+        return stopTimes;
     }
 
     @Override

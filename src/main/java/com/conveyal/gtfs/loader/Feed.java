@@ -103,7 +103,7 @@ public class Feed {
             new TimeZoneValidator(this, errorStorage),
             new NewTripTimesValidator(this, errorStorage),
             new NamesValidator(this, errorStorage),
-            new FlexValidator(this, errorStorage)
+            new FlexValidator(this, errorStorage, dataSource)
         );
         // Create additional validators specified in this method's args and add to list of feed validators to run.
         for (FeedValidatorCreator creator : additionalValidators) {

@@ -169,331 +169,307 @@
         "error_type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME",
         "line_number" : 2
       }, {
-        "bad_value" : "1",
-        "entity_id" : null,
-        "entity_sequence" : null,
-        "entity_type" : "BookingRule",
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 0,
+        "entity_type" : "StopTime",
         "error_id" : 7,
-        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_LAST_DAY",
-        "line_number" : 2
-      }, {
-        "bad_value" : "7",
-        "entity_id" : null,
-        "entity_sequence" : null,
-        "entity_type" : "BookingRule",
-        "error_id" : 8,
-        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY",
-        "line_number" : 2
-      }, {
-        "bad_value" : "04100312-8fe1-46a5-a9f2-556f39478f57",
-        "entity_id" : null,
-        "entity_sequence" : null,
-        "entity_type" : "BookingRule",
-        "error_id" : 9,
-        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID",
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
         "line_number" : 2
       }, {
         "bad_value" : "25200",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
+        "entity_type" : "StopTime",
+        "error_id" : 8,
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 0,
+        "entity_type" : "StopTime",
+        "error_id" : 9,
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 2
+      }, {
+        "bad_value" : "25200",
+        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 10,
-        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
         "line_number" : 2
       }, {
-        "bad_value" : "25200",
+        "bad_value" : "1.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 11,
-        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
         "line_number" : 2
       }, {
-        "bad_value" : "25200",
+        "bad_value" : "60.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 12,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
         "line_number" : 2
       }, {
-        "bad_value" : "25200",
+        "bad_value" : "1.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 13,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
         "line_number" : 2
       }, {
-        "bad_value" : "1.0",
+        "bad_value" : "60.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 14,
-        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
         "line_number" : 2
       }, {
-        "bad_value" : "60.0",
+        "bad_value" : "25260",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 15,
-        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
-        "line_number" : 2
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "line_number" : 3
       }, {
-        "bad_value" : "1.0",
+        "bad_value" : "25260",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 16,
-        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
-        "line_number" : 2
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 3
       }, {
-        "bad_value" : "60.0",
+        "bad_value" : "25260",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 17,
-        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
-        "line_number" : 2
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 3
       }, {
         "bad_value" : "25260",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 18,
-        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
         "line_number" : 3
       }, {
-        "bad_value" : "25260",
+        "bad_value" : "1.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 19,
-        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
         "line_number" : 3
       }, {
-        "bad_value" : "25260",
+        "bad_value" : "60.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 20,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
         "line_number" : 3
       }, {
-        "bad_value" : "25260",
+        "bad_value" : "1.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 21,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
         "line_number" : 3
       }, {
-        "bad_value" : "1.0",
+        "bad_value" : "60.0",
         "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 22,
-        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
         "line_number" : 3
       }, {
-        "bad_value" : "60.0",
-        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "bad_value" : "28800",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 23,
-        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
-        "line_number" : 3
+        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "line_number" : 4
       }, {
-        "bad_value" : "1.0",
-        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "bad_value" : "28800",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 24,
-        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
-        "line_number" : 3
+        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "line_number" : 4
       }, {
-        "bad_value" : "60.0",
-        "entity_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d",
-        "entity_sequence" : 2,
+        "bad_value" : "25320",
+        "entity_id" : "frequency-trip",
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 25,
-        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
-        "line_number" : 3
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "line_number" : 4
       }, {
-        "bad_value" : "28800",
+        "bad_value" : "25320",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 26,
-        "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
         "line_number" : 4
       }, {
-        "bad_value" : "28800",
+        "bad_value" : "1.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 27,
-        "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
         "line_number" : 4
       }, {
-        "bad_value" : "25320",
+        "bad_value" : "60.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 28,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
         "line_number" : 4
       }, {
-        "bad_value" : "25320",
+        "bad_value" : "1.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 29,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
         "line_number" : 4
       }, {
-        "bad_value" : "1.0",
+        "bad_value" : "60.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 30,
-        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
-        "line_number" : 4
-      }, {
-        "bad_value" : "60.0",
-        "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
-        "entity_type" : "StopTime",
-        "error_id" : 31,
-        "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
-        "line_number" : 4
-      }, {
-        "bad_value" : "1.0",
-        "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
-        "entity_type" : "StopTime",
-        "error_id" : 32,
-        "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
-        "line_number" : 4
-      }, {
-        "bad_value" : "60.0",
-        "entity_id" : "frequency-trip",
-        "entity_sequence" : 1,
-        "entity_type" : "StopTime",
-        "error_id" : 33,
         "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
         "line_number" : 4
       }, {
         "bad_value" : "30540",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 34,
+        "error_id" : 31,
         "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
         "line_number" : 5
       }, {
         "bad_value" : "30540",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 35,
+        "error_id" : 32,
         "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
         "line_number" : 5
       }, {
         "bad_value" : "25380",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 36,
+        "error_id" : 33,
         "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
         "line_number" : 5
       }, {
         "bad_value" : "25380",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 37,
+        "error_id" : 34,
         "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
         "line_number" : 5
       }, {
         "bad_value" : "1.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 38,
+        "error_id" : 35,
         "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR",
         "line_number" : 5
       }, {
         "bad_value" : "60.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 39,
+        "error_id" : 36,
         "error_type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET",
         "line_number" : 5
       }, {
         "bad_value" : "1.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 40,
+        "error_id" : 37,
         "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR",
         "line_number" : 5
       }, {
         "bad_value" : "60.0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 2,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 41,
+        "error_id" : 38,
         "error_type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET",
         "line_number" : 5
       }, {
         "bad_value" : "30660",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 3,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 42,
+        "error_id" : 39,
         "error_type" : "FLEX_FORBIDDEN_ARRIVAL_TIME",
         "line_number" : 6
       }, {
         "bad_value" : "30660",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 3,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 43,
+        "error_id" : 40,
         "error_type" : "FLEX_FORBIDDEN_DEPARTURE_TIME",
         "line_number" : 6
       }, {
         "bad_value" : "25380",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 3,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 44,
+        "error_id" : 41,
         "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
         "line_number" : 6
       }, {
         "bad_value" : "25380",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 3,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 45,
+        "error_id" : 42,
         "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
         "line_number" : 6
       }, {
         "bad_value" : "0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 3,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 46,
+        "error_id" : 43,
         "error_type" : "FLEX_FORBIDDEN_PICKUP_TYPE",
         "line_number" : 6
       }, {
         "bad_value" : "0",
         "entity_id" : "frequency-trip",
-        "entity_sequence" : 3,
+        "entity_sequence" : 0,
         "entity_type" : "StopTime",
-        "error_id" : 47,
+        "error_id" : 44,
         "error_type" : "FLEX_FORBIDDEN_DROP_OFF_TYPE",
         "line_number" : 6
       }, {
@@ -501,9 +477,33 @@
         "entity_id" : "frequency-trip",
         "entity_sequence" : null,
         "entity_type" : "Trip",
-        "error_id" : 48,
+        "error_id" : 45,
         "error_type" : "TRIP_SPEED_NOT_VALIDATED",
         "line_number" : 3
+      }, {
+        "bad_value" : "1",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : "BookingRule",
+        "error_id" : 46,
+        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_LAST_DAY",
+        "line_number" : 2
+      }, {
+        "bad_value" : "7",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : "BookingRule",
+        "error_id" : 47,
+        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY",
+        "line_number" : 2
+      }, {
+        "bad_value" : "04100312-8fe1-46a5-a9f2-556f39478f57",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : "BookingRule",
+        "error_id" : 48,
+        "error_type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID",
+        "line_number" : 2
       }, {
         "bad_value" : "20170916",
         "entity_id" : null,

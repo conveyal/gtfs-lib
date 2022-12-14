@@ -498,11 +498,19 @@ public abstract class Entity implements Serializable {
         }
     }
 
-
     // shared code between reading and writing
     public static final String human (long n) {
         if (n >= 1000000) return String.format("%.1fM", n/1000000.0);
         if (n >= 1000) return String.format("%.1fk", n/1000.0);
         else return String.format("%d", n);
     }
+
+    public static int getIntValue(String value) {
+        return value == null ? INT_MISSING : Integer.parseInt(value);
+    }
+
+    public static double getDoubleValue(String value) {
+        return value == null ? DOUBLE_MISSING : Double.parseDouble(value);
+    }
+
 }

@@ -13,11 +13,15 @@ import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.Lists;
 
+import javax.sql.DataSource;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.conveyal.gtfs.error.NewGTFSErrorType.VALIDATOR_FAILED;
 import static com.conveyal.gtfs.model.Entity.DOUBLE_MISSING;
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
+import static com.conveyal.gtfs.model.StopTime.getFlexStopTimesForValidation;
 import static com.conveyal.gtfs.util.GeoJsonUtil.GEOMETRY_TYPE_POLYGON;
 
 /**
@@ -33,8 +37,11 @@ import static com.conveyal.gtfs.util.GeoJsonUtil.GEOMETRY_TYPE_POLYGON;
  */
 public class FlexValidator extends FeedValidator {
 
-    public FlexValidator(Feed feed, SQLErrorStorage errorStorage) {
+    DataSource dataSource;
+
+    public FlexValidator(Feed feed, SQLErrorStorage errorStorage, DataSource dataSource) {
         super(feed, errorStorage);
+        this.dataSource = dataSource;
     }
 
     @Override
@@ -44,15 +51,20 @@ public class FlexValidator extends FeedValidator {
         List<Location> locations = Lists.newArrayList(feed.locations);
 
         if (isFlexFeed(bookingRules, locationGroups, locations)) {
-            List<StopTime> stopTimes = Lists.newArrayList(feed.stopTimes);
+            List<NewGTFSError> errors = new ArrayList<>();
+            try {
+                List<StopTime> stopTimes = getFlexStopTimesForValidation(dataSource.getConnection(), feed.tablePrefix);
+                stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, locationGroups, locations)));
+                feed.trips.forEach(trip -> errors.addAll(validateTrip(trip, stopTimes, locationGroups, locations)));
+            } catch (SQLException e) {
+                String badValue = String.join(":", this.getClass().getSimpleName(), e.toString());
+                errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, badValue));
+            }
             List<Stop> stops = Lists.newArrayList(feed.stops);
             List<FareRule> fareRules = Lists.newArrayList(feed.fareRules);
-            List<NewGTFSError> errors = new ArrayList<>();
             feed.bookingRules.forEach(bookingRule -> errors.addAll(validateBookingRule(bookingRule)));
             feed.locationGroups.forEach(locationGroup -> errors.addAll(validateLocationGroup(locationGroup, stops, locations)));
             feed.locations.forEach(location -> errors.addAll(validateLocation(location, stops, fareRules)));
-            feed.stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, locationGroups, locations)));
-            feed.trips.forEach(trip -> errors.addAll(validateTrip(trip, stopTimes, locationGroups, locations)));
             // Register errors, if any, once all checks have been completed.
             errors.forEach(this::registerError);
         }
