@@ -635,6 +635,7 @@ public class JdbcTableWriter implements TableWriter {
                     "pattern_id",
                     "timepoint",
                     "drop_off_type",
+                    "stop_headsign",
                     "pickup_type",
                     "continuous_pickup",
                     "continuous_drop_off",
