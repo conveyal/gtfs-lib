@@ -3,6 +3,7 @@ package com.conveyal.gtfs;
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
+import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Pattern;
@@ -44,21 +45,6 @@ public class PatternFinder {
     private Multimap<TripPatternKey, Trip> tripsForPattern = LinkedHashMultimap.create();
 
     private int nTripsProcessed = 0;
-
-    /**
-     * Bin all trips by the sequence of stops they visit.
-     * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
-     */
-//    public void findPatterns(Feed feed) {
-//
-//        for (Trip trip : trips) {
-//        }
-//        feed.patterns.stream().forEach(p -> {
-//            feed.patterns.put(p.pattern_id, p);
-//            p.associatedTrips.stream().forEach(t -> feed.tripPatternMap.put(t, p.pattern_id));
-//        });
-//
-//    }
 
     public void processTrip(Trip trip, Iterable<StopTime> orderedStopTimes) {
         if (++nTripsProcessed % 100000 == 0) {
@@ -117,9 +103,9 @@ public class PatternFinder {
     }
 
     /**
-     * Destructively rename the supplied collection of patterns.
-     * This process requires access to all the stops in the feed.
-     * Some validators already cache a map of all the stops. There's probably a cleaner way to do this.
+     * Destructively rename the supplied collection of patterns. This process requires access to all stops, locations
+     * and location groups in the feed. Some validators already cache a map of all the stops. There's probably a
+     * cleaner way to do this.
      */
     public static void renamePatterns(
         Collection<Pattern> patterns,
@@ -154,7 +140,7 @@ public class PatternFinder {
 
             for (String stopId : pattern.orderedStops) {
                 Stop stop = stopById.get(stopId);
-                // If the stop doesn't exist, it's probably a location and we can ignore it for renaming
+                // If the stop doesn't exist, it's probably a location or location group and can be ignored for renaming
                 if (stop == null || fromName.equals(stop.stop_name) || toName.equals(stop.stop_name)) continue;
                 namingInfo.vias.put(stop.stop_name, pattern);
             }
@@ -179,10 +165,10 @@ public class PatternFinder {
 
                 // check for unique via stop
                 pattern.orderedStops.stream().map(
-                        stop -> stopById.get(stop) != null ? stopById.get(stop) : locationById.get(stop)
+                    uniqueEntityId -> getStopType(uniqueEntityId, stopById, locationById, locationGroupById)
                 ).forEach(entity -> {
                     Set<Pattern> viaIntersection = new HashSet<>(intersection);
-                    String stopName = (entity instanceof Stop) ? ((Stop) entity).stop_name : ((Location) entity).stop_name;
+                    String stopName = getStopName(entity);
                     viaIntersection.retainAll(info.vias.get(stopName));
 
                     if (viaIntersection.size() == 1) {
@@ -218,6 +204,43 @@ public class PatternFinder {
                         pattern.orderedStops.size(), pattern.name, pattern.associatedTrips.size());
             }
         }
+    }
+
+    /**
+     * Using the 'unique stop id' return the object it actually relates to. Under flex, a stop id can either be a stop,
+     * location or location group, this method decides which.
+     */
+    private static Object getStopType(
+        String uniqueEntityId,
+        Map<String, Stop> stopById,
+        Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById
+    ) {
+        if (stopById.get(uniqueEntityId) != null) {
+            return stopById.get(uniqueEntityId);
+        } else if (locationById.get(uniqueEntityId) != null) {
+            return locationById.get(uniqueEntityId);
+        } else if (locationGroupById.get(uniqueEntityId) != null) {
+            return locationGroupById.get(uniqueEntityId);
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Extract the 'stop name' from either a stop, location or location group depending on the entity type.
+     */
+    private static String getStopName(Object entity) {
+        if (entity != null) {
+            if (entity instanceof Stop) {
+                return ((Stop) entity).stop_name;
+            } else if (entity instanceof Location) {
+                return ((Location) entity).stop_name;
+            } else if (entity instanceof LocationGroup) {
+                return ((LocationGroup) entity).location_group_name;
+            }
+        }
+        return "stopNameUnknown";
     }
 
     /**
