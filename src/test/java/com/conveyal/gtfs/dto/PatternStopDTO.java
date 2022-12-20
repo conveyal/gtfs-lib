@@ -9,6 +9,7 @@ public class PatternStopDTO {
     public Double shape_dist_traveled;
     public Integer drop_off_type;
     public Integer pickup_type;
+    public String stop_headsign;
     public Integer stop_sequence;
     public Integer timepoint;
     public Integer continuous_pickup;
