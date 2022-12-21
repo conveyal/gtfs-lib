@@ -152,14 +152,15 @@ public class PatternFinderValidator extends TripValidator {
                     // Stop sequence is zero-based.
                     setIntParameter(insertPatternStopStatement, 2, i);
                     insertPatternStopStatement.setString(3, stopId);
-                    setIntParameter(insertPatternStopStatement,4, travelTime);
-                    setIntParameter(insertPatternStopStatement,5, dwellTime);
-                    setIntParameter(insertPatternStopStatement,6, key.dropoffTypes.get(i));
-                    setIntParameter(insertPatternStopStatement,7, key.pickupTypes.get(i));
-                    setDoubleParameter(insertPatternStopStatement, 8, key.shapeDistances.get(i));
-                    setIntParameter(insertPatternStopStatement,9, key.timepoints.get(i));
-                    setIntParameter(insertPatternStopStatement,10, key.continuous_pickup.get(i));
-                    setIntParameter(insertPatternStopStatement,11, key.continuous_drop_off.get(i));
+                    insertPatternStopStatement.setString(4, key.stopHeadsigns.get(i));
+                    setIntParameter(insertPatternStopStatement,5, travelTime);
+                    setIntParameter(insertPatternStopStatement,6, dwellTime);
+                    setIntParameter(insertPatternStopStatement,7, key.dropoffTypes.get(i));
+                    setIntParameter(insertPatternStopStatement,8, key.pickupTypes.get(i));
+                    setDoubleParameter(insertPatternStopStatement, 9, key.shapeDistances.get(i));
+                    setIntParameter(insertPatternStopStatement,10, key.timepoints.get(i));
+                    setIntParameter(insertPatternStopStatement,11, key.continuous_pickup.get(i));
+                    setIntParameter(insertPatternStopStatement,12, key.continuous_drop_off.get(i));
                     patternStopTracker.addBatch();
                 }
                 // Finally, update all trips on this pattern to reference this pattern's ID.
