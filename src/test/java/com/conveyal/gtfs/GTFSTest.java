@@ -1291,6 +1291,7 @@ public class GTFSTest {
                 new RecordExpectation("stop_id", "4u6g"),
                 new RecordExpectation("stop_sequence", 1),
                 new RecordExpectation("pickup_type", 0),
+                new RecordExpectation("stop_headsign", "Test stop headsign"),
                 new RecordExpectation("drop_off_type", 0),
                 new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
             }
