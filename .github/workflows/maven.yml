@@ -37,6 +37,7 @@ jobs:
     - name: Install maven-semantic-release
       # FIXME: Enable cache for node packages (add package.json?)
       run: |
+        node --version
         yarn global add @conveyal/maven-semantic-release semantic-release
         # Add yarn path to GITHUB_PATH so that global package is executable.
         echo "$(yarn global bin)" >> $GITHUB_PATH
@@ -66,4 +67,5 @@ jobs:
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
-       semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev --skip-maven-deploy
+        node --version
+        semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev --skip-maven-deploy
