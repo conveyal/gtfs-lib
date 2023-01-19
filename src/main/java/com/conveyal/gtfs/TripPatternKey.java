@@ -98,13 +98,6 @@ public class TripPatternKey {
 
     @Override
     public int hashCode() {
-        int result = routeId != null ? routeId.hashCode() : 0;
-        result = 31 * result + (stops != null ? stops.hashCode() : 0);
-        result = 31 * result + (pickupTypes != null ? pickupTypes.hashCode() : 0);
-        result = 31 * result + (dropoffTypes != null ? dropoffTypes.hashCode() : 0);
-        result = 31 * result + (start_pickup_dropoff_window != null ? start_pickup_dropoff_window.hashCode() : 0);
-        result = 31 * result + (end_pickup_dropoff_window != null ? end_pickup_dropoff_window.hashCode() : 0);
-        return result;
+        return Objects.hash(routeId, stops, pickupTypes, dropoffTypes, start_pickup_dropoff_window, end_pickup_dropoff_window);
     }
-
 }
