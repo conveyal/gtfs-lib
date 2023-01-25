@@ -30,13 +30,14 @@ jobs:
       with:
         java-version: 1.8
     # Install node 14+ for running maven-semantic-release.
-    - name: Use Node.js 14.x
+    - name: Use Node.js 18.X
       uses: actions/setup-node@v1
       with:
-        node-version: 14.x
+        node-version: 18
     - name: Install maven-semantic-release
       # FIXME: Enable cache for node packages (add package.json?)
       run: |
+        node --version
         yarn global add @conveyal/maven-semantic-release semantic-release
         # Add yarn path to GITHUB_PATH so that global package is executable.
         echo "$(yarn global bin)" >> $GITHUB_PATH
@@ -62,8 +63,14 @@ jobs:
           # See https://github.com/conveyal/gtfs-lib/issues/193.
           #
       # The git commands get the commit hash of the HEAD commit and the commit just before HEAD.
+    # Install node 14+ for running maven-semantic-release.
+    - name: Use Node.js 18.X
+      uses: actions/setup-node@v1
+      with:
+        node-version: 18
     - name: Run maven-semantic-release
       env:
         GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
-       semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev --skip-maven-deploy
+        node --version
+        semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev --skip-maven-deploy

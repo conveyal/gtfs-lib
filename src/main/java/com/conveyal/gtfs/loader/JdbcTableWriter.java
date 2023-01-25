@@ -635,6 +635,7 @@ public class JdbcTableWriter implements TableWriter {
                     "pattern_id",
                     "timepoint",
                     "drop_off_type",
+                    "stop_headsign",
                     "pickup_type",
                     "continuous_pickup",
                     "continuous_drop_off",
@@ -1149,6 +1150,7 @@ public class JdbcTableWriter implements TableWriter {
             stopTime.stop_id = patternStop.stop_id;
             stopTime.drop_off_type = patternStop.drop_off_type;
             stopTime.pickup_type = patternStop.pickup_type;
+            stopTime.stop_headsign = patternStop.stop_headsign;
             stopTime.timepoint = patternStop.timepoint;
             stopTime.shape_dist_traveled = patternStop.shape_dist_traveled;
             stopTime.continuous_drop_off = patternStop.continuous_drop_off;

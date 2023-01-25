@@ -13,6 +13,7 @@ query ($namespace: String) {
         id
         pattern_id
         pickup_type
+        stop_headsign
         shape_dist_traveled
         stop {
           stop_id
