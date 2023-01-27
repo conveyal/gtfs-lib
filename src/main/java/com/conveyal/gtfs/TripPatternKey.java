@@ -8,6 +8,7 @@ import gnu.trove.list.array.TIntArrayList;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static com.conveyal.gtfs.model.Entity.INT_MISSING;
 
@@ -22,6 +23,10 @@ public class TripPatternKey {
     public List<String> stops = new ArrayList<>();
     public TIntList pickupTypes = new TIntArrayList();
     public TIntList dropoffTypes = new TIntArrayList();
+    // Flex additions included in equality check.
+    public TIntList start_pickup_dropoff_window = new TIntArrayList();
+    public TIntList end_pickup_dropoff_window = new TIntArrayList();
+
     // Note, the lists below are not used in the equality check.
     public TIntList arrivalTimes = new TIntArrayList();
     public TIntList departureTimes = new TIntArrayList();
@@ -33,10 +38,6 @@ public class TripPatternKey {
     // Flex additions
     public List<String> pickup_booking_rule_id = new ArrayList<>();
     public List<String> drop_off_booking_rule_id = new ArrayList<>();
-
-    // Additional GTFS Flex location groups and locations fields
-    public TIntList start_pickup_dropoff_window = new TIntArrayList();
-    public TIntList end_pickup_dropoff_window = new TIntArrayList();
     public TDoubleList mean_duration_factor = new TDoubleArrayList();
     public TDoubleList mean_duration_offset = new TDoubleArrayList();
     public TDoubleList safe_duration_factor = new TDoubleArrayList();
@@ -85,21 +86,18 @@ public class TripPatternKey {
 
         TripPatternKey that = (TripPatternKey) o;
 
-        if (dropoffTypes != null ? !dropoffTypes.equals(that.dropoffTypes) : that.dropoffTypes != null) return false;
-        if (pickupTypes != null ? !pickupTypes.equals(that.pickupTypes) : that.pickupTypes != null) return false;
-        if (routeId != null ? !routeId.equals(that.routeId) : that.routeId != null) return false;
-        if (stops != null ? !stops.equals(that.stops) : that.stops != null) return false;
+        if (!Objects.equals(dropoffTypes, that.dropoffTypes)) return false;
+        if (!Objects.equals(pickupTypes, that.pickupTypes)) return false;
+        if (!Objects.equals(routeId, that.routeId)) return false;
+        if (!Objects.equals(stops, that.stops)) return false;
+        if (!Objects.equals(start_pickup_dropoff_window, that.start_pickup_dropoff_window)) return false;
+        if (!Objects.equals(end_pickup_dropoff_window, that.end_pickup_dropoff_window)) return false;
 
         return true;
     }
 
     @Override
     public int hashCode() {
-        int result = routeId != null ? routeId.hashCode() : 0;
-        result = 31 * result + (stops != null ? stops.hashCode() : 0);
-        result = 31 * result + (pickupTypes != null ? pickupTypes.hashCode() : 0);
-        result = 31 * result + (dropoffTypes != null ? dropoffTypes.hashCode() : 0);
-        return result;
+        return Objects.hash(routeId, stops, pickupTypes, dropoffTypes, start_pickup_dropoff_window, end_pickup_dropoff_window);
     }
-
 }
