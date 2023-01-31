@@ -21,6 +21,7 @@
           "stop" : [ {
             "stop_id" : "4u6g"
           } ],
+          "stop_headsign" : "Test stop headsign",
           "stop_id" : "4u6g",
           "stop_sequence" : 0,
           "timepoint" : 1
@@ -37,6 +38,7 @@
           "stop" : [ {
             "stop_id" : "johv"
           } ],
+          "stop_headsign" : "Test stop headsign 2",
           "stop_id" : "johv",
           "stop_sequence" : 1,
           "timepoint" : 1
@@ -134,6 +136,7 @@
           "stop" : [ {
             "stop_id" : "4u6g"
           } ],
+          "stop_headsign" : "Test stop headsign frequency trip",
           "stop_id" : "4u6g",
           "stop_sequence" : 0,
           "timepoint" : 1
@@ -150,6 +153,7 @@
           "stop" : [ {
             "stop_id" : "1234"
           } ],
+          "stop_headsign" : "Test stop headsign frequency trip",
           "stop_id" : "1234",
           "stop_sequence" : 1,
           "timepoint" : 1

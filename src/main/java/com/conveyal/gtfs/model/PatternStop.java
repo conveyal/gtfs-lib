@@ -21,6 +21,7 @@ public class PatternStop extends PatternHalt {
     public int pickup_type;
     public int drop_off_type;
     public int timepoint;
+    public String stop_headsign;
     public int continuous_pickup = INT_MISSING;
     public int continuous_drop_off = INT_MISSING;
 
@@ -38,6 +39,7 @@ public class PatternStop extends PatternHalt {
         // Stop sequence is zero-based.
         setIntParameter(statement, oneBasedIndex++, stop_sequence);
         statement.setString(oneBasedIndex++, stop_id);
+        statement.setString(oneBasedIndex++, stop_headsign);
         setIntParameter(statement, oneBasedIndex++, default_travel_time);
         setIntParameter(statement, oneBasedIndex++, default_dwell_time);
         setIntParameter(statement, oneBasedIndex++, drop_off_type);

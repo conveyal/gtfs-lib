@@ -312,6 +312,7 @@ public class Table {
             // FIXME: Do we need an index on stop_id?
             new StringField("stop_id", REQUIRED).isReferenceTo(STOPS),
             // Editor-specific fields
+            new StringField("stop_headsign", EDITOR),
             new IntegerField("default_travel_time", EDITOR,0, Integer.MAX_VALUE),
             new IntegerField("default_dwell_time", EDITOR, 0, Integer.MAX_VALUE),
             new IntegerField("drop_off_type", EDITOR, 2),
