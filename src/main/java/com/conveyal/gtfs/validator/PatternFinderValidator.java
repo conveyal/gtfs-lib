@@ -307,7 +307,7 @@ public class PatternFinderValidator extends TripValidator {
      * Calculate previous departure time, needed for all patterns. This is done by defining the 'last valid departure
      * time' for all stops except the first.
      */
-    private int calculatePreviousDepartureTime(
+    public int calculatePreviousDepartureTime(
         boolean prevIsFlexStop,
         boolean currentIsFlexStop,
         int lastValidDepartureTime,
