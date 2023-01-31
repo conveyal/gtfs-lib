@@ -340,6 +340,7 @@ public class PatternFinderValidator extends TripValidator {
             patternStop.pattern_id = patternId;
             patternStop.stop_sequence = stopSequence;
             patternStop.stop_id = patternTypeId;
+            patternStop.stop_headsign = tripPattern.stopHeadsigns.get(stopSequence);
             patternStop.default_travel_time = travelTime;
             patternStop.default_dwell_time = timeInLocation;
             patternStop.drop_off_type = tripPattern.dropoffTypes.get(stopSequence);

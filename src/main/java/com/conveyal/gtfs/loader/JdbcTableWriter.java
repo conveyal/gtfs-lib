@@ -734,6 +734,7 @@ public class JdbcTableWriter implements TableWriter {
                         "pattern_id",
                         "timepoint",
                         "drop_off_type",
+                        "stop_headsign",
                         "pickup_type",
                         "continuous_pickup",
                         "continuous_drop_off",
@@ -1165,6 +1166,7 @@ public class JdbcTableWriter implements TableWriter {
         for (String ref : referenceStrings) {
             preparedStatement.setString(oneBasedIndex++, ref);
         }
+
         LOG.info(preparedStatement.toString());
         ResultSet resultSet = preparedStatement.executeQuery();
         Set<String> foundReferences = new HashSet<>();
@@ -1654,7 +1656,6 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-<<<<<<< HEAD
      * If deleting a route or pattern, cascade delete shapes. This must happen before patterns are deleted. Otherwise,
      * the queries to select shapes to delete would fail because there would be no pattern records to join with.
      */
@@ -1683,8 +1684,6 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-=======
->>>>>>> dev
      * Execute the provided sql and return the number of rows effected.
      */
     private int executeStatement(String sql) throws SQLException {
