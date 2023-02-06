@@ -31,6 +31,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -161,21 +162,13 @@ public class PatternFinderValidator extends TripValidator {
                 TripPatternKey key = entry.getKey();
                 pattern.setStatementParameters(insertPatternStatement, true);
                 patternTracker.addBatch();
-                // Determine initial departure time based on the stop type.
-                int lastValidDepartureTime = isFlexStop(locationById, locationGroupById, key.stops.get(0))
-                    ? key.end_pickup_dropoff_window.get(0)
-                    : key.departureTimes.get(0);
+                // Determine departure times based on the stop type.
+                List<Integer> previousDepartureTimes = calculatePreviousDepartureTimes(key, locationById, locationGroupById);
                 // Construct pattern stops based on values in trip pattern key.
                 for (int stopSequence = 0; stopSequence < key.stops.size(); stopSequence++) {
                     String stopOrLocationIdOrLocationGroupId = key.stops.get(stopSequence);
                     boolean prevIsFlexStop = stopSequence > 0 && isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence - 1));
-                    lastValidDepartureTime = calculatePreviousDepartureTime(
-                        prevIsFlexStop,
-                        isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence)),
-                        lastValidDepartureTime,
-                        key,
-                        stopSequence
-                    );
+                    int lastValidDepartureTime = previousDepartureTimes.get(stopSequence);
                     if (stopById.containsKey(stopOrLocationIdOrLocationGroupId)) {
                         insertPatternType(
                             stopSequence,
@@ -304,17 +297,24 @@ public class PatternFinderValidator extends TripValidator {
     }
 
     /**
-     * Calculate previous departure time, needed for all patterns. This is done by defining the 'last valid departure
+     * Calculate previous departure times, needed for all patterns. This is done by defining the 'last valid departure
      * time' for all stops except the first.
      */
-    public int calculatePreviousDepartureTime(
-        boolean prevIsFlexStop,
-        boolean currentIsFlexStop,
-        int lastValidDepartureTime,
+    public List<Integer> calculatePreviousDepartureTimes(
         TripPatternKey key,
-        int stopSequence
+        Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById
     ) {
-        if (stopSequence > 0) {
+        List<Integer> previousDepartureTimes = new ArrayList<>();
+        // Determine initial departure time based on the stop type.
+        int lastValidDepartureTime = isFlexStop(locationById, locationGroupById, key.stops.get(0))
+            ? key.end_pickup_dropoff_window.get(0)
+            : key.departureTimes.get(0);
+        previousDepartureTimes.add(lastValidDepartureTime);
+        // Construct pattern stops based on values in trip pattern key.
+        for (int stopSequence = 1; stopSequence < key.stops.size(); stopSequence++) {
+            boolean prevIsFlexStop = isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence - 1));
+            boolean currentIsFlexStop = isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence));
             // Set travel time for all stops except the first.
             if (prevIsFlexStop && currentIsFlexStop) {
                 // Previous and current are flex stops. There is no departure time between flex stops.
@@ -329,8 +329,9 @@ public class PatternFinderValidator extends TripValidator {
                     lastValidDepartureTime = prevDepartureStop;
                 }
             }
+            previousDepartureTimes.add(lastValidDepartureTime);
         }
-        return lastValidDepartureTime;
+        return previousDepartureTimes;
     }
 
     /**
