@@ -298,7 +298,7 @@ public class PatternFinderValidator extends TripValidator {
 
     /**
      * Calculate previous departure times, needed for all patterns. This is done by defining the 'last valid departure
-     * time' for all stops except the first.
+     * time' for all stops. The previous departure time for the first stop will always be zero.
      */
     public List<Integer> calculatePreviousDepartureTimes(
         TripPatternKey key,
@@ -310,7 +310,8 @@ public class PatternFinderValidator extends TripValidator {
         int lastValidDepartureTime = isFlexStop(locationById, locationGroupById, key.stops.get(0))
             ? key.end_pickup_dropoff_window.get(0)
             : key.departureTimes.get(0);
-        previousDepartureTimes.add(lastValidDepartureTime);
+        // Set the previous departure time for the first stop, which will always be zero.
+        previousDepartureTimes.add(0);
         // Construct pattern stops based on values in trip pattern key.
         for (int stopSequence = 1; stopSequence < key.stops.size(); stopSequence++) {
             boolean prevIsFlexStop = isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence - 1));
