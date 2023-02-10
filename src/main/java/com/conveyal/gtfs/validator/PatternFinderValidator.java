@@ -31,6 +31,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -161,64 +162,48 @@ public class PatternFinderValidator extends TripValidator {
                 TripPatternKey key = entry.getKey();
                 pattern.setStatementParameters(insertPatternStatement, true);
                 patternTracker.addBatch();
+                // Determine departure times based on the stop type.
+                List<Integer> previousDepartureTimes = calculatePreviousDepartureTimes(key, locationById, locationGroupById);
                 // Construct pattern stops based on values in trip pattern key.
-                // FIXME: Use pattern stops table here?
-                int lastValidDeparture = key.departureTimes.get(0);
                 for (int stopSequence = 0; stopSequence < key.stops.size(); stopSequence++) {
                     String stopOrLocationIdOrLocationGroupId = key.stops.get(stopSequence);
-                    // Calculate previous departure time, needed for both pattern location and pattern stop
-                    int prevDeparture = INT_MISSING;
-                    if (stopSequence > 0) {
-                        int prevDepartureStop = key.departureTimes.get(stopSequence - 1);
-                        int prevDepartureFlex = key.end_pickup_dropoff_window.get(stopSequence - 1);
-                        if (prevDepartureStop != INT_MISSING) {
-                            prevDeparture = prevDepartureStop;
-                        }
-                        // Only use the flex departure if it is after the stop departure.
-                        // FLEX TODO: Create a unit test to test this!
-                        if (prevDepartureFlex > prevDepartureStop) {
-                            prevDeparture = prevDepartureFlex;
-                        }
-
-                        // Set travel time for all stops except the first.
-                        if (prevDeparture != INT_MISSING) {
-                            // Update the previous departure if it's not missing. Otherwise, base travel time based on the
-                            // most recent valid departure.
-                            lastValidDeparture = prevDeparture;
-                        }
-                    }
+                    boolean prevIsFlexStop = stopSequence > 0 && isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence - 1));
+                    int lastValidDepartureTime = previousDepartureTimes.get(stopSequence);
                     if (stopById.containsKey(stopOrLocationIdOrLocationGroupId)) {
                         insertPatternType(
                             stopSequence,
                             key,
-                            lastValidDeparture,
+                            lastValidDepartureTime,
                             pattern.pattern_id,
                             insertPatternStopStatement,
                             patternStopTracker,
                             stopOrLocationIdOrLocationGroupId,
-                            PatternReconciliation.PatternType.STOP
+                            PatternReconciliation.PatternType.STOP,
+                            prevIsFlexStop
                         );
                     } else if (locationById.containsKey(stopOrLocationIdOrLocationGroupId)) {
                         insertPatternType(
                             stopSequence,
                             key,
-                            lastValidDeparture,
+                            lastValidDepartureTime,
                             pattern.pattern_id,
                             insertPatternLocationStatement,
                             patternLocationTracker,
                             stopOrLocationIdOrLocationGroupId,
-                            PatternReconciliation.PatternType.LOCATION
+                            PatternReconciliation.PatternType.LOCATION,
+                            prevIsFlexStop
                         );
                     } else if (locationGroupById.containsKey(stopOrLocationIdOrLocationGroupId)) {
                         insertPatternType(
                             stopSequence,
                             key,
-                            lastValidDeparture,
+                            lastValidDepartureTime,
                             pattern.pattern_id,
                             insertPatternLocationGroupStatement,
                             patternLocationGroupTracker,
                             stopOrLocationIdOrLocationGroupId,
-                            PatternReconciliation.PatternType.LOCATION_GROUP
+                            PatternReconciliation.PatternType.LOCATION_GROUP,
+                            prevIsFlexStop
                         );
                     }
                 }
@@ -302,6 +287,55 @@ public class PatternFinderValidator extends TripValidator {
     }
 
     /**
+     * Determine if the provided stop id is a flex stop (location or location group).
+     */
+    private boolean isFlexStop(
+        Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById,
+        String stopId) {
+        return locationById.containsKey(stopId) || locationGroupById.containsKey(stopId);
+    }
+
+    /**
+     * Calculate previous departure times, needed for all patterns. This is done by defining the 'last valid departure
+     * time' for all stops. The previous departure time for the first stop will always be zero.
+     */
+    public List<Integer> calculatePreviousDepartureTimes(
+        TripPatternKey key,
+        Map<String, Location> locationById,
+        Map<String, LocationGroup> locationGroupById
+    ) {
+        List<Integer> previousDepartureTimes = new ArrayList<>();
+        // Determine initial departure time based on the stop type.
+        int lastValidDepartureTime = isFlexStop(locationById, locationGroupById, key.stops.get(0))
+            ? key.end_pickup_dropoff_window.get(0)
+            : key.departureTimes.get(0);
+        // Set the previous departure time for the first stop, which will always be zero.
+        previousDepartureTimes.add(0);
+        // Construct pattern stops based on values in trip pattern key.
+        for (int stopSequence = 1; stopSequence < key.stops.size(); stopSequence++) {
+            boolean prevIsFlexStop = isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence - 1));
+            boolean currentIsFlexStop = isFlexStop(locationById, locationGroupById, key.stops.get(stopSequence));
+            // Set travel time for all stops except the first.
+            if (prevIsFlexStop && currentIsFlexStop) {
+                // Previous and current are flex stops. There is no departure time between flex stops.
+                lastValidDepartureTime = 0;
+            } else {
+                int prevDepartureStop = prevIsFlexStop
+                    ? key.end_pickup_dropoff_window.get(stopSequence - 1)
+                    : key.departureTimes.get(stopSequence - 1);
+                if (prevDepartureStop > lastValidDepartureTime) {
+                    // Update the last valid departure if the previous departure is after this. Otherwise, continue to
+                    // use the most recent valid departure.
+                    lastValidDepartureTime = prevDepartureStop;
+                }
+            }
+            previousDepartureTimes.add(lastValidDepartureTime);
+        }
+        return previousDepartureTimes;
+    }
+
+    /**
      * Insert pattern types. This covers pattern stops, locations and location groups.
      */
     private void insertPatternType(
@@ -312,21 +346,25 @@ public class PatternFinderValidator extends TripValidator {
         PreparedStatement statement,
         BatchTracker batchTracker,
         String patternTypeId,
-        PatternReconciliation.PatternType patternType
+        PatternReconciliation.PatternType patternType,
+        boolean prevIsFlexStop
     ) throws SQLException {
         int travelTime = 0;
-        travelTime = (patternType == PatternReconciliation.PatternType.STOP)
-            ? getTravelTime(
+        if (patternType == PatternReconciliation.PatternType.STOP) {
+            travelTime = getTravelTime(
                 travelTime,
                 stopSequence,
                 tripPattern.arrivalTimes.get(stopSequence),
-                lastValidDeparture)
-            : getTravelTime(
+                lastValidDeparture);
+        } else if (!prevIsFlexStop) {
+            // If the previous stop is not flex, calculate travel time. If the previous stop is flex the travel time will
+            // be zero.
+            travelTime = getTravelTime(
                 travelTime,
                 stopSequence,
                 tripPattern.start_pickup_dropoff_window.get(stopSequence),
                 lastValidDeparture);
-
+        }
         int timeInLocation = (patternType == PatternReconciliation.PatternType.STOP)
             ? getTimeInLocation(
                 tripPattern.arrivalTimes.get(stopSequence),
