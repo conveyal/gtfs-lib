@@ -18,6 +18,7 @@ public class PatternLocation extends PatternHalt {
     public int pickup_type;
     public int drop_off_type;
     public int timepoint;
+    public String stop_headsign;
     public int continuous_pickup = INT_MISSING;
     public int continuous_drop_off = INT_MISSING;
 
@@ -46,6 +47,7 @@ public class PatternLocation extends PatternHalt {
         setIntParameter(statement, oneBasedIndex++, drop_off_type);
         setIntParameter(statement, oneBasedIndex++, pickup_type);
         setIntParameter(statement, oneBasedIndex++, timepoint);
+        statement.setString(oneBasedIndex++, stop_headsign);
         setIntParameter(statement, oneBasedIndex++, continuous_pickup);
         setIntParameter(statement, oneBasedIndex++, continuous_drop_off);
         statement.setString(oneBasedIndex++, pickup_booking_rule_id);
