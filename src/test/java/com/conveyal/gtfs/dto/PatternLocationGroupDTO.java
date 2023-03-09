@@ -19,6 +19,7 @@ public class PatternLocationGroupDTO {
     public int pickup_type;
     public int drop_off_type;
     public int timepoint;
+    public String stop_headsign;
     public int continuous_pickup;
     public int continuous_drop_off;
 
