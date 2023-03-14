@@ -559,6 +559,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
+            .field(MapFetcher.field("stop_headsign"))
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
 
@@ -598,6 +599,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("continuous_pickup", GraphQLInt))
             .field(MapFetcher.field("stop_sequence", GraphQLInt))
             .field(MapFetcher.field("timepoint", GraphQLInt))
+            .field(MapFetcher.field("stop_headsign"))
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
 
