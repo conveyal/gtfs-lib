@@ -24,7 +24,12 @@ import java.io.StringReader;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -103,15 +108,15 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<Location> locations = new ArrayList<>();
-        Set<String> uniqueLocationIds = new HashSet<String>();
+        Set<String> seenLocationIds = new HashSet<String>();
         for (Feature feature : featureCollection.getFeatures()) {
             String geometryType = getGeometryType(feature.getGeometryType().getName(), errors);
-            if (geometryType == null) continue;
             Location location = new Location();
             String locationId = feature.getId();
 
-            // Skip duplicate IDs (this happens more than you think)
-            if (!uniqueLocationIds.add(locationId)) continue;
+            // Skip empty geometry and skip duplicate IDs (this happens more than you think)
+            if (geometryType == null || !seenLocationIds.add(locationId)) continue;
+
             location.location_id = locationId;
             location.geometry_type = geometryType;
             extractPropertyValues(location, feature.getProperties(), errors);
@@ -193,13 +198,13 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<LocationShape> locationShapes = new ArrayList<>();
-        Set<String> uniqueLocationIds = new HashSet<String>();
+        Set<String> seenLocationIds = new HashSet<String>();
         for (Feature feature : featureCollection.getFeatures()) {
             Geometry geometry = feature.getFeature().getGeometry();
             String geometryType = getGeometryType(geometry.getGeometryType().getName(), errors);
-            if (geometryType == null) continue;
-            // Skip duplicate IDs (this happens more than you think)
-            if (!uniqueLocationIds.add(feature.getId())) continue;
+
+            // Skip empty geometry and skip duplicate IDs (this happens more than you think)
+            if (geometryType == null || !seenLocationIds.add(feature.getId())) continue;
             switch (geometryType) {
                 case GEOMETRY_TYPE_POLYLINE:
                     LineString lineString = (LineString) geometry;
