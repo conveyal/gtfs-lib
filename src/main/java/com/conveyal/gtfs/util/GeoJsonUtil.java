@@ -115,7 +115,7 @@ public class GeoJsonUtil {
             String locationId = feature.getId();
 
             // Skip empty geometry and skip duplicate IDs (this happens more than you think)
-            if (geometryType == null || !seenLocationIds.add(locationId)) continue;
+            if (locationId == null || geometryType == null || !seenLocationIds.add(locationId)) continue;
 
             location.location_id = locationId;
             location.geometry_type = geometryType;
@@ -202,16 +202,16 @@ public class GeoJsonUtil {
         for (Feature feature : featureCollection.getFeatures()) {
             Geometry geometry = feature.getFeature().getGeometry();
             String geometryType = getGeometryType(geometry.getGeometryType().getName(), errors);
-
-            // Skip empty geometry and skip duplicate IDs (this happens more than you think)
-            if (geometryType == null || !seenLocationIds.add(feature.getId())) continue;
+            String locationId = feature.getId();
+            // Skip features without IDs, empty geometry and skip duplicate IDs (this happens more than you think)
+            if (locationId == null || geometryType == null || !seenLocationIds.add(locationId)) continue;
             switch (geometryType) {
                 case GEOMETRY_TYPE_POLYLINE:
                     LineString lineString = (LineString) geometry;
                     for (Point point : lineString.getPoints()) {
                         locationShapes.add(
                             // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
-                            buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
+                            buildLocationShape(locationId, locationId, point.getY(), point.getX())
                         );
                     }
                     break;
