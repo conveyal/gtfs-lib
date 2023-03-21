@@ -101,6 +101,13 @@ public class GeoJsonUtil {
     }
 
     /**
+     *   Check for features without IDs, with empty geometry or duplicate IDs (this happens more than you think)
+     */
+    private static boolean isValidLocation(String locationId, String geometryType, Set<String> seenLocationIds) {
+        return (locationId == null || geometryType == null || !seenLocationIds.add(locationId)) ? false : true;
+    }
+
+    /**
      * Extract from a list of features, the items which are common to all features.
      */
     private static List<Location> unpackLocations(
@@ -108,14 +115,13 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<Location> locations = new ArrayList<>();
-        Set<String> seenLocationIds = new HashSet<String>();
+        Set<String> seenLocationIds = new HashSet<>();
         for (Feature feature : featureCollection.getFeatures()) {
             String geometryType = getGeometryType(feature.getGeometryType().getName(), errors);
             Location location = new Location();
             String locationId = feature.getId();
 
-            // Skip empty geometry and skip duplicate IDs (this happens more than you think)
-            if (locationId == null || geometryType == null || !seenLocationIds.add(locationId)) continue;
+            if (!isValidLocation(locationId, geometryType, seenLocationIds)) continue;
 
             location.location_id = locationId;
             location.geometry_type = geometryType;
@@ -198,13 +204,12 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<LocationShape> locationShapes = new ArrayList<>();
-        Set<String> seenLocationIds = new HashSet<String>();
+        Set<String> seenLocationIds = new HashSet<>();
         for (Feature feature : featureCollection.getFeatures()) {
             Geometry geometry = feature.getFeature().getGeometry();
             String geometryType = getGeometryType(geometry.getGeometryType().getName(), errors);
             String locationId = feature.getId();
-            // Skip features without IDs, empty geometry and skip duplicate IDs (this happens more than you think)
-            if (locationId == null || geometryType == null || !seenLocationIds.add(locationId)) continue;
+            if (!isValidLocation(locationId, geometryType, seenLocationIds)) continue;
             switch (geometryType) {
                 case GEOMETRY_TYPE_POLYLINE:
                     LineString lineString = (LineString) geometry;
