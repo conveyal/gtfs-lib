@@ -8,6 +8,7 @@
         "name" : "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips)",
         "pattern_id" : "1",
         "pattern_locations" : [ ],
+        "pattern_stop_areas" : [ ],
         "pattern_stops" : [ {
           "default_dwell_time" : 0,
           "default_travel_time" : 0,
@@ -122,6 +123,18 @@
         "pattern_locations" : [ {
           "id" : 1,
           "location_id" : "area_251"
+        } ],
+        "pattern_stop_areas" : [ {
+          "area_id" : "3",
+          "id" : 1,
+          "stop_areas" : [ {
+            "area" : [ {
+              "area_name" : "Location group referencing a location",
+              "id" : 4
+            } ],
+            "area_id" : "3",
+            "id" : 4
+          } ]
         } ],
         "pattern_stops" : [ {
           "default_dwell_time" : 0,

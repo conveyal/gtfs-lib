@@ -23,7 +23,7 @@
         "type" : "FLEX_FORBIDDEN_DEPARTURE_TIME"
       }, {
         "count" : 1,
-        "message" : "It is forbidden to define a drop off type of 0 (Regularly scheduled pickup) when a stop id refers to a location group or location.",
+        "message" : "It is forbidden to define a drop off type of 0 (Regularly scheduled pickup) when a stop id refers to a stop area or location.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_DROP_OFF_TYPE"
       }, {
@@ -33,17 +33,17 @@
         "type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW"
       }, {
         "count" : 4,
-        "message" : "It is forbidden to define a mean duration factor when a stop id does not refer to a location group or location.",
+        "message" : "It is forbidden to define a mean duration factor when a stop id does not refer to a stop area or location.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_MEAN_DURATION_FACTOR"
       }, {
         "count" : 4,
-        "message" : "It is forbidden to define a mean duration offset when a stop id does not refer to a location group or location.",
+        "message" : "It is forbidden to define a mean duration offset when a stop id does not refer to a stop area or location.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_MEAN_DURATION_OFFSET"
       }, {
         "count" : 1,
-        "message" : "It is forbidden to define a pickup type of 0 (Regularly scheduled pickup) when a stop id refers to a location group or location.",
+        "message" : "It is forbidden to define a pickup type of 0 (Regularly scheduled pickup) when a stop id refers to a stop area or location.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_PICKUP_TYPE"
       }, {
@@ -63,12 +63,12 @@
         "type" : "FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY"
       }, {
         "count" : 4,
-        "message" : "It is forbidden to define a safe duration factor when a stop id does not refer to a location group or location.",
+        "message" : "It is forbidden to define a safe duration factor when a stop id does not refer to a stop area or location.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_SAFE_DURATION_FACTOR"
       }, {
         "count" : 4,
-        "message" : "It is forbidden to define a safe duration offset when a stop id does not refer to a location group or location.",
+        "message" : "It is forbidden to define a safe duration offset when a stop id does not refer to a stop area or location.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_SAFE_DURATION_OFFSET"
       }, {
@@ -81,11 +81,6 @@
         "message" : "Unable to parse the locations.geojson file. Make sure the file conforms to the GeoJson standard and supported geometry types are used.",
         "priority" : "HIGH",
         "type" : "GEO_JSON_PARSING"
-      }, {
-        "count" : 1,
-        "message" : "This location group is not referenced by any trips.",
-        "priority" : "MEDIUM",
-        "type" : "LOCATION_GROUP_UNUSED"
       }, {
         "count" : 1,
         "message" : "A required field was missing or empty in a particular row.",
@@ -103,12 +98,17 @@
         "type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME"
       }, {
         "count" : 1,
+        "message" : "This stop area is not referenced by any trips.",
+        "priority" : "MEDIUM",
+        "type" : "STOP_AREA_UNUSED"
+      }, {
+        "count" : 1,
         "message" : "This stop is not referenced by any trips.",
         "priority" : "MEDIUM",
         "type" : "STOP_UNUSED"
       }, {
         "count" : 1,
-        "message" : "Trip speed not validated because it contains at least one stop which is a location or location group.",
+        "message" : "Trip speed not validated because it contains at least one stop which is a location or stop area.",
         "priority" : "LOW",
         "type" : "TRIP_SPEED_NOT_VALIDATED"
       } ],
@@ -140,7 +140,7 @@
         "bad_value" : "location_id:area-999, stop_id:area-999",
         "entity_id" : "2",
         "entity_sequence" : null,
-        "entity_type" : "LocationGroup",
+        "entity_type" : "StopArea",
         "error_id" : 3,
         "error_type" : "MISSING_FOREIGN_TABLE_REFERENCE",
         "line_number" : 3

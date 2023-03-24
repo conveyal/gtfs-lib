@@ -31,7 +31,7 @@ public class ReversedTripValidator extends TripValidator {
         List<StopTime> stopTimes,
         List<Stop> stops,
         List<Location> locations,
-        List<LocationGroup> locationGroups
+        List<StopArea> stopAreas
     ) {
         // TODO implement
     }

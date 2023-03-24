@@ -1,4 +1,4 @@
-package com.conveyal.gtfs.validator;
+    package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
@@ -7,8 +7,8 @@ import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.BookingRule;
 import com.conveyal.gtfs.model.FareRule;
 import com.conveyal.gtfs.model.Location;
-import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopArea;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.Lists;
@@ -30,7 +30,7 @@ import static com.conveyal.gtfs.util.GeoJsonUtil.GEOMETRY_TYPE_POLYGON;
  *
  * Number of checks:
  *
- * Location group: 2
+ * Stop area: 2
  * Location: 2
  * Stop times: 14
  * Booking rules: 10
@@ -47,15 +47,15 @@ public class FlexValidator extends FeedValidator {
     @Override
     public void validate() {
         List<BookingRule> bookingRules = Lists.newArrayList(feed.bookingRules);
-        List<LocationGroup> locationGroups = Lists.newArrayList(feed.locationGroups);
+        List<StopArea> stopAreas = Lists.newArrayList(feed.stopAreas);
         List<Location> locations = Lists.newArrayList(feed.locations);
 
-        if (isFlexFeed(bookingRules, locationGroups, locations)) {
+        if (isFlexFeed(bookingRules, stopAreas, locations)) {
             List<NewGTFSError> errors = new ArrayList<>();
             try {
                 List<StopTime> stopTimes = getFlexStopTimesForValidation(dataSource.getConnection(), feed.tablePrefix);
-                stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, locationGroups, locations)));
-                feed.trips.forEach(trip -> errors.addAll(validateTrip(trip, stopTimes, locationGroups, locations)));
+                stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, stopAreas, locations)));
+                feed.trips.forEach(trip -> errors.addAll(validateTrip(trip, stopTimes, stopAreas, locations)));
             } catch (SQLException e) {
                 String badValue = String.join(":", this.getClass().getSimpleName(), e.toString());
                 errorStorage.storeError(NewGTFSError.forFeed(VALIDATOR_FAILED, badValue));
@@ -63,7 +63,7 @@ public class FlexValidator extends FeedValidator {
             List<Stop> stops = Lists.newArrayList(feed.stops);
             List<FareRule> fareRules = Lists.newArrayList(feed.fareRules);
             feed.bookingRules.forEach(bookingRule -> errors.addAll(validateBookingRule(bookingRule)));
-            feed.locationGroups.forEach(locationGroup -> errors.addAll(validateLocationGroup(locationGroup, stops, locations)));
+            feed.stopAreas.forEach(stopArea -> errors.addAll(validateStopArea(stopArea, stops, locations)));
             feed.locations.forEach(location -> errors.addAll(validateLocation(location, stops, fareRules)));
             // Register errors, if any, once all checks have been completed.
             errors.forEach(this::registerError);
@@ -75,27 +75,27 @@ public class FlexValidator extends FeedValidator {
      */
     private static boolean isFlexFeed(
         List<BookingRule> bookingRules,
-        List<LocationGroup> locationGroups,
+        List<StopArea> stopAreas,
         List<Location> locations
     ) {
         return
             (bookingRules != null && !bookingRules.isEmpty()) ||
-            (locationGroups != null && !locationGroups.isEmpty()) ||
+            (stopAreas != null && !stopAreas.isEmpty()) ||
             (locations != null && !locations.isEmpty());
     }
 
     /**
-     * Check if a trip contains a stop that references a location or location group. A trip's speed can not be validated
-     * if at least one stop references a location or location group.
+     * Check if a trip contains a stop that references a location or stop area. A trip's speed can not be validated
+     * if at least one stop references a location or stop area.
      */
     public static List<NewGTFSError> validateTrip(
         Trip trip,
         List<StopTime> stopTimes,
-        List<LocationGroup> locationGroups,
+        List<StopArea> stopAreas,
         List<Location> locations
     ) {
         List<NewGTFSError> errors = new ArrayList<>();
-        if (tripHasLocationGroupOrLocationForStop(trip, stopTimes, locationGroups, locations)) {
+        if (tripHasStopAreaOrLocationForStop(trip, stopTimes, stopAreas, locations)) {
             errors.add(NewGTFSError.forEntity(
                 trip,
                 NewGTFSErrorType.TRIP_SPEED_NOT_VALIDATED).setBadValue(trip.trip_id)
@@ -105,21 +105,21 @@ public class FlexValidator extends FeedValidator {
     }
 
     /**
-     * Check location group id conforms to flex specification constraints.
+     * Check stop area's area id conforms to flex specification constraints.
      */
-    public static List<NewGTFSError> validateLocationGroup(
-        LocationGroup locationGroup,
+    public static List<NewGTFSError> validateStopArea(
+        StopArea stopArea,
         List<Stop> stops,
         List<Location> locations
     ) {
         List<NewGTFSError> errors = new ArrayList<>();
         if (
-            locationGroupIdOrLocationIdIsStopId(stops, locationGroup.location_group_id) ||
-            locationGroupIdIsLocationId(locations, locationGroup.location_group_id)
+            stopAreaOrLocationIsStop(stops, stopArea.area_id) ||
+            stopAreaIsLocation(locations, stopArea.area_id)
         ) {
             errors.add(NewGTFSError.forEntity(
-                locationGroup,
-                NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_GROUP_ID).setBadValue(locationGroup.location_group_id)
+                stopArea,
+                NewGTFSErrorType.FLEX_FORBIDDEN_STOP_AREA_AREA_ID).setBadValue(stopArea.area_id)
             );
         }
         return errors;
@@ -130,7 +130,7 @@ public class FlexValidator extends FeedValidator {
      */
     public static List<NewGTFSError> validateLocation(Location location, List<Stop> stops, List<FareRule> fareRules) {
         List<NewGTFSError> errors = new ArrayList<>();
-        if (locationGroupIdOrLocationIdIsStopId(stops, location.location_id)) {
+        if (stopAreaOrLocationIsStop(stops, location.location_id)) {
             errors.add(NewGTFSError.forEntity(
                 location,
                 NewGTFSErrorType.FLEX_FORBIDDEN_LOCATION_ID).setBadValue(location.location_id)
@@ -150,7 +150,7 @@ public class FlexValidator extends FeedValidator {
      */
     public static List<NewGTFSError> validateStopTime(
         StopTime stopTime,
-        List<LocationGroup> locationGroups,
+        List<StopArea> stopAreas,
         List<Location> locations
     ) {
 
@@ -199,30 +199,30 @@ public class FlexValidator extends FeedValidator {
             );
         }
 
-        boolean stopIdRefersToLocationGroupOrLocation = stopIdIsLocationGroupOrLocation(
+        boolean stopIdRefersToStopAreaOrLocation = stopIdIsStopAreaOrLocation(
             stopTime.stop_id,
-            locationGroups,
+            stopAreas,
             locations
         );
 
-        if (stopTime.start_pickup_dropoff_window == INT_MISSING && stopIdRefersToLocationGroupOrLocation) {
-            // start_pickup_dropoff_window is required if stop_id refers to a location group or location.
+        if (stopTime.start_pickup_dropoff_window == INT_MISSING && stopIdRefersToStopAreaOrLocation) {
+            // start_pickup_dropoff_window is required if stop_id refers to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_REQUIRED_START_PICKUP_DROPOFF_WINDOW)
                 .setBadValue(Integer.toString(stopTime.start_pickup_dropoff_window))
             );
         }
-        if (stopTime.end_pickup_dropoff_window == INT_MISSING && stopIdRefersToLocationGroupOrLocation) {
-            // end_pickup_dropoff_window is required if stop_id refers to a location group or location.
+        if (stopTime.end_pickup_dropoff_window == INT_MISSING && stopIdRefersToStopAreaOrLocation) {
+            // end_pickup_dropoff_window is required if stop_id refers to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_REQUIRED_END_PICKUP_DROPOFF_WINDOW)
                 .setBadValue(Integer.toString(stopTime.end_pickup_dropoff_window))
             );
         }
-        if (stopTime.pickup_type == 0 && stopIdRefersToLocationGroupOrLocation) {
-            // pickup_type 0 (Regularly scheduled pickup) is forbidden if stop_id refers to a location group or location.
+        if (stopTime.pickup_type == 0 && stopIdRefersToStopAreaOrLocation) {
+            // pickup_type 0 (Regularly scheduled pickup) is forbidden if stop_id refers to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_PICKUP_TYPE)
@@ -230,61 +230,61 @@ public class FlexValidator extends FeedValidator {
             );
         }
 
-        boolean stopIdRefersToLocationGroup = stopIdIsLocationGroup(stopTime.stop_id, locationGroups);
+        boolean stopIdRefersToStopArea = stopIdIsStopArea(stopTime.stop_id, stopAreas);
 
-        if (stopTime.pickup_type == 3 && stopIdRefersToLocationGroup) {
+        if (stopTime.pickup_type == 3 && stopIdRefersToStopArea) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
-            // location group.
+            // stop area.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
-                    NewGTFSErrorType.FLEX_FORBIDDEN_PICKUP_TYPE_FOR_LOCATION_GROUP)
+                    NewGTFSErrorType.FLEX_FORBIDDEN_PICKUP_TYPE_FOR_STOP_AREA)
                 .setBadValue(Integer.toString(stopTime.pickup_type))
             );
         }
 
-        if (stopTime.pickup_type == 3 && stopIdIsNonPolygonLocation(stopTime.stop_id, locations)) {
+        if (stopTime.pickup_type == 3 && stopIdIsLocation(stopTime.stop_id, locations)) {
             // pickup_type 3 (Must coordinate with driver to arrange pickup) is forbidden if stop_id refers to a
-            // location that is not a single "LineString".
+            // location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_PICKUP_TYPE_FOR_LOCATION)
                 .setBadValue(Integer.toString(stopTime.pickup_type))
             );
         }
-        if (stopTime.drop_off_type == 0 && stopIdRefersToLocationGroupOrLocation) {
-            // drop_off_type 0 (Regularly scheduled pickup) is forbidden if stop_id refers to a location group or location.
+        if (stopTime.drop_off_type == 0 && stopIdRefersToStopAreaOrLocation) {
+            // drop_off_type 0 (Regularly scheduled pickup) is forbidden if stop_id refers to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_DROP_OFF_TYPE)
                 .setBadValue(Integer.toString(stopTime.drop_off_type))
             );
         }
-        if (stopTime.mean_duration_factor != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
-            // mean_duration_factor is forbidden if stop_id does not refer to a location group or location.
+        if (stopTime.mean_duration_factor != DOUBLE_MISSING && !stopIdRefersToStopAreaOrLocation) {
+            // mean_duration_factor is forbidden if stop_id does not refer to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_FACTOR)
                 .setBadValue(Double.toString(stopTime.mean_duration_factor))
             );
         }
-        if (stopTime.mean_duration_offset != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
-            // mean_duration_offset is forbidden if stop_id does not refer to a location group or location.
+        if (stopTime.mean_duration_offset != DOUBLE_MISSING && !stopIdRefersToStopAreaOrLocation) {
+            // mean_duration_offset is forbidden if stop_id does not refer to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_MEAN_DURATION_OFFSET)
                 .setBadValue(Double.toString(stopTime.mean_duration_offset))
             );
         }
-        if (stopTime.safe_duration_factor != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
-            // safe_duration_factor is forbidden if stop_id does not refer to a location group or location.
+        if (stopTime.safe_duration_factor != DOUBLE_MISSING && !stopIdRefersToStopAreaOrLocation) {
+            // safe_duration_factor is forbidden if stop_id does not refer to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_SAFE_DURATION_FACTOR)
                 .setBadValue(Double.toString(stopTime.safe_duration_factor))
             );
         }
-        if (stopTime.safe_duration_offset != DOUBLE_MISSING && !stopIdRefersToLocationGroupOrLocation) {
-            // safe_duration_offset is forbidden if stop_id does not refer to a location group or location.
+        if (stopTime.safe_duration_offset != DOUBLE_MISSING && !stopIdRefersToStopAreaOrLocation) {
+            // safe_duration_offset is forbidden if stop_id does not refer to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
                     NewGTFSErrorType.FLEX_FORBIDDEN_SAFE_DURATION_OFFSET)
@@ -411,18 +411,18 @@ public class FlexValidator extends FeedValidator {
     }
 
     /**
-     * Check if a location group id or location id matches any stop ids.
+     * Check if a stop area or location matches any stop ids.
      */
-    private static boolean locationGroupIdOrLocationIdIsStopId(List<Stop> stops, String id) {
+    private static boolean stopAreaOrLocationIsStop(List<Stop> stops, String id) {
         return !stops.isEmpty() && stops.stream().anyMatch(stop -> stop.stop_id.equals(id));
     }
 
     /**
-     * Check if a location group id matches any location ids.
+     * Check if a stop area (area id) matches any locations.
      */
-    private static boolean locationGroupIdIsLocationId(List<Location> locations, String locationGroupId) {
+    private static boolean stopAreaIsLocation(List<Location> locations, String areaId) {
         return !locations.isEmpty() &&
-            locations.stream().anyMatch(location -> location.location_id.equals(locationGroupId));
+            locations.stream().anyMatch(location -> location.location_id.equals(areaId));
     }
 
     /**
@@ -439,24 +439,24 @@ public class FlexValidator extends FeedValidator {
     }
 
     /**
-     * Check if a stop id matches any location ids or any location group ids.
+     * Check if a stop id matches any locations or any stop areas.
      */
-    public static boolean stopIdIsLocationGroupOrLocation(
+    public static boolean stopIdIsStopAreaOrLocation(
         String stopId,
-        List<LocationGroup> locationGroups,
+        List<StopArea> stopAreas,
         List<Location> locations
     ) {
-        return stopIdIsLocationGroup(stopId, locationGroups) || stopIdIsLocation(stopId, locations);
+        return stopIdIsStopArea(stopId, stopAreas) || stopIdIsLocation(stopId, locations);
     }
 
     /**
-     * Check if a stop id matches any location group ids.
+     * Check if a stop id matches any stop area, area ids.
      */
-    public static boolean stopIdIsLocationGroup(String stopId, List<LocationGroup> locationGroups) {
+    public static boolean stopIdIsStopArea(String stopId, List<StopArea> stopAreas) {
         return
-            locationGroups != null &&
-                !locationGroups.isEmpty() &&
-                locationGroups.stream().anyMatch(locationGroup -> stopId.equals(locationGroup.location_group_id));
+            stopAreas != null &&
+                !stopAreas.isEmpty() &&
+                stopAreas.stream().anyMatch(stopArea -> stopId.equals(stopArea.area_id));
     }
 
     /**
@@ -483,18 +483,18 @@ public class FlexValidator extends FeedValidator {
     }
 
     /**
-     * Check if a trip contains at least one stop time that references a stop that is a location or location group.
+     * Check if a trip contains at least one stop time that references a stop that is a location or stop area.
      */
-    public static boolean tripHasLocationGroupOrLocationForStop(
+    public static boolean tripHasStopAreaOrLocationForStop(
         Trip trip,
         List<StopTime> stopTimes,
-        List<LocationGroup> locationGroups,
+        List<StopArea> stopAreas,
         List<Location> locations
     ) {
         for (StopTime stopTime : stopTimes) {
             if (
                 trip.trip_id.equals(stopTime.trip_id) &&
-                stopIdIsLocationGroupOrLocation(stopTime.stop_id, locationGroups, locations)
+                stopIdIsStopAreaOrLocation(stopTime.stop_id, stopAreas, locations)
             ) {
                 return true;
             }

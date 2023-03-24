@@ -21,6 +21,7 @@ public class FeedLoadResult implements Serializable {
     public int errorCount;
     public String fatalException;
 
+    public TableLoadResult area;
     public TableLoadResult agency;
     public TableLoadResult bookingRules;
     public TableLoadResult calendar;
@@ -30,10 +31,10 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult feedInfo;
     public TableLoadResult frequencies;
     public TableLoadResult locations;
-    public TableLoadResult locationGroups;
     public TableLoadResult locationShapes;
     public TableLoadResult routes;
     public TableLoadResult shapes;
+    public TableLoadResult stopAreas;
     public TableLoadResult stops;
     public TableLoadResult stopTimes;
     public TableLoadResult transfers;
@@ -52,6 +53,7 @@ public class FeedLoadResult implements Serializable {
      * Optional constructor to generate blank table load results on instantiation.
      */
     public FeedLoadResult (boolean constructTableResults) {
+        area = new TableLoadResult();
         agency = new TableLoadResult();
         bookingRules = new TableLoadResult();
         calendar = new TableLoadResult();
@@ -61,10 +63,10 @@ public class FeedLoadResult implements Serializable {
         feedInfo = new TableLoadResult();
         frequencies = new TableLoadResult();
         locations = new TableLoadResult();
-        locationGroups = new TableLoadResult();
         locationShapes = new TableLoadResult();
         routes = new TableLoadResult();
         shapes = new TableLoadResult();
+        stopAreas = new TableLoadResult();
         stops = new TableLoadResult();
         stopTimes = new TableLoadResult();
         transfers = new TableLoadResult();
@@ -74,12 +76,13 @@ public class FeedLoadResult implements Serializable {
     }
 
     /**
-     * Determine if the feed loaded has GTFS Flex enhancements. Is used in datatools-server -> FeedSource.java.
+     * Determine if the feed loaded has GTFS Flex enhancements. This is used in datatools-server -> FeedSource.java only
+     * which is why it is flagged as not used within gtfs-lib.
      */
     public boolean isGTFSFlex() {
         return
             (bookingRules != null && bookingRules.rowCount > 0) ||
-            (locationGroups != null && locationGroups.rowCount > 0) ||
+            (stopAreas != null && stopAreas.rowCount > 0) ||
             (locations != null && locations.rowCount > 0) ||
             (locationShapes != null && locationShapes.rowCount > 0);
     }

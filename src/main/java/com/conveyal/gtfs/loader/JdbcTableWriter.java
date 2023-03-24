@@ -5,8 +5,8 @@ import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
-import com.conveyal.gtfs.model.PatternLocationGroup;
 import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.PatternStopArea;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
@@ -180,11 +180,11 @@ public class JdbcTableWriter implements TableWriter {
                     // If a referencing table has the current table as its parent, update child elements.
                     JsonNode childEntities = jsonObject.get(referencingTable.name);
                     if ((referencingTable.name.equals(Table.PATTERN_LOCATION.name) ||
-                        referencingTable.name.equals(Table.PATTERN_LOCATION_GROUP.name)) &&
+                        referencingTable.name.equals(Table.PATTERN_STOP_AREA.name)) &&
                         (hasNoChildEntities(childEntities))
                     ) {
                         // This is a backwards hack to prevent the addition of pattern location breaking existing
-                        // pattern functionality. If pattern location or pattern location group is not provided set to
+                        // pattern functionality. If pattern location or pattern stop are is not provided set to
                         // an empty array to avoid the following exception.
                         childEntities = mapper.createArrayNode();
                     }
@@ -323,18 +323,18 @@ public class JdbcTableWriter implements TableWriter {
                 tablePrefix + ".",
                 EntityPopulator.PATTERN_LOCATION
             );
-            JDBCTableReader<PatternLocationGroup> patternLocationGroups = new JDBCTableReader(
-                Table.PATTERN_LOCATION_GROUP,
+            JDBCTableReader<PatternStopArea> patternStopAreas = new JDBCTableReader(
+                Table.PATTERN_STOP_AREA,
                 dataSource,
                 tablePrefix + ".",
-                EntityPopulator.PATTERN_LOCATION_GROUP
+                EntityPopulator.PATTERN_STOP_AREA
             );
             String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
             List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
             Iterator<PatternHalt> patternHalts = Iterators.concat(
                 patternStops.getOrdered(patternId).iterator(),
                 patternLocations.getOrdered(patternId).iterator(),
-                patternLocationGroups.getOrdered(patternId).iterator()
+                patternStopAreas.getOrdered(patternId).iterator()
             );
             while (patternHalts.hasNext()) {
                 PatternHalt patternHalt = patternHalts.next();
@@ -384,9 +384,9 @@ public class JdbcTableWriter implements TableWriter {
                             cumulativeTravelTime,
                             timesForTripId.getKey()
                         );
-                    } else if (patternHalt instanceof PatternLocationGroup) {
+                    } else if (patternHalt instanceof PatternStopArea) {
                         cumulativeTravelTime += updateStopTimes(
-                            (PatternLocationGroup) patternHalt,
+                            (PatternStopArea) patternHalt,
                             cumulativeTravelTime,
                             timesForTripId.getKey()
                         );
@@ -655,7 +655,7 @@ public class JdbcTableWriter implements TableWriter {
         boolean isPatternTable =
                 Table.PATTERN_STOP.name.equals(subTable.name) ||
                 Table.PATTERN_LOCATION.name.equals(subTable.name) ||
-                Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name);
+                Table.PATTERN_STOP_AREA.name.equals(subTable.name);
         if (isPatternTable) {
             reconciliation.stage(mapper, subTable, subEntities, keyValue);
         }
@@ -744,7 +744,7 @@ public class JdbcTableWriter implements TableWriter {
                     );
                 }
                 if (Table.PATTERN_LOCATION.name.equals(subTable.name) ||
-                    Table.PATTERN_LOCATION_GROUP.name.equals(subTable.name)
+                    Table.PATTERN_STOP_AREA.name.equals(subTable.name)
                 ) {
                     updateLinkedFields(
                         subTable,
@@ -876,10 +876,10 @@ public class JdbcTableWriter implements TableWriter {
                         null
                     );
             } else {
-                // Pattern type is location group
+                // Pattern type is stop area
                 cumulativeTravelTime +=
                     updateStopTimes(
-                        reconciliation.getPatternLocationGroup(genericStop.referenceId),
+                        reconciliation.getPatternStopArea(genericStop.referenceId),
                         cumulativeTravelTime,
                         null
                     );
@@ -949,7 +949,7 @@ public class JdbcTableWriter implements TableWriter {
         int previousTravelTime,
         String tripId
     ) throws SQLException {
-        return updateStopTimesForPatternLocationOrPatternLocationGroup(
+        return updateStopTimesForPatternLocationOrPatternStopArea(
             patternLocation.flex_default_travel_time,
             patternLocation.flex_default_zone_time,
             patternLocation.pattern_id,
@@ -959,32 +959,32 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Updates the stop times that reference the specified pattern location group.
+     * Updates the stop times that reference the specified pattern stop area.
      *
      * @return the travel and dwell time added by this pattern.
      * @throws SQLException
      */
     private int updateStopTimes(
-        PatternLocationGroup patternLocationGroup,
+        PatternStopArea patternStopArea,
         int previousTravelTime,
         String tripId
     ) throws SQLException {
-        return updateStopTimesForPatternLocationOrPatternLocationGroup(
-            patternLocationGroup.flex_default_travel_time,
-            patternLocationGroup.flex_default_zone_time,
-            patternLocationGroup.pattern_id,
-            patternLocationGroup.stop_sequence,
+        return updateStopTimesForPatternLocationOrPatternStopArea(
+            patternStopArea.flex_default_travel_time,
+            patternStopArea.flex_default_zone_time,
+            patternStopArea.pattern_id,
+            patternStopArea.stop_sequence,
             previousTravelTime,
             tripId);
     }
 
     /**
-     * Updates the stop times that reference the specified pattern location or pattern location group.
+     * Updates the stop times that reference the specified pattern location or pattern stop area.
      *
      * @return the travel and dwell time added by this pattern.
      * @throws SQLException
      */
-    private int updateStopTimesForPatternLocationOrPatternLocationGroup(
+    private int updateStopTimesForPatternLocationOrPatternStopArea(
         int flexDefaultTravelTime,
         int flexDefaultZoneTime,
         String patternId,
@@ -1553,10 +1553,10 @@ public class JdbcTableWriter implements TableWriter {
         Shape.deleteShapesRelatedToRouteOrPattern(connection, tablePrefix, routeOrPatternId, keyColumn, parentTableName);
 
         if (parentTableName.equals(Table.ROUTES.name)) {
-            // Delete pattern stops, locations and location groups before joining patterns are deleted.
+            // Delete pattern stops, locations and stop areas before joining patterns are deleted.
             deletePatternStops(routeOrPatternId);
             deletePatternLocations(routeOrPatternId);
-            deletePatternLocationGroups(routeOrPatternId);
+            deletePatternStopAreas(routeOrPatternId);
         }
     }
 
@@ -1599,22 +1599,22 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * If deleting a route, cascade delete pattern location groups for patterns first. This must happen before patterns are
-     * deleted. Otherwise, the queries to select pattern_location_groups to delete would fail because there would be no pattern
+     * If deleting a route, cascade delete pattern stop areas for patterns first. This must happen before patterns are
+     * deleted. Otherwise, the queries to select pattern_stop_areas to delete would fail because there would be no pattern
      * records to join with.
      */
-    private void deletePatternLocationGroups(String routeId) throws SQLException {
-        // Delete pattern location groups for route.
-        int deletedPatternLocationGroups = executeStatement(
+    private void deletePatternStopAreas(String routeId) throws SQLException {
+        // Delete pattern stop areas for route.
+        int deletedPatternStopAreas = executeStatement(
             String.format(
                 "delete from %s plg using %s p, %s r where plg.pattern_id = p.pattern_id and p.route_id = r.route_id and r.route_id = '%s'",
-                String.format("%s.pattern_location_groups", tablePrefix),
+                String.format("%s.pattern_stop_areas", tablePrefix),
                 String.format("%s.patterns", tablePrefix),
                 String.format("%s.routes", tablePrefix),
                 routeId
             )
         );
-        LOG.info("Deleted {} pattern location groups for pattern {}", deletedPatternLocationGroups, routeId);
+        LOG.info("Deleted {} pattern stop areas for pattern {}", deletedPatternStopAreas, routeId);
     }
 
     /**

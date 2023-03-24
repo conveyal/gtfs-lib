@@ -153,6 +153,7 @@ public class JdbcGtfsLoader {
             }
             // Load each table in turn, saving some summary information about what happened during each table load
             result.agency = load(Table.AGENCY);
+            result.area = load(Table.AREA);
             result.calendar = load(Table.CALENDAR);
             result.calendarDates = load(Table.CALENDAR_DATES);
             result.routes = load(Table.ROUTES);
@@ -165,7 +166,7 @@ public class JdbcGtfsLoader {
             result.trips = load(Table.TRIPS); // refs routes
             result.frequencies = load(Table.FREQUENCIES); // refs trips
             result.locations = load(Table.LOCATIONS);
-            result.locationGroups = load(Table.LOCATION_GROUPS);
+            result.stopAreas = load(Table.STOP_AREAS);
             result.stopTimes = load(Table.STOP_TIMES); // refs location groups, locations and stops
             result.translations = load(Table.TRANSLATIONS);
             result.attributions = load(Table.ATTRIBUTIONS);

@@ -6,9 +6,9 @@ import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
-import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopArea;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import org.slf4j.Logger;
@@ -51,11 +51,11 @@ public class SpeedTripValidator extends TripValidator {
         List<StopTime> stopTimes,
         List<Stop> stops,
         List<Location> locations,
-        List<LocationGroup> locationGroups
+        List<StopArea> stopAreas
     ) {
-        if (FlexValidator.tripHasLocationGroupOrLocationForStop(trip, stopTimes, locationGroups, locations)) {
+        if (FlexValidator.tripHasStopAreaOrLocationForStop(trip, stopTimes, stopAreas, locations)) {
             LOG.warn(
-                "Trip speed not validated for trip id {} because it contains at least one stop that is a location or location group.",
+                "Trip speed not validated for trip id {} because it contains at least one stop that is a location or stop area.",
                 trip.trip_id
             );
             return;

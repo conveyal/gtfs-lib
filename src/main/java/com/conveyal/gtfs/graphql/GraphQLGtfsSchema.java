@@ -73,6 +73,14 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("agency_timezone"))
             .build();
 
+    // Represents rows from area.txt
+    public static final GraphQLObjectType areaType = newObject().name("area")
+            .description("A GTFS agency object")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("area_id"))
+            .field(MapFetcher.field("area_name"))
+            .build();
+
     // Represents rows from booking_rules.txt
     public static final GraphQLObjectType bookingRulesType = newObject().name("booking_rules")
             .description("A GTFS booking rule object")
@@ -180,13 +188,19 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("default_route_type"))
             .build();
 
-    // Represents location_groups.txt
-    public static final GraphQLObjectType locationGroupType = newObject().name("location_groups")
-            .description("A GTFS location_group object")
+    // Represents stop_areas.txt
+    public static final GraphQLObjectType stopAreaType = newObject().name("stop_areas")
+            .description("A GTFS stop_areas object")
             .field(MapFetcher.field("id", GraphQLInt))
-            .field(MapFetcher.field("location_group_id"))
-            .field(MapFetcher.field("location_id"))
-            .field(MapFetcher.field("location_group_name"))
+            .field(MapFetcher.field("area_id"))
+            .field(MapFetcher.field("stop_id"))
+            .field(newFieldDefinition()
+                .name("area")
+                .type(new GraphQLList(areaType))
+                .argument(intArg(LIMIT_ARG))
+                .dataFetcher(new JDBCFetcher("areas", "area_id"))
+                .build()
+            )
             .build();
 
     // Represents the shapes held within locations.geojson
@@ -406,7 +420,7 @@ public class GraphQLGtfsSchema {
                             new JDBCFetcher("patterns", "route_id", null, false),
                             new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                             new JDBCFetcher("pattern_locations", "pattern_id", null, false),
-                            new JDBCFetcher("pattern_location_groups", "pattern_id", null, false),
+                            new JDBCFetcher("pattern_stop_areas", "pattern_id", null, false),
                             new JDBCFetcher("stops", "stop_id")))
                     .build())
             .field(newFieldDefinition()
@@ -475,7 +489,7 @@ public class GraphQLGtfsSchema {
                             // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id"),
-                            new JDBCFetcher("pattern_location_groups", "location_group_id"),
+                            new JDBCFetcher("pattern_stop_areas", "area_id"),
                             new JDBCFetcher("pattern_locations", "location_id")))
                     .build())
             .field(newFieldDefinition()
@@ -490,7 +504,7 @@ public class GraphQLGtfsSchema {
                             // will be returned.
                             new JDBCFetcher("pattern_stops", "stop_id", null, false),
                             new JDBCFetcher("pattern_locations", "location_id", null, false),
-                            new JDBCFetcher("pattern_location_groups", "location_group_id", null, false),
+                            new JDBCFetcher("pattern_stop_areas", "area_id", null, false),
                             new JDBCFetcher("patterns", "pattern_id", null, false),
                             new JDBCFetcher("routes", "route_id")))
                     .build())
@@ -580,17 +594,10 @@ public class GraphQLGtfsSchema {
             )
             .build();
 
-
-    /**
-     * Represents each stop in a list of locations within a pattern.
-     * We could return just a list of LocationIDs within the pattern (a JSON array of strings) but
-     * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
-     */
-    public static final GraphQLObjectType patternLocationGroupType = newObject().name("patternLocationGroup")
+    public static final GraphQLObjectType patternStopAreaType = newObject().name("patternStopArea")
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("pattern_id"))
-            .field(MapFetcher.field("location_group_id"))
+            .field(MapFetcher.field("area_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_type", GraphQLInt))
@@ -613,9 +620,9 @@ public class GraphQLGtfsSchema {
             // FIXME: This will only returns a list with one stop entity (unless there is a referential integrity issue)
             // Should this be modified to be an object, rather than a list?
             .field(newFieldDefinition()
-                    .type(new GraphQLList(locationGroupType))
-                    .name("location")
-                    .dataFetcher(new JDBCFetcher("location_groups", "location_group_id"))
+                    .type(new GraphQLList(stopAreaType))
+                    .name("stop_areas")
+                    .dataFetcher(new JDBCFetcher("stop_areas", "area_id"))
                     .build()
             )
             .build();
@@ -723,13 +730,13 @@ public class GraphQLGtfsSchema {
                             false))
                     .build())
             .field(newFieldDefinition()
-                    .name("pattern_location_groups")
-                    .type(new GraphQLList(patternLocationGroupType))
+                    .name("pattern_stop_areas")
+                    .type(new GraphQLList(patternStopAreaType))
                     // FIXME Update JDBCFetcher to have noLimit boolean for fetchers on "naturally" nested types
                     // (i.e., nested types that typically would only be nested under another entity and only make sense
                     // with the entire set -- fares -> fare rules, trips -> stop times, patterns -> pattern stops/shapes)
                     .argument(intArg(LIMIT_ARG))
-                    .dataFetcher(new JDBCFetcher("pattern_location_groups",
+                    .dataFetcher(new JDBCFetcher("pattern_stop_areas",
                             "pattern_id",
                             "stop_sequence",
                             false))
@@ -750,7 +757,7 @@ public class GraphQLGtfsSchema {
                         // will be returned.
                         new JDBCFetcher("pattern_stops", "pattern_id", null, false),
                         new JDBCFetcher("pattern_locations", "location_id", null, false),
-                        new JDBCFetcher("pattern_location_groups", "location_group_id", null, false),
+                        new JDBCFetcher("pattern_stop_areas", "area_id", null, false),
                         new JDBCFetcher("stops", "stop_id")))
                 .build())
             .field(newFieldDefinition()
@@ -903,6 +910,17 @@ public class GraphQLGtfsSchema {
                     .build()
             )
             .field(newFieldDefinition()
+                    .name("areas")
+                    .type(new GraphQLList(GraphQLGtfsSchema.areaType))
+                    .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                    .argument(multiStringArg("area_id"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    .dataFetcher(new JDBCFetcher(Table.AREA.name))
+                    .build()
+            )
+            .field(newFieldDefinition()
                     .name("booking_rules")
                     .type(new GraphQLList(GraphQLGtfsSchema.bookingRulesType))
                     .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
@@ -947,17 +965,6 @@ public class GraphQLGtfsSchema {
                     .build()
             )
             .field(newFieldDefinition()
-                .name("location_groups")
-                .type(new GraphQLList(GraphQLGtfsSchema.locationGroupType))
-                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
-                .argument(multiStringArg("location_group_id"))
-                .argument(intArg(ID_ARG))
-                .argument(intArg(LIMIT_ARG))
-                .argument(intArg(OFFSET_ARG))
-                .dataFetcher(new JDBCFetcher(Table.LOCATION_GROUPS.name))
-                .build()
-            )
-            .field(newFieldDefinition()
                 .name("location_shapes")
                 .type(new GraphQLList(GraphQLGtfsSchema.locationShapeType))
                 .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
@@ -979,6 +986,17 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("routes"))
                     .build()
+            )
+            .field(newFieldDefinition()
+                .name("stop_areas")
+                .type(new GraphQLList(GraphQLGtfsSchema.stopAreaType))
+                .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                .argument(multiStringArg("area_id"))
+                .argument(intArg(ID_ARG))
+                .argument(intArg(LIMIT_ARG))
+                .argument(intArg(OFFSET_ARG))
+                .dataFetcher(new JDBCFetcher(Table.STOP_AREAS.name))
+                .build()
             )
             .field(newFieldDefinition()
                     .name("stops")
