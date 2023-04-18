@@ -18,6 +18,8 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.dbutils.DbUtils;
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1427,6 +1429,11 @@ public class JdbcTableWriter implements TableWriter {
             // IMPORTANT: Skip the table for the entity we're modifying or if loop table does not have field.
             if (table.name.equals(gtfsTable.name)) continue;
             for (Field field : gtfsTable.fields) {
+                if (table.name.equals("schedule_exceptions") && gtfsTable.name.equals("calendar_dates")) {
+                    // HACK: schedule exceptions is really a reference to calendars and calendar_dates. We need to update both.
+                    // However, schedule_exceptions does not require a reference to calendar_dates right now.
+                    referencingTables.add(gtfsTable);
+                }
                 if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
                     // If any of the table's fields are foreign references to the specified table, add to the return set.
                     referencingTables.add(gtfsTable);
@@ -1497,6 +1504,71 @@ public class JdbcTableWriter implements TableWriter {
         for (Table referencingTable : referencingTables) {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
+            // Custom logic for calendar dates because it's not captured right now
+            if (table.name.equals("schedule_exceptions") && referencingTable.name.equals("calendar_dates")){
+                // The keys are all calendars in the added and removed service columns
+                // TODO: generalise this
+                String addedService = getValueForId(id, "added_service", namespace, table, connection);
+                String[] addedServiceList = StringUtils.strip(addedService, "{}").split("[,]", 0);
+                String removedService = getValueForId(id, "removed_service", namespace, table, connection);
+                String[] removedServiceList = StringUtils.strip(removedService, "{}").split("[,]", 0);
+                String dates = getValueForId(id, "dates", namespace, table, connection);
+                dates = StringUtils.strip(dates, "{}");
+
+                String[] allServiceToDelete = ArrayUtils.addAll(addedServiceList, removedServiceList);
+
+                // Schedule exceptions map to many different calendar dates (one for each date / service ID combination)
+                for (String date : dates.split("[,]", 0)) {
+                    for (String serviceId : allServiceToDelete) {
+                        LOG.info("service", serviceId);
+                        // TODO: better way to do this with existing method?
+                        // Prepare the SQL statement:
+                        String sql;
+                        PreparedStatement updateStatement;
+                        boolean isArrayField = keyField.getSqlType().equals(JDBCType.ARRAY);
+                        switch (sqlMethod) {
+                            case DELETE:
+                                sql = String.format(
+                                        "delete from %s where service_id = ? and date = ?",
+                                        refTableName
+                                );
+
+                                updateStatement = connection.prepareStatement(sql);
+                                updateStatement.setString(1, serviceId);
+                                updateStatement.setString(2, date);
+                                LOG.info(updateStatement.toString());
+                                int result = updateStatement.executeUpdate();
+
+                                if (result > 0) {
+                                    // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
+                                    //  deleteEntityHook).
+                                    if (sqlMethod.equals(SqlMethod.DELETE)) {
+                                        // Check for restrictions on delete.
+                                        if (table.isCascadeDeleteRestricted()) {
+                                            // The entity must not have any referencing entities in order to delete it.
+                                            connection.rollback();
+                                            String message = String.format(
+                                                    "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                                    entityClass.getSimpleName(),
+                                                    keyField.name,
+                                                    keyValue,
+                                                    result,
+                                                    referencingTable.name,
+                                                    entityClass.getSimpleName()
+                                            );
+                                            LOG.warn(message);
+                                            throw new SQLException(message);
+                                        }
+                                    }
+                                    LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
+                                } else {
+                                    LOG.info("No references in {} found!", refTableName);
+                                }
+                        }
+                    }
+                }
+            }
+
             for (Field field : referencingTable.editorFields()) {
                 if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
                     // Get statement to update or delete entities that reference the key value.
