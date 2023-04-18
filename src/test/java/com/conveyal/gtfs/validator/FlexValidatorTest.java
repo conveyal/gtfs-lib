@@ -300,43 +300,43 @@ public class FlexValidatorTest {
     private static Stream<BaseArguments> createBookingRuleChecks() {
         return Stream.of(
             new BaseArguments(
-                createBookingRule(INT_MISSING, 1, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, null),
+                createBookingRule(INT_MISSING, 1, INT_MISSING, INT_MISSING, INT_MISSING, null, null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_REQUIRED_PRIOR_NOTICE_DURATION_MIN)
             ),
             new BaseArguments(
-                createBookingRule(30, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, null),
+                createBookingRule(30, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, null, null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_DURATION_MIN)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, 0, 30, INT_MISSING, INT_MISSING, INT_MISSING, null),
+                createBookingRule(INT_MISSING, 0, 30, INT_MISSING, INT_MISSING, null, null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_DURATION_MAX)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, 2, 30, INT_MISSING, INT_MISSING, INT_MISSING, null),
+                createBookingRule(INT_MISSING, 2, 30, INT_MISSING, INT_MISSING, null, null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_DURATION_MAX, NewGTFSErrorType.FLEX_REQUIRED_PRIOR_NOTICE_LAST_DAY)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, 2, INT_MISSING, 1, INT_MISSING, INT_MISSING, null),
+                createBookingRule(INT_MISSING, 2, INT_MISSING, 1, INT_MISSING, null, null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_LAST_DAY)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, 0, INT_MISSING, INT_MISSING, 1, 1000, null),
+                createBookingRule(INT_MISSING, 0, INT_MISSING, INT_MISSING, 1, "07:00:00", null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY_FOR_BOOKING_TYPE)
             ),
             new BaseArguments(
-                createBookingRule(30, 1, 30, INT_MISSING, 1, 1030, null),
+                createBookingRule(30, 1, 30, INT_MISSING, 1, "10:30:00", null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_START_DAY)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, INT_MISSING, 30, INT_MISSING, 2, INT_MISSING, null),
+                createBookingRule(INT_MISSING, INT_MISSING, 30, INT_MISSING, 2, null, null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_REQUIRED_PRIOR_NOTICE_START_TIME)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, 1900, null),
+                createBookingRule(INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, "19:00:00", null),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_START_TIME)
             ),
             new BaseArguments(
-                createBookingRule(INT_MISSING, 0, INT_MISSING, INT_MISSING, INT_MISSING, INT_MISSING, "1"),
+                createBookingRule(INT_MISSING, 0, INT_MISSING, INT_MISSING, INT_MISSING, null, "1"),
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_NOTICE_SERVICE_ID)
             )
         );
@@ -483,7 +483,7 @@ public class FlexValidatorTest {
         int priorNoticeDurationMax,
         int priorNoticeLastDay,
         int priorNoticeStartDay,
-        int priorNoticeStartTime,
+        String priorNoticeStartTime,
         String priorNoticeServiceId
     ) {
         BookingRule bookingRule = new BookingRule();

@@ -16,9 +16,9 @@ public class BookingRuleDTO {
     public int prior_notice_duration_min;
     public int prior_notice_duration_max;
     public int prior_notice_last_day;
-    public int prior_notice_last_time;
+    public String prior_notice_last_time;
     public int prior_notice_start_day;
-    public int prior_notice_start_time;
+    public String prior_notice_start_time;
     public String prior_notice_service_id;
     public String message;
     public String pickup_message;
