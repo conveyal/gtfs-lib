@@ -471,6 +471,8 @@ public class JDBCTableWriterTest {
             assertResultValue(resultSet, "message", Matchers.nullValue());
             assertResultValue(resultSet, "prior_notice_duration_min", equalTo(createdBookingRule.prior_notice_duration_min));
             assertResultValue(resultSet, "prior_notice_duration_max", equalTo(createdBookingRule.prior_notice_duration_max));
+            assertResultValue(resultSet, "prior_notice_start_time", equalTo(createdBookingRule.prior_notice_start_time));
+            assertResultValue(resultSet, "prior_notice_last_time", equalTo(createdBookingRule.prior_notice_last_time));
         }
         // try to delete record
         JdbcTableWriter deleteTableWriter = createTestTableWriter(bookingRuleTable);
@@ -1798,6 +1800,8 @@ public class JDBCTableWriterTest {
         bookingRule.booking_type = 1;
         bookingRule.prior_notice_duration_min = 60;
         bookingRule.prior_notice_duration_max = 120;
+        bookingRule.prior_notice_last_time = "17:11:12";
+        bookingRule.prior_notice_start_time = "07:11:12";
         // convert object to json and save it
         JdbcTableWriter createTableWriter = createTestTableWriter(Table.BOOKING_RULES);
         String output = createTableWriter.create(mapper.writeValueAsString(bookingRule), true);

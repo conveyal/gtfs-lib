@@ -181,7 +181,8 @@ public class GtfsFlexTest {
                     new DataExpectation[]{
                         new DataExpectation("booking_rule_id", "booking_route_16604"),
                         new DataExpectation("booking_type", "2"),
-                        new DataExpectation("prior_notice_start_time", "08:00:00")
+                        new DataExpectation("prior_notice_start_time", "08:00:00"),
+                        new DataExpectation("prior_notice_last_time", "17:00:00")
                     }
                 ),
                 new TestUtils.FileTestCase(
