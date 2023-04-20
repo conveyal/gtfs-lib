@@ -1314,6 +1314,9 @@ public class JdbcTableWriter implements TableWriter {
         Integer id
     ) throws SQLException {
         final boolean isCreating = id == null;
+        // HACK: when ensuring referential integrity for a table like calendar_dates, our key is multiple columns.
+        // TODO: adapt this method to check a key of several columns (e.g. service_id, date combination)
+        if (!table.hasUniqueKeyField) return;
         String keyField = table.getKeyFieldName();
         String tableName = String.join(".", namespace, table.name);
         JsonNode val = jsonObject.get(keyField);
@@ -1471,11 +1474,11 @@ public class JdbcTableWriter implements TableWriter {
         if (type.equals("service")) {
             String addedServiceIds = getValueForId(id, "added_service", namespace, table, connection);
             String removedServiceIds = getValueForId(id, "removed_service", namespace, table, connection);
-            parsedString = addedServiceIds + removedServiceIds;
+            parsedString = addedServiceIds + "," + removedServiceIds;
         } else {
             parsedString = getValueForId(id, type, namespace, table, connection);
         }
-        return StringUtils.strip(parsedString, "{}").split("[,]", 0);
+        return parsedString.replaceAll("[{}]", "").split("[,]", 0);
     }
 
     /**
@@ -1484,7 +1487,8 @@ public class JdbcTableWriter implements TableWriter {
     private Integer deleteCalendarDatesForException(
         int id,
         String namespace,
-        Table table
+        Table table,
+        String refTableName
     ) throws SQLException {
         String[] serviceIds = parseExceptionListField(id, namespace, table, "service");
         String[] dates = parseExceptionListField(id, namespace, table, "dates");
@@ -1493,7 +1497,7 @@ public class JdbcTableWriter implements TableWriter {
         // Schedule exceptions map to many different calendar dates (one for each date / service ID combination)
         for (String date : dates) {
             for (String serviceId : serviceIds) {
-                String sql =String.format("delete from calendar_dates where service_id = ? and date = ?");
+                String sql =String.format("delete from %s where service_id = ? and date = ?", refTableName);
                 PreparedStatement updateStatement = connection.prepareStatement(sql);
                 updateStatement.setString(1, serviceId);
                 updateStatement.setString(2, date);
@@ -1501,7 +1505,6 @@ public class JdbcTableWriter implements TableWriter {
                 resultCount += updateStatement.executeUpdate();
             }
         }
-
         return resultCount;
     }
 
@@ -1553,7 +1556,7 @@ public class JdbcTableWriter implements TableWriter {
             int result;
             // Custom logic for calendar dates because schedule_exceptions does not reference calendar dates right now.
             if (table.name.equals("schedule_exceptions") && referencingTable.name.equals("calendar_dates")) {
-                result = deleteCalendarDatesForException(id, namespace, table);
+                result = deleteCalendarDatesForException(id, namespace, table, refTableName);
                 LOG.info("Deleted {} entries in calendar dates associated with schedule exception {}", result, id);
             } else { // General deletion
                 for (Field field : referencingTable.editorFields()) {

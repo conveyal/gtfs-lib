@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.TestUtils;
 import com.conveyal.gtfs.dto.CalendarDTO;
+import com.conveyal.gtfs.dto.CalendarDateDTO;
 import com.conveyal.gtfs.dto.FareDTO;
 import com.conveyal.gtfs.dto.FareRuleDTO;
 import com.conveyal.gtfs.dto.FeedInfoDTO;
@@ -419,6 +420,60 @@ public class JDBCTableWriterTest {
         LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
         // Make sure route record does not exist in DB.
         assertThatSqlQueryYieldsZeroRows(getColumnsForId(scheduleException.id, scheduleExceptionTable));
+    }
+
+    /**
+     * Ensure that {@link ScheduleException}s which are loaded from an existing GTFS can be removed properly,
+     * including created entries in calendar_dates.
+     */
+    @Test
+    public void canCreateAndDeleteCalendarDates() throws IOException, SQLException, InvalidNamespaceException {
+        String firstServiceId = "REMOVED";
+        String secondServiceId = "ADDED";
+        String[] allServiceIds = new String[]{firstServiceId, secondServiceId};
+        String[] holidayDates = new String[]{"20190812", "20190813", "20190814"};
+
+        final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
+        final Table calendarDatesTable = Table.CALENDAR_DATES;
+        final Class<ScheduleExceptionDTO> scheduleExceptionDTOClass = ScheduleExceptionDTO.class;
+
+        // Create new schedule exception which involves 2 service IDs and multiple dates
+        ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
+        exceptionInput.name = "Incredible multi day holiday";
+        exceptionInput.exemplar = 9; // Add, swap, or remove type
+        exceptionInput.removed_service = new String[]{firstServiceId};
+        exceptionInput.added_service = new String[]{secondServiceId};
+        exceptionInput.dates = holidayDates;
+
+        // Save the schedule exception
+        // TODO: share this with other schedule exception method?
+        TableWriter<ScheduleException> createTableWriter = createTestTableWriter(scheduleExceptionTable);
+        String scheduleExceptionOutput = createTableWriter.create(mapper.writeValueAsString(exceptionInput), true);
+        ScheduleExceptionDTO scheduleException = mapper.readValue(scheduleExceptionOutput, scheduleExceptionDTOClass);
+
+        // Create a calendar_dates entry for each date of the schedule exception
+        for (String date: holidayDates) {
+            createAndStoreCalendarDate(firstServiceId, date, 2); // firstServiceId is removed
+            createAndStoreCalendarDate(secondServiceId, date, 1); // secondServiceId is added
+        }
+
+        // Delete a schedule exception
+        JdbcTableWriter deleteTableWriter = createTestTableWriter(scheduleExceptionTable);
+        int deleteOutput = deleteTableWriter.delete(scheduleException.id, true);
+        LOG.info("deleted {} records from {}", deleteOutput, scheduleExceptionTable.name);
+
+        // Verify that the entries in calendar_dates are removed after deleting the schedule exception.
+        for (String date : holidayDates) {
+            for (String serviceId : allServiceIds){
+                String sql = String.format("select * from %s.%s where service_id = '%s' and date = '%s'",
+                        testNamespace,
+                        calendarDatesTable.name,
+                        serviceId,
+                        date
+                );
+                assertThatSqlQueryYieldsZeroRows(sql);
+            }
+        }
     }
 
     /**
@@ -1064,5 +1119,31 @@ public class JDBCTableWriterTest {
         LOG.info("create {} output:", Table.CALENDAR.name);
         LOG.info(output);
         return mapper.readValue(output, CalendarDTO.class);
+    }
+
+    /**
+     * Create and store a simple calendar date that modifies service on one day.
+     */
+    private static CalendarDateDTO createAndStoreCalendarDate(String serviceId, String date, int exceptionType)  throws IOException, SQLException, InvalidNamespaceException {
+        JdbcTableWriter createCalendarDateWriter = new JdbcTableWriter(Table.CALENDAR_DATES, testDataSource, testNamespace);
+
+        CalendarDateDTO calendarDate = createCalendarDate(serviceId, date, exceptionType);
+        String output = createCalendarDateWriter.create(mapper.writeValueAsString(calendarDate), true);
+
+        LOG.info("create {} output:", Table.CALENDAR_DATES.name);
+        LOG.info(output);
+
+        return mapper.readValue(output, CalendarDateDTO.class);
+    }
+
+    /**
+     * Create a calendar date.
+     */
+    private static CalendarDateDTO createCalendarDate(String serviceId, String date, Integer exceptionType) {
+        CalendarDateDTO calenderDate = new CalendarDateDTO();
+        calenderDate.date = date;
+        calenderDate.service_id = serviceId;
+        calenderDate.exception_type = exceptionType;
+        return calenderDate;
     }
 }
