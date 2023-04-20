@@ -1432,6 +1432,9 @@ public class JdbcTableWriter implements TableWriter {
                 if (table.name.equals("schedule_exceptions") && gtfsTable.name.equals("calendar_dates")) {
                     // HACK: schedule exceptions is really a reference to calendars and calendar_dates. We need to update both.
                     // However, schedule_exceptions does not require a reference to calendar_dates right now.
+                    // This is OK for an update event because there is code that avoids updating referenceTables
+                    // with a null parentTable. However, this makes calendar_dates a referenceTable for all situations,
+                    // which could have unexpected behaviour.
                     referencingTables.add(gtfsTable);
                 }
                 if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
@@ -1457,6 +1460,49 @@ public class JdbcTableWriter implements TableWriter {
             value = selectResults.getString(1);
         }
         return value;
+    }
+
+    /**
+     * Parse a list field in the schedule exceptions table (dates, added_service, or removed_service) into a list of string.
+     * List fields take the form {ServiceId1, ServiceId2, ServiceId3, ...}
+     */
+    private String[] parseExceptionListField(int id, String namespace, Table table, String type) throws SQLException {
+        String parsedString;
+        if (type.equals("service")) {
+            String addedServiceIds = getValueForId(id, "added_service", namespace, table, connection);
+            String removedServiceIds = getValueForId(id, "removed_service", namespace, table, connection);
+            parsedString = addedServiceIds + removedServiceIds;
+        } else {
+            parsedString = getValueForId(id, type, namespace, table, connection);
+        }
+        return StringUtils.strip(parsedString, "{}").split("[,]", 0);
+    }
+
+    /**
+     * Delete all entries in calendar dates associated with a schedule exception.
+     */
+    private Integer deleteCalendarDatesForException(
+        int id,
+        String namespace,
+        Table table
+    ) throws SQLException {
+        String[] serviceIds = parseExceptionListField(id, namespace, table, "service");
+        String[] dates = parseExceptionListField(id, namespace, table, "dates");
+        int resultCount = 0;
+
+        // Schedule exceptions map to many different calendar dates (one for each date / service ID combination)
+        for (String date : dates) {
+            for (String serviceId : serviceIds) {
+                String sql =String.format("delete from calendar_dates where service_id = ? and date = ?");
+                PreparedStatement updateStatement = connection.prepareStatement(sql);
+                updateStatement.setString(1, serviceId);
+                updateStatement.setString(2, date);
+                LOG.info(updateStatement.toString());
+                resultCount += updateStatement.executeUpdate();
+            }
+        }
+
+        return resultCount;
     }
 
     /**
@@ -1504,101 +1550,43 @@ public class JdbcTableWriter implements TableWriter {
         for (Table referencingTable : referencingTables) {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
-            // Custom logic for calendar dates because it's not captured right now
-            if (table.name.equals("schedule_exceptions") && referencingTable.name.equals("calendar_dates")){
-                // The keys are all calendars in the added and removed service columns
-                // TODO: generalise this
-                String addedService = getValueForId(id, "added_service", namespace, table, connection);
-                String[] addedServiceList = StringUtils.strip(addedService, "{}").split("[,]", 0);
-                String removedService = getValueForId(id, "removed_service", namespace, table, connection);
-                String[] removedServiceList = StringUtils.strip(removedService, "{}").split("[,]", 0);
-                String dates = getValueForId(id, "dates", namespace, table, connection);
-                dates = StringUtils.strip(dates, "{}");
-
-                String[] allServiceToDelete = ArrayUtils.addAll(addedServiceList, removedServiceList);
-
-                // Schedule exceptions map to many different calendar dates (one for each date / service ID combination)
-                for (String date : dates.split("[,]", 0)) {
-                    for (String serviceId : allServiceToDelete) {
-                        LOG.info("service", serviceId);
-                        // TODO: better way to do this with existing method?
-                        // Prepare the SQL statement:
-                        String sql;
-                        PreparedStatement updateStatement;
-                        boolean isArrayField = keyField.getSqlType().equals(JDBCType.ARRAY);
-                        switch (sqlMethod) {
-                            case DELETE:
-                                sql = String.format(
-                                        "delete from %s where service_id = ? and date = ?",
-                                        refTableName
-                                );
-
-                                updateStatement = connection.prepareStatement(sql);
-                                updateStatement.setString(1, serviceId);
-                                updateStatement.setString(2, date);
-                                LOG.info(updateStatement.toString());
-                                int result = updateStatement.executeUpdate();
-
-                                if (result > 0) {
-                                    // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
-                                    //  deleteEntityHook).
-                                    if (sqlMethod.equals(SqlMethod.DELETE)) {
-                                        // Check for restrictions on delete.
-                                        if (table.isCascadeDeleteRestricted()) {
-                                            // The entity must not have any referencing entities in order to delete it.
-                                            connection.rollback();
-                                            String message = String.format(
-                                                    "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                                    entityClass.getSimpleName(),
-                                                    keyField.name,
-                                                    keyValue,
-                                                    result,
-                                                    referencingTable.name,
-                                                    entityClass.getSimpleName()
-                                            );
-                                            LOG.warn(message);
-                                            throw new SQLException(message);
-                                        }
-                                    }
-                                    LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
-                                } else {
-                                    LOG.info("No references in {} found!", refTableName);
+            int result;
+            // Custom logic for calendar dates because schedule_exceptions does not reference calendar dates right now.
+            if (table.name.equals("schedule_exceptions") && referencingTable.name.equals("calendar_dates")) {
+                result = deleteCalendarDatesForException(id, namespace, table);
+                LOG.info("Deleted {} entries in calendar dates associated with schedule exception {}", result, id);
+            } else { // General deletion
+                for (Field field : referencingTable.editorFields()) {
+                    if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
+                        // Get statement to update or delete entities that reference the key value.
+                        PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
+                        LOG.info(updateStatement.toString());
+                        result = updateStatement.executeUpdate();
+                        if (result > 0) {
+                            // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
+                            //  deleteEntityHook).
+                            if (sqlMethod.equals(SqlMethod.DELETE)) {
+                                // Check for restrictions on delete.
+                                if (table.isCascadeDeleteRestricted()) {
+                                    // The entity must not have any referencing entities in order to delete it.
+                                    connection.rollback();
+                                    String message = String.format(
+                                            "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                            entityClass.getSimpleName(),
+                                            keyField.name,
+                                            keyValue,
+                                            result,
+                                            referencingTable.name,
+                                            entityClass.getSimpleName()
+                                    );
+                                    LOG.warn(message);
+                                    throw new SQLException(message);
                                 }
-                        }
-                    }
-                }
-            }
-
-            for (Field field : referencingTable.editorFields()) {
-                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                    // Get statement to update or delete entities that reference the key value.
-                    PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
-                    LOG.info(updateStatement.toString());
-                    int result = updateStatement.executeUpdate();
-                    if (result > 0) {
-                        // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
-                        //  deleteEntityHook).
-                        if (sqlMethod.equals(SqlMethod.DELETE)) {
-                            // Check for restrictions on delete.
-                            if (table.isCascadeDeleteRestricted()) {
-                                // The entity must not have any referencing entities in order to delete it.
-                                connection.rollback();
-                                String message = String.format(
-                                    "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                    entityClass.getSimpleName(),
-                                    keyField.name,
-                                    keyValue,
-                                    result,
-                                    referencingTable.name,
-                                    entityClass.getSimpleName()
-                                );
-                                LOG.warn(message);
-                                throw new SQLException(message);
                             }
+                            LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
+                        } else {
+                            LOG.info("No references in {} found!", refTableName);
                         }
-                        LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
-                    } else {
-                        LOG.info("No references in {} found!", refTableName);
                     }
                 }
             }
