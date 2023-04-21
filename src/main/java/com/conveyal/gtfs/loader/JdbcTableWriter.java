@@ -18,8 +18,6 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.dbutils.DbUtils;
-import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -1466,7 +1464,7 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Parse a list field in the schedule exceptions table (dates, added_service, or removed_service) into a list of string.
+     * Parse a list field in the schedule exceptions table (dates, added_service, or removed_service) into an array of strings.
      * List fields take the form {ServiceId1, ServiceId2, ServiceId3, ...}
      */
     private String[] parseExceptionListField(int id, String namespace, Table table, String type) throws SQLException {
@@ -1554,11 +1552,12 @@ public class JdbcTableWriter implements TableWriter {
             // Update/delete foreign references that have match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
             int result;
-            // Custom logic for calendar dates because schedule_exceptions does not reference calendar dates right now.
             if (table.name.equals("schedule_exceptions") && referencingTable.name.equals("calendar_dates")) {
+                // Custom logic for calendar dates because schedule_exceptions does not reference calendar dates right now.
                 result = deleteCalendarDatesForException(id, namespace, table, refTableName);
                 LOG.info("Deleted {} entries in calendar dates associated with schedule exception {}", result, id);
-            } else { // General deletion
+            } else {
+                // General deletion
                 for (Field field : referencingTable.editorFields()) {
                     if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
                         // Get statement to update or delete entities that reference the key value.
