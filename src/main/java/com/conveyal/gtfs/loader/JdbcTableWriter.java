@@ -1491,12 +1491,12 @@ public class JdbcTableWriter implements TableWriter {
         String[] serviceIds = parseExceptionListField(id, namespace, table, "service");
         String[] dates = parseExceptionListField(id, namespace, table, "dates");
         int resultCount = 0;
+        String sql = String.format("delete from %s where service_id = ? and date = ?", refTableName);
+        PreparedStatement updateStatement = connection.prepareStatement(sql);
 
         // Schedule exceptions map to many different calendar dates (one for each date / service ID combination)
         for (String date : dates) {
             for (String serviceId : serviceIds) {
-                String sql =String.format("delete from %s where service_id = ? and date = ?", refTableName);
-                PreparedStatement updateStatement = connection.prepareStatement(sql);
                 updateStatement.setString(1, serviceId);
                 updateStatement.setString(2, date);
                 LOG.info(updateStatement.toString());

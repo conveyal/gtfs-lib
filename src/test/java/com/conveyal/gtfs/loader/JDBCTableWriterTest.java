@@ -430,8 +430,8 @@ public class JDBCTableWriterTest {
     public void canCreateAndDeleteCalendarDates() throws IOException, SQLException, InvalidNamespaceException {
         String firstServiceId = "REMOVED";
         String secondServiceId = "ADDED";
-        String[] allServiceIds = new String[]{firstServiceId, secondServiceId};
-        String[] holidayDates = new String[]{"20190812", "20190813", "20190814"};
+        String[] allServiceIds = new String[] {firstServiceId, secondServiceId};
+        String[] holidayDates = new String[] {"20190812", "20190813", "20190814"};
 
         final Table scheduleExceptionTable = Table.SCHEDULE_EXCEPTIONS;
         final Table calendarDatesTable = Table.CALENDAR_DATES;
@@ -441,8 +441,8 @@ public class JDBCTableWriterTest {
         ScheduleExceptionDTO exceptionInput = new ScheduleExceptionDTO();
         exceptionInput.name = "Incredible multi day holiday";
         exceptionInput.exemplar = 9; // Add, swap, or remove type
-        exceptionInput.removed_service = new String[]{firstServiceId};
-        exceptionInput.added_service = new String[]{secondServiceId};
+        exceptionInput.removed_service = new String[] {firstServiceId};
+        exceptionInput.added_service = new String[] {secondServiceId};
         exceptionInput.dates = holidayDates;
 
         // Save the schedule exception
@@ -1124,7 +1124,7 @@ public class JDBCTableWriterTest {
     /**
      * Create and store a simple calendar date that modifies service on one day.
      */
-    private static CalendarDateDTO createAndStoreCalendarDate(String serviceId, String date, int exceptionType)  throws IOException, SQLException, InvalidNamespaceException {
+    private static CalendarDateDTO createAndStoreCalendarDate(String serviceId, String date, int exceptionType) throws IOException, SQLException, InvalidNamespaceException {
         JdbcTableWriter createCalendarDateWriter = new JdbcTableWriter(Table.CALENDAR_DATES, testDataSource, testNamespace);
 
         CalendarDateDTO calendarDate = createCalendarDate(serviceId, date, exceptionType);
