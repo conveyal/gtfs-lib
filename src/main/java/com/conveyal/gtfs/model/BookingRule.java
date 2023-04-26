@@ -18,9 +18,9 @@ public class BookingRule extends Entity {
     public int prior_notice_duration_min;
     public int prior_notice_duration_max;
     public int prior_notice_last_day;
-    public int prior_notice_last_time = INT_MISSING;
+    public String prior_notice_last_time;
     public int prior_notice_start_day;
-    public int prior_notice_start_time = INT_MISSING;
+    public String prior_notice_start_time;
     public String prior_notice_service_id;
     public String message;
     public String pickup_message;
@@ -47,9 +47,9 @@ public class BookingRule extends Entity {
         setIntParameter(statement, oneBasedIndex++, prior_notice_duration_min);
         setIntParameter(statement, oneBasedIndex++, prior_notice_duration_max);
         setIntParameter(statement, oneBasedIndex++, prior_notice_last_day);
-        setIntParameter(statement, oneBasedIndex++, prior_notice_last_time);
+        statement.setString(oneBasedIndex++, prior_notice_last_time);
         setIntParameter(statement, oneBasedIndex++, prior_notice_start_day);
-        setIntParameter(statement, oneBasedIndex++, prior_notice_start_time);
+        statement.setString(oneBasedIndex++, prior_notice_start_time);
         statement.setString(oneBasedIndex++, prior_notice_service_id);
         statement.setString(oneBasedIndex++, message);
         statement.setString(oneBasedIndex++, pickup_message);
@@ -79,9 +79,9 @@ public class BookingRule extends Entity {
             bookingRule.prior_notice_duration_min = getIntField("prior_notice_duration_min", false, 0, Integer.MAX_VALUE);
             bookingRule.prior_notice_duration_max = getIntField("prior_notice_duration_max", false, 0, Integer.MAX_VALUE);
             bookingRule.prior_notice_last_day = getIntField("prior_notice_last_day", false, 0, Integer.MAX_VALUE);
-            bookingRule.prior_notice_last_time = getTimeField("prior_notice_last_time", false);
+            bookingRule.prior_notice_last_time = getStringField("prior_notice_last_time", false);
             bookingRule.prior_notice_start_day = getIntField("prior_notice_start_day", false, 0, Integer.MAX_VALUE);
-            bookingRule.prior_notice_start_time = getTimeField("prior_notice_start_time", false);
+            bookingRule.prior_notice_start_time = getStringField("prior_notice_start_time", false);
             bookingRule.prior_notice_service_id = getStringField("prior_notice_service_id", false);
             bookingRule.message = getStringField("message", false);
             bookingRule.pickup_message = getStringField("pickup_message", false);
@@ -123,9 +123,9 @@ public class BookingRule extends Entity {
             writeIntField(bookingRule.prior_notice_duration_min);
             writeIntField(bookingRule.prior_notice_duration_max);
             writeIntField(bookingRule.prior_notice_last_day);
-            writeTimeField(bookingRule.prior_notice_last_time);
+            writeStringField(bookingRule.prior_notice_last_time);
             writeIntField(bookingRule.prior_notice_start_day);
-            writeTimeField(bookingRule.prior_notice_start_time);
+            writeStringField(bookingRule.prior_notice_start_time);
             writeStringField(bookingRule.prior_notice_service_id);
             writeStringField(bookingRule.message);
             writeStringField(bookingRule.pickup_message);
