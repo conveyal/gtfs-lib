@@ -1569,41 +1569,38 @@ public class JdbcTableWriter implements TableWriter {
                             // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
                             //  deleteEntityHook).
                             if (sqlMethod.equals(SqlMethod.DELETE)) {
-                                ArrayList<String> patternAndRouteIds = new ArrayList<String>();
+                                ArrayList<String> patternAndRouteIds = new ArrayList<>();
                                 // Check for restrictions on delete.
                                 if (table.isCascadeDeleteRestricted()) {
                                     // The entity must not have any referencing entities in order to delete it.
                                     connection.rollback();
-                                    // Check if the class is a stop
                                     if (entityClass.getSimpleName().equals("Stop")) {
-                                        // if it is a stop, then we can initiate some function that looks up the pattern stops associated with the stop
                                         String patternStopLookup = String.format(
-                                                "select distinct ps.pattern_id, r.id " +
-                                                "from %s.pattern_stops ps " +
-                                                "inner join " +
-                                                "%s.patterns p " +
-                                                "on p.pattern_id = ps.pattern_id " +
-                                                "inner join " +
-                                                "%s.routes r " +
-                                                "on p.route_id = r.route_id " +
-                                                "where %s = '%s'",
-                                                namespace,
-                                                namespace,
-                                                namespace,
-                                                keyField.name,
-                                                keyValue
+                                            "select distinct ps.pattern_id, r.id " +
+                                            "from %s.pattern_stops ps " +
+                                            "inner join " +
+                                            "%s.patterns p " +
+                                            "on p.pattern_id = ps.pattern_id " +
+                                            "inner join " +
+                                            "%s.routes r " +
+                                            "on p.route_id = r.route_id " +
+                                            "where %s = '%s'",
+                                            namespace,
+                                            namespace,
+                                            namespace,
+                                            keyField.name,
+                                            keyValue
                                         );
                                         PreparedStatement patternStopSelectStatement = connection.prepareStatement(patternStopLookup);
                                         if (patternStopSelectStatement.execute()) {
                                             ResultSet resultSet = patternStopSelectStatement.getResultSet();
                                             while (resultSet.next()) {
                                                 patternAndRouteIds.add(
-                                                        "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "}"
+                                                    "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "}"
                                                 );
                                             }
                                         }
                                     }
-                                    // once we know the pattern stops associated, then we can add some links to the error message..
                                     String message = String.format(
                                             "Cannot delete %s %s=%s. %d %s reference this %s.",
                                             entityClass.getSimpleName(),
@@ -1614,8 +1611,12 @@ public class JdbcTableWriter implements TableWriter {
                                             entityClass.getSimpleName()
                                     );
                                     if (patternAndRouteIds.size() > 0) {
-                                        String patternIdsString = StringUtils.join(patternAndRouteIds, ",");
-                                        message += "\n" + "Referenced pattern IDs: [" + patternIdsString + "]";
+                                        // Append referenced patterns data to the end of the error.
+                                        message = String.format(
+                                            "%s\nReferenced patterns: [%s]",
+                                                message,
+                                                StringUtils.join(patternAndRouteIds, ",")
+                                        );
                                     }
                                     LOG.warn(message);
                                     throw new SQLException(message);
