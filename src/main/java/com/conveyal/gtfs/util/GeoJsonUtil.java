@@ -26,6 +26,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -100,6 +101,13 @@ public class GeoJsonUtil {
     }
 
     /**
+     *   Check for features without IDs, with empty geometry or duplicate IDs (this happens more than you think)
+     */
+    private static boolean isValidLocation(String locationId, String geometryType, Set<String> seenLocationIds) {
+        return (locationId == null || geometryType == null || !seenLocationIds.add(locationId)) ? false : true;
+    }
+
+    /**
      * Extract from a list of features, the items which are common to all features.
      */
     private static List<Location> unpackLocations(
@@ -107,11 +115,15 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<Location> locations = new ArrayList<>();
+        Set<String> seenLocationIds = new HashSet<>();
         for (Feature feature : featureCollection.getFeatures()) {
             String geometryType = getGeometryType(feature.getGeometryType().getName(), errors);
-            if (geometryType == null) continue;
             Location location = new Location();
-            location.location_id = feature.getId();
+            String locationId = feature.getId();
+
+            if (!isValidLocation(locationId, geometryType, seenLocationIds)) continue;
+
+            location.location_id = locationId;
             location.geometry_type = geometryType;
             extractPropertyValues(location, feature.getProperties(), errors);
             locations.add(location);
@@ -192,17 +204,19 @@ public class GeoJsonUtil {
         List<String> errors
     ) {
         ArrayList<LocationShape> locationShapes = new ArrayList<>();
+        Set<String> seenLocationIds = new HashSet<>();
         for (Feature feature : featureCollection.getFeatures()) {
             Geometry geometry = feature.getFeature().getGeometry();
             String geometryType = getGeometryType(geometry.getGeometryType().getName(), errors);
-            if (geometryType == null) continue;
+            String locationId = feature.getId();
+            if (!isValidLocation(locationId, geometryType, seenLocationIds)) continue;
             switch (geometryType) {
                 case GEOMETRY_TYPE_POLYLINE:
                     LineString lineString = (LineString) geometry;
                     for (Point point : lineString.getPoints()) {
                         locationShapes.add(
                             // Because we're only supporting a single linestring right now, use location_id as the geometry_id too
-                            buildLocationShape(feature.getId(), feature.getId(), point.getY(), point.getX())
+                            buildLocationShape(locationId, locationId, point.getY(), point.getX())
                         );
                     }
                     break;

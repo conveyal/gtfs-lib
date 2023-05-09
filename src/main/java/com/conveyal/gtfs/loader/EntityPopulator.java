@@ -297,9 +297,9 @@ public interface EntityPopulator<T> {
         bookingRule.prior_notice_duration_min = getIntIfPresent(result, "prior_notice_duration_min", columnForName);
         bookingRule.prior_notice_duration_max = getIntIfPresent(result, "prior_notice_duration_max", columnForName);
         bookingRule.prior_notice_last_day = getIntIfPresent(result, "prior_notice_last_day", columnForName);
-        bookingRule.prior_notice_last_time = getIntIfPresent(result, "prior_notice_last_time", columnForName);
+        bookingRule.prior_notice_last_time = getStringIfPresent(result, "prior_notice_last_time", columnForName);
         bookingRule.prior_notice_start_day = getIntIfPresent(result, "prior_notice_start_day", columnForName);
-        bookingRule.prior_notice_start_time = getIntIfPresent(result, "prior_notice_start_time", columnForName);
+        bookingRule.prior_notice_start_time = getStringIfPresent(result, "prior_notice_start_time", columnForName);
         bookingRule.prior_notice_service_id = getStringIfPresent(result, "prior_notice_service_id", columnForName);
         bookingRule.message = getStringIfPresent(result, "message", columnForName);
         bookingRule.pickup_message = getStringIfPresent(result, "pickup_message", columnForName);

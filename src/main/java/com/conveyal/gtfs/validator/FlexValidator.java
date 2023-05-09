@@ -381,20 +381,20 @@ public class FlexValidator extends FeedValidator {
                 .setBadValue(Integer.toString(bookingRule.prior_notice_start_day))
             );
         }
-        if (bookingRule.prior_notice_start_time == INT_MISSING && bookingRule.prior_notice_start_day != INT_MISSING) {
+        if (bookingRule.prior_notice_start_time == null && bookingRule.prior_notice_start_day != INT_MISSING) {
             // prior_notice_start_time is required if prior_notice_start_day is defined.
             errors.add(NewGTFSError.forEntity(
                     bookingRule,
                     NewGTFSErrorType.FLEX_REQUIRED_PRIOR_NOTICE_START_TIME)
-                .setBadValue(Integer.toString(bookingRule.prior_notice_start_time))
+                .setBadValue(bookingRule.prior_notice_start_time)
             );
         }
-        if (bookingRule.prior_notice_start_time != INT_MISSING && bookingRule.prior_notice_start_day == INT_MISSING) {
+        if (bookingRule.prior_notice_start_time != null && bookingRule.prior_notice_start_day == INT_MISSING) {
             // prior_notice_start_time is forbidden if prior_notice_start_day is not defined.
             errors.add(NewGTFSError.forEntity(
                     bookingRule,
                     NewGTFSErrorType.FLEX_FORBIDDEN_PRIOR_START_TIME)
-                .setBadValue(Integer.toString(bookingRule.prior_notice_start_time))
+                .setBadValue(bookingRule.prior_notice_start_time)
             );
         }
         if ((bookingRule.prior_notice_service_id != null &&
