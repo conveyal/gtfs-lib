@@ -1382,7 +1382,7 @@ public class JDBCTableWriterTest {
                 ),
                 70, 70, 13, 6
             ),
-            // Add a location group to the end.
+            // Add a stop area to the end.
             new PatternArguments(
                 new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),
@@ -1424,7 +1424,7 @@ public class JDBCTableWriterTest {
                 ),
                 70, 70, 13, 6
             ),
-            // Add location group to middle.
+            // Add stop area to middle.
             new PatternArguments(
                 new PatternLocationDTO[] {
                     new PatternLocationDTO(patternId, locationOne.location_id, 1, 70, 70),

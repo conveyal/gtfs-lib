@@ -255,7 +255,7 @@ public class FlexValidatorTest {
                 "2", null,
                 Lists.newArrayList(NewGTFSErrorType.FLEX_FORBIDDEN_SAFE_DURATION_OFFSET)
             ),
-            // Checks against location group instead of location.
+            // Checks against stop area instead of location.
             new StopTimeArguments(
                 createStopTime(1.0, DOUBLE_MISSING, DOUBLE_MISSING, DOUBLE_MISSING),
                 null, "2",

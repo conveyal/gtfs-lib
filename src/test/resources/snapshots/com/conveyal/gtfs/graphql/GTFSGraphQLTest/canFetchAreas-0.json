@@ -3,19 +3,19 @@
     "feed" : {
       "areas" : [ {
         "area_id" : "1",
-        "area_name" : "Location group referencing a stop",
+        "area_name" : "Area referencing a stop",
         "id" : 2
       }, {
         "area_id" : "2",
-        "area_name" : "Location group referencing an invalid location",
+        "area_name" : "Area referencing an invalid location",
         "id" : 3
       }, {
         "area_id" : "3",
-        "area_name" : "Location group referencing a location",
+        "area_name" : "Area referencing a location",
         "id" : 4
       }, {
         "area_id" : "4",
-        "area_name" : "Multi location group",
+        "area_name" : "Multi areas",
         "id" : 5
       } ],
       "feed_version" : "1.0"

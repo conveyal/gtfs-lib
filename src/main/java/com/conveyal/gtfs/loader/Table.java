@@ -372,7 +372,7 @@ public class Table {
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#areastxt-no-change
     public static final Table AREA = new Table("areas", Area.class, OPTIONAL,
-        new StringField("area_id", REQUIRED),
+        new StringField("area_id", REQUIRED).isReferenceTo(STOP_AREAS),
         new StringField("area_name", OPTIONAL)
     );
 

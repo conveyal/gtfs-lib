@@ -102,7 +102,6 @@ public class JdbcGtfsExporter {
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             result.agency = export(Table.AGENCY, connection);
-            // TODO: No idea if booking rules and location groups need to have a 'fromEditor' option?
             result.bookingRules = export(Table.BOOKING_RULES, connection);
             result.stopAreas = exportStopAreas();
             if (fromEditor) {
@@ -514,7 +513,7 @@ public class JdbcGtfsExporter {
     }
 
     /**
-     * Expand the location group data and write to zip file.
+     * Expand the stop areas data and write to zip file.
      */
     public static void writeStopAreasToFile(
         ZipOutputStream zipOutputStream,

@@ -4,28 +4,28 @@
       "feed_version" : "1.0",
       "stop_areas" : [ {
         "area" : [ {
-          "area_name" : "Location group referencing a stop"
+          "area_name" : "Area referencing a stop"
         } ],
         "area_id" : "1",
         "id" : 2,
         "stop_id" : "123"
       }, {
         "area" : [ {
-          "area_name" : "Location group referencing an invalid location"
+          "area_name" : "Area referencing an invalid location"
         } ],
         "area_id" : "2",
         "id" : 3,
         "stop_id" : "area-999"
       }, {
         "area" : [ {
-          "area_name" : "Location group referencing a location"
+          "area_name" : "Area referencing a location"
         } ],
         "area_id" : "3",
         "id" : 4,
         "stop_id" : "area_1469-1"
       }, {
         "area" : [ {
-          "area_name" : "Multi location group"
+          "area_name" : "Multi areas"
         } ],
         "area_id" : "4",
         "id" : 5,

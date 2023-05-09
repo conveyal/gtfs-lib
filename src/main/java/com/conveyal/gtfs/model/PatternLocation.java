@@ -22,11 +22,9 @@ public class PatternLocation extends PatternHalt {
     public int continuous_pickup = INT_MISSING;
     public int continuous_drop_off = INT_MISSING;
 
-    // Flex additions.
+    // Additional GTFS Flex fields.
     public String pickup_booking_rule_id;
     public String drop_off_booking_rule_id;
-
-    // Additional GTFS Flex location groups and locations fields
     public int flex_default_travel_time = INT_MISSING;
     public int flex_default_zone_time = INT_MISSING;
     public double mean_duration_factor = DOUBLE_MISSING;

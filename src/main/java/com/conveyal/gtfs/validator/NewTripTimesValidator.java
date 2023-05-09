@@ -192,7 +192,7 @@ public class NewTripTimesValidator extends FeedValidator {
         }
 
         // Check that first and last stop times are not missing values and repair them if they are not locations or
-        // location groups. Note that this repair will be seen by the validators but not saved in the database.
+        // stop areas. Note that this repair will be seen by the validators but not saved in the database.
         StopTime firstStop = stopTimes.get(0);
         StopTime lastStop = stopTimes.get(stopTimes.size() - 1);
         if (!FlexValidator.stopIdIsStopAreaOrLocation(firstStop.stop_id, stopAreas, locations)) {
@@ -271,7 +271,7 @@ public class NewTripTimesValidator extends FeedValidator {
     }
 
     /**
-     * A single stop is permitted if it is a location or location group.
+     * A single stop is permitted if it is a location or stop area.
      */
     private boolean hasSingleFlexStop(
         List<StopTime> stopTimes,

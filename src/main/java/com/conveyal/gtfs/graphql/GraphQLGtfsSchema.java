@@ -75,7 +75,7 @@ public class GraphQLGtfsSchema {
 
     // Represents rows from area.txt
     public static final GraphQLObjectType areaType = newObject().name("area")
-            .description("A GTFS agency object")
+            .description("A GTFS area object")
             .field(MapFetcher.field("id", GraphQLInt))
             .field(MapFetcher.field("area_id"))
             .field(MapFetcher.field("area_name"))
@@ -343,7 +343,7 @@ public class GraphQLGtfsSchema {
             // Additional GTFS Flex booking rule fields.
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
-            // Additional GTFS Flex location groups and locations fields
+            // Additional GTFS Flex fields.
             .field(MapFetcher.field("start_pickup_dropoff_window", GraphQLInt))
             .field(MapFetcher.field("end_pickup_dropoff_window", GraphQLInt))
             .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
@@ -577,7 +577,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
 
-            // Additional GTFS Flex location groups and locations fields
+            // Additional GTFS Flex fields.
             .field(MapFetcher.field("flex_default_travel_time", GraphQLInt))
             .field(MapFetcher.field("flex_default_zone_time", GraphQLInt))
             .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
@@ -610,7 +610,7 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
 
-            // Additional GTFS Flex location groups and locations fields
+            // Additional GTFS Flex fields.
             .field(MapFetcher.field("flex_default_travel_time", GraphQLInt))
             .field(MapFetcher.field("flex_default_zone_time", GraphQLInt))
             .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
