@@ -266,7 +266,8 @@ public class PatternFinder {
         } else if (locationById.containsKey(haltId)) {
             return locationById.get(haltId).stop_name;
         } else if (stopAreaById.containsKey(haltId)) {
-            return areaById.get(haltId).area_name;
+            Area area = areaById.get(haltId);
+            return area.area_name != null ? area.area_name : area.area_id;
         }
         return isFrom ? "fromTerminusNameUnknown" : "toTerminusNameUnknown";
     }
