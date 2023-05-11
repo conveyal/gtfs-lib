@@ -511,7 +511,7 @@ public class GraphQLGtfsSchema {
      * Represents each stop in a list of stops within a pattern.
      * We could return just a list of StopIDs within the pattern (a JSON array of strings) but
      * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     * like lat and lon, or pickup and drop off types if we add those to the pattern signature.
      */
     public static final GraphQLObjectType patternStopType = newObject().name("patternStop")
             .field(MapFetcher.field("id", GraphQLInt))
@@ -545,7 +545,7 @@ public class GraphQLGtfsSchema {
      * Represents each stop in a list of locations within a pattern.
      * We could return just a list of LocationIDs within the pattern (a JSON array of strings) but
      * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     * like lat and lon, or pickup and drop off types if we add those to the pattern signature.
      */
     public static final GraphQLObjectType patternLocationType = newObject().name("patternLocation")
             .field(MapFetcher.field("id", GraphQLInt))
@@ -585,7 +585,7 @@ public class GraphQLGtfsSchema {
      * Represents each stop in a list of locations within a pattern.
      * We could return just a list of LocationIDs within the pattern (a JSON array of strings) but
      * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     * like lat and lon, or pickup and drop off types if we add those to the pattern signature.
      */
     public static final GraphQLObjectType patternLocationGroupType = newObject().name("patternLocationGroup")
             .field(MapFetcher.field("id", GraphQLInt))

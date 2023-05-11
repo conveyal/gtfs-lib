@@ -175,7 +175,7 @@ public class GTFSTest {
     }
 
     /**
-     * Tests that a GTFS feed with blank (unspecified) values for pickup and dropoff types in stop_times.txt
+     * Tests that a GTFS feed with blank (unspecified) values for pickup and drop off types in stop_times.txt
      * is loaded with the blank values resolved, so that the patterns are counted correctly.
      */
     @Test
@@ -197,7 +197,7 @@ public class GTFSTest {
 
         // The first pattern should be added to the editor patterns table.
         assertThat(
-            "There should be one pattern in the patterns table after resolving blank pickup/dropoff values in stop_times.",
+            "There should be one pattern in the patterns table after resolving blank pickup/drop off values in stop_times.",
             runIntegrationTestOnFolder("fake-ferry-blank-pickups", nullValue(), expectations1, errorExpectations),
             equalTo(true)
         );
@@ -207,7 +207,7 @@ public class GTFSTest {
         assertThrows(
             AssertionError.class,
             () -> runIntegrationTestOnFolder("fake-ferry-blank-pickups", nullValue(), expectations2, errorExpectations),
-            "There should be *only* one pattern in the patterns table after resolving blank pickup/dropoff values."
+            "There should be *only* one pattern in the patterns table after resolving blank pickup/drop off values."
         );
     }
 

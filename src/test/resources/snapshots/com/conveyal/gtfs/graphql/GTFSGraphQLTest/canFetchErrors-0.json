@@ -18,7 +18,7 @@
         "type" : "FLEX_FORBIDDEN_ARRIVAL_TIME"
       }, {
         "count" : 5,
-        "message" : "It is forbidden to define a departure time when either start pickup drop off window or end pickup dropoff window are defined.",
+        "message" : "It is forbidden to define a departure time when either start pickup drop off window or end pickup drop off window are defined.",
         "priority" : "HIGH",
         "type" : "FLEX_FORBIDDEN_DEPARTURE_TIME"
       }, {
@@ -30,7 +30,7 @@
         "count" : 5,
         "message" : "It is forbidden to define a end pickup drop off window when either an arrive time or departure time are defined.",
         "priority" : "HIGH",
-        "type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW"
+        "type" : "FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW"
       }, {
         "count" : 4,
         "message" : "It is forbidden to define a mean duration factor when a stop id does not refer to a location group or location.",
@@ -75,7 +75,7 @@
         "count" : 5,
         "message" : "It is forbidden to define a start pickup drop off window when either an arrive time or departure time are defined.",
         "priority" : "HIGH",
-        "type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW"
+        "type" : "FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW"
       }, {
         "count" : 4,
         "message" : "Unable to parse the locations.geojson file. Make sure the file conforms to the GeoJson standard and supported geometry types are used.",
@@ -190,7 +190,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 9,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 2
       }, {
         "bad_value" : "25200",
@@ -198,7 +198,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 10,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 2
       }, {
         "bad_value" : "1.0",
@@ -254,7 +254,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 17,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 3
       }, {
         "bad_value" : "25260",
@@ -262,7 +262,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 18,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 3
       }, {
         "bad_value" : "1.0",
@@ -318,7 +318,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 25,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 4
       }, {
         "bad_value" : "25320",
@@ -326,7 +326,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 26,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 4
       }, {
         "bad_value" : "1.0",
@@ -382,7 +382,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 33,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 5
       }, {
         "bad_value" : "25380",
@@ -390,7 +390,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 34,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 5
       }, {
         "bad_value" : "1.0",
@@ -446,7 +446,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 41,
-        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 6
       }, {
         "bad_value" : "25380",
@@ -454,7 +454,7 @@
         "entity_sequence" : 0,
         "entity_type" : "StopTime",
         "error_id" : 42,
-        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW",
+        "error_type" : "FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW",
         "line_number" : 6
       }, {
         "bad_value" : "0",

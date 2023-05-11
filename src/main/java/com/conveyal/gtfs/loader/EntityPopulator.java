@@ -281,7 +281,7 @@ public interface EntityPopulator<T> {
         stopTime.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
         stopTime.drop_off_booking_rule_id = getStringIfPresent(result, "drop_off_booking_rule_id", columnForName);
         stopTime.start_pickup_drop_off_window = getIntIfPresent(result, "start_pickup_drop_off_window", columnForName);
-        stopTime.end_pickup_drop_off_window = getIntIfPresent(result, "end_pickup_dropoff_window", columnForName);
+        stopTime.end_pickup_drop_off_window = getIntIfPresent(result, "end_pickup_drop_off_window", columnForName);
         stopTime.mean_duration_factor = getDoubleIfPresent(result, "mean_duration_factor", columnForName);
         stopTime.mean_duration_offset = getDoubleIfPresent(result, "mean_duration_offset", columnForName);
         stopTime.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
