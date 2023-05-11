@@ -562,8 +562,8 @@ public class JdbcTableWriter implements TableWriter {
             } catch (StorageException e) {
                 LOG.warn("Could not set field {} to value {}. Attempting to parse integer seconds.", field.name, value);
                 if (field.name.contains("_time") ||
-                    field.name.contains("start_pickup_dropoff_window") ||
-                    field.name.contains("end_pickup_dropoff_window")
+                    field.name.contains("start_pickup_drop_off_window") ||
+                    field.name.contains("end_pickup_drop_off_window")
                 ) {
                     // FIXME: This is a hack to get time related fields into the right format. Because the UI
                     //  currently returns them as seconds since midnight rather than the Field-defined format HH:MM:SS
@@ -999,7 +999,7 @@ public class JdbcTableWriter implements TableWriter {
         tripId = (tripId != null) ? String.format("'%s'", tripId) : "t.trip_id";
 
         String sql = String.format(
-            "update %s.stop_times st set start_pickup_dropoff_window = ?, end_pickup_dropoff_window = ? from %s.trips t " +
+            "update %s.stop_times st set start_pickup_drop_off_window = ?, end_pickup_drop_off_window = ? from %s.trips t " +
                 "where st.trip_id = %s AND t.pattern_id = ? AND st.stop_sequence = ?",
             tablePrefix,
             tablePrefix,
@@ -1020,7 +1020,7 @@ public class JdbcTableWriter implements TableWriter {
     /**
      * Update stop time values depending on caller. If updating stop times for pattern stops, this will update the
      * arrival_time and departure_time. If updating stop times for pattern locations, this will update the
-     * start_pickup_dropoff_window and end_pickup_dropoff_window.
+     * start_pickup_drop_off_window and end_pickup_drop_off_window.
      */
     private int updateStopTimes(
         String sql,

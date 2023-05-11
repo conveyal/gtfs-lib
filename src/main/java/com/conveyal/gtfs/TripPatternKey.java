@@ -24,8 +24,8 @@ public class TripPatternKey {
     public TIntList pickupTypes = new TIntArrayList();
     public TIntList dropoffTypes = new TIntArrayList();
     // Flex additions included in equality check.
-    public TIntList start_pickup_dropoff_window = new TIntArrayList();
-    public TIntList end_pickup_dropoff_window = new TIntArrayList();
+    public TIntList start_pickup_drop_off_window = new TIntArrayList();
+    public TIntList end_pickup_drop_off_window = new TIntArrayList();
 
     // Note, the lists below are not used in the equality check.
     public TIntList arrivalTimes = new TIntArrayList();
@@ -63,8 +63,8 @@ public class TripPatternKey {
         pickup_booking_rule_id.add(st.pickup_booking_rule_id);
         drop_off_booking_rule_id.add(st.drop_off_booking_rule_id);
 
-        start_pickup_dropoff_window.add(st.start_pickup_dropoff_window);
-        end_pickup_dropoff_window.add(st.end_pickup_dropoff_window);
+        start_pickup_drop_off_window.add(st.start_pickup_drop_off_window);
+        end_pickup_drop_off_window.add(st.end_pickup_drop_off_window);
         mean_duration_factor.add(st.mean_duration_factor);
         mean_duration_offset.add(st.mean_duration_offset);
         safe_duration_factor.add(st.safe_duration_factor);
@@ -92,14 +92,14 @@ public class TripPatternKey {
         if (!Objects.equals(pickupTypes, that.pickupTypes)) return false;
         if (!Objects.equals(routeId, that.routeId)) return false;
         if (!Objects.equals(stops, that.stops)) return false;
-        if (!Objects.equals(start_pickup_dropoff_window, that.start_pickup_dropoff_window)) return false;
-        if (!Objects.equals(end_pickup_dropoff_window, that.end_pickup_dropoff_window)) return false;
+        if (!Objects.equals(start_pickup_drop_off_window, that.start_pickup_drop_off_window)) return false;
+        if (!Objects.equals(end_pickup_drop_off_window, that.end_pickup_drop_off_window)) return false;
 
         return true;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(routeId, stops, pickupTypes, dropoffTypes, start_pickup_dropoff_window, end_pickup_dropoff_window);
+        return Objects.hash(routeId, stops, pickupTypes, dropoffTypes, start_pickup_drop_off_window, end_pickup_drop_off_window);
     }
 }

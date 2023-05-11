@@ -533,8 +533,8 @@ public class FlexValidatorTest {
         stopTime.safe_duration_factor = safeDurationFactor;
         stopTime.safe_duration_offset = safeDurationOffset;
         // Additional parameters to satisfy previous cases which have already been tested.
-        stopTime.start_pickup_dropoff_window = 1200;
-        stopTime.end_pickup_dropoff_window = 1300;
+        stopTime.start_pickup_drop_off_window = 1200;
+        stopTime.end_pickup_drop_off_window = 1300;
         stopTime.pickup_type = 1;
         stopTime.drop_off_type = 1;
         return stopTime;
@@ -549,8 +549,8 @@ public class FlexValidatorTest {
     ) {
         StopTime stopTime = new StopTime();
         stopTime.stop_id = stopId;
-        stopTime.start_pickup_dropoff_window = startPickupDropOffWindow;
-        stopTime.end_pickup_dropoff_window = endPickupDropOffWindow;
+        stopTime.start_pickup_drop_off_window = startPickupDropOffWindow;
+        stopTime.end_pickup_drop_off_window = endPickupDropOffWindow;
         stopTime.pickup_type = pickupType;
         stopTime.drop_off_type = dropOffType;
         return stopTime;
@@ -565,8 +565,8 @@ public class FlexValidatorTest {
         StopTime stopTime = new StopTime();
         stopTime.arrival_time = arrivalTime;
         stopTime.departure_time = departureTime;
-        stopTime.start_pickup_dropoff_window = startPickupDropOffWindow;
-        stopTime.end_pickup_dropoff_window = endPickupDropOffWindow;
+        stopTime.start_pickup_drop_off_window = startPickupDropOffWindow;
+        stopTime.end_pickup_drop_off_window = endPickupDropOffWindow;
         return stopTime;
     }
 

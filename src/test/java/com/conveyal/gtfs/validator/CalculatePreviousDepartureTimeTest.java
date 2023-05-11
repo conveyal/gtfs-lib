@@ -95,7 +95,7 @@ class CalculatePreviousDepartureTimeTest {
         StopTime stopTime = new StopTime();
         stopTime.stop_id = stopId;
         stopTime.departure_time = departureTime;
-        stopTime.end_pickup_dropoff_window = endPickupDropOffWindow;
+        stopTime.end_pickup_drop_off_window = endPickupDropOffWindow;
         return stopTime;
     }
 }

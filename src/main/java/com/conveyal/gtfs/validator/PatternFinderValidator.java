@@ -308,7 +308,7 @@ public class PatternFinderValidator extends TripValidator {
         List<Integer> previousDepartureTimes = new ArrayList<>();
         // Determine initial departure time based on the stop type.
         int lastValidDepartureTime = isFlexStop(locationById, locationGroupById, key.stops.get(0))
-            ? key.end_pickup_dropoff_window.get(0)
+            ? key.end_pickup_drop_off_window.get(0)
             : key.departureTimes.get(0);
         // Set the previous departure time for the first stop, which will always be zero.
         previousDepartureTimes.add(0);
@@ -322,7 +322,7 @@ public class PatternFinderValidator extends TripValidator {
                 lastValidDepartureTime = 0;
             } else {
                 int prevDepartureStop = prevIsFlexStop
-                    ? key.end_pickup_dropoff_window.get(stopSequence - 1)
+                    ? key.end_pickup_drop_off_window.get(stopSequence - 1)
                     : key.departureTimes.get(stopSequence - 1);
                 if (prevDepartureStop > lastValidDepartureTime) {
                     // Update the last valid departure if the previous departure is after this. Otherwise, continue to
@@ -362,7 +362,7 @@ public class PatternFinderValidator extends TripValidator {
             travelTime = getTravelTime(
                 travelTime,
                 stopSequence,
-                tripPattern.start_pickup_dropoff_window.get(stopSequence),
+                tripPattern.start_pickup_drop_off_window.get(stopSequence),
                 lastValidDeparture);
         }
         int timeInLocation = (patternType == PatternReconciliation.PatternType.STOP)
@@ -370,8 +370,8 @@ public class PatternFinderValidator extends TripValidator {
                 tripPattern.arrivalTimes.get(stopSequence),
                 tripPattern.departureTimes.get(stopSequence))
             : getTimeInLocation(
-                tripPattern.start_pickup_dropoff_window.get(stopSequence),
-                tripPattern.end_pickup_dropoff_window.get(stopSequence));
+                tripPattern.start_pickup_drop_off_window.get(stopSequence),
+                tripPattern.end_pickup_drop_off_window.get(stopSequence));
 
         if (patternType == PatternReconciliation.PatternType.STOP) {
             PatternStop patternStop = new PatternStop();
