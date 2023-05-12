@@ -241,15 +241,18 @@ public class PatternFinder {
             } else if (entity instanceof StopArea) {
                 StopArea stopArea = (StopArea) entity;
                 Area area = areaById.get(stopArea.area_id);
-                return (area != null) ? area.area_name : "stopNameUnknown";
+                if (area != null) {
+                    return area.area_name;
+                }
             }
         }
         return "stopNameUnknown";
     }
 
     /**
-     * Return either the 'from' or 'to' terminus name. Check the list of stops first, if there is no match, then check
-     * the locations or areas (via stop areas). If neither provide a match return a default value.
+     * Return either the 'from' or 'to' terminus name. Check the stops followed by locations and then areas (via stop
+     * areas). If a match is found return the name (or id if this is no available). If there are no matches return the
+     * default value.
      */
     private static String getTerminusName(
         Pattern pattern,
@@ -262,9 +265,11 @@ public class PatternFinder {
         int id = isFrom ? 0 : pattern.orderedStops.size() - 1;
         String haltId = pattern.orderedStops.get(id);
         if (stopById.containsKey(haltId)) {
-            return stopById.get(haltId).stop_name;
+            Stop stop = stopById.get(haltId);
+            return stop.stop_name != null ? stop.stop_name : stop.stop_id;
         } else if (locationById.containsKey(haltId)) {
-            return locationById.get(haltId).stop_name;
+            Location location = locationById.get(haltId);
+            return location.stop_name != null ? location.stop_name : location.location_id;
         } else if (stopAreaById.containsKey(haltId)) {
             Area area = areaById.get(haltId);
             return area.area_name != null ? area.area_name : area.area_id;

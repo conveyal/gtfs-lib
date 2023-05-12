@@ -184,7 +184,7 @@ public class JdbcTableWriter implements TableWriter {
                         (hasNoChildEntities(childEntities))
                     ) {
                         // This is a backwards hack to prevent the addition of pattern location breaking existing
-                        // pattern functionality. If pattern location or pattern stop are is not provided set to
+                        // pattern functionality. If pattern location or pattern stop is not provided set to
                         // an empty array to avoid the following exception.
                         childEntities = mapper.createArrayNode();
                     }
