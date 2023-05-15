@@ -323,6 +323,7 @@ public class Table {
             new StringField("min_transfer_time", OPTIONAL))
             .addPrimaryKey()
             .keyFieldIsNotUnique()
+            .hasCompoundKey()
             .addPrimaryKeyNames("from_stop_id", "to_stop_id");
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
@@ -478,12 +479,11 @@ public class Table {
     }
 
     /**
-     * Get field names that are primary keys for a table.
+     * Get field names that are primary keys for a table. This is used by the PreserveCustomFields transformation
+     * in datatools-server for determining keys for CSV matching.
      */
     public List<String> getPrimaryKeyNames () {
-        List<String> keys = new ArrayList<>();
-        for (String key : primaryKeyNames) keys.add(key);
-        return keys;
+        return Arrays.asList(primaryKeyNames);
     }
 
 
