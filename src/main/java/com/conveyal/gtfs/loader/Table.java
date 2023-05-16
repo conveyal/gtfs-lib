@@ -126,7 +126,9 @@ public class Table {
         new URLField("agency_branding_url", OPTIONAL),
         new URLField("agency_fare_url", OPTIONAL),
         new StringField("agency_email", OPTIONAL) // FIXME new field type for emails?
-    ).restrictDelete().addPrimaryKey().addPrimaryKeyNames("agency_id");
+    ).restrictDelete()
+    .addPrimaryKey()
+    .addPrimaryKeyNames("agency_id");
 
     // The GTFS spec says this table is required, but in practice it is not required if calendar_dates is present.
     public static final Table CALENDAR = new Table("calendar", Calendar.class, OPTIONAL,
@@ -142,7 +144,9 @@ public class Table {
         new DateField("end_date", REQUIRED),
         // Editor-specific field
         new StringField("description", EDITOR)
-    ).restrictDelete().addPrimaryKey().addPrimaryKeyNames("service_id");
+    ).restrictDelete()
+    .addPrimaryKey()
+    .addPrimaryKeyNames("service_id");
 
     public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
             new StringField("name", REQUIRED), // FIXME: This makes name the key field...
@@ -158,7 +162,8 @@ public class Table {
         new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR),
         new DateField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
-    ).keyFieldIsNotUnique().addPrimaryKeyNames("service_id", "date");
+    ).keyFieldIsNotUnique()
+    .addPrimaryKeyNames("service_id", "date");
 
     public static final Table FARE_ATTRIBUTES = new Table("fare_attributes", FareAttribute.class, OPTIONAL,
         new StringField("fare_id", REQUIRED),
@@ -172,7 +177,8 @@ public class Table {
             new ReferenceFieldShouldBeProvidedCheck("agency_id")
         ),
         new IntegerField("transfer_duration", OPTIONAL)
-    ).addPrimaryKey().addPrimaryKeyNames("fare_id");
+    ).addPrimaryKey()
+    .addPrimaryKeyNames("fare_id");
 
     // FIXME: Should we add some constraint on number of rows that this table has? Perhaps this is a GTFS editor specific
     //  feature.
@@ -221,7 +227,8 @@ public class Table {
         new ShortField("status", EDITOR, 2),
         new ShortField("continuous_pickup", OPTIONAL,3),
         new ShortField("continuous_drop_off", OPTIONAL,3)
-    ).addPrimaryKey().addPrimaryKeyNames("route_id");
+    ).addPrimaryKey()
+    .addPrimaryKeyNames("route_id");
 
     public static final Table SHAPES = new Table("shapes", ShapePoint.class, OPTIONAL,
             new StringField("shape_id", REQUIRED),
@@ -245,7 +252,8 @@ public class Table {
             new ShortField("direction_id", EDITOR, 1),
             new ShortField("use_frequency", EDITOR, 1),
             new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
-    ).addPrimaryKey().addPrimaryKeyNames("pattern_id");
+    ).addPrimaryKey()
+    .addPrimaryKeyNames("pattern_id");
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id", REQUIRED),
@@ -272,8 +280,7 @@ public class Table {
         new StringField("stop_timezone", OPTIONAL),
         new ShortField("wheelchair_boarding", OPTIONAL, 2),
         new StringField("platform_code", OPTIONAL)
-    )
-    .restrictDelete()
+    ).restrictDelete()
     .addPrimaryKey()
     .addPrimaryKeyNames("stop_id");
 
@@ -293,8 +300,7 @@ public class Table {
             // If the contains_id is defined, its value must exist as a zone_id in stops.txt.
             new ForeignRefExistsCheck("zone_id", "fare_rules")
         )
-    )
-    .withParentTable(FARE_ATTRIBUTES)
+    ).withParentTable(FARE_ATTRIBUTES)
     .addPrimaryKey().keyFieldIsNotUnique()
     .addPrimaryKeyNames("fare_id", "route_id", "origin_id", "destination_id", "contains_id");
 
@@ -313,18 +319,19 @@ public class Table {
             new ShortField("timepoint", EDITOR, 1),
             new ShortField("continuous_pickup", OPTIONAL,3),
             new ShortField("continuous_drop_off", OPTIONAL,3)
-    ).withParentTable(PATTERNS).addPrimaryKeyNames("pattern_id", "stop_sequence");
+    ).withParentTable(PATTERNS)
+    .addPrimaryKeyNames("pattern_id", "stop_sequence");
 
     public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
             // FIXME: Do we need an index on from_ and to_stop_id
             new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
             new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
             new ShortField("transfer_type", REQUIRED, 3),
-            new StringField("min_transfer_time", OPTIONAL))
-            .addPrimaryKey()
-            .keyFieldIsNotUnique()
-            .hasCompoundKey()
-            .addPrimaryKeyNames("from_stop_id", "to_stop_id");
+            new StringField("min_transfer_time", OPTIONAL)
+    ).addPrimaryKey()
+    .keyFieldIsNotUnique()
+    .hasCompoundKey()
+    .addPrimaryKeyNames("from_stop_id", "to_stop_id");
 
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id", REQUIRED),
@@ -341,7 +348,8 @@ public class Table {
         new ShortField("bikes_allowed", OPTIONAL, 2),
         // Editor-specific fields below.
         new StringField("pattern_id", EDITOR).isReferenceTo(PATTERNS)
-    ).addPrimaryKey().addPrimaryKeyNames("trip_id");
+    ).addPrimaryKey()
+    .addPrimaryKeyNames("trip_id");
 
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
@@ -361,7 +369,8 @@ public class Table {
             new DoubleField("shape_dist_traveled", OPTIONAL, 0, Double.POSITIVE_INFINITY, -1),
             new ShortField("timepoint", OPTIONAL, 1),
             new IntegerField("fare_units_traveled", EXTENSION) // OpenOV NL extension
-    ).withParentTable(TRIPS).addPrimaryKeyNames("trip_id", "stop_sequence");
+    ).withParentTable(TRIPS)
+    .addPrimaryKeyNames("trip_id", "stop_sequence");
 
     // Must come after TRIPS table to which it has a reference
     public static final Table FREQUENCIES = new Table("frequencies", Frequency.class, OPTIONAL,
@@ -372,10 +381,10 @@ public class Table {
             // (e.g., a ferry running exact times at a 4 hour headway), but will catch cases where milliseconds were
             // exported accidentally.
             new IntegerField("headway_secs", REQUIRED, 20, 60*60*6),
-            new IntegerField("exact_times", OPTIONAL, 1))
-            .withParentTable(TRIPS)
-            .keyFieldIsNotUnique()
-            .addPrimaryKeyNames("trip_id", "start_time");
+            new IntegerField("exact_times", OPTIONAL, 1)
+    ).withParentTable(TRIPS)
+    .keyFieldIsNotUnique()
+    .addPrimaryKeyNames("trip_id", "start_time");
 
     // GTFS reference: https://developers.google.com/transit/gtfs/reference#attributionstxt
     public static final Table TRANSLATIONS = new Table("translations", Translation.class, OPTIONAL,
@@ -394,9 +403,9 @@ public class Table {
             new StringField("field_value", OPTIONAL).requireConditions(
                 // If the record_id is empty the field_value is required.
                 new FieldIsEmptyCheck("record_id")
-            ))
-            .keyFieldIsNotUnique()
-            .addPrimaryKeyNames("table_name", "field_name", "language", "record_id", "record_sub_id", "field_value");
+            )
+    ).keyFieldIsNotUnique()
+    .addPrimaryKeyNames("table_name", "field_name", "language", "record_id", "record_sub_id", "field_value");
 
     public static final Table ATTRIBUTIONS = new Table("attributions", Attribution.class, OPTIONAL,
             new StringField("attribution_id", OPTIONAL),
@@ -409,8 +418,8 @@ public class Table {
             new ShortField("is_authority", OPTIONAL, 1),
             new URLField("attribution_url", OPTIONAL),
             new StringField("attribution_email", OPTIONAL),
-            new StringField("attribution_phone", OPTIONAL))
-            .addPrimaryKeyNames("attribution_id");
+            new StringField("attribution_phone", OPTIONAL)
+    ).addPrimaryKeyNames("attribution_id");
 
     /** List of tables in order needed for checking referential integrity during load stage. */
     public static final Table[] tablesInOrder = {
