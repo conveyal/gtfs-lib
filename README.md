@@ -1,4 +1,6 @@
 # gtfs-lib [![Build Status](https://travis-ci.org/conveyal/gtfs-lib.svg?branch=master)](https://travis-ci.org/conveyal/gtfs-lib)
+[![Join the chat at https://matrix.to/#/#gtfs-lib:gitter.im](https://badges.gitter.im/repo.png)](https://matrix.to/#/#gtfs-lib:gitter.im)
+
 
 A library for loading and saving GTFS feeds of arbitrary size with disk-backed storage.
 
@@ -13,6 +15,10 @@ The main design goals are:
 - Tolerate and recover from parsing errors, aiming to load the entire file even when values are missing or corrupted
 
 A gtfs-lib GTFSFeed object should faithfully represent the contents of a single GTFS feed file. At least during the initial load, no heuristics are applied to clean up the data. Basic syntax is verified, and any problems encountered are logged in detail. At this stage, fields or entites may be missing, and the data may be nonsensical. Then in an optional post-load validation phase, semantic checks are performed and problems are optionally repaired.
+
+## Getting in touch
+
+We have a Gitter [space](https://matrix.to/#/#transit-data-tools:gitter.im) for the full TRANSIT-Data-Tools project where you can post questions and comments. This includes a room dedicated to GTFS-lib discussions.
 
 ## Usage
 
