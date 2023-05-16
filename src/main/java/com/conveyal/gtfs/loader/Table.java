@@ -488,8 +488,7 @@ public class Table {
     }
 
     /**
-     * Get field names that are primary keys for a table. This is used by the PreserveCustomFields transformation
-     * in datatools-server for determining keys for CSV matching.
+     * Get field names that are primary keys for a table.
      */
     public List<String> getPrimaryKeyNames () {
         return Arrays.asList(primaryKeyNames);
