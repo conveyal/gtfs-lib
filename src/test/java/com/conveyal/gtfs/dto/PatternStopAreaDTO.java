@@ -3,19 +3,19 @@ package com.conveyal.gtfs.dto;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /**
- * DTO used to model expected {@link com.conveyal.gtfs.model.PatternLocationGroup} JSON structure for the editor. NOTE:
+ * DTO used to model expected {@link com.conveyal.gtfs.model.PatternStopArea} JSON structure for the editor. NOTE:
  * reference types (e.g., Integer and Double) are used here in order to model null/empty values in JSON object.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class PatternLocationGroupDTO {
+public class PatternStopAreaDTO {
     public int id;
 
     // PatternHalt params
     public String pattern_id;
     public int stop_sequence;
 
-    // PatternLocationGroup params
-    public String location_group_id;
+    // PatternStopArea params
+    public String area_id;
     public int pickup_type;
     public int drop_off_type;
     public int timepoint;
@@ -34,25 +34,25 @@ public class PatternLocationGroupDTO {
     public double safe_duration_offset;
 
     /** Empty constructor for deserialization */
-    public PatternLocationGroupDTO() {}
+    public PatternStopAreaDTO() {}
 
-    public PatternLocationGroupDTO(
+    public PatternStopAreaDTO(
         String patternId,
-        String location_group_id,
+        String area_id,
         int stopSequence,
         int flexDefaultTravelTime,
         int flexDefaultZoneTime
     ) {
         this.pattern_id = patternId;
-        this.location_group_id = location_group_id;
+        this.area_id = area_id;
         this.stop_sequence = stopSequence;
         this.flex_default_travel_time = flexDefaultTravelTime;
         this.flex_default_zone_time = flexDefaultZoneTime;
     }
 
-    public PatternLocationGroupDTO(String pattern_id, String location_group_id, int stop_sequence) {
+    public PatternStopAreaDTO(String pattern_id, String area_id, int stop_sequence) {
         this.pattern_id = pattern_id;
-        this.location_group_id = location_group_id;
+        this.area_id = area_id;
         this.stop_sequence = stop_sequence;
     }
 }

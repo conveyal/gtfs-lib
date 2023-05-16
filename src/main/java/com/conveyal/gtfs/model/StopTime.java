@@ -41,7 +41,7 @@ public class StopTime extends Entity implements Cloneable, Serializable {
     public String pickup_booking_rule_id;
     public String drop_off_booking_rule_id;
 
-    // Additional GTFS Flex location groups and locations fields
+    // Additional GTFS Flex fields.
     public int start_pickup_dropoff_window = INT_MISSING;
     public int end_pickup_dropoff_window = INT_MISSING;
     public double mean_duration_factor = DOUBLE_MISSING;

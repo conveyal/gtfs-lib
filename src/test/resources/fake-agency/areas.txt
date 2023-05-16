@@ -1,0 +1,2 @@
+area_id,area_name
+1,"This is the area name"

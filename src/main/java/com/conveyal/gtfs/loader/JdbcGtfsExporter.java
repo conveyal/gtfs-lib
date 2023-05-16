@@ -4,10 +4,10 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Location;
-import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.ScheduleException;
 import com.conveyal.gtfs.model.Service;
+import com.conveyal.gtfs.model.StopArea;
 import com.conveyal.gtfs.util.GeoJsonUtil;
 import com.google.common.collect.Lists;
 import org.apache.commons.dbutils.DbUtils;
@@ -38,7 +38,7 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import static com.conveyal.gtfs.loader.Table.LOCATION_GROUPS_FILE_NAME;
+import static com.conveyal.gtfs.loader.Table.STOP_AREAS_FILE_NAME;
 
 /**
  * Handles exporting a feed contained in the database to a GTFS zip file.
@@ -102,9 +102,8 @@ public class JdbcGtfsExporter {
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             result.agency = export(Table.AGENCY, connection);
-            // TODO: No idea if booking rules and location groups need to have a 'fromEditor' option?
             result.bookingRules = export(Table.BOOKING_RULES, connection);
-            result.locationGroups = exportLocationGroups();
+            result.stopAreas = exportStopAreas();
             if (fromEditor) {
                 // only export calendar entries that have at least one day of service set
                 // this could happen in cases where a feed was imported that only had calendar_dates.txt
@@ -470,26 +469,26 @@ public class JdbcGtfsExporter {
     }
 
     /**
-     * Export location groups.
+     * Export stop areas.
      */
-    private TableLoadResult exportLocationGroups() {
+    private TableLoadResult exportStopAreas() {
         long startTime = System.currentTimeMillis();
         TableLoadResult tableLoadResult = new TableLoadResult();
         try {
-            final TableReader<LocationGroup> locationGroupIterator
-                = new JDBCTableReader(Table.LOCATION_GROUPS, dataSource, feedIdToExport + ".", EntityPopulator.LOCATION_GROUP);
-            List<LocationGroup> locationGroups = Lists.newArrayList(locationGroupIterator);
-            if (!locationGroups.isEmpty()) {
+            final TableReader<StopArea> stopAreaIterator
+                = new JDBCTableReader(Table.STOP_AREAS, dataSource, feedIdToExport + ".", EntityPopulator.STOP_AREAS);
+            List<StopArea> stopAreas = Lists.newArrayList(stopAreaIterator);
+            if (!stopAreas.isEmpty()) {
                 // Only export if data is available.
-                tableLoadResult.rowCount = locationGroups.size();
-                writeLocationGroupsToFile(zipOutputStream, locationGroups);
-                LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, LOCATION_GROUPS_FILE_NAME, System.currentTimeMillis() - startTime);
+                tableLoadResult.rowCount = stopAreas.size();
+                writeStopAreasToFile(zipOutputStream, stopAreas);
+                LOG.info("Copied {} {} in {} ms.", tableLoadResult.rowCount, STOP_AREAS_FILE_NAME, System.currentTimeMillis() - startTime);
             } else {
-                LOG.warn("No location groups exported as the table is empty!");
+                LOG.warn("No stop areas exported as the table is empty!");
             }
         } catch (IOException e) {
             tableLoadResult.fatalException = e.toString();
-            LOG.error("Exception while exporting {}", LOCATION_GROUPS_FILE_NAME, e);
+            LOG.error("Exception while exporting {}", STOP_AREAS_FILE_NAME, e);
         }
         return tableLoadResult;
     }
@@ -514,17 +513,17 @@ public class JdbcGtfsExporter {
     }
 
     /**
-     * Expand the location group data and write to zip file.
+     * Expand the stop areas data and write to zip file.
      */
-    public static void writeLocationGroupsToFile(
+    public static void writeStopAreasToFile(
         ZipOutputStream zipOutputStream,
-        List<LocationGroup> locationGroups
+        List<StopArea> stopAreas
     ) throws IOException {
         // Create entry for table.
-        zipOutputStream.putNextEntry(new ZipEntry(LOCATION_GROUPS_FILE_NAME));
+        zipOutputStream.putNextEntry(new ZipEntry(STOP_AREAS_FILE_NAME));
         // Create and use PrintWriter, but don't close. This is done when the zip entry is closed.
         PrintWriter p = new PrintWriter(zipOutputStream);
-        p.print(LocationGroup.packLocationGroups(locationGroups));
+        p.print(StopArea.packStopAreas(stopAreas));
         p.flush();
         zipOutputStream.closeEntry();
     }

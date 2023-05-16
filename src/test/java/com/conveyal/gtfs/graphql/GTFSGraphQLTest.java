@@ -148,6 +148,14 @@ public class GTFSGraphQLTest {
         });
     }
 
+    /** Tests that the areas of a feed can be fetched. */
+    @Test
+    public void canFetchAreas() {
+        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
+            MatcherAssert.assertThat(queryGraphQL("feedAreas.txt"), matchesSnapshot());
+        });
+    }
+
     /** Tests that the booking rules of a feed can be fetched. */
     @Test
     public void canFetchBookingRules() throws IOException {
@@ -172,11 +180,11 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests that the location groups of a feed can be fetched. */
+    /** Tests that the stop areas of a feed can be fetched. */
     @Test
-    public void canFetchLocationGroups() {
+    public void canFetchStopAreas() {
         assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-            MatcherAssert.assertThat(queryGraphQL("feedLocationGroups.txt"), matchesSnapshot());
+            MatcherAssert.assertThat(queryGraphQL("feedStopAreas.txt"), matchesSnapshot());
         });
     }
 
