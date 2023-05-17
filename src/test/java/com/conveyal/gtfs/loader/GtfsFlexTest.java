@@ -98,8 +98,14 @@ public class GtfsFlexTest {
     }
 
     @Test
-    void hasLoadedExpectedNumberOfLocationGroups() {
-        String query = buildQuery(doloresCountyTestNamespace, "location_groups","location_group_id","1");
+    void hasLoadedExpectedNumberOfAreas() {
+        String query = buildQuery(doloresCountyTestNamespace, "areas","area_id","1");
+        assertThatSqlCountQueryYieldsExpectedCount(doloresCountyTestDataSource, query, 1);
+    }
+
+    @Test
+    void hasLoadedExpectedNumberOfStopAreas() {
+        String query = buildQuery(doloresCountyTestNamespace, "stop_areas","area_id","1");
         assertThatSqlCountQueryYieldsExpectedCount(doloresCountyTestDataSource, query, 1);
     }
 
@@ -186,11 +192,17 @@ public class GtfsFlexTest {
                     }
                 ),
                 new TestUtils.FileTestCase(
-                    "location_groups.txt",
+                    "areas.txt",
                     new DataExpectation[]{
-                        new DataExpectation("location_group_id", "1"),
-                        new DataExpectation("location_id", "123"),
-                        new DataExpectation("location_group_name", "This is the location group name")
+                        new DataExpectation("area_id", "1"),
+                        new DataExpectation("area_name", "This is the area name"),
+                    }
+                ),
+                new TestUtils.FileTestCase(
+                    "stop_areas.txt",
+                    new DataExpectation[]{
+                        new DataExpectation("area_id", "1"),
+                        new DataExpectation("stop_id", "123"),
                     }
                 ),
                 new TestUtils.FileTestCase(

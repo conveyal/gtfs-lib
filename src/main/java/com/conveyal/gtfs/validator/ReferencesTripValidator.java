@@ -3,9 +3,9 @@ package com.conveyal.gtfs.validator;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
 import com.conveyal.gtfs.model.Location;
-import com.conveyal.gtfs.model.LocationGroup;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.StopArea;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.google.common.collect.Lists;
@@ -44,7 +44,7 @@ public class ReferencesTripValidator extends TripValidator {
         List<StopTime> stopTimes,
         List<Stop> stops,
         List<Location> locations,
-        List<LocationGroup> locationGroups
+        List<StopArea> stopAreas
     ) {
         if (trip != null) referencedTrips.add(trip.trip_id);
         if (route != null) referencedRoutes.add(route.route_id);
@@ -63,9 +63,9 @@ public class ReferencesTripValidator extends TripValidator {
                 referencedLocations.add(location.location_id);
             }
         });
-        locationGroups.forEach(locationGroup -> {
-            if (locationGroup != null) {
-                referencedLocations.add(locationGroup.location_group_id);
+        stopAreas.forEach(stopArea -> {
+            if (stopArea != null) {
+                referencedLocations.add(stopArea.area_id);
             }
         });
     }
@@ -98,16 +98,16 @@ public class ReferencesTripValidator extends TripValidator {
             }
         });
 
-        // A location group is used as a stop id within stop times. If the stop id is a location group id check for a
-        // match against the referenced location groups.
-        List<LocationGroup> locationGroups = Lists.newArrayList(feed.locationGroups);
+        // A stop area is used as a stop id within stop times. If the stop id is a stop area check for a
+        // match against the referenced stop areas.
+        List<StopArea> stopAreas = Lists.newArrayList(feed.stopAreas);
         feed.stopTimes.forEach(stopTime -> {
-            if (FlexValidator.stopIdIsLocationGroup(stopTime.stop_id, locationGroups) &&
+            if (FlexValidator.stopIdIsStopArea(stopTime.stop_id, stopAreas) &&
                 !referencedLocationGroups.contains(stopTime.stop_id)
             ) {
                 registerError(
-                    getLocationGroupById(locationGroups, stopTime.stop_id),
-                    LOCATION_GROUP_UNUSED,
+                    getStopAreaById(stopAreas, stopTime.stop_id),
+                    STOP_AREA_UNUSED,
                     stopTime.stop_id
                 );
             }
@@ -125,11 +125,11 @@ public class ReferencesTripValidator extends TripValidator {
     }
 
     /**
-     * Get location group by location group id or return null if there is no match.
+     * Get stop area by area id or return null if there is no match.
      */
-    private LocationGroup getLocationGroupById(List<LocationGroup> locationGroups, String locationGroupId) {
-        return locationGroups.stream()
-            .filter(locationGroup -> locationGroupId.equals(locationGroup.location_group_id))
+    private StopArea getStopAreaById(List<StopArea> stopAreas, String areaId) {
+        return stopAreas.stream()
+            .filter(stopArea -> areaId.equals(stopArea.area_id))
             .findAny()
             .orElse(null);
     }

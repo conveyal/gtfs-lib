@@ -1,0 +1,5 @@
+area_id,area_name
+1,"Area referencing a stop"
+2,"Area referencing an invalid location"
+3,"Area referencing a location"
+4,"Multi areas"

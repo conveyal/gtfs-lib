@@ -28,6 +28,18 @@ query ($namespace: String) {
         id
         location_id
       }
+      pattern_stop_areas {
+        id
+        area_id
+        stop_areas {
+            id
+            area_id
+            area {
+                id
+                area_name
+            }
+        }
+      }
       route {
         route_id
       }

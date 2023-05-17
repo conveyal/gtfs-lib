@@ -62,12 +62,13 @@ public class GTFSFeed implements Cloneable, Closeable {
     public final Map<String, Agency> agency;
     public final Map<String, BookingRule> bookingRules;
     public final Map<String, Location> locations;
-    public final Map<String, LocationGroup> locationGroups;
     public final Map<String, LocationShape> locationShapes;
     public final Map<String, FeedInfo> feedInfo;
     // This is how you do a multimap in mapdb: https://github.com/jankotek/MapDB/blob/release-1.0/src/test/java/examples/MultiMap.java
     public final NavigableSet<Tuple2<String, Frequency>> frequencies;
     public final Map<String, Route> routes;
+    public final Map<String, StopArea> stopAreas;
+    public final Map<String, Area> areas;
     public final Map<String, Stop> stops;
     public final Map<String, Transfer> transfers;
     public final BTreeMap<String, Trip> trips;
@@ -178,14 +179,15 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         // Flex tables. These must be loaded before stop times. If any of these tables contain data it is assumed that
         // we are working with a flex feed.
+        new Area.Loader(this).loadTable(zip);
         new BookingRule.Loader(this).loadTable(zip);
-        new LocationGroup.Loader(this).loadTable(zip);
         new Location.Loader(this).loadTable(zip);
         new LocationShape.Loader(this).loadTable(zip);
 
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
+        new StopArea.Loader(this).loadTable(zip);
         new Transfer.Loader(this).loadTable(zip);
         new Trip.Loader(this).loadTable(zip);
         new Frequency.Loader(this).loadTable(zip);
@@ -219,6 +221,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             // don't write empty feed_info.txt
             if (!this.feedInfo.isEmpty()) new FeedInfo.Writer(this).writeTable(zip);
 
+            new Area.Writer(this).writeTable(zip);
             new Agency.Writer(this).writeTable(zip);
             new Calendar.Writer(this).writeTable(zip);
             new CalendarDate.Writer(this).writeTable(zip);
@@ -233,9 +236,9 @@ public class GTFSFeed implements Cloneable, Closeable {
             new StopTime.Writer(this).writeTable(zip);
 
             if (!this.bookingRules.isEmpty()) new BookingRule.Writer(this).writeTable(zip);
-            if (!this.locationGroups.isEmpty()) {
-                // export location groups
-                JdbcGtfsExporter.writeLocationGroupsToFile(zip, new ArrayList<>(locationGroups.values()));
+            if (!this.stopAreas.isEmpty()) {
+                // export stop areas
+                JdbcGtfsExporter.writeStopAreasToFile(zip, new ArrayList<>(stopAreas.values()));
             }
             if (!this.locations.isEmpty()) {
                 // export locations
@@ -386,7 +389,13 @@ public class GTFSFeed implements Cloneable, Closeable {
             Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
             patternFinder.processTrip(trip, orderedStopTimesForTrip);
         }
-        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null, null, null);
+        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(
+            this.stops,
+            null,
+            null,
+            null,
+            null
+        );
         this.patterns.putAll(patternObjects.values().stream()
                 .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
@@ -669,9 +678,10 @@ public class GTFSFeed implements Cloneable, Closeable {
         calendars = db.getTreeMap("calendars");
 
         // Flex tables.
+        areas = db.getTreeMap("areas");
         bookingRules = db.getTreeMap("booking_rules");
         locations = db.getTreeMap("locations");
-        locationGroups = db.getTreeMap("location_groups");
+        stopAreas = db.getTreeMap("stop_areas");
         locationShapes = db.getTreeMap("location_shapes");
 
         feedId = db.getAtomicString("feed_id").get();
@@ -689,14 +699,14 @@ public class GTFSFeed implements Cloneable, Closeable {
     }
 
     /**
-     * If booking rules, location groups or location shapes have been created and contain data, the assumption is that
+     * If booking rules, stop areas or location shapes have been created and contain data, the assumption is that
      * this is a GTFS Flex feed. These tables must be loaded before this can be referenced. At the moment
      * {@link StopTime} references this and is loaded after the check is made on these tables.
      */
     public boolean isGTFSFlexFeed() {
         return
             !bookingRules.isEmpty() ||
-            !locationGroups.isEmpty() ||
+            !stopAreas.isEmpty() ||
             !locationShapes.isEmpty();
     }
 }
