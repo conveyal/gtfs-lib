@@ -1576,7 +1576,7 @@ public class JdbcTableWriter implements TableWriter {
                                     connection.rollback();
                                     if (entityClass.getSimpleName().equals("Stop")) {
                                         String patternStopLookup = String.format(
-                                            "select distinct ps.pattern_id, r.id " +
+                                            "select distinct p.id, r.id " +
                                             "from %s.pattern_stops ps " +
                                             "inner join " +
                                             "%s.patterns p " +
