@@ -1,4 +1,4 @@
-trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,continuous_pickup,continuous_drop_off,shape_dist_traveled,timepoint,pickup_booking_rule_id,drop_off_booking_rule_id,start_pickup_dropoff_window,end_pickup_dropoff_window,mean_duration_factor,mean_duration_offset,safe_duration_factor,safe_duration_offset
+trip_id,arrival_time,departure_time,stop_id,stop_sequence,stop_headsign,pickup_type,drop_off_type,continuous_pickup,continuous_drop_off,shape_dist_traveled,timepoint,pickup_booking_rule_id,drop_off_booking_rule_id,start_pickup_drop_off_window,end_pickup_drop_off_window,mean_duration_factor,mean_duration_offset,safe_duration_factor,safe_duration_offset
 a30277f8-e50a-4a85-9141-b1e0da9d429d,07:00:00,07:00:00,4u6g,1,Test stop headsign,0,0,1,1,0.0000000,1,"1","1",07:00:00,07:00:00,1,60,1,60
 a30277f8-e50a-4a85-9141-b1e0da9d429d,07:01:00,07:01:00,johv,2,Test stop headsign 2,0,0,1,1,341.4491961,1,"1","1",07:01:00,07:01:00,1,60,1,60
 frequency-trip,08:00:00,08:00:00,4u6g,1,Test stop headsign frequency trip,0,0,1,1,0.0000000,1,"1","1",07:02:00,07:02:00,1,60,1,60

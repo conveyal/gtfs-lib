@@ -19,9 +19,9 @@ public class StopTimeDTO {
     public String pickup_booking_rule_id;
     public String drop_off_booking_rule_id;
 
-    // Additional GTFS Flex fields.
-    public Integer start_pickup_dropoff_window;
-    public Integer end_pickup_dropoff_window;
+    // Additional GTFS Flex location groups and locations fields
+    public Integer start_pickup_drop_off_window;
+    public Integer end_pickup_drop_off_window;
     public double mean_duration_factor;
     public double mean_duration_offset;
     public double safe_duration_factor;

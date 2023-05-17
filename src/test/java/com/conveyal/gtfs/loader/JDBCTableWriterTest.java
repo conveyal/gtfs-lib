@@ -692,8 +692,8 @@ public class JDBCTableWriterTest {
         createdStopTime.stop_id = updatedStopTimeId;
         createdStopTime.pickup_booking_rule_id = "2";
         createdStopTime.drop_off_booking_rule_id = "3";
-        createdStopTime.start_pickup_dropoff_window = 60;
-        createdStopTime.end_pickup_dropoff_window = 60;
+        createdStopTime.start_pickup_drop_off_window = 60;
+        createdStopTime.end_pickup_drop_off_window = 60;
         createdStopTime.mean_duration_factor = 1;
         createdStopTime.mean_duration_offset = 60;
         createdStopTime.safe_duration_factor = 1;
@@ -718,8 +718,8 @@ public class JDBCTableWriterTest {
         while (resultSet.next()) {
             assertResultValue(resultSet, "pickup_booking_rule_id", equalTo(createdStopTime.pickup_booking_rule_id));
             assertResultValue(resultSet, "drop_off_booking_rule_id", equalTo(createdStopTime.drop_off_booking_rule_id));
-            assertResultValue(resultSet, "start_pickup_dropoff_window", equalTo(createdStopTime.start_pickup_dropoff_window));
-            assertResultValue(resultSet, "end_pickup_dropoff_window", equalTo(createdStopTime.end_pickup_dropoff_window));
+            assertResultValue(resultSet, "start_pickup_drop_off_window", equalTo(createdStopTime.start_pickup_drop_off_window));
+            assertResultValue(resultSet, "end_pickup_drop_off_window", equalTo(createdStopTime.end_pickup_drop_off_window));
             assertResultValue(resultSet, "mean_duration_factor", equalTo(createdStopTime.mean_duration_factor));
             assertResultValue(resultSet, "mean_duration_offset", equalTo(createdStopTime.mean_duration_offset));
             assertResultValue(resultSet, "safe_duration_factor", equalTo(createdStopTime.safe_duration_factor));
@@ -1523,8 +1523,8 @@ public class JDBCTableWriterTest {
                     assertResultValue(stopTimesResultSet, "arrival_time", equalTo(start));
                     assertResultValue(stopTimesResultSet, "departure_time", equalTo(end));
                 } else {
-                    assertResultValue(stopTimesResultSet, "start_pickup_dropoff_window", equalTo(start));
-                    assertResultValue(stopTimesResultSet, "end_pickup_dropoff_window", equalTo(end));
+                    assertResultValue(stopTimesResultSet, "start_pickup_drop_off_window", equalTo(start));
+                    assertResultValue(stopTimesResultSet, "end_pickup_drop_off_window", equalTo(end));
                 }
             }
         }
@@ -1942,8 +1942,8 @@ public class JDBCTableWriterTest {
         stopTime.stop_sequence = 1;
         stopTime.pickup_booking_rule_id = "1";
         stopTime.drop_off_booking_rule_id = "2";
-        stopTime.start_pickup_dropoff_window = 0;
-        stopTime.end_pickup_dropoff_window = 0;
+        stopTime.start_pickup_drop_off_window = 0;
+        stopTime.end_pickup_drop_off_window = 0;
         stopTime.mean_duration_factor = 0;
         stopTime.mean_duration_offset = 0;
         stopTime.safe_duration_factor = 0;

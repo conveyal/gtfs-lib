@@ -344,8 +344,8 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("pickup_booking_rule_id"))
             .field(MapFetcher.field("drop_off_booking_rule_id"))
             // Additional GTFS Flex fields.
-            .field(MapFetcher.field("start_pickup_dropoff_window", GraphQLInt))
-            .field(MapFetcher.field("end_pickup_dropoff_window", GraphQLInt))
+            .field(MapFetcher.field("start_pickup_drop_off_window", GraphQLInt))
+            .field(MapFetcher.field("end_pickup_drop_off_window", GraphQLInt))
             .field(MapFetcher.field("mean_duration_factor", GraphQLFloat))
             .field(MapFetcher.field("mean_duration_offset", GraphQLFloat))
             .field(MapFetcher.field("safe_duration_factor", GraphQLFloat))
@@ -525,7 +525,7 @@ public class GraphQLGtfsSchema {
      * Represents each stop in a list of stops within a pattern.
      * We could return just a list of StopIDs within the pattern (a JSON array of strings) but
      * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     * like lat and lon, or pickup and drop off types if we add those to the pattern signature.
      */
     public static final GraphQLObjectType patternStopType = newObject().name("patternStop")
             .field(MapFetcher.field("id", GraphQLInt))
@@ -559,7 +559,7 @@ public class GraphQLGtfsSchema {
      * Represents each stop in a list of locations within a pattern.
      * We could return just a list of LocationIDs within the pattern (a JSON array of strings) but
      * that structure would prevent us from joining tables and returning additional stop details
-     * like lat and lon, or pickup and dropoff types if we add those to the pattern signature.
+     * like lat and lon, or pickup and drop off types if we add those to the pattern signature.
      */
     public static final GraphQLObjectType patternLocationType = newObject().name("patternLocation")
             .field(MapFetcher.field("id", GraphQLInt))

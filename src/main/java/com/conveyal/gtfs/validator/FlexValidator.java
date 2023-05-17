@@ -1,4 +1,4 @@
-    package com.conveyal.gtfs.validator;
+package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
@@ -157,8 +157,8 @@ public class FlexValidator extends FeedValidator {
         List<NewGTFSError> errors = new ArrayList<>();
 
         if (stopTime.arrival_time != INT_MISSING &&
-            (stopTime.start_pickup_dropoff_window != INT_MISSING ||
-                stopTime.end_pickup_dropoff_window != INT_MISSING)
+            (stopTime.start_pickup_drop_off_window != INT_MISSING ||
+                stopTime.end_pickup_drop_off_window != INT_MISSING)
         ) {
             // Arrival time must not be defined if start/end pickup drop off window is defined.
             errors.add(NewGTFSError.forEntity(
@@ -167,8 +167,8 @@ public class FlexValidator extends FeedValidator {
             );
         }
         if (stopTime.departure_time != INT_MISSING &&
-            (stopTime.start_pickup_dropoff_window != INT_MISSING ||
-                stopTime.end_pickup_dropoff_window != INT_MISSING)
+            (stopTime.start_pickup_drop_off_window != INT_MISSING ||
+                stopTime.end_pickup_drop_off_window != INT_MISSING)
         ) {
             // Departure time must not be defined if start/end pickup drop off window is defined.
             errors.add(NewGTFSError.forEntity(
@@ -176,26 +176,26 @@ public class FlexValidator extends FeedValidator {
                 NewGTFSErrorType.FLEX_FORBIDDEN_DEPARTURE_TIME).setBadValue(Integer.toString(stopTime.departure_time))
             );
         }
-        if (stopTime.start_pickup_dropoff_window != INT_MISSING &&
+        if (stopTime.start_pickup_drop_off_window != INT_MISSING &&
             (stopTime.arrival_time != INT_MISSING ||
                 stopTime.departure_time != INT_MISSING)
         ) {
-            // start_pickup_dropoff_window is forbidden if arrival time or departure time are defined.
+            // start_pickup_drop_off_window is forbidden if arrival time or departure time are defined.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
-                    NewGTFSErrorType.FLEX_FORBIDDEN_START_PICKUP_DROPOFF_WINDOW)
-                .setBadValue(Integer.toString(stopTime.start_pickup_dropoff_window))
+                    NewGTFSErrorType.FLEX_FORBIDDEN_START_PICKUP_DROP_OFF_WINDOW)
+                .setBadValue(Integer.toString(stopTime.start_pickup_drop_off_window))
             );
         }
-        if (stopTime.end_pickup_dropoff_window != INT_MISSING &&
+        if (stopTime.end_pickup_drop_off_window != INT_MISSING &&
             (stopTime.arrival_time != INT_MISSING ||
                 stopTime.departure_time != INT_MISSING)
         ) {
-            // end_pickup_dropoff_window is forbidden if arrival time or departure time are defined.
+            // end_pickup_drop_off_window is forbidden if arrival time or departure time are defined.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
-                    NewGTFSErrorType.FLEX_FORBIDDEN_END_PICKUP_DROPOFF_WINDOW)
-                .setBadValue(Integer.toString(stopTime.end_pickup_dropoff_window))
+                    NewGTFSErrorType.FLEX_FORBIDDEN_END_PICKUP_DROP_OFF_WINDOW)
+                .setBadValue(Integer.toString(stopTime.end_pickup_drop_off_window))
             );
         }
 
@@ -205,20 +205,20 @@ public class FlexValidator extends FeedValidator {
             locations
         );
 
-        if (stopTime.start_pickup_dropoff_window == INT_MISSING && stopIdRefersToStopAreaOrLocation) {
-            // start_pickup_dropoff_window is required if stop_id refers to a stop area or location.
+        if (stopTime.start_pickup_drop_off_window == INT_MISSING && stopIdRefersToStopAreaOrLocation) {
+            // start_pickup_drop_off_window is required if stop_id refers to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
-                    NewGTFSErrorType.FLEX_REQUIRED_START_PICKUP_DROPOFF_WINDOW)
-                .setBadValue(Integer.toString(stopTime.start_pickup_dropoff_window))
+                    NewGTFSErrorType.FLEX_REQUIRED_START_PICKUP_DROP_OFF_WINDOW)
+                .setBadValue(Integer.toString(stopTime.start_pickup_drop_off_window))
             );
         }
-        if (stopTime.end_pickup_dropoff_window == INT_MISSING && stopIdRefersToStopAreaOrLocation) {
-            // end_pickup_dropoff_window is required if stop_id refers to a stop area or location.
+        if (stopTime.end_pickup_drop_off_window == INT_MISSING && stopIdRefersToStopAreaOrLocation) {
+            // end_pickup_drop_off_window is required if stop_id refers to a stop area or location.
             errors.add(NewGTFSError.forEntity(
                     stopTime,
-                    NewGTFSErrorType.FLEX_REQUIRED_END_PICKUP_DROPOFF_WINDOW)
-                .setBadValue(Integer.toString(stopTime.end_pickup_dropoff_window))
+                    NewGTFSErrorType.FLEX_REQUIRED_END_PICKUP_DROP_OFF_WINDOW)
+                .setBadValue(Integer.toString(stopTime.end_pickup_drop_off_window))
             );
         }
         if (stopTime.pickup_type == 0 && stopIdRefersToStopAreaOrLocation) {

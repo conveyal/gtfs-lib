@@ -210,8 +210,8 @@ public class GtfsFlexTest {
                     new DataExpectation[]{
                         new DataExpectation("pickup_booking_rule_id", "booking_route_16604"),
                         new DataExpectation("drop_off_booking_rule_id", "booking_route_16604"),
-                        new DataExpectation("start_pickup_dropoff_window", "08:00:00"),
-                        new DataExpectation("end_pickup_dropoff_window", "17:00:00"),
+                        new DataExpectation("start_pickup_drop_off_window", "08:00:00"),
+                        new DataExpectation("end_pickup_drop_off_window", "17:00:00"),
                         new DataExpectation("mean_duration_factor", "1.0000000"),
                         new DataExpectation("mean_duration_offset", "15.0000000"),
                         new DataExpectation("safe_duration_factor", "1.0000000"),

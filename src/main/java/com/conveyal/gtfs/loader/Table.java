@@ -405,8 +405,8 @@ public class Table {
 
             // Additional GTFS Flex stop areas and locations fields
             // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_timestxt-file-extended
-            new TimeField("start_pickup_dropoff_window", OPTIONAL),
-            new TimeField("end_pickup_dropoff_window", OPTIONAL),
+            new TimeField("start_pickup_drop_off_window", OPTIONAL),
+            new TimeField("end_pickup_drop_off_window", OPTIONAL),
             new DoubleField("mean_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new DoubleField("mean_duration_offset", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
             new DoubleField("safe_duration_factor", OPTIONAL, 0, Double.POSITIVE_INFINITY, 2),
