@@ -1,2 +1,2 @@
 area_id,stop_id
-1,123
+area1,123

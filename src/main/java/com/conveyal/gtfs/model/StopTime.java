@@ -212,8 +212,8 @@ public class StopTime extends Entity implements Cloneable, Serializable {
 
     /**
      * Check that the flex column 'start_pickup_drop_off_window' existing in the stop time table. If this column exists
-     * it is assumed that the other flex columns do too. This is to guard against cases where booking rules, location
-     * groups or locations are defined in a feed but flex specific stop time columns are not.
+     * it is assumed that the other flex columns do too. This is to guard against cases where booking rules, stop
+     * areas or locations are defined in a feed but flex specific stop time columns are not.
      */
     private static boolean flexColumnExist(Connection connection, String tablePrefix) throws SQLException {
         boolean exists = false;
