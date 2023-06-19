@@ -220,6 +220,19 @@ public class JdbcGtfsSnapshotter {
                     scheduleExceptionsStatement
                 );
 
+                // Fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
+                // table.
+                JDBCTableReader<Calendar> calendarReader = new JDBCTableReader(
+                    Table.CALENDAR,
+                    dataSource,
+                    feedIdToSnapshot + ".",
+                    EntityPopulator.CALENDAR
+                );
+                Set<String> calendarServiceIds = new HashSet<>();
+                for (Calendar calendar : calendarReader.getAll()) {
+                    calendarServiceIds.add(calendar.service_id);
+                }
+
                 JDBCTableReader<CalendarDate> calendarDatesReader = new JDBCTableReader(
                     Table.CALENDAR_DATES,
                     dataSource,
@@ -238,6 +251,10 @@ public class JdbcGtfsSnapshotter {
                     // Skip any null dates
                     if (calendarDate.date == null) {
                         LOG.warn("Encountered calendar date record with null value for date field. Skipping.");
+                        continue;
+                    }
+                    if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
+                        LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
                         continue;
                     }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
@@ -277,19 +294,6 @@ public class JdbcGtfsSnapshotter {
                     scheduleExceptionsTracker.addBatch();
                 }
                 scheduleExceptionsTracker.executeRemaining();
-
-                // fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
-                // table.
-                JDBCTableReader<Calendar> calendarReader = new JDBCTableReader(
-                    Table.CALENDAR,
-                    dataSource,
-                    feedIdToSnapshot + ".",
-                    EntityPopulator.CALENDAR
-                );
-                Set<String> calendarServiceIds = new HashSet<>();
-                for (Calendar calendar : calendarReader.getAll()) {
-                    calendarServiceIds.add(calendar.service_id);
-                }
 
                 // For service_ids that only existed in the calendar_dates table, insert auto-generated, "blank"
                 // (no days of week specified) calendar entries.

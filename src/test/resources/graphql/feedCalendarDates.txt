@@ -1,0 +1,10 @@
+query ($namespace: String) {
+  feed(namespace: $namespace) {
+    feed_version
+    calendar_dates {
+      service_id
+      date
+      exception_type
+    }
+  }
+}

@@ -90,6 +90,14 @@ public class GraphQLGtfsSchema {
             .field(MapFetcher.field("description"))
             .build();
 
+    // Represents rows from calendar_dates.txt
+    public static final GraphQLObjectType calendarDatesType = newObject()
+            .name("calendar_dates")
+            .field(MapFetcher.field("id", GraphQLInt))
+            .field(MapFetcher.field("service_id"))
+            .field(MapFetcher.field("date"))
+            .field(MapFetcher.field("exception_type", GraphQLInt))
+            .build();
     private static final GraphQLScalarType stringList = new GraphQLScalarType("StringList", "List of Strings", new StringCoercing());
 
     // Represents GTFS Editor service exceptions.
@@ -713,6 +721,17 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("calendar"))
+                    .build()
+            )
+            .field(newFieldDefinition()
+                    .name("calendar_dates")
+                    .type(new GraphQLList(GraphQLGtfsSchema.calendarDatesType))
+                    .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
+                    .argument(multiStringArg("service_id"))
+                    .argument(intArg(ID_ARG))
+                    .argument(intArg(LIMIT_ARG))
+                    .argument(intArg(OFFSET_ARG))
+                    .dataFetcher(new JDBCFetcher("calendar_dates"))
                     .build()
             )
             .field(newFieldDefinition()

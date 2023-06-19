@@ -70,20 +70,27 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
 
         @Override
         public void loadOneRow() throws IOException {
-            /* Calendars and Fares are special: they are stored as joined tables rather than simple maps. */
-            String service_id = getStringField("service_id", true);
-            Service service = services.computeIfAbsent(service_id, Service::new);
+            /* Calendars and calendar dates that are matched on service id are special: they are stored as joined tables
+             rather than simple maps. */
+            String serviceId = getStringField("service_id", true);
             LocalDate date = getDateField("date", true);
-            if (service.calendar_dates.containsKey(date)) {
-                feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
+            CalendarDate cd = new CalendarDate();
+            cd.id = row + 1; // offset line number by 1 to account for 0-based row index
+            cd.service_id = serviceId;
+            cd.date = date;
+            cd.exception_type = getIntField("exception_type", true, 1, 2);
+            cd.feed = feed;
+            if (services.containsKey(serviceId)) {
+                // Calendar date is related to calendar.
+                Service service = services.computeIfAbsent(serviceId, Service::new);
+                if (service.calendar_dates.containsKey(date)) {
+                    feed.errors.add(new DuplicateKeyError(tableName, row, "(service_id, date)"));
+                } else {
+                    service.calendar_dates.put(date, cd);
+                }
             } else {
-                CalendarDate cd = new CalendarDate();
-                cd.id = row + 1; // offset line number by 1 to account for 0-based row index
-                cd.service_id = service_id;
-                cd.date = date;
-                cd.exception_type = getIntField("exception_type", true, 1, 2);
-                cd.feed = feed;
-                service.calendar_dates.put(date, cd);
+                // Calendar date is a stand-alone date that is not related to a calendar.
+                if (cd.service_id != null) feed.calendarDates.put(cd.service_id, cd);
             }
         }
     }
@@ -108,13 +115,15 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
 
         @Override
         protected Iterator<CalendarDate> iterator() {
+            // Combine all calendar dates references. This is only used to write to table/file.
             Iterator<Service> serviceIterator = feed.services.values().iterator();
-            return Iterators.concat(Iterators.transform(serviceIterator, new Function<Service, Iterator<CalendarDate>> () {
-                @Override
-                public Iterator<CalendarDate> apply(Service service) {
-                    return service.calendar_dates.values().iterator();
-                }
-            }));
+            Iterator<CalendarDate> calendarDatesFromServices = Iterators.concat(
+                Iterators.transform(serviceIterator, service -> service.calendar_dates.values().iterator())
+            );
+            Iterator<CalendarDate> calendarDatesIterator = feed.calendarDates.values().iterator();
+            return Iterators.concat(
+                calendarDatesIterator, calendarDatesFromServices
+            );
         }
     }
 }

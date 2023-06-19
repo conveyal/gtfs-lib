@@ -11,7 +11,6 @@ import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -109,6 +108,7 @@ public class JdbcGtfsExporter {
             } else {
                 result.calendar = export(Table.CALENDAR, connection);
             }
+            boolean exportCalendarDatesDirectFromTable = true;
             if (fromEditor) {
                 // Export schedule exceptions in place of calendar dates if exporting a feed/schema that represents an editor snapshot.
                 GTFSFeed feed = new GTFSFeed();
@@ -165,22 +165,27 @@ public class JdbcGtfsExporter {
                         feed.services.put(cal.service_id, service);
                     }
                     if (calendarDateCount == 0) {
-                        LOG.info("No calendar dates found. Skipping table.");
+                        LOG.info("No calendar dates found within scheduled exceptions.");
                     } else {
+                        // In this scenario all values in the calendar dates table need to be combined with calendar
+                        // dates derived from scheduled exceptions and then written to file.
+                        exportCalendarDatesDirectFromTable = false;
+                        JDBCTableReader<CalendarDate> calendarDatesReader = new JDBCTableReader(
+                            Table.CALENDAR_DATES,
+                            dataSource,
+                            feedIdToExport + ".",
+                            EntityPopulator.CALENDAR_DATE
+                        );
+                        Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
+                        for (CalendarDate calendarDate : calendarDates) {
+                            feed.calendarDates.put(calendarDate.service_id, calendarDate);
+                        }
                         LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
                         new CalendarDate.Writer(feed).writeTable(zipOutputStream);
                     }
-                } else {
-                    // No calendar records exist, export calendar_dates as is and hope for the best.
-                    // This situation will occur in at least 2 scenarios:
-                    // 1.  A GTFS has been loaded into the editor that had only the calendar_dates.txt file
-                    //     and no further edits were made before exporting to a snapshot
-                    // 2.  A new GTFS has been created from scratch and calendar information has yet to be added.
-                    //     This will result in an invalid GTFS, but it was what the user wanted so ¯\_(ツ)_/¯
-                    result.calendarDates = export(Table.CALENDAR_DATES, connection);
                 }
-            } else {
-                // Otherwise, simply export the calendar dates as they were loaded in.
+            }
+            if (exportCalendarDatesDirectFromTable) {
                 result.calendarDates = export(Table.CALENDAR_DATES, connection);
             }
             result.fareAttributes = export(Table.FARE_ATTRIBUTES, connection);

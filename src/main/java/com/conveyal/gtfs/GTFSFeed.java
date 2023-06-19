@@ -84,6 +84,10 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
     public final BTreeMap<String, Service> services;
 
+    /* A calendar date specifies a single date that a service runs. These dates are wholly separate to calendar dates
+    * that are related to a calendar and defined in 'services'. */
+    public final Map<String, CalendarDate> calendarDates;
+
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     public final NavigableSet<GTFSError> errors;
 
@@ -153,21 +157,18 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         new Agency.Loader(this).loadTable(zip);
 
-        // calendars and calendar dates are joined into services. This means a lot of manipulating service objects as
-        // they are loaded; since mapdb keys/values are immutable, load them in memory then copy them to MapDB once
-        // we're done loading them
+        // calendars and calendar dates are joined into services, where there is a match on service id. This means a lot
+        // of manipulating service objects as they are loaded; since mapdb keys/values are immutable, load them in
+        // memory then copy them to MapDB once we're done loading them.
         Map<String, Service> serviceTable = new HashMap<>();
         new Calendar.Loader(this, serviceTable).loadTable(zip);
         new CalendarDate.Loader(this, serviceTable).loadTable(zip);
         this.services.putAll(serviceTable);
-        serviceTable = null; // free memory
 
-        // Same deal
         Map<String, Fare> fares = new HashMap<>();
         new FareAttribute.Loader(this, fares).loadTable(zip);
         new FareRule.Loader(this, fares).loadTable(zip);
         this.fares.putAll(fares);
-        fares = null; // free memory
 
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
@@ -627,6 +628,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.db = db;
 
         agency = db.getTreeMap("agency");
+        calendarDates = db.getTreeMap("calendar_dates");
         feedInfo = db.getTreeMap("feed_info");
         routes = db.getTreeMap("routes");
         trips = db.getTreeMap("trips");
