@@ -111,8 +111,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
-            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567"))
         );
         assertThat(
             runIntegrationTestOnFolder(
@@ -143,7 +142,6 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
-            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             // The below "wrong number of fields" errors are for empty new lines
@@ -158,8 +156,8 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
             new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
-            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
+            new ErrorExpectation(NewGTFSErrorType.NO_SERVICE)
         );
         assertThat(
             "Integration test passes",
@@ -282,8 +280,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
-            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED)
         );
         assertThat(
             runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, errorExpectations),
@@ -359,7 +356,8 @@ public class GTFSTest {
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
-            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.NO_SERVICE)
         );
         assertThat(
             runIntegrationTestOnFolder(
@@ -413,18 +411,6 @@ public class GTFSTest {
                     new RecordExpectation("date", 20170920),
                     new RecordExpectation("exception_type", 2)
                 }
-            ),
-            // calendar-dates.txt-only expectation
-            new PersistenceExpectation(
-                "calendar",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "only-in-calendar-dates-txt"
-                    ),
-                    new RecordExpectation("start_date", 20170916),
-                    new RecordExpectation("end_date", 20170916)
-                },
-                true
             ),
             new PersistenceExpectation(
                 "calendar_dates",

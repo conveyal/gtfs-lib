@@ -62,6 +62,8 @@ public class ServiceValidator extends TripValidator {
 
     private Map<LocalDate, DateInfo> dateInfoForDate = new HashMap<>();
 
+    private Set<String> calendarServiceIds = new HashSet<>();
+
     public ServiceValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
     }
@@ -92,15 +94,27 @@ public class ServiceValidator extends TripValidator {
             // ERR
             return;
         }
+
+        // Create a list of calendar service ids. We are only interested in creating services for calendar and related
+        // calendar dates.
+        for (Calendar calendar : feed.calendars) {
+            calendarServiceIds.add(calendar.service_id);
+        }
+
         // Get the map from modes to service durations in seconds for this trip's service ID.
         // Create a new empty map if it doesn't yet exist.
-        ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(trip.service_id, ServiceInfo::new);
-        if (route != null) {
-            // Increment the service duration for this trip's transport mode and service ID.
-            serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
+        if (calendarServiceIds.contains(trip.service_id)) {
+            // Trip contains calendar service id, therefore we are interested in creating service info for this service id.
+            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(trip.service_id, ServiceInfo::new);
+            if (route != null) {
+                // Increment the service duration for this trip's transport mode and service ID.
+                serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
+            }
+            // Record which trips occur on each service_id.
+            serviceInfo.tripIds.add(trip.trip_id);
+            LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
         }
-        // Record which trips occur on each service_id.
-        serviceInfo.tripIds.add(trip.trip_id);
+
         // TODO validate mode codes
     }
 
@@ -120,11 +134,8 @@ public class ServiceValidator extends TripValidator {
     private void validateServiceInfo(ValidationResult validationResult) {
         LOG.info("Merging calendars and calendar_dates...");
 
-        Set<String> calendarServiceIds = new HashSet<>();
-
         // First handle the calendar entries, which define repeating weekly schedules.
         for (Calendar calendar : feed.calendars) {
-            calendarServiceIds.add(calendar.service_id);
             // Validate that calendars apply to at least one day of the week.
             if (!isCalendarUsedDuringWeek(calendar)) {
                 if (errorStorage != null) registerError(calendar, SERVICE_WITHOUT_DAYS_OF_WEEK);
@@ -152,22 +163,24 @@ public class ServiceValidator extends TripValidator {
             }
         }
 
+        // Next remove any calendar date entries from serviceInfoForServiceId which
+
         // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules.
-        for (CalendarDate calendarDate : feed.calendarDates) {
-            if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
-                LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
-                continue;
-            }
-            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
-            if (calendarDate.exception_type == 1) {
-                // Service added, add to set for this date.
-                serviceInfo.datesActive.add(calendarDate.date);
-            } else if (calendarDate.exception_type == 2) {
-                // Service removed, remove from Set for this date.
-                serviceInfo.datesActive.remove(calendarDate.date);
-            }
-            // Otherwise exception_type is out of range. This should already have been caught during the loading phase.
-        }
+//        for (CalendarDate calendarDate : feed.calendarDates) {
+//            if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
+//                LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
+//                continue;
+//            }
+//            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
+//            if (calendarDate.exception_type == 1) {
+//                // Service added, add to set for this date.
+//                serviceInfo.datesActive.add(calendarDate.date);
+//            } else if (calendarDate.exception_type == 2) {
+//                // Service removed, remove from Set for this date.
+//                serviceInfo.datesActive.remove(calendarDate.date);
+//            }
+//            // Otherwise exception_type is out of range. This should already have been caught during the loading phase.
+//        }
 
         /*
             A view that is similar to ServiceInfo class, but doesn't deal well with missing IDs in either subquery:
