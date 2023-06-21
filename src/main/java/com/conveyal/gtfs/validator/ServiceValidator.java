@@ -120,8 +120,11 @@ public class ServiceValidator extends TripValidator {
     private void validateServiceInfo(ValidationResult validationResult) {
         LOG.info("Merging calendars and calendar_dates...");
 
+        Set<String> calendarServiceIds = new HashSet<>();
+
         // First handle the calendar entries, which define repeating weekly schedules.
         for (Calendar calendar : feed.calendars) {
+            calendarServiceIds.add(calendar.service_id);
             // Validate that calendars apply to at least one day of the week.
             if (!isCalendarUsedDuringWeek(calendar)) {
                 if (errorStorage != null) registerError(calendar, SERVICE_WITHOUT_DAYS_OF_WEEK);
@@ -151,6 +154,10 @@ public class ServiceValidator extends TripValidator {
 
         // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules.
         for (CalendarDate calendarDate : feed.calendarDates) {
+            if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
+                LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
+                continue;
+            }
             ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
             if (calendarDate.exception_type == 1) {
                 // Service added, add to set for this date.

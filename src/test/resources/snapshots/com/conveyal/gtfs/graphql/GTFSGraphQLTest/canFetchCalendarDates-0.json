@@ -1,0 +1,16 @@
+{
+  "data" : {
+    "feed" : {
+      "calendar_dates" : [ {
+        "date" : "20170916",
+        "exception_type" : 2,
+        "service_id" : "04100312-8fe1-46a5-a9f2-556f39478f57"
+      }, {
+        "date" : "20230619",
+        "exception_type" : 2,
+        "service_id" : "exception-in-own-right"
+      } ],
+      "feed_version" : "1.0"
+    }
+  }
+}
