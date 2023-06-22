@@ -111,7 +111,8 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567"))
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
         );
         assertThat(
             runIntegrationTestOnFolder(
@@ -153,11 +154,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.MISSING_FOREIGN_TABLE_REFERENCE),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
-            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
-            new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
-            new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
-            new ErrorExpectation(NewGTFSErrorType.NO_SERVICE)
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
         );
         assertThat(
             "Integration test passes",
@@ -280,7 +277,8 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
-            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED)
+            new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
+            new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
         );
         assertThat(
             runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, errorExpectations),
@@ -423,6 +421,26 @@ public class GTFSTest {
                 }
             ),
             new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-exception-one"
+                    ),
+                    new RecordExpectation("date", 20230622),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-exception-two"
+                    ),
+                    new RecordExpectation("date", 20230622),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
                 "stop_times",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -497,6 +515,7 @@ public class GTFSTest {
         };
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
         );
@@ -1203,6 +1222,16 @@ public class GTFSTest {
                     "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
                 ),
                 new RecordExpectation("date", 20170916),
+                new RecordExpectation("exception_type", 2)
+            }
+        ),
+        new PersistenceExpectation(
+            "calendar_dates",
+            new RecordExpectation[]{
+                new RecordExpectation(
+                    "service_id", "exception-in-own-right"
+                ),
+                new RecordExpectation("date", 20230619),
                 new RecordExpectation("exception_type", 2)
             }
         ),

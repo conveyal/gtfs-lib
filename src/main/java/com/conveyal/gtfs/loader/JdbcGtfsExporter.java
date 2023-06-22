@@ -168,7 +168,8 @@ public class JdbcGtfsExporter {
                         LOG.info("No calendar dates found within scheduled exceptions.");
                     } else {
                         // In this scenario all values in the calendar dates table need to be combined with calendar
-                        // dates derived from scheduled exceptions and then written to file.
+                        // dates derived from scheduled exceptions and then written to file. Service calendar dates and
+                        // calendar dates are merged in CalendarDate.iterator() for export.
                         exportCalendarDatesDirectFromTable = false;
                         JDBCTableReader<CalendarDate> calendarDatesReader = new JDBCTableReader(
                             Table.CALENDAR_DATES,
@@ -178,7 +179,10 @@ public class JdbcGtfsExporter {
                         );
                         Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
                         for (CalendarDate calendarDate : calendarDates) {
-                            feed.calendarDates.put(calendarDate.service_id, calendarDate);
+                            if (!feed.services.containsKey(calendarDate.service_id)) {
+                                // Only include the calendar date if not already derived from a scheduled exception.
+                                feed.calendarDates.put(calendarDate.service_id, calendarDate);
+                            }
                         }
                         LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
                         new CalendarDate.Writer(feed).writeTable(zipOutputStream);

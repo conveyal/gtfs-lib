@@ -163,24 +163,23 @@ public class ServiceValidator extends TripValidator {
             }
         }
 
-        // Next remove any calendar date entries from serviceInfoForServiceId which
-
-        // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules.
-//        for (CalendarDate calendarDate : feed.calendarDates) {
-//            if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
-//                LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
-//                continue;
-//            }
-//            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
-//            if (calendarDate.exception_type == 1) {
-//                // Service added, add to set for this date.
-//                serviceInfo.datesActive.add(calendarDate.date);
-//            } else if (calendarDate.exception_type == 2) {
-//                // Service removed, remove from Set for this date.
-//                serviceInfo.datesActive.remove(calendarDate.date);
-//            }
-//            // Otherwise exception_type is out of range. This should already have been caught during the loading phase.
-//        }
+        // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules. A calendar date
+        // must be related (via a service id) to a calendar to qualify.
+        for (CalendarDate calendarDate : feed.calendarDates) {
+            if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
+                LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
+                continue;
+            }
+            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
+            if (calendarDate.exception_type == 1) {
+                // Service added, add to set for this date.
+                serviceInfo.datesActive.add(calendarDate.date);
+            } else if (calendarDate.exception_type == 2) {
+                // Service removed, remove from Set for this date.
+                serviceInfo.datesActive.remove(calendarDate.date);
+            }
+            // Otherwise exception_type is out of range. This should already have been caught during the loading phase.
+        }
 
         /*
             A view that is similar to ServiceInfo class, but doesn't deal well with missing IDs in either subquery:

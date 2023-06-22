@@ -157,7 +157,7 @@ public class GTFSFeed implements Cloneable, Closeable {
 
         new Agency.Loader(this).loadTable(zip);
 
-        // calendars and calendar dates are joined into services, where there is a match on service id. This means a lot
+        // Calendars and calendar dates are joined into services, where there is a match on service id. This means a lot
         // of manipulating service objects as they are loaded; since mapdb keys/values are immutable, load them in
         // memory then copy them to MapDB once we're done loading them.
         Map<String, Service> serviceTable = new HashMap<>();

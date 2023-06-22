@@ -3,6 +3,11 @@
     "feed" : {
       "error_counts" : [ {
         "count" : 1,
+        "message" : "No service_ids were active on a date within the range of dates with defined service.",
+        "priority" : "MEDIUM",
+        "type" : "DATE_NO_SERVICE"
+      }, {
+        "count" : 1,
         "message" : "All travel times in the feed are rounded to the minute, which may cause unexpected results in routing applications where travel times are zero.",
         "priority" : "LOW",
         "type" : "FEED_TRAVEL_TIMES_ROUNDED"
@@ -67,6 +72,14 @@
         "error_id" : 4,
         "error_type" : "STOP_UNUSED",
         "line_number" : 6
+      }, {
+        "bad_value" : "20170916",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 5,
+        "error_type" : "DATE_NO_SERVICE",
+        "line_number" : null
       } ],
       "feed_version" : "1.0"
     }
