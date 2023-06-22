@@ -151,7 +151,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
-            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FOREIGN_TABLE_REFERENCE),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),

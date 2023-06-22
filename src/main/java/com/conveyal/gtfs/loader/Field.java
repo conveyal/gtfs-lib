@@ -8,6 +8,7 @@ import com.google.common.collect.ImmutableSet;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLType;
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -46,7 +47,7 @@ public abstract class Field {
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
      * integrity when loading a feed.
      * */
-    public Table referenceTable = null;
+    public HashSet<Table> referenceTables = new HashSet<>();
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
     private boolean isConditionallyRequired;
@@ -138,7 +139,7 @@ public abstract class Field {
      * a many-to-many reference.
      */
     public boolean isForeignReference () {
-        return this.referenceTable != null;
+        return !this.referenceTables.isEmpty();
     }
 
     /**
@@ -181,7 +182,7 @@ public abstract class Field {
      * @return this same Field instance
      */
     public Field isReferenceTo(Table table) {
-        this.referenceTable = table;
+        referenceTables.add(table);
         return this;
     }
 

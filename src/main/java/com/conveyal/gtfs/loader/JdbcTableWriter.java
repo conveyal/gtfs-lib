@@ -594,6 +594,7 @@ public class JdbcTableWriter implements TableWriter {
         boolean hasOrderField = orderFieldName != null;
         int previousOrder = -1;
         TIntSet orderValues = new TIntHashSet();
+        Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable = HashMultimap.create();
         Multimap<Table, String> referencesPerTable = HashMultimap.create();
         int cumulativeTravelTime = 0;
         for (JsonNode entityNode : subEntities) {
@@ -602,19 +603,9 @@ public class JdbcTableWriter implements TableWriter {
             // Always override the key field (shape_id for shapes, pattern_id for patterns) regardless of the entity's
             // actual value.
             subEntity.put(keyField.name, keyValue);
-            // Check any references the sub entity might have. For example, this checks that stop_id values on
-            // pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
-            // i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
-            // field statement above.
-            for (Field field : subTable.specFields()) {
-                if (field.referenceTable != null && !field.referenceTable.name.equals(specTable.name)) {
-                    JsonNode refValueNode = subEntity.get(field.name);
-                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
-                    if (refValueNode.isNull() && !field.isRequired()) continue;
-                    String refValue = refValueNode.asText();
-                    referencesPerTable.put(field.referenceTable, refValue);
-                }
-            }
+
+            checkTableReferences(foreignReferencesPerTable, referencesPerTable, specTable, subTable, subEntity);
+
             // Insert new sub-entity.
             if (entityCount == 0) {
                 // If handling first iteration, create the prepared statement (later iterations will add to batch).
@@ -689,6 +680,41 @@ public class JdbcTableWriter implements TableWriter {
         // Return key value in the case that it was updated (the only case for this would be if the shape was referenced
         // by multiple patterns).
         return keyValue;
+    }
+
+    /**
+     * Check any references the sub entity might have. For example, this checks that stop_id values on
+     * pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
+     * i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
+     * field statement above.
+     */
+    private void checkTableReferences(
+        Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable,
+        Multimap<Table, String> referencesPerTable,
+        Table specTable,
+        Table subTable,
+        ObjectNode subEntity
+    ) {
+        for (Field field : subTable.specFields()) {
+            if (field.referenceTables.isEmpty()) continue;
+            Multimap<Table, String> foreignReferences = HashMultimap.create();
+            for (Table referenceTable : field.referenceTables) {
+                if (!referenceTable.name.equals(specTable.name)) {
+                    JsonNode refValueNode = subEntity.get(field.name);
+                    // Skip over references that are null but not required (e.g., route_id in fare_rules).
+                    if (refValueNode.isNull() && !field.isRequired()) continue;
+                    String refValue = refValueNode.asText();
+                    if (field.referenceTables.size() == 1) {
+                        referencesPerTable.put(referenceTable, refValue);
+                    } else {
+                        foreignReferences.put(referenceTable, refValue);
+                    }
+                }
+            }
+            if (!foreignReferences.isEmpty()) {
+                foreignReferencesPerTable.put(subTable, foreignReferences);
+            }
+        }
     }
 
     /**
@@ -1439,14 +1465,18 @@ public class JdbcTableWriter implements TableWriter {
                     // which could have unexpected behaviour.
                     referencingTables.add(gtfsTable);
                 }
-                if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                    // If any of the table's fields are foreign references to the specified table, add to the return set.
-                    referencingTables.add(gtfsTable);
+                if (field.isForeignReference()) {
+                    for (Table refTable : field.referenceTables) {
+                        if (refTable.name.equals(table.name)) {
+                            referencingTables.add(gtfsTable);
+                        }
+                    }
                 }
             }
         }
         return referencingTables;
     }
+
 
     /**
      * For a given integer ID, return the value for the specified field name for that entity.
@@ -1560,71 +1590,75 @@ public class JdbcTableWriter implements TableWriter {
             } else {
                 // General deletion
                 for (Field field : referencingTable.editorFields()) {
-                    if (field.isForeignReference() && field.referenceTable.name.equals(table.name)) {
-                        // Get statement to update or delete entities that reference the key value.
-                        PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
-                        LOG.info(updateStatement.toString());
-                        result = updateStatement.executeUpdate();
-                        if (result > 0) {
-                            // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
-                            //  deleteEntityHook).
-                            if (sqlMethod.equals(SqlMethod.DELETE)) {
-                                ArrayList<String> patternAndRouteIds = new ArrayList<>();
-                                // Check for restrictions on delete.
-                                if (table.isCascadeDeleteRestricted()) {
-                                    // The entity must not have any referencing entities in order to delete it.
-                                    connection.rollback();
-                                    if (entityClass.getSimpleName().equals("Stop")) {
-                                        String patternStopLookup = String.format(
-                                            "select distinct p.id, r.id " +
-                                            "from %s.pattern_stops ps " +
-                                            "inner join " +
-                                            "%s.patterns p " +
-                                            "on p.pattern_id = ps.pattern_id " +
-                                            "inner join " +
-                                            "%s.routes r " +
-                                            "on p.route_id = r.route_id " +
-                                            "where %s = '%s'",
-                                            namespace,
-                                            namespace,
-                                            namespace,
-                                            keyField.name,
-                                            keyValue
-                                        );
-                                        PreparedStatement patternStopSelectStatement = connection.prepareStatement(patternStopLookup);
-                                        if (patternStopSelectStatement.execute()) {
-                                            ResultSet resultSet = patternStopSelectStatement.getResultSet();
-                                            while (resultSet.next()) {
-                                                patternAndRouteIds.add(
-                                                    "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "}"
+                    if (field.isForeignReference()) {
+                        for (Table refTable : field.referenceTables) {
+                            if (refTable.name.equals(table.name)) {
+                                // Get statement to update or delete entities that reference the key value.
+                                PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
+                                LOG.info(updateStatement.toString());
+                                result = updateStatement.executeUpdate();
+                                if (result > 0) {
+                                    // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
+                                    //  deleteEntityHook).
+                                    if (sqlMethod.equals(SqlMethod.DELETE)) {
+                                        ArrayList<String> patternAndRouteIds = new ArrayList<>();
+                                        // Check for restrictions on delete.
+                                        if (table.isCascadeDeleteRestricted()) {
+                                            // The entity must not have any referencing entities in order to delete it.
+                                            connection.rollback();
+                                            if (entityClass.getSimpleName().equals("Stop")) {
+                                                String patternStopLookup = String.format(
+                                                    "select distinct p.id, r.id " +
+                                                        "from %s.pattern_stops ps " +
+                                                        "inner join " +
+                                                        "%s.patterns p " +
+                                                        "on p.pattern_id = ps.pattern_id " +
+                                                        "inner join " +
+                                                        "%s.routes r " +
+                                                        "on p.route_id = r.route_id " +
+                                                        "where %s = '%s'",
+                                                    namespace,
+                                                    namespace,
+                                                    namespace,
+                                                    keyField.name,
+                                                    keyValue
+                                                );
+                                                PreparedStatement patternStopSelectStatement = connection.prepareStatement(patternStopLookup);
+                                                if (patternStopSelectStatement.execute()) {
+                                                    ResultSet resultSet = patternStopSelectStatement.getResultSet();
+                                                    while (resultSet.next()) {
+                                                        patternAndRouteIds.add(
+                                                            "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "}"
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            String message = String.format(
+                                                "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                                entityClass.getSimpleName(),
+                                                keyField.name,
+                                                keyValue,
+                                                result,
+                                                referencingTable.name,
+                                                entityClass.getSimpleName()
+                                            );
+                                            if (patternAndRouteIds.size() > 0) {
+                                                // Append referenced patterns data to the end of the error.
+                                                message = String.format(
+                                                    "%s\nReferenced patterns: [%s]",
+                                                    message,
+                                                    StringUtils.join(patternAndRouteIds, ",")
                                                 );
                                             }
+                                            LOG.warn(message);
+                                            throw new SQLException(message);
                                         }
                                     }
-                                    String message = String.format(
-                                            "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                            entityClass.getSimpleName(),
-                                            keyField.name,
-                                            keyValue,
-                                            result,
-                                            referencingTable.name,
-                                            entityClass.getSimpleName()
-                                    );
-                                    if (patternAndRouteIds.size() > 0) {
-                                        // Append referenced patterns data to the end of the error.
-                                        message = String.format(
-                                            "%s\nReferenced patterns: [%s]",
-                                                message,
-                                                StringUtils.join(patternAndRouteIds, ",")
-                                        );
-                                    }
-                                    LOG.warn(message);
-                                    throw new SQLException(message);
+                                    LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
+                                } else {
+                                    LOG.info("No references in {} found!", refTableName);
                                 }
                             }
-                            LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
-                        } else {
-                            LOG.info("No references in {} found!", refTableName);
                         }
                     }
                 }
