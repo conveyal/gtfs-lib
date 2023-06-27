@@ -11,6 +11,7 @@ import org.postgresql.copy.CopyManager;
 import org.postgresql.core.BaseConnection;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.sql.DataSource;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -27,8 +28,10 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -108,40 +111,66 @@ public class JdbcGtfsExporter {
             } else {
                 result.calendar = export(Table.CALENDAR, connection);
             }
-            boolean exportCalendarDatesDirectFromTable = true;
             if (fromEditor) {
                 // Export schedule exceptions in place of calendar dates if exporting a feed/schema that represents an editor snapshot.
                 GTFSFeed feed = new GTFSFeed();
                 // FIXME: The below table readers should probably just share a connection with the exporter.
                 JDBCTableReader<ScheduleException> exceptionsReader =
-                        new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
-                                EntityPopulator.SCHEDULE_EXCEPTION);
+                    new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
+                        EntityPopulator.SCHEDULE_EXCEPTION);
                 JDBCTableReader<Calendar> calendarsReader =
-                        new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
-                                EntityPopulator.CALENDAR);
+                    new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
+                        EntityPopulator.CALENDAR);
                 Iterable<Calendar> calendars = calendarsReader.getAll();
+                Set<String> calendarServiceIds = new HashSet<>();
+                for (Calendar calendar : calendarsReader.getAll()) {
+                    calendarServiceIds.add(calendar.service_id);
+                }
                 Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
                 List<ScheduleException> exceptions = new ArrayList<>();
-                // FIXME: Doing this causes the connection to stay open, but it is closed in the finalizer so it should
-                // not be a big problem.
-                for (ScheduleException exception : exceptionsIterator) {
-                    exceptions.add(exception);
+                List<ScheduleException> calendarDateServices = new ArrayList<>();
+                for (ScheduleException ex : exceptionsIterator) {
+                    if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
+                        (ex.addedService.stream().noneMatch(calendarServiceIds::contains) &&
+                            ex.removedService.stream().noneMatch(calendarServiceIds::contains))) {
+                        calendarDateServices.add(ex);
+                    } else {
+                        exceptions.add(ex);
+                    }
                 }
+
+                int calendarDateCount = 0;
+                // Extract calendar date services, convert to calendar date and add to the feed. We are expect only one
+                // date and either one entry in add service or remove service. Must likely, only one entry ever in add
+                // service.
+                for (ScheduleException ex : calendarDateServices) {
+                    // Only ever expecting one date here.
+                    LocalDate date = ex.dates.get(0);
+                    CalendarDate calendarDate = new CalendarDate();
+                    calendarDate.date = date;
+                    if (!ex.addedService.isEmpty()) {
+                        calendarDate.service_id = ex.addedService.get(0);
+                    } else if (!ex.removedService.isEmpty()) {
+                        calendarDate.service_id = ex.removedService.get(0);
+                    } else {
+                        calendarDate.service_id = ex.name;
+                    }
+                    // It is assumed for a calendar date service that only dates where the service is available are defined.
+                    calendarDate.exception_type = 1;
+                    Service service = new Service(calendarDate.service_id);
+                    service.calendar_dates.put(date, calendarDate);
+                    feed.services.put(calendarDate.service_id, service);
+                    calendarDateCount++;
+                }
+
                 // check whether the feed is organized in a format with the calendars.txt file
                 if (calendarsReader.getRowCount() > 0) {
                     // feed does have calendars.txt file, continue export with strategy of matching exceptions
                     // to calendar to output calendar_dates.txt
-                    int calendarDateCount = 0;
                     for (Calendar cal : calendars) {
                         Service service = new Service(cal.service_id);
                         service.calendar = cal;
                         for (ScheduleException ex : exceptions) {
-                            if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
-                                (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
-                                // Skip swap exception if cal is not referenced by added or removed service.
-                                // This is not technically necessary, but the output is cleaner/more intelligible.
-                                continue;
-                            }
 
                             for (LocalDate date : ex.dates) {
                                 if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
@@ -156,7 +185,7 @@ public class JdbcGtfsExporter {
                                 LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
 
                                 if (service.calendar_dates.containsKey(date))
-                                    throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
+                                    throw new IllegalArgumentException("Duplicate schedule exceptions on " + date);
 
                                 service.calendar_dates.put(date, calendarDate);
                                 calendarDateCount += 1;
@@ -165,31 +194,24 @@ public class JdbcGtfsExporter {
                         feed.services.put(cal.service_id, service);
                     }
                     if (calendarDateCount == 0) {
-                        LOG.info("No calendar dates found within scheduled exceptions.");
+                        LOG.info("No calendar dates found. Skipping table.");
                     } else {
-                        // In this scenario all values in the calendar dates table need to be combined with calendar
-                        // dates derived from scheduled exceptions and then written to file. Service calendar dates and
-                        // calendar dates are merged in CalendarDate.iterator() for export.
-                        exportCalendarDatesDirectFromTable = false;
-                        JDBCTableReader<CalendarDate> calendarDatesReader = new JDBCTableReader(
-                            Table.CALENDAR_DATES,
-                            dataSource,
-                            feedIdToExport + ".",
-                            EntityPopulator.CALENDAR_DATE
-                        );
-                        Iterable<CalendarDate> calendarDates = calendarDatesReader.getAll();
-                        for (CalendarDate calendarDate : calendarDates) {
-                            if (!feed.services.containsKey(calendarDate.service_id)) {
-                                // Only include the calendar date if not already derived from a scheduled exception.
-                                feed.calendarDates.put(calendarDate.service_id, calendarDate);
-                            }
-                        }
                         LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
                         new CalendarDate.Writer(feed).writeTable(zipOutputStream);
                     }
                 }
-            }
-            if (exportCalendarDatesDirectFromTable) {
+
+                if (calendarsReader.getRowCount() == 0 && calendarDateServices.isEmpty()) {
+                    // No calendar or calendar date service records exist, export calendar_dates as is and hope for the best.
+                    // This situation will occur in at least 2 scenarios:
+                    // 1.  A GTFS has been loaded into the editor that had only the calendar_dates.txt file
+                    //     and no further edits were made before exporting to a snapshot
+                    // 2.  A new GTFS has been created from scratch and calendar information has yet to be added.
+                    //     This will result in an invalid GTFS, but it was what the user wanted so ¯\_(ツ)_/¯
+                    result.calendarDates = export(Table.CALENDAR_DATES, connection);
+                }
+            } else {
+                // Otherwise, simply export the calendar dates as they were loaded in.
                 result.calendarDates = export(Table.CALENDAR_DATES, connection);
             }
             result.fareAttributes = export(Table.FARE_ATTRIBUTES, connection);

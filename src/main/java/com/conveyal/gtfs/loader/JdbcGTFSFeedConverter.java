@@ -92,8 +92,6 @@ public class JdbcGTFSFeedConverter {
                     .map(service -> service.calendar_dates.values())
                     .flatMap(Collection::stream)
                     .collect(Collectors.toList());
-            // Combine calendar dates and calendar dates derived from services.
-            calendarDates.addAll(new ArrayList<>(gtfsFeed.calendarDates.values()));
             List<FareAttribute> fareAttributes = gtfsFeed.fares.values()
                     .stream()
                     .map(fare -> fare.fare_attribute)

@@ -84,10 +84,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     /* A service is a calendar entry and all calendar_dates that modify that calendar entry. */
     public final BTreeMap<String, Service> services;
 
-    /* A calendar date specifies a single date that a service runs. These dates are wholly separate to calendar dates
-    * that are related to a calendar and defined in 'services'. */
-    public final Map<String, CalendarDate> calendarDates;
-
     /* A place to accumulate errors while the feed is loaded. Tolerate as many errors as possible and keep on loading. */
     public final NavigableSet<GTFSError> errors;
 
@@ -628,7 +624,6 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.db = db;
 
         agency = db.getTreeMap("agency");
-        calendarDates = db.getTreeMap("calendar_dates");
         feedInfo = db.getTreeMap("feed_info");
         routes = db.getTreeMap("routes");
         trips = db.getTreeMap("trips");

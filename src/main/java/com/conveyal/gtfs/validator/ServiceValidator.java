@@ -62,8 +62,6 @@ public class ServiceValidator extends TripValidator {
 
     private Map<LocalDate, DateInfo> dateInfoForDate = new HashMap<>();
 
-    private Set<String> calendarServiceIds = new HashSet<>();
-
     public ServiceValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
     }
@@ -94,27 +92,15 @@ public class ServiceValidator extends TripValidator {
             // ERR
             return;
         }
-
-        // Create a list of calendar service ids. We are only interested in creating services for calendar and related
-        // calendar dates.
-        for (Calendar calendar : feed.calendars) {
-            calendarServiceIds.add(calendar.service_id);
-        }
-
         // Get the map from modes to service durations in seconds for this trip's service ID.
         // Create a new empty map if it doesn't yet exist.
-        if (calendarServiceIds.contains(trip.service_id)) {
-            // Trip contains calendar service id, therefore we are interested in creating service info for this service id.
-            ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(trip.service_id, ServiceInfo::new);
-            if (route != null) {
-                // Increment the service duration for this trip's transport mode and service ID.
-                serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
-            }
-            // Record which trips occur on each service_id.
-            serviceInfo.tripIds.add(trip.trip_id);
-            LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
+        ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(trip.service_id, ServiceInfo::new);
+        if (route != null) {
+            // Increment the service duration for this trip's transport mode and service ID.
+            serviceInfo.durationByRouteType.adjustOrPutValue(route.route_type, tripDurationSeconds, tripDurationSeconds);
         }
-
+        // Record which trips occur on each service_id.
+        serviceInfo.tripIds.add(trip.trip_id);
         // TODO validate mode codes
     }
 
@@ -163,13 +149,8 @@ public class ServiceValidator extends TripValidator {
             }
         }
 
-        // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules. A calendar date
-        // must be related (via a service id) to a calendar to qualify.
+        // Next handle the calendar_dates, which specify exceptions to the repeating weekly schedules.
         for (CalendarDate calendarDate : feed.calendarDates) {
-            if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
-                LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
-                continue;
-            }
             ServiceInfo serviceInfo = serviceInfoForServiceId.computeIfAbsent(calendarDate.service_id, ServiceInfo::new);
             if (calendarDate.exception_type == 1) {
                 // Service added, add to set for this date.
@@ -202,8 +183,8 @@ public class ServiceValidator extends TripValidator {
                 for (String tripId : serviceInfo.tripIds) {
                     registerError(
                         NewGTFSError.forTable(Table.TRIPS, NewGTFSErrorType.TRIP_NEVER_ACTIVE)
-                                    .setEntityId(tripId)
-                                    .setBadValue(tripId));
+                            .setEntityId(tripId)
+                            .setBadValue(tripId));
                 }
             }
             if (serviceInfo.tripIds.isEmpty()) {
@@ -266,7 +247,7 @@ public class ServiceValidator extends TripValidator {
                     // Check for low or zero service, which seems to happen even when services are defined.
                     // This will also catch cases where dateInfo was null and the new instance contains no service.
                     registerError(NewGTFSError.forFeed(NewGTFSErrorType.DATE_NO_SERVICE,
-                                                       DateField.GTFS_DATE_FORMATTER.format(date)));
+                        DateField.GTFS_DATE_FORMATTER.format(date)));
                 }
             }
         }
@@ -339,7 +320,7 @@ public class ServiceValidator extends TripValidator {
 
             String serviceDurationsTableName = feed.tablePrefix + "service_durations";
             sql = String.format("create table %s (service_id varchar, route_type integer, " +
-                                    "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
+                "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
             LOG.info(sql);
             statement.execute(sql);
             sql = String.format("insert into %s values (?, ?, ?)", serviceDurationsTableName);

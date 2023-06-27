@@ -486,7 +486,6 @@ public class GraphQLGtfsSchema {
             .field(RowCountFetcher.field("stop_times"))
             .field(RowCountFetcher.field("agency"))
             .field(RowCountFetcher.field("calendar"))
-            .field(RowCountFetcher.field("calendar_dates"))
             .field(RowCountFetcher.field("errors"))
             .build();
 
@@ -721,17 +720,6 @@ public class GraphQLGtfsSchema {
                     .argument(intArg(LIMIT_ARG))
                     .argument(intArg(OFFSET_ARG))
                     .dataFetcher(new JDBCFetcher("calendar"))
-                    .build()
-            )
-            .field(newFieldDefinition()
-                    .name("calendar_dates")
-                    .type(new GraphQLList(GraphQLGtfsSchema.calendarDatesType))
-                    .argument(stringArg("namespace")) // FIXME maybe these nested namespace arguments are not doing anything.
-                    .argument(multiStringArg("service_id"))
-                    .argument(intArg(ID_ARG))
-                    .argument(intArg(LIMIT_ARG))
-                    .argument(intArg(OFFSET_ARG))
-                    .dataFetcher(new JDBCFetcher("calendar_dates"))
                     .build()
             )
             .field(newFieldDefinition()

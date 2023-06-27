@@ -150,7 +150,6 @@ public class Table {
 
     public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
             new StringField("name", REQUIRED), // FIXME: This makes name the key field...
-            // FIXME: Change to DateListField
             new DateListField("dates", REQUIRED),
             new ShortField("exemplar", REQUIRED, 9),
             new StringListField("custom_schedule", OPTIONAL).isReferenceTo(CALENDAR),

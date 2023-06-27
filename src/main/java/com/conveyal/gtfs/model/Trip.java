@@ -85,7 +85,7 @@ public class Trip extends Entity {
               Routes because they would be serialized into the MapDB.
              */
             // TODO confirm existence of shape ID
-            getRefField("service_id", true, feed.services, feed.calendarDates);
+            getRefField("service_id", true, feed.services);
             getRefField("route_id", true, feed.routes);
         }
 

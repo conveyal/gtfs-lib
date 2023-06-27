@@ -5,8 +5,7 @@
       "row_counts" : {
         "agency" : 1,
         "calendar" : 1,
-        "calendar_dates" : 2,
-        "errors" : 6,
+        "errors" : 8,
         "routes" : 1,
         "stop_times" : 4,
         "stops" : 5,

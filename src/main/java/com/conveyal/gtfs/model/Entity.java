@@ -268,25 +268,6 @@ public abstract class Entity implements Serializable {
             return val;
         }
 
-        /**
-         * Used to check referential integrity in two targets. E.g. a service id defined in a trip could either be in
-         * services or calendar dates.
-         */
-        protected <K, V, J> void getRefField(String column, boolean required, Map<K, V> target1, Map<K, J> target2) throws IOException {
-            String str = getFieldCheckRequired(column, required);
-            if (str != null) {
-                V val = target1.get(str);
-                J val2 = target2.get(str);
-                String transitId = column + ":" + str;
-                if (!feed.transitIds.contains(transitId)) {
-                    feed.transitIds.add(transitId);
-                    if (val == null && val2 == null) {
-                        feed.errors.add(new ReferentialIntegrityError(tableName, row, column, str));
-                    }
-                }
-            }
-        }
-
         protected abstract boolean isRequired();
 
         /** Implemented by subclasses to read one row, produce one GTFS entity, and store that entity in a map. */

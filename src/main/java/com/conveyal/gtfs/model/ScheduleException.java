@@ -41,7 +41,7 @@ public class ScheduleException extends Entity {
 
     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
-        // FIXME
+        // Require
     }
 
     public boolean serviceRunsOn(Calendar calendar) {
@@ -73,6 +73,8 @@ public class ScheduleException extends Entity {
                 if (removedService != null && removedService.contains(calendar.service_id)) {
                     return false;
                 }
+            case CALENDAR_DATE_SERVICE:
+                return false;
             default:
                 // can't actually happen, but java requires a default with a return here
                 return false;
@@ -84,7 +86,7 @@ public class ScheduleException extends Entity {
      * For example, run Sunday service on Presidents' Day, or no service on New Year's Day.
      */
     public enum ExemplarServiceDescriptor {
-        MONDAY(0), TUESDAY(1), WEDNESDAY(2), THURSDAY(3), FRIDAY(4), SATURDAY(5), SUNDAY(6), NO_SERVICE(7), CUSTOM(8), SWAP(9), MISSING(-1);
+        MONDAY(0), TUESDAY(1), WEDNESDAY(2), THURSDAY(3), FRIDAY(4), SATURDAY(5), SUNDAY(6), NO_SERVICE(7), CUSTOM(8), SWAP(9), CALENDAR_DATE_SERVICE(10), MISSING(-1);
 
         private final int value;
 
@@ -119,6 +121,8 @@ public class ScheduleException extends Entity {
                 return ExemplarServiceDescriptor.CUSTOM;
             case 9:
                 return ExemplarServiceDescriptor.SWAP;
+            case 10:
+                return ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE;
             default:
                 return ExemplarServiceDescriptor.MISSING;
         }

@@ -164,14 +164,6 @@ public class GTFSGraphQLTest {
         });
     }
 
-    /** Tests that the calendar dates of a feed can be fetched. */
-    @Test
-    void canFetchCalendarDates() {
-        assertTimeout(Duration.ofMillis(TEST_TIMEOUT), () -> {
-            MatcherAssert.assertThat(queryGraphQL("feedCalendarDates.txt"), matchesSnapshot());
-        });
-    }
-
     /** Tests that the fares of a feed can be fetched. */
     @Test
     public void canFetchFares() {

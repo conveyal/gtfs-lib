@@ -28,6 +28,16 @@
         "type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME"
       }, {
         "count" : 1,
+        "message" : "A service code was defined, but is never active on any date.",
+        "priority" : "MEDIUM",
+        "type" : "SERVICE_NEVER_ACTIVE"
+      }, {
+        "count" : 1,
+        "message" : "A service code was defined, but is never referenced by any trips.",
+        "priority" : "MEDIUM",
+        "type" : "SERVICE_UNUSED"
+      }, {
+        "count" : 1,
         "message" : "This stop is not referenced by any trips.",
         "priority" : "MEDIUM",
         "type" : "STOP_UNUSED"
@@ -73,11 +83,27 @@
         "error_type" : "STOP_UNUSED",
         "line_number" : 6
       }, {
-        "bad_value" : "20170916",
+        "bad_value" : "exception-in-own-right",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
         "error_id" : 5,
+        "error_type" : "SERVICE_NEVER_ACTIVE",
+        "line_number" : null
+      }, {
+        "bad_value" : "exception-in-own-right",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 6,
+        "error_type" : "SERVICE_UNUSED",
+        "line_number" : null
+      }, {
+        "bad_value" : "20170916",
+        "entity_id" : null,
+        "entity_sequence" : null,
+        "entity_type" : null,
+        "error_id" : 7,
         "error_type" : "DATE_NO_SERVICE",
         "line_number" : null
       } ],

@@ -248,13 +248,9 @@ public class JdbcGtfsSnapshotter {
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
                 Multimap<String, String> addedServiceForDate = HashMultimap.create();
                 for (CalendarDate calendarDate : calendarDates) {
-                    // Skip any null dates
+                    // Skip any null dates.
                     if (calendarDate.date == null) {
                         LOG.warn("Encountered calendar date record with null value for date field. Skipping.");
-                        continue;
-                    }
-                    if (calendarDate.service_id != null && !calendarServiceIds.contains(calendarDate.service_id)) {
-                        LOG.warn("Encountered calendar date that is not joined by service id to a calendar. Skipping.");
                         continue;
                     }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
@@ -262,15 +258,17 @@ public class JdbcGtfsSnapshotter {
                         addedServiceForDate.put(date, calendarDate.service_id);
                         // create (if needed) and extend range of dummy calendar that would need to be created if we are
                         // copying from a feed that doesn't have the calendar.txt file
-                        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
-                        calendar.service_id = calendarDate.service_id;
-                        if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
-                            calendar.start_date = calendarDate.date;
+                        if (calendarDate.service_id != null && calendarServiceIds.contains(calendarDate.service_id)) {
+                            Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+                            calendar.service_id = calendarDate.service_id;
+                            if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
+                                calendar.start_date = calendarDate.date;
+                            }
+                            if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
+                                calendar.end_date = calendarDate.date;
+                            }
+                            dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
                         }
-                        if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
-                            calendar.end_date = calendarDate.date;
-                        }
-                        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
                         removedServiceForDate.put(date, calendarDate.service_id);
                     }
