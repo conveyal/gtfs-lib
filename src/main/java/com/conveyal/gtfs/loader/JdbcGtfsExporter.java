@@ -141,7 +141,7 @@ public class JdbcGtfsExporter {
 
                 int calendarDateCount = 0;
                 // Extract calendar date services, convert to calendar date and add to the feed. We are expect only one
-                // date and either one entry in add service or remove service. Must likely, only one entry ever in add
+                // date and either one entry in add service or remove service. Most likely, only one entry ever in add
                 // service.
                 for (ScheduleException ex : calendarDateServices) {
                     // Only ever expecting one date here.
@@ -150,15 +150,17 @@ public class JdbcGtfsExporter {
                     calendarDate.date = date;
                     if (!ex.addedService.isEmpty()) {
                         calendarDate.service_id = ex.addedService.get(0);
+                        calendarDate.exception_type = 1;
                     } else if (!ex.removedService.isEmpty()) {
                         calendarDate.service_id = ex.removedService.get(0);
+                        calendarDate.exception_type = 2;
                     } else {
                         calendarDate.service_id = ex.name;
                     }
-                    // It is assumed for a calendar date service that only dates where the service is available are defined.
-                    calendarDate.exception_type = 1;
                     Service service = new Service(calendarDate.service_id);
                     service.calendar_dates.put(date, calendarDate);
+                    // If the calendar dates provided contain duplicates (e.g. two or more identical service ids that are
+                    // NOT associated with a calendar) only the first entry will persist export.
                     feed.services.put(calendarDate.service_id, service);
                     calendarDateCount++;
                 }
@@ -193,12 +195,12 @@ public class JdbcGtfsExporter {
                         }
                         feed.services.put(cal.service_id, service);
                     }
-                    if (calendarDateCount == 0) {
-                        LOG.info("No calendar dates found. Skipping table.");
-                    } else {
-                        LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
-                        new CalendarDate.Writer(feed).writeTable(zipOutputStream);
-                    }
+                }
+                if (calendarDateCount == 0) {
+                    LOG.info("No calendar dates found. Skipping table.");
+                } else {
+                    LOG.info("Writing {} calendar dates from schedule exceptions", calendarDateCount);
+                    new CalendarDate.Writer(feed).writeTable(zipOutputStream);
                 }
 
                 if (calendarsReader.getRowCount() == 0 && calendarDateServices.isEmpty()) {
