@@ -89,15 +89,6 @@ public class GraphQLGtfsSchema {
             // FIXME: Description is an editor-specific field
             .field(MapFetcher.field("description"))
             .build();
-
-    // Represents rows from calendar_dates.txt
-    public static final GraphQLObjectType calendarDatesType = newObject()
-            .name("calendar_dates")
-            .field(MapFetcher.field("id", GraphQLInt))
-            .field(MapFetcher.field("service_id"))
-            .field(MapFetcher.field("date"))
-            .field(MapFetcher.field("exception_type", GraphQLInt))
-            .build();
     private static final GraphQLScalarType stringList = new GraphQLScalarType("StringList", "List of Strings", new StringCoercing());
 
     // Represents GTFS Editor service exceptions.

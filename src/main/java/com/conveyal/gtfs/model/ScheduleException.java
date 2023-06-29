@@ -41,7 +41,7 @@ public class ScheduleException extends Entity {
 
     @Override
     public void setStatementParameters(PreparedStatement statement, boolean setDefaultId) throws SQLException {
-        // Require
+        // FIXME
     }
 
     public boolean serviceRunsOn(Calendar calendar) {

@@ -131,12 +131,20 @@ public class GTFSTest {
      * Tests that a GTFS feed with bad date values in calendars.txt and calendar_dates.txt can pass the integration test.
      */
     @Test
-    public void canLoadFeedWithBadDates () {
+    void canLoadFeedWithBadDates () {
         PersistenceExpectation[] expectations = PersistenceExpectation.list(
             new PersistenceExpectation(
                 "calendar",
                 new RecordExpectation[]{
                     new RecordExpectation("start_date", null)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation("service_id", "123_ID_NOT_EXISTS"),
+                    new RecordExpectation("date", "20190301"),
+                    new RecordExpectation("exception_type", "1")
                 }
             )
         );

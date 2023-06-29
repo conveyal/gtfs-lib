@@ -683,10 +683,9 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
-     * Check any references the sub entity might have. For example, this checks that stop_id values on
-     * pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
-     * i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
-     * field statement above.
+     * Check any references the sub entity might have. For example, this checks that a service_id defined in a trip
+     * refers to a calendar or calendar date. NOTE: This skips the "specTable", i.e., for pattern stops it will not
+     * check pattern_id references. This is enforced above with the put key field statement above.
      */
     private void checkTableReferences(
         Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable,

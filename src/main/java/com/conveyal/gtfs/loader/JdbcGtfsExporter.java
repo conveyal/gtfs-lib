@@ -127,15 +127,14 @@ public class JdbcGtfsExporter {
                     calendarServiceIds.add(calendar.service_id);
                 }
                 Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
-                List<ScheduleException> exceptions = new ArrayList<>();
-                List<ScheduleException> calendarDateServices = new ArrayList<>();
+                List<ScheduleException> calendarExceptions = new ArrayList<>();
+                List<ScheduleException> calendarDateExceptions = new ArrayList<>();
+                // Separate distinct calendar date exceptions from those associated with calendars.
                 for (ScheduleException ex : exceptionsIterator) {
-                    if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
-                        (ex.addedService.stream().noneMatch(calendarServiceIds::contains) &&
-                            ex.removedService.stream().noneMatch(calendarServiceIds::contains))) {
-                        calendarDateServices.add(ex);
+                    if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE)) {
+                        calendarDateExceptions.add(ex);
                     } else {
-                        exceptions.add(ex);
+                        calendarExceptions.add(ex);
                     }
                 }
 
@@ -143,20 +142,13 @@ public class JdbcGtfsExporter {
                 // Extract calendar date services, convert to calendar date and add to the feed. We are expect only one
                 // date and either one entry in add service or remove service. Most likely, only one entry ever in add
                 // service.
-                for (ScheduleException ex : calendarDateServices) {
+                for (ScheduleException ex : calendarDateExceptions) {
                     // Only ever expecting one date here.
                     LocalDate date = ex.dates.get(0);
                     CalendarDate calendarDate = new CalendarDate();
                     calendarDate.date = date;
-                    if (!ex.addedService.isEmpty()) {
-                        calendarDate.service_id = ex.addedService.get(0);
-                        calendarDate.exception_type = 1;
-                    } else if (!ex.removedService.isEmpty()) {
-                        calendarDate.service_id = ex.removedService.get(0);
-                        calendarDate.exception_type = 2;
-                    } else {
-                        calendarDate.service_id = ex.name;
-                    }
+                    calendarDate.service_id = ex.name;
+                    calendarDate.exception_type = 1;
                     Service service = new Service(calendarDate.service_id);
                     service.calendar_dates.put(date, calendarDate);
                     // If the calendar dates provided contain duplicates (e.g. two or more identical service ids that are
@@ -172,7 +164,7 @@ public class JdbcGtfsExporter {
                     for (Calendar cal : calendars) {
                         Service service = new Service(cal.service_id);
                         service.calendar = cal;
-                        for (ScheduleException ex : exceptions) {
+                        for (ScheduleException ex : calendarExceptions) {
 
                             for (LocalDate date : ex.dates) {
                                 if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
@@ -203,7 +195,7 @@ public class JdbcGtfsExporter {
                     new CalendarDate.Writer(feed).writeTable(zipOutputStream);
                 }
 
-                if (calendarsReader.getRowCount() == 0 && calendarDateServices.isEmpty()) {
+                if (calendarsReader.getRowCount() == 0 && calendarDateExceptions.isEmpty()) {
                     // No calendar or calendar date service records exist, export calendar_dates as is and hope for the best.
                     // This situation will occur in at least 2 scenarios:
                     // 1.  A GTFS has been loaded into the editor that had only the calendar_dates.txt file
