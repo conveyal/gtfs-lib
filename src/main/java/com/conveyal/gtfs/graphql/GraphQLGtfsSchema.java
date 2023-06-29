@@ -89,6 +89,7 @@ public class GraphQLGtfsSchema {
             // FIXME: Description is an editor-specific field
             .field(MapFetcher.field("description"))
             .build();
+
     private static final GraphQLScalarType stringList = new GraphQLScalarType("StringList", "List of Strings", new StringCoercing());
 
     // Represents GTFS Editor service exceptions.
@@ -477,6 +478,7 @@ public class GraphQLGtfsSchema {
             .field(RowCountFetcher.field("stop_times"))
             .field(RowCountFetcher.field("agency"))
             .field(RowCountFetcher.field("calendar"))
+            .field(RowCountFetcher.field("calendar_dates"))
             .field(RowCountFetcher.field("errors"))
             .build();
 
