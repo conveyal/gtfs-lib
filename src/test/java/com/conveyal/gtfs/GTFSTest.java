@@ -112,8 +112,6 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
             new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
         );
         assertThat(
@@ -292,8 +290,6 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED),
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
-            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
             new ErrorExpectation(NewGTFSErrorType.DATE_NO_SERVICE)
         );
         assertThat(

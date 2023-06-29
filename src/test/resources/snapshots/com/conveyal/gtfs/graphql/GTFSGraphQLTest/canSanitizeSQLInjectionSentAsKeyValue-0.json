@@ -30,11 +30,13 @@
         }, {
           "stop_id" : "1234"
         } ],
-        "trip_count" : 2,
+        "trip_count" : 3,
         "trips" : [ {
           "trip_id" : "a30277f8-e50a-4a85-9141-b1e0da9d429d"
         }, {
           "trip_id" : "frequency-trip"
+        }, {
+          "trip_id" : "calendar-date-trip"
         } ],
         "wheelchair_accessible" : null
       } ]

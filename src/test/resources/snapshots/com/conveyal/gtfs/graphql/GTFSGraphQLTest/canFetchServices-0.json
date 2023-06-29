@@ -4,9 +4,9 @@
       "feed_version" : "1.0",
       "services" : [ {
         "dates" : [ "20170915", "20170917" ],
-        "duration_seconds" : "60",
+        "duration_seconds" : "1800",
         "durations" : [ {
-          "duration_seconds" : 60,
+          "duration_seconds" : 1800,
           "route_type" : 3
         } ],
         "n_days_active" : "2",
@@ -17,7 +17,7 @@
           "trip_id" : "frequency-trip"
         } ]
       }, {
-        "dates" : [ "20230619" ],
+        "dates" : [ "20170917" ],
         "duration_seconds" : "1740",
         "durations" : [ {
           "duration_seconds" : 1740,
@@ -26,7 +26,7 @@
         "n_days_active" : "1",
         "service_id" : "calendar-date-service",
         "trips" : [ {
-          "trip_id" : "frequency-trip"
+          "trip_id" : "calendar-date-trip"
         } ]
       } ]
     }

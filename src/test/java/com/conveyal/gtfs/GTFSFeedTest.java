@@ -101,8 +101,8 @@ public class GTFSFeedTest {
                 "calendar_dates.txt",
                 new DataExpectation[]{
                     new DataExpectation("service_id", "calendar-date-service"),
-                    new DataExpectation("date", "20230619"),
-                    new DataExpectation("exception_type", "2")
+                    new DataExpectation("date", "20170917"),
+                    new DataExpectation("exception_type", "1")
                 }
             ),
             new FileTestCase(
