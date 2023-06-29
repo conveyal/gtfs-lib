@@ -297,10 +297,10 @@ public class GTFSFeed implements Cloneable, Closeable {
      */
     public Iterable<StopTime> getOrderedStopTimesForTrip (String trip_id) {
         Map<Fun.Tuple2, StopTime> tripStopTimes =
-            stop_times.subMap(
-                Fun.t2(trip_id, null),
-                Fun.t2(trip_id, Fun.HI)
-            );
+                stop_times.subMap(
+                        Fun.t2(trip_id, null),
+                        Fun.t2(trip_id, Fun.HI)
+                );
         return tripStopTimes.values();
     }
 
@@ -361,7 +361,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         }
         Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null);
         this.patterns.putAll(patternObjects.values().stream()
-            .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
+                .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
 
     /**
@@ -370,8 +370,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     public Iterable<StopTime> getInterpolatedStopTimesForTrip (String trip_id) throws FirstAndLastStopsDoNotHaveTimes {
         // clone stop times so as not to modify base GTFS structures
         StopTime[] stopTimes = StreamSupport.stream(getOrderedStopTimesForTrip(trip_id).spliterator(), false)
-            .map(st -> st.clone())
-            .toArray(i -> new StopTime[i]);
+                .map(st -> st.clone())
+                .toArray(i -> new StopTime[i]);
 
         // avoid having to make sure that the array has length below.
         if (stopTimes.length == 0) return Collections.emptyList();
@@ -449,8 +449,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         // IntelliJ tells me all these casts are unnecessary, and that's also my feeling, but the code won't compile
         // without them
         return (List<Frequency>) frequencies.subSet(new Fun.Tuple2(trip_id, null), new Fun.Tuple2(trip_id, Fun.HI)).stream()
-            .map(t2 -> ((Tuple2<String, Frequency>) t2).b)
-            .collect(Collectors.toList());
+                .map(t2 -> ((Tuple2<String, Frequency>) t2).b)
+                .collect(Collectors.toList());
     }
 
     public List<String> getOrderedStopListForTrip (String trip_id) {
@@ -518,8 +518,8 @@ public class GTFSFeed implements Cloneable, Closeable {
     /** Get the length of a trip in meters. */
     public double getTripDistance (String trip_id, boolean straightLine) {
         return straightLine
-            ? GeoUtils.getDistance(this.getStraightLineForStops(trip_id))
-            : GeoUtils.getDistance(this.getTripGeometry(trip_id));
+                ? GeoUtils.getDistance(this.getStraightLineForStops(trip_id))
+                : GeoUtils.getDistance(this.getTripGeometry(trip_id));
     }
 
     /** Get trip speed (using trip shape if available) in meters per second. */
@@ -550,7 +550,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         if (this.convexHull == null) {
             synchronized (this) {
                 List<Coordinate> coordinates = this.stops.values().stream().map(
-                    stop -> new Coordinate(stop.stop_lon, stop.stop_lat)
+                        stop -> new Coordinate(stop.stop_lon, stop.stop_lat)
                 ).collect(Collectors.toList());
                 Coordinate[] coords = coordinates.toArray(new Coordinate[coordinates.size()]);
                 ConvexHull convexHull = new ConvexHull(coords, gf);
@@ -591,13 +591,13 @@ public class GTFSFeed implements Cloneable, Closeable {
     public GTFSFeed () {
         // calls to this must be first operation in constructor - why, Java?
         this(DBMaker.newTempFileDB()
-            .transactionDisable()
-            .mmapFileEnable()
-            .asyncWriteEnable()
-            .deleteFilesAfterClose()
-            .compressionEnable()
-            // .cacheSize(1024 * 1024) this bloats memory consumption
-            .make()); // TODO db.close();
+                .transactionDisable()
+                .mmapFileEnable()
+                .asyncWriteEnable()
+                .deleteFilesAfterClose()
+                .compressionEnable()
+                // .cacheSize(1024 * 1024) this bloats memory consumption
+                .make()); // TODO db.close();
     }
 
     /** Create a GTFS feed connected to a particular DB, which will be created if it does not exist. */
@@ -610,12 +610,12 @@ public class GTFSFeed implements Cloneable, Closeable {
         try{
             DBMaker dbMaker = DBMaker.newFileDB(new File(dbFile));
             db = dbMaker
-                .transactionDisable()
-                .mmapFileEnable()
-                .asyncWriteEnable()
-                .compressionEnable()
+                    .transactionDisable()
+                    .mmapFileEnable()
+                    .asyncWriteEnable()
+                    .compressionEnable()
 //                     .cacheSize(1024 * 1024) this bloats memory consumption
-                .make();
+                    .make();
             return db;
         } catch (ExecutionError | IOError | Exception e) {
             LOG.error("Could not construct db from file.", e);
@@ -646,8 +646,8 @@ public class GTFSFeed implements Cloneable, Closeable {
         // use Java serialization because MapDB serialization is very slow with JTS as they have a lot of references.
         // nothing else contains JTS objects
         patterns = db.createTreeMap("patterns")
-            .valueSerializer(Serializer.JAVA)
-            .makeOrGet();
+                .valueSerializer(Serializer.JAVA)
+                .makeOrGet();
 
         tripPatternMap = db.getTreeMap("patternForTrip");
 

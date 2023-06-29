@@ -140,8 +140,7 @@ public class JdbcGtfsExporter {
 
                 int calendarDateCount = 0;
                 // Extract calendar date services, convert to calendar date and add to the feed. We are expect only one
-                // date and either one entry in add service or remove service. Most likely, only one entry ever in add
-                // service.
+                // date which will be exported as a service on the specified date.
                 for (ScheduleException ex : calendarDateExceptions) {
                     // Only ever expecting one date here.
                     LocalDate date = ex.dates.get(0);

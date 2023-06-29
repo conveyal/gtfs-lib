@@ -241,13 +241,13 @@ public class JdbcGtfsSnapshotter {
                 Multimap<String, String> addedServiceForDate = HashMultimap.create();
                 HashMap<String, String> calendarDateService = new HashMap<>();
                 for (CalendarDate calendarDate : calendarDates) {
-                    // Skip any null dates.
-                    if (calendarDate.date == null) {
-                        LOG.warn("Encountered calendar date record with null value for date field. Skipping.");
+                    // Skip any null dates or service ids.
+                    if (calendarDate.date == null || calendarDate.service_id == null) {
+                        LOG.warn("Encountered calendar date record with null value for date/service_id field. Skipping.");
                         continue;
                     }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
-                    if (calendarDate.service_id != null && calendarServiceIds.contains(calendarDate.service_id)) {
+                    if (calendarServiceIds.contains(calendarDate.service_id)) {
                         // Calendar date is related to a calendar.
                         if (calendarDate.exception_type == 1) {
                             addedServiceForDate.put(date, calendarDate.service_id);
@@ -265,7 +265,7 @@ public class JdbcGtfsSnapshotter {
                         } else {
                             removedServiceForDate.put(date, calendarDate.service_id);
                         }
-                    } else if (!calendarServiceIds.contains(calendarDate.service_id)) {
+                    } else {
                         // Calendar date is unique.
                         calendarDateService.put(date, calendarDate.service_id);
                     }
