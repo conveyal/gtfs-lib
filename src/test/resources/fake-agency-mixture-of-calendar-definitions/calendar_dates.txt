@@ -1,5 +1,5 @@
 service_id,date,exception_type
 in-both-calendar-txt-and-calendar-dates,20170920,2
 only-in-calendar-dates-txt,20170916,1
-calendar-dates-txt-exception-one,20170917,1
-calendar-dates-txt-exception-two,20170918,1
+calendar-dates-txt-service-one,20170917,1
+calendar-dates-txt-service-two,20170918,1

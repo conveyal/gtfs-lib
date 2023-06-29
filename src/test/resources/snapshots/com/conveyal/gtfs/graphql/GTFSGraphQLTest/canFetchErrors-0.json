@@ -83,7 +83,7 @@
         "error_type" : "STOP_UNUSED",
         "line_number" : 6
       }, {
-        "bad_value" : "exception-in-own-right",
+        "bad_value" : "calendar-date-service",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,
@@ -91,7 +91,7 @@
         "error_type" : "SERVICE_NEVER_ACTIVE",
         "line_number" : null
       }, {
-        "bad_value" : "exception-in-own-right",
+        "bad_value" : "calendar-date-service",
         "entity_id" : null,
         "entity_sequence" : null,
         "entity_type" : null,

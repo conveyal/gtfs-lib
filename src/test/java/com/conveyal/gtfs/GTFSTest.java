@@ -439,7 +439,7 @@ public class GTFSTest {
                 "calendar_dates",
                 new RecordExpectation[]{
                     new RecordExpectation(
-                        "service_id", "calendar-dates-txt-exception-one"
+                        "service_id", "calendar-dates-txt-service-one"
                     ),
                     new RecordExpectation("date", 20170917),
                     new RecordExpectation("exception_type", 1)
@@ -449,7 +449,7 @@ public class GTFSTest {
                 "calendar_dates",
                 new RecordExpectation[]{
                     new RecordExpectation(
-                        "service_id", "calendar-dates-txt-exception-two"
+                        "service_id", "calendar-dates-txt-service-two"
                     ),
                     new RecordExpectation("date", 20170918),
                     new RecordExpectation("exception_type", 1)
