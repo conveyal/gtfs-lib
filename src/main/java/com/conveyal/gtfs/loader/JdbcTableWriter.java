@@ -427,7 +427,10 @@ public class JdbcTableWriter implements TableWriter {
                         // Array field type expects comma-delimited values.
                         List<String> values = new ArrayList<>();
                         for (JsonNode node : value) {
-                            values.add(node.asText());
+                            String nodeText = node.asText();
+                            // Surround text value in quotes to preserve any internal commas
+                            if (field instanceof StringListField) nodeText = "\"" + nodeText + "\"";
+                            values.add(nodeText);
                         }
                         field.setParameter(preparedStatement, index, String.join(",", values));
                     } else {
