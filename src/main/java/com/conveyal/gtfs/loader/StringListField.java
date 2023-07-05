@@ -33,10 +33,10 @@ public class StringListField extends Field {
 
     @Override
     public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
-        // FIXME
         try {
+            // Only split on commas following an escaped quotation mark, as this indicates a new item in the list.
             String[] stringList = string.split("(?<=\"),");
-            // Clean the string list of any escaped quotations which are required to preserve any internal commas
+            // Clean the string list of any escaped quotations which are required to preserve any internal commas.
             stringList = Arrays.stream(stringList).map(s -> s.replace("\"", "")).toArray(String[]::new);
             Array array = preparedStatement.getConnection().createArrayOf("text", stringList);
             preparedStatement.setArray(oneBasedIndex, array);
