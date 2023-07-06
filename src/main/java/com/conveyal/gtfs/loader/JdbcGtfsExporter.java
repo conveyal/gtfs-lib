@@ -30,6 +30,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -135,7 +136,12 @@ public class JdbcGtfsExporter {
                     for (Calendar cal : calendars) {
                         Service service = new Service(cal.service_id);
                         service.calendar = cal;
-                        for (ScheduleException ex : exceptions) {
+                        List<ScheduleException> calendarExceptions = exceptions.stream().filter(ex ->
+                            ex.addedService.contains(cal.service_id) ||
+                            ex.removedService.contains(cal.service_id) ||
+                            ex.customSchedule.contains(cal.service_id)
+                        ).collect(Collectors.toList());
+                        for (ScheduleException ex : calendarExceptions) {
                             if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
                                 (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
                                 // Skip swap exception if cal is not referenced by added or removed service.
