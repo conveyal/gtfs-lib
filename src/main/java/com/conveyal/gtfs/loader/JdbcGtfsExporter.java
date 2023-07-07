@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -163,7 +164,12 @@ public class JdbcGtfsExporter {
                     for (Calendar cal : calendars) {
                         Service service = new Service(cal.service_id);
                         service.calendar = cal;
-                        for (ScheduleException ex : calendarExceptions) {
+                        List<ScheduleException> exceptionsForCalendar = calendarExceptions.stream().filter(ex ->
+                            ex.addedService.contains(cal.service_id) ||
+                            ex.removedService.contains(cal.service_id) ||
+                            ex.customSchedule.contains(cal.service_id)
+                        ).collect(Collectors.toList());
+                        for (ScheduleException ex : exceptionsForCalendar) {
 
                             for (LocalDate date : ex.dates) {
                                 if (date.isBefore(cal.start_date) || date.isAfter(cal.end_date)) {
@@ -175,7 +181,7 @@ public class JdbcGtfsExporter {
                                 calendarDate.date = date;
                                 calendarDate.service_id = cal.service_id;
                                 calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
-                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
+                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date);
 
                                 if (service.calendar_dates.containsKey(date))
                                     throw new IllegalArgumentException("Duplicate schedule exceptions on " + date);
