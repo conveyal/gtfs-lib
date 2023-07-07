@@ -159,7 +159,7 @@ public class JdbcGtfsExporter {
                                 calendarDate.date = date;
                                 calendarDate.service_id = cal.service_id;
                                 calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
-                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
+                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date);
 
                                 if (service.calendar_dates.containsKey(date))
                                     throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
