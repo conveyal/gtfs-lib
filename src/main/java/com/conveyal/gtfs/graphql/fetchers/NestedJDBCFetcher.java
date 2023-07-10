@@ -54,7 +54,7 @@ public class NestedJDBCFetcher implements DataFetcher<List<Map<String, Object>>>
                         // queries which first get the fields to join to routes.
                         new JDBCFetcher("pattern_stops", "stop_id", null, false),
                         new JDBCFetcher("pattern_locations", "location_id", null, false),
-                        new JDBCFetcher("pattern_location_groups", "location_group_id", null, false),
+                        new JDBCFetcher("pattern_stop_areas", "area_id", null, false),
                         new JDBCFetcher("patterns", "pattern_id", null, false),
                         new JDBCFetcher("routes", "route_id")))
                 .build();

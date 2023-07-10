@@ -103,11 +103,6 @@
         "type" : "ROUTE_LONG_NAME_CONTAINS_SHORT_NAME"
       }, {
         "count" : 1,
-        "message" : "This stop area is not referenced by any trips.",
-        "priority" : "MEDIUM",
-        "type" : "STOP_AREA_UNUSED"
-      }, {
-        "count" : 1,
         "message" : "This stop is not referenced by any trips.",
         "priority" : "MEDIUM",
         "type" : "STOP_UNUSED"

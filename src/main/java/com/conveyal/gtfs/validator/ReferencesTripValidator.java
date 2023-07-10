@@ -31,7 +31,7 @@ public class ReferencesTripValidator extends TripValidator {
     Set<String> referencedTrips = new HashSet<>();
     Set<String> referencedRoutes = new HashSet<>();
     Set<String> referencedLocations = new HashSet<>();
-    Set<String> referencedLocationGroups = new HashSet<>();
+    Set<String> referencedStopAreas = new HashSet<>();
 
     public ReferencesTripValidator(Feed feed, SQLErrorStorage errorStorage) {
         super(feed, errorStorage);
@@ -65,7 +65,7 @@ public class ReferencesTripValidator extends TripValidator {
         });
         stopAreas.forEach(stopArea -> {
             if (stopArea != null) {
-                referencedLocations.add(stopArea.area_id);
+                referencedStopAreas.add(stopArea.area_id);
             }
         });
     }
@@ -103,7 +103,7 @@ public class ReferencesTripValidator extends TripValidator {
         List<StopArea> stopAreas = Lists.newArrayList(feed.stopAreas);
         feed.stopTimes.forEach(stopTime -> {
             if (FlexValidator.stopIdIsStopArea(stopTime.stop_id, stopAreas) &&
-                !referencedLocationGroups.contains(stopTime.stop_id)
+                !referencedStopAreas.contains(stopTime.stop_id)
             ) {
                 registerError(
                     getStopAreaById(stopAreas, stopTime.stop_id),
