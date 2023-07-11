@@ -102,6 +102,7 @@ public class JdbcGtfsExporter {
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             result.agency = export(Table.AGENCY, connection);
+            result.area = export(Table.AREA, connection);
             result.bookingRules = export(Table.BOOKING_RULES, connection);
             result.stopAreas = exportStopAreas();
             if (fromEditor) {
