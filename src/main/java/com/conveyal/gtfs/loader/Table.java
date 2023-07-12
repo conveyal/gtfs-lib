@@ -43,6 +43,7 @@ import org.apache.commons.io.input.BOMInputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -779,7 +780,7 @@ public class Table {
                 ZipEntry e = entries.nextElement();
                 // Ordering of entries cannot be guaranteed across OS. Using a `\` prefix forces the complete file name
                 // to be considered. This prevents stop_areas.txt being loaded instead of areas.txt!
-                if (e.getName().endsWith(String.format("\\%s", tableFileName))) {
+                if (e.getName().endsWith(String.format("%s%s", File.separator, tableFileName))) {
                     entry = e;
                     if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, TABLE_IN_SUBDIRECTORY));
                     break;
