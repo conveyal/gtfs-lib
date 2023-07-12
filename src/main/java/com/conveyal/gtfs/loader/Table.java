@@ -777,7 +777,9 @@ public class Table {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry e = entries.nextElement();
-                if (e.getName().endsWith(tableFileName)) {
+                // Ordering of entries cannot be guaranteed across OS. Using a `\` prefix forces the complete file name
+                // to be considered. This prevents stop_areas.txt being loaded instead of areas.txt!
+                if (e.getName().endsWith(String.format("\\%s", tableFileName))) {
                     entry = e;
                     if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, TABLE_IN_SUBDIRECTORY));
                     break;
