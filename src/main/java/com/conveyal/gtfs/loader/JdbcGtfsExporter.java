@@ -69,6 +69,17 @@ public class JdbcGtfsExporter {
     }
 
     /**
+     * Utility method to check if an exception uses a specific service.
+     */
+    public Boolean exceptionInvolvesService(ScheduleException ex, String serviceId) {
+        return (
+            ex.addedService.contains(serviceId) ||
+            ex.removedService.contains(serviceId) ||
+            ex.customSchedule.contains(serviceId)
+        );
+    }
+
+    /**
      * Export primary entity tables as well as Pattern and PatternStops tables.
      *
      * FIXME: This should probably only export main GTFS tables... unless there is a benefit to keeping editor fields or
@@ -136,12 +147,10 @@ public class JdbcGtfsExporter {
                     for (Calendar cal : calendars) {
                         Service service = new Service(cal.service_id);
                         service.calendar = cal;
-                        List<ScheduleException> calendarExceptions = exceptions.stream().filter(ex ->
-                            ex.addedService.contains(cal.service_id) ||
-                            ex.removedService.contains(cal.service_id) ||
-                            ex.customSchedule.contains(cal.service_id)
-                        ).collect(Collectors.toList());
-                        for (ScheduleException ex : calendarExceptions) {
+                        for (ScheduleException ex : exceptions.stream()
+                            .filter(ex -> exceptionInvolvesService(ex, cal.service_id))
+                            .collect(Collectors.toList())
+                        ) {
                             if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
                                 (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
                                 // Skip swap exception if cal is not referenced by added or removed service.
