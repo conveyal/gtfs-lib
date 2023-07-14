@@ -7,7 +7,9 @@ import java.sql.Array;
 import java.sql.JDBCType;
 import java.sql.PreparedStatement;
 import java.sql.SQLType;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -32,9 +34,12 @@ public class StringListField extends Field {
 
     @Override
     public Set<NewGTFSError> setParameter(PreparedStatement preparedStatement, int oneBasedIndex, String string) {
-        // FIXME
         try {
-            Array array = preparedStatement.getConnection().createArrayOf("text", string.split(","));
+            // Only split on commas following an escaped quotation mark, as this indicates a new item in the list.
+            List<String> stringList = Arrays.asList(string.split("(?<=\"),"));
+            // Clean the string list of any escaped quotations which are required to preserve any internal commas.
+            stringList.replaceAll(s -> s.replace("\"", ""));
+            Array array = preparedStatement.getConnection().createArrayOf("text", stringList.toArray(new String[0]));
             preparedStatement.setArray(oneBasedIndex, array);
             return Collections.EMPTY_SET;
         } catch (Exception e) {
