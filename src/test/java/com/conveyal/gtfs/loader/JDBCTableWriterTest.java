@@ -1880,24 +1880,17 @@ public class JDBCTableWriterTest {
         PatternStopDTO[] patternStops,
         int useFrequency
     ) throws InvalidNamespaceException, SQLException, IOException {
-        // Create new route
-        createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
-        // Create new pattern for route
-        PatternDTO input = new PatternDTO();
-        input.pattern_id = patternId;
-        input.route_id = routeId;
-        input.name = name;
-        input.use_frequency = useFrequency;
-        input.shape_id = shapeId;
-        input.shapes = shapes;
-        input.pattern_stops = patternStops;
-        // Write the pattern to the database
-        JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
-        String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
-        LOG.info("create {} output:", Table.PATTERNS.name);
-        LOG.info(output);
-        // Parse output
-        return mapper.readValue(output, PatternDTO.class);
+        return createRouteAndPattern(
+            routeId,
+            patternId,
+            name,
+            shapeId,
+            shapes,
+            patternStops,
+            null,
+            null,
+            useFrequency
+        );
     }
 
     /**
@@ -1925,8 +1918,8 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
-        input.pattern_locations = patternLocations;
-        input.pattern_stop_areas = patternStopAreas;
+        if (patternLocations != null) input.pattern_locations = patternLocations;
+        if (patternStopAreas != null) input.pattern_stop_areas = patternStopAreas;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
