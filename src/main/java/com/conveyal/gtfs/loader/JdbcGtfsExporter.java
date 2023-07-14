@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -73,17 +72,6 @@ public class JdbcGtfsExporter {
         this.outFile = outFile;
         this.dataSource = dataSource;
         this.fromEditor = fromEditor;
-    }
-
-    /**
-     * Utility method to check if an exception uses a specific service.
-     */
-    public Boolean exceptionInvolvesService(ScheduleException ex, String serviceId) {
-        return (
-            ex.addedService.contains(serviceId) ||
-            ex.removedService.contains(serviceId) ||
-            ex.customSchedule.contains(serviceId)
-        );
     }
 
     /**
@@ -136,11 +124,11 @@ public class JdbcGtfsExporter {
                 GTFSFeed feed = new GTFSFeed();
                 // FIXME: The below table readers should probably just share a connection with the exporter.
                 JDBCTableReader<ScheduleException> exceptionsReader =
-                        new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
-                                EntityPopulator.SCHEDULE_EXCEPTION);
+                    new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
+                        EntityPopulator.SCHEDULE_EXCEPTION);
                 JDBCTableReader<Calendar> calendarsReader =
-                        new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
-                                EntityPopulator.CALENDAR);
+                    new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
+                        EntityPopulator.CALENDAR);
                 Iterable<Calendar> calendars = calendarsReader.getAll();
                 Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
                 List<ScheduleException> exceptions = new ArrayList<>();
@@ -157,10 +145,7 @@ public class JdbcGtfsExporter {
                     for (Calendar cal : calendars) {
                         Service service = new Service(cal.service_id);
                         service.calendar = cal;
-                        for (ScheduleException ex : exceptions.stream()
-                            .filter(ex -> exceptionInvolvesService(ex, cal.service_id))
-                            .collect(Collectors.toList())
-                        ) {
+                        for (ScheduleException ex : exceptions) {
                             if (ex.exemplar.equals(ScheduleException.ExemplarServiceDescriptor.SWAP) &&
                                 (!ex.addedService.contains(cal.service_id) && !ex.removedService.contains(cal.service_id))) {
                                 // Skip swap exception if cal is not referenced by added or removed service.
@@ -178,7 +163,7 @@ public class JdbcGtfsExporter {
                                 calendarDate.date = date;
                                 calendarDate.service_id = cal.service_id;
                                 calendarDate.exception_type = ex.serviceRunsOn(cal) ? 1 : 2;
-                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date);
+                                LOG.info("Adding exception {} (type={}) for calendar {} on date {}", ex.name, calendarDate.exception_type, cal.service_id, date.toString());
 
                                 if (service.calendar_dates.containsKey(date))
                                     throw new IllegalArgumentException("Duplicate schedule exceptions on " + date.toString());
