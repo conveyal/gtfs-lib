@@ -778,8 +778,8 @@ public class Table {
             Enumeration<? extends ZipEntry> entries = zipFile.entries();
             while (entries.hasMoreElements()) {
                 ZipEntry e = entries.nextElement();
-                // Ordering of entries cannot be guaranteed across OS. Using a `\` prefix forces the complete file name
-                // to be considered. This prevents stop_areas.txt being loaded instead of areas.txt!
+                // Order of entries cannot be guaranteed across OS. Including a file separator prefix forces the
+                // complete file name to be considered. This prevents stop_areas.txt being loaded instead of areas.txt.
                 if (e.getName().endsWith(String.format("%s%s", File.separator, tableFileName))) {
                     entry = e;
                     if (sqlErrorStorage != null) sqlErrorStorage.storeError(NewGTFSError.forTable(this, TABLE_IN_SUBDIRECTORY));

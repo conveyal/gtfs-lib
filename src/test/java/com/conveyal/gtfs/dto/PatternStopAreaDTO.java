@@ -50,9 +50,9 @@ public class PatternStopAreaDTO {
         this.flex_default_zone_time = flexDefaultZoneTime;
     }
 
-    public PatternStopAreaDTO(String pattern_id, String area_id, int stop_sequence) {
-        this.pattern_id = pattern_id;
-        this.area_id = area_id;
-        this.stop_sequence = stop_sequence;
+    public PatternStopAreaDTO(String patternId, String areaId, int stopSequence) {
+        this.pattern_id = patternId;
+        this.area_id = areaId;
+        this.stop_sequence = stopSequence;
     }
 }
