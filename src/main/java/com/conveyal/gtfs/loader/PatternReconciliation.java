@@ -115,21 +115,21 @@ public class PatternReconciliation {
     /**
      * Reconcile pattern stops and pattern locations.
      */
-    public void reconcile() throws SQLException {
+    public boolean reconcile() throws SQLException {
         if (patternLocations.isEmpty() && patternStops.isEmpty() && patternStopAreas.isEmpty()) {
             LOG.info("No pattern stops, locations nor stop areas provided. Pattern reconciliation not required.");
-            return;
+            return false;
         }
         tripsForPattern = getTripIdsForPatternId();
         if (tripsForPattern.isEmpty()) {
             LOG.info("No associated trips for pattern id {}. Pattern reconciliation not required.", patternId);
-            return;
+            return false;
         }
         newGenericStops = getGenericStops();
         ReconciliationOperation reconciliationOperation = getOperation(originalGenericStopIds, newGenericStops);
         if (reconciliationOperation == ReconciliationOperation.NONE) {
             LOG.info("Pattern stops not changed. Pattern reconciliation not required.");
-            return;
+            return false;
         }
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
         joinToTrips = String.format(
@@ -140,6 +140,7 @@ public class PatternReconciliation {
             patternId
         );
         reconcilePattern(reconciliationOperation);
+        return true;
     }
 
     /**
