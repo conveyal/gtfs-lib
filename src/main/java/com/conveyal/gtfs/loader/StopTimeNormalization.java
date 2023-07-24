@@ -37,11 +37,14 @@ public class StopTimeNormalization {
     final PreparedStatement flexStopStatementForSingleTrip;
     final BatchTracker flexStopTrackerForAllTrips;
     final PreparedStatement flexStopStatementForAllTrips;
+
     StopTimeNormalization(DataSource dataSource, Connection connection, String tablePrefix) throws SQLException {
         this.dataSource = dataSource;
+        // The connection already established is required so that the state of uncommitted changes are considered.
         this.connection = connection;
         this.tablePrefix = tablePrefix;
 
+        // Match the prepared statements with batch trackers.
         normalStopStatementForSingleTrip = connection.prepareStatement(getNormalStopSql(true));
         normalStopTrackerForSingleTrip = new BatchTracker("Normal stop, single trip", normalStopStatementForSingleTrip);
         normalStopStatementForAllTrips = connection.prepareStatement(getNormalStopSql(false));
@@ -81,7 +84,7 @@ public class StopTimeNormalization {
      * For a given pattern id and starting stop sequence (inclusive), normalize all stop times to match the pattern
      * stops' travel times.
      *
-     * @return number of stop times updated
+     * @return number of stop times updated.
      */
     public int normalizeStopTimesForPattern(int beginWithSequence, String patternId) throws SQLException {
         try {
@@ -180,14 +183,15 @@ public class StopTimeNormalization {
             tablePrefix,
             tablePrefix
         );
-        PreparedStatement statement = connection.prepareStatement(getPrevTravelTimeSql);
-        statement.setInt(1, previousStopSequence);
-        statement.setString(2, patternId);
-        LOG.info("Get previous travel time sql: {}", statement);
-        ResultSet resultSet = statement.executeQuery();
         Map<String, Integer> timesForTripIds = new HashMap<>();
-        while (resultSet.next()) {
-            timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
+        try (PreparedStatement statement = dataSource.getConnection().prepareStatement(getPrevTravelTimeSql)) {
+            statement.setInt(1, previousStopSequence);
+            statement.setString(2, patternId);
+            LOG.info("Get previous travel time sql: {}", statement);
+            ResultSet resultSet = statement.executeQuery();
+            while (resultSet.next()) {
+                timesForTripIds.put(resultSet.getString(1), resultSet.getInt(2));
+            }
         }
         return timesForTripIds;
     }
