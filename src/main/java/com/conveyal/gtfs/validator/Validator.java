@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.conveyal.gtfs.error.NewGTFSError;
+import com.conveyal.gtfs.error.NewGTFSErrorInterface;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.loader.Feed;
@@ -33,7 +34,7 @@ public abstract class Validator {
     /**
      * Store an error that affects a single line of a single table. Wraps the underlying error factory method.
      */
-    public void registerError(Entity entity, NewGTFSErrorType errorType) {
+    public void registerError(Entity entity, NewGTFSErrorInterface errorType) {
         errorStorage.storeError(NewGTFSError.forEntity(entity, errorType));
     }
 
@@ -49,7 +50,7 @@ public abstract class Validator {
      * collection of errors need to be temporarily held before storing in batch (e.g., waiting to store travel time zero
      * errors before it is determined that the entire feed uses travel times rounded to the minute).
      */
-    NewGTFSError createUnregisteredError (Entity entity, NewGTFSErrorType errorType) {
+    NewGTFSError createUnregisteredError (Entity entity, NewGTFSErrorInterface errorType) {
         return NewGTFSError.forEntity(entity, errorType);
     }
 
@@ -65,7 +66,7 @@ public abstract class Validator {
      * Store an error that affects a single line of a single table.
      * Add a bad value to it.
      */
-    public void registerError(Entity entity, NewGTFSErrorType errorType, Object badValue) {
+    public void registerError(Entity entity, NewGTFSErrorInterface errorType, Object badValue) {
         errorStorage.storeError(NewGTFSError.forEntity(entity, errorType).setBadValue(badValue.toString()));
     }
 
