@@ -311,9 +311,18 @@ public class JdbcTableWriter implements TableWriter {
      * @return number of stop times updated
      */
     public int normalizeStopTimesForPattern(int id, int beginWithSequence) throws SQLException {
-        String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
-        StopTimeNormalization stopTimeNormalization = new StopTimeNormalization(dataSource, connection, tablePrefix);
-        return stopTimeNormalization.normalizeStopTimesForPattern(beginWithSequence, patternId);
+        try {
+            String patternId = getValueForId(id, "pattern_id", tablePrefix, Table.PATTERNS, connection);
+            StopTimeNormalization stopTimeNormalization = new StopTimeNormalization(dataSource, connection, tablePrefix);
+            int stopTimesUpdated = stopTimeNormalization.normalizeStopTimesForPattern(beginWithSequence, patternId);
+            connection.commit();
+            return stopTimesUpdated;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        } finally {
+            DbUtils.closeQuietly(connection);
+        }
     }
 
     /**

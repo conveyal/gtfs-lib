@@ -29,14 +29,14 @@ public class StopTimeNormalization {
     final DataSource dataSource;
     final String tablePrefix;
     final Connection connection;
-    final BatchTracker normalStopTrackerForSingleTrip;
-    final PreparedStatement normalStopStatementForSingleTrip;
-    final BatchTracker normalStopTrackerForAllTrips;
-    final PreparedStatement normalStopStatementForAllTrips;
-    final BatchTracker flexStopTrackerForSingleTrip;
-    final PreparedStatement flexStopStatementForSingleTrip;
-    final BatchTracker flexStopTrackerForAllTrips;
-    final PreparedStatement flexStopStatementForAllTrips;
+    final BatchTracker normalStopForSingleTripTracker;
+    final PreparedStatement normalStopForSingleTripStatement;
+    final BatchTracker normalStopForAllTripsTracker;
+    final PreparedStatement normalStopForAllTripsStatement;
+    final BatchTracker flexStopForSingleTripTracker;
+    final PreparedStatement flexStopForSingleTripStatement;
+    final BatchTracker flexStopForAllTripsTracker;
+    final PreparedStatement flexStopForAllTripsStatement;
 
     StopTimeNormalization(DataSource dataSource, Connection connection, String tablePrefix) throws SQLException {
         this.dataSource = dataSource;
@@ -45,15 +45,15 @@ public class StopTimeNormalization {
         this.tablePrefix = tablePrefix;
 
         // Match the prepared statements with batch trackers.
-        normalStopStatementForSingleTrip = connection.prepareStatement(getNormalStopSql(true));
-        normalStopTrackerForSingleTrip = new BatchTracker("Normal stop, single trip", normalStopStatementForSingleTrip);
-        normalStopStatementForAllTrips = connection.prepareStatement(getNormalStopSql(false));
-        normalStopTrackerForAllTrips = new BatchTracker("Normal stop, all trips", normalStopStatementForAllTrips);
+        normalStopForSingleTripStatement = connection.prepareStatement(getNormalStopSql(true));
+        normalStopForSingleTripTracker = new BatchTracker("Normal stop, single trip", normalStopForSingleTripStatement);
+        normalStopForAllTripsStatement = connection.prepareStatement(getNormalStopSql(false));
+        normalStopForAllTripsTracker = new BatchTracker("Normal stop, all trips", normalStopForAllTripsStatement);
 
-        flexStopStatementForSingleTrip = connection.prepareStatement(getFlexStopSql(true));
-        flexStopTrackerForSingleTrip = new BatchTracker("Flex stop, single trip", flexStopStatementForSingleTrip);
-        flexStopStatementForAllTrips = connection.prepareStatement(getFlexStopSql(false));
-        flexStopTrackerForAllTrips = new BatchTracker("Flex stop, all trips", flexStopStatementForAllTrips);
+        flexStopForSingleTripStatement = connection.prepareStatement(getFlexStopSql(true));
+        flexStopForSingleTripTracker = new BatchTracker("Flex stop, single trip", flexStopForSingleTripStatement);
+        flexStopForAllTripsStatement = connection.prepareStatement(getFlexStopSql(false));
+        flexStopForAllTripsTracker = new BatchTracker("Flex stop, all trips", flexStopForAllTripsStatement);
     }
 
     private String getNormalStopSql(boolean isSingleTrip) {
@@ -87,91 +87,82 @@ public class StopTimeNormalization {
      * @return number of stop times updated.
      */
     public int normalizeStopTimesForPattern(int beginWithSequence, String patternId) throws SQLException {
-        try {
-            JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
-                Table.PATTERN_STOP,
-                dataSource,
-                tablePrefix + ".",
-                EntityPopulator.PATTERN_STOP
-            );
-            JDBCTableReader<PatternLocation> patternLocations = new JDBCTableReader(
-                Table.PATTERN_LOCATION,
-                dataSource,
-                tablePrefix + ".",
-                EntityPopulator.PATTERN_LOCATION
-            );
-            JDBCTableReader<PatternStopArea> patternStopAreas = new JDBCTableReader(
-                Table.PATTERN_STOP_AREA,
-                dataSource,
-                tablePrefix + ".",
-                EntityPopulator.PATTERN_STOP_AREA
-            );
-            List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
-            Iterator<PatternHalt> patternHalts = Iterators.concat(
-                patternStops.getOrdered(patternId).iterator(),
-                patternLocations.getOrdered(patternId).iterator(),
-                patternStopAreas.getOrdered(patternId).iterator()
-            );
-            while (patternHalts.hasNext()) {
-                PatternHalt patternHalt = patternHalts.next();
-                if (patternHalt.stop_sequence >= beginWithSequence) {
-                    patternHaltsToNormalize.add(patternHalt);
-                }
+        JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
+            Table.PATTERN_STOP,
+            dataSource,
+            tablePrefix + ".",
+            EntityPopulator.PATTERN_STOP
+        );
+        JDBCTableReader<PatternLocation> patternLocations = new JDBCTableReader(
+            Table.PATTERN_LOCATION,
+            dataSource,
+            tablePrefix + ".",
+            EntityPopulator.PATTERN_LOCATION
+        );
+        JDBCTableReader<PatternStopArea> patternStopAreas = new JDBCTableReader(
+            Table.PATTERN_STOP_AREA,
+            dataSource,
+            tablePrefix + ".",
+            EntityPopulator.PATTERN_STOP_AREA
+        );
+        List<PatternHalt> patternHaltsToNormalize = new ArrayList<>();
+        Iterator<PatternHalt> patternHalts = Iterators.concat(
+            patternStops.getOrdered(patternId).iterator(),
+            patternLocations.getOrdered(patternId).iterator(),
+            patternStopAreas.getOrdered(patternId).iterator()
+        );
+        while (patternHalts.hasNext()) {
+            PatternHalt patternHalt = patternHalts.next();
+            if (patternHalt.stop_sequence >= beginWithSequence) {
+                patternHaltsToNormalize.add(patternHalt);
             }
-            // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
-            patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> (o).stop_sequence)).collect(Collectors.toList());
-            PatternHalt firstPatternHalt = patternHaltsToNormalize.iterator().next();
-            int firstStopSequence = firstPatternHalt.stop_sequence;
-            Map<String, Integer> timesForTripIds = getPreviousTravelTimes(firstStopSequence, firstPatternHalt.pattern_id);
-
-            for (Map.Entry<String, Integer> timesForTripId : timesForTripIds.entrySet()) {
-                // Initialize travel time with previous stop time value.
-                int cumulativeTravelTime = timesForTripId.getValue();
-                for (PatternHalt patternHalt : patternHaltsToNormalize) {
-                    if (patternHalt instanceof PatternStop) {
-                        cumulativeTravelTime += updateStopTimesForPatternStop(
-                            (PatternStop) patternHalt,
-                            cumulativeTravelTime,
-                            timesForTripId.getKey()
-                        );
-                    } else if (patternHalt instanceof PatternLocation) {
-                        PatternLocation patternLocation = (PatternLocation) patternHalt;
-                        cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternStopArea(
-                            patternLocation.flex_default_travel_time,
-                            patternLocation.flex_default_zone_time,
-                            patternLocation.pattern_id,
-                            patternLocation.stop_sequence,
-                            cumulativeTravelTime,
-                            timesForTripId.getKey()
-                        );
-                    } else if (patternHalt instanceof PatternStopArea) {
-                        PatternStopArea patternStopArea = (PatternStopArea) patternHalt;
-                        cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternStopArea(
-                            patternStopArea.flex_default_travel_time,
-                            patternStopArea.flex_default_zone_time,
-                            patternStopArea.pattern_id,
-                            patternStopArea.stop_sequence,
-                            cumulativeTravelTime,
-                            timesForTripId.getKey()
-                        );
-                    } else {
-                        LOG.warn("Pattern with ID {} contained a halt that wasn't a normal or flex stop!", patternId);
-                    }
-                }
-            }
-            int stopTimesUpdated = executeAllBatchTrackers();
-            connection.commit();
-            LOG.info("Update {} stop times.", stopTimesUpdated);
-            return stopTimesUpdated;
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e;
-        } finally {
-            DbUtils.closeQuietly(connection);
         }
+        // Use PatternHalt superclass to extract shared fields to be able to compare stops and locations
+        patternHaltsToNormalize = patternHaltsToNormalize.stream().sorted(Comparator.comparingInt(o -> (o).stop_sequence)).collect(Collectors.toList());
+        PatternHalt firstPatternHalt = patternHaltsToNormalize.iterator().next();
+        int firstStopSequence = firstPatternHalt.stop_sequence;
+        Map<String, Integer> timesForTripIds = getPreviousTravelTimes(firstStopSequence, firstPatternHalt.pattern_id);
+
+        for (Map.Entry<String, Integer> timesForTripId : timesForTripIds.entrySet()) {
+            // Initialize travel time with previous stop time value.
+            int cumulativeTravelTime = timesForTripId.getValue();
+            for (PatternHalt patternHalt : patternHaltsToNormalize) {
+                if (patternHalt instanceof PatternStop) {
+                    cumulativeTravelTime += updateStopTimesForPatternStop(
+                        (PatternStop) patternHalt,
+                        cumulativeTravelTime,
+                        timesForTripId.getKey()
+                    );
+                } else if (patternHalt instanceof PatternLocation) {
+                    PatternLocation patternLocation = (PatternLocation) patternHalt;
+                    cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternStopArea(
+                        patternLocation.flex_default_travel_time,
+                        patternLocation.flex_default_zone_time,
+                        patternLocation.pattern_id,
+                        patternLocation.stop_sequence,
+                        cumulativeTravelTime,
+                        timesForTripId.getKey()
+                    );
+                } else if (patternHalt instanceof PatternStopArea) {
+                    PatternStopArea patternStopArea = (PatternStopArea) patternHalt;
+                    cumulativeTravelTime += updateStopTimesForPatternLocationOrPatternStopArea(
+                        patternStopArea.flex_default_travel_time,
+                        patternStopArea.flex_default_zone_time,
+                        patternStopArea.pattern_id,
+                        patternStopArea.stop_sequence,
+                        cumulativeTravelTime,
+                        timesForTripId.getKey()
+                    );
+                } else {
+                    LOG.warn("Pattern with ID {} contained a halt that wasn't a normal or flex stop!", patternId);
+                }
+            }
+        }
+        return executeAllBatchTrackers();
     }
 
     private Map<String, Integer> getPreviousTravelTimes(int firstStopSequence, String patternId) throws SQLException {
+        Map<String, Integer> timesForTripIds = new HashMap<>();
         String timeField = firstStopSequence > 0 ? "departure_time" : "arrival_time";
         // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
         int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
@@ -183,8 +174,7 @@ public class StopTimeNormalization {
             tablePrefix,
             tablePrefix
         );
-        Map<String, Integer> timesForTripIds = new HashMap<>();
-        try (PreparedStatement statement = dataSource.getConnection().prepareStatement(getPrevTravelTimeSql)) {
+        try (PreparedStatement statement = connection.prepareStatement(getPrevTravelTimeSql)) {
             statement.setInt(1, previousStopSequence);
             statement.setString(2, patternId);
             LOG.info("Get previous travel time sql: {}", statement);
@@ -237,16 +227,17 @@ public class StopTimeNormalization {
                 );
             }
         }
-        int stopTimesUpdated = executeAllBatchTrackers();
-        LOG.info("Updated {} stop times.", stopTimesUpdated);
+        executeAllBatchTrackers();
     }
 
     private int executeAllBatchTrackers() throws SQLException {
-        return
-            normalStopTrackerForAllTrips.executeRemaining() +
-            normalStopTrackerForSingleTrip.executeRemaining() +
-            flexStopTrackerForAllTrips.executeRemaining() +
-            flexStopTrackerForSingleTrip.executeRemaining();
+        int stopTimesUpdated =
+            normalStopForAllTripsTracker.executeRemaining() +
+            normalStopForSingleTripTracker.executeRemaining() +
+            flexStopForAllTripsTracker.executeRemaining() +
+            flexStopForSingleTripTracker.executeRemaining();
+        LOG.info("Updated {} stop times.", stopTimesUpdated);
+        return stopTimesUpdated;
     }
 
     /**
@@ -333,23 +324,23 @@ public class StopTimeNormalization {
         // because we normalize stop sequence values for stop times during snapshotting for the editor.
         statement.setInt(oneBasedIndex, stopSequence);
         // Log query, execute statement, and log result.
-        LOG.info("Updating stop time {}", statement);
+        LOG.info("Adding statement {} to tracker {}", statement, batchTracker);
         batchTracker.addBatch();
     }
 
     private PreparedStatement getPreparedStatement(boolean isFlex, String tripId) {
         if (isFlex) {
-            return (tripId != null) ? this.flexStopStatementForSingleTrip : this.flexStopStatementForAllTrips;
+            return (tripId != null) ? flexStopForSingleTripStatement : flexStopForAllTripsStatement;
         } else {
-            return (tripId != null) ? this.normalStopStatementForSingleTrip : this.normalStopStatementForAllTrips;
+            return (tripId != null) ? normalStopForSingleTripStatement : normalStopForAllTripsStatement;
         }
     }
 
     private BatchTracker getBatchTracker(boolean isFlex, String tripId) {
         if (isFlex) {
-            return (tripId != null) ? this.flexStopTrackerForSingleTrip : this.flexStopTrackerForAllTrips;
+            return (tripId != null) ? flexStopForSingleTripTracker : flexStopForAllTripsTracker;
         } else {
-            return (tripId != null) ? this.normalStopTrackerForSingleTrip : this.normalStopTrackerForAllTrips;
+            return (tripId != null) ? normalStopForSingleTripTracker : normalStopForAllTripsTracker;
         }
     }
 
