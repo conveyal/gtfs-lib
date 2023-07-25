@@ -85,6 +85,11 @@ public enum NewGTFSErrorType {
     // MTC-specific errors.
     FIELD_VALUE_TOO_LONG(Priority.MEDIUM, "Field value has too many characters."),
 
+    // Shared Stops-specifc errors.
+    MULTIPLE_SHARED_STOPS_GROUPS(Priority.HIGH, "GTFS entity belongs to more than one shared-stop group."),
+    SHARED_STOP_GROUP_MUTLIPLE_PRIMARY_STOPS(Priority.HIGH, "Shared-stop group has multiple primary stops."),
+    SHARED_STOP_GROUP_ENTITY_DOES_NOT_EXIST(Priority.MEDIUM, "Shared-stop group entity does not exist."),
+
     // Unknown errors.
     OTHER(Priority.LOW, "Other errors.");
 
