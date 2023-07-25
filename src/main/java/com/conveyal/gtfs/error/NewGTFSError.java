@@ -23,7 +23,7 @@ public class NewGTFSError {
     public Class<? extends Entity> entityType;
 
     /** The kind of error encountered. */
-    public final NewGTFSErrorType errorType;
+    public final NewGTFSErrorInterface errorType;
 
     /** Key-value pairs providing additional information about this error. */
     public Map<String, String> errorInfo = new HashMap<>();
@@ -70,13 +70,13 @@ public class NewGTFSError {
      * @param entityType should be supplied for a table, may be null if the error affects a whole feed.
      * @param errorType must always be supplied.
      */
-    private NewGTFSError (Class<? extends Entity> entityType, NewGTFSErrorType errorType) {
+    private NewGTFSError (Class<? extends Entity> entityType, NewGTFSErrorInterface errorType) {
         this.entityType = entityType;
         this.errorType = errorType;
     }
 
     // Factory Builder for cases where an entity has not yet been constructed, but we know the line number.
-    public static NewGTFSError forLine (Table table, int lineNumber, NewGTFSErrorType errorType, String badValue) {
+    public static NewGTFSError forLine (Table table, int lineNumber, NewGTFSErrorInterface errorType, String badValue) {
         NewGTFSError error = new NewGTFSError(table.getEntityClass(), errorType);
         error.lineNumber = lineNumber;
         error.badValue = badValue;
@@ -84,7 +84,7 @@ public class NewGTFSError {
     }
 
     // Factory Builder for cases where an entity has not yet been constructed, but we know the line number.
-    public static NewGTFSError forLine(LineContext lineContext, NewGTFSErrorType errorType, String badValue) {
+    public static NewGTFSError forLine(LineContext lineContext, NewGTFSErrorInterface errorType, String badValue) {
         NewGTFSError error = new NewGTFSError(lineContext.table.getEntityClass(), errorType);
         error.lineNumber = lineContext.lineNumber;
         error.badValue = badValue;
@@ -92,7 +92,7 @@ public class NewGTFSError {
     }
 
     // Factory Builder for cases where the entity has already been decoded and an error is discovered during validation
-    public static NewGTFSError forEntity(Entity entity, NewGTFSErrorType errorType) {
+    public static NewGTFSError forEntity(Entity entity, NewGTFSErrorInterface errorType) {
         NewGTFSError error = new NewGTFSError(entity.getClass(), errorType);
         error.lineNumber = entity.id;
         error.entityId = entity.getId();
@@ -101,12 +101,12 @@ public class NewGTFSError {
     }
 
     // Factory Builder
-    public static NewGTFSError forTable (Table table, NewGTFSErrorType errorType) {
+    public static NewGTFSError forTable (Table table, NewGTFSErrorInterface errorType) {
         return new NewGTFSError(table.getEntityClass(), errorType);
     }
 
     // Factory Builder for feed-wide error
-    public static NewGTFSError forFeed (NewGTFSErrorType errorType, String badValue) {
+    public static NewGTFSError forFeed (NewGTFSErrorInterface errorType, String badValue) {
         return new NewGTFSError(null, errorType).setBadValue(badValue);
     }
 

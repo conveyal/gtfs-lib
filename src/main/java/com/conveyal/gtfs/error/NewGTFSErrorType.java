@@ -6,7 +6,7 @@ import com.conveyal.gtfs.validator.model.Priority;
  * This enum defines the GTFS error types that can be encountered when validating GTFS table data. Each error type has a
  * severity level and related error message.
  */
-public enum NewGTFSErrorType {
+public enum NewGTFSErrorType implements NewGTFSErrorInterface {
     // Standard errors.
     AGENCY_ID_REQUIRED_FOR_MULTI_AGENCY_FEEDS(Priority.HIGH, "For GTFS feeds with more than one agency, agency_id is required."),
     BOOLEAN_FORMAT(Priority.MEDIUM, "A GTFS boolean field must contain the value 1 or 0."),
