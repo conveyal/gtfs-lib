@@ -46,20 +46,6 @@ public class GTFSFeedTest {
      */
     @Test
     public void canDoRoundtripLoadAndWriteToZipFile() throws IOException {
-        // create a temp file for this test
-        File outZip = File.createTempFile("fake-agency-output", ".zip");
-
-        // delete file to make sure we can assert that this program created the file
-        outZip.delete();
-
-        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
-        feed.toFile(outZip.getAbsolutePath());
-        feed.close();
-        assertThat(outZip.exists(), is(true));
-
-        // assert that rows of data were written to files within the zipfile
-        ZipFile zip = new ZipFile(outZip);
-
         FileTestCase[] fileTestCases = {
             // agency.txt
             new FileTestCase(
@@ -110,11 +96,8 @@ public class GTFSFeedTest {
                 }
             )
         };
-        TestUtils.lookThroughFiles(fileTestCases, zip);
-        // Close the zip file so it can be deleted.
-        zip.close();
-        // delete file to make sure we can assert that this program created the file
-        outZip.delete();
+        loadAndWriteToZipFile(simpleGtfsZipFileName, fileTestCases);
+
     }
 
     /**
@@ -122,20 +105,6 @@ public class GTFSFeedTest {
      */
     @Test
     void canDoRoundTripLoadAndWriteToFlexZipFile() throws IOException {
-        // create a temp file for this test
-        File outZip = File.createTempFile("fake-agency-with-flex-output", ".zip");
-
-        // delete file to make sure we can assert that this program created the file
-        outZip.delete();
-
-        GTFSFeed feed = GTFSFeed.fromFile(simpleFlexGtfsZipFileName);
-        feed.toFile(outZip.getAbsolutePath());
-        feed.close();
-        assertThat(outZip.exists(), is(true));
-
-        // assert that rows of data were written to files within the zip file.
-        ZipFile zip = new ZipFile(outZip);
-
         FileTestCase[] fileTestCases = {
             // agency.txt
             new FileTestCase(
@@ -208,6 +177,27 @@ public class GTFSFeedTest {
                 }
             )
         };
+        loadAndWriteToZipFile(simpleFlexGtfsZipFileName, fileTestCases);
+    }
+
+    /**
+     * Load feed and then write to zip file. Once complete, perform tests.
+     */
+    void loadAndWriteToZipFile(String zipFileName, FileTestCase[] fileTestCases) throws IOException {
+        // create a temp file for this test
+        File outZip = File.createTempFile(zipFileName, ".zip");
+
+        // delete file to make sure we can assert that this program created the file
+        outZip.delete();
+
+        GTFSFeed feed = GTFSFeed.fromFile(zipFileName);
+        feed.toFile(outZip.getAbsolutePath());
+        feed.close();
+        assertThat(outZip.exists(), is(true));
+
+        // assert that rows of data were written to files within the zip file.
+        ZipFile zip = new ZipFile(outZip);
+
         TestUtils.lookThroughFiles(fileTestCases, zip);
         // Close the zip file so it can be deleted.
         zip.close();
