@@ -1479,7 +1479,6 @@ public class JdbcTableWriter implements TableWriter {
         return referencingTables;
     }
 
-
     /**
      * For a given integer ID, return the value for the specified field name for that entity.
      */

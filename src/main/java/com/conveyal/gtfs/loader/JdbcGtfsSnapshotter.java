@@ -214,12 +214,7 @@ public class JdbcGtfsSnapshotter {
 
                 // Fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
                 // table.
-                JDBCTableReader<Calendar> calendarReader = new JDBCTableReader(
-                    Table.CALENDAR,
-                    dataSource,
-                    feedIdToSnapshot + ".",
-                    EntityPopulator.CALENDAR
-                );
+                JDBCTableReader<Calendar> calendarReader = JDBCTableReader.getCalendarTableReader(dataSource, feedIdToSnapshot);
                 Set<String> calendarServiceIds = new HashSet<>();
                 for (Calendar calendar : calendarReader.getAll()) {
                     calendarServiceIds.add(calendar.service_id);
@@ -251,17 +246,7 @@ public class JdbcGtfsSnapshotter {
                         // Calendar date is related to a calendar.
                         if (calendarDate.exception_type == 1) {
                             addedServiceForDate.put(date, calendarDate.service_id);
-                            // create (if needed) and extend range of dummy calendar that would need to be created if we are
-                            // copying from a feed that doesn't have the calendar.txt file
-                            Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
-                            calendar.service_id = calendarDate.service_id;
-                            if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
-                                calendar.start_date = calendarDate.date;
-                            }
-                            if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
-                                calendar.end_date = calendarDate.date;
-                            }
-                            dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
+                            extendDummyCalendarRange(dummyCalendarsByServiceId, calendarDate);
                         } else {
                             removedServiceForDate.put(date, calendarDate.service_id);
                         }
@@ -285,35 +270,26 @@ public class JdbcGtfsSnapshotter {
                 // For usability and simplicity of code, don't attempt to find all dates with similar
                 // added and removed services, but simply create an entry for each found date.
                 for (String date : Sets.union(removedServiceForDate.keySet(), addedServiceForDate.keySet())) {
-                    scheduleExceptionsStatement.setString(1, date);
-                    String[] dates = {date};
-                    scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
-                    scheduleExceptionsStatement.setInt(3, ScheduleException.ExemplarServiceDescriptor.SWAP.getValue());
-                    scheduleExceptionsStatement.setArray(
-                        4,
-                        connection.createArrayOf("text", addedServiceForDate.get(date).toArray())
+                    createScheduledExceptionStatement(
+                        scheduleExceptionsStatement,
+                        scheduleExceptionsTracker,
+                        date,
+                        new String[] {date},
+                        ScheduleException.ExemplarServiceDescriptor.SWAP,
+                        addedServiceForDate.get(date).toArray(),
+                        removedServiceForDate.get(date).toArray()
                     );
-                    scheduleExceptionsStatement.setArray(
-                        5,
-                        connection.createArrayOf("text", removedServiceForDate.get(date).toArray())
-                    );
-                    scheduleExceptionsTracker.addBatch();
                 }
                 for (Map.Entry<String,String> entry : calendarDateService.entrySet()) {
-                    String serviceId = entry.getValue();
-                    scheduleExceptionsStatement.setString(1, serviceId);
-                    String[] dates = {entry.getKey()};
-                    scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
-                    scheduleExceptionsStatement.setInt(3, ScheduleException.ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE.getValue());
-                    scheduleExceptionsStatement.setArray(
-                        4,
-                        connection.createArrayOf("text", new String[] {})
+                    createScheduledExceptionStatement(
+                        scheduleExceptionsStatement,
+                        scheduleExceptionsTracker,
+                        entry.getValue(),
+                        new String[] {entry.getKey()},
+                        ScheduleException.ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE,
+                        new String[] {},
+                        new String[] {}
                     );
-                    scheduleExceptionsStatement.setArray(
-                        5,
-                        connection.createArrayOf("text", new String[] {})
-                    );
-                    scheduleExceptionsTracker.addBatch();
                 }
                 scheduleExceptionsTracker.executeRemaining();
 
@@ -366,6 +342,48 @@ public class JdbcGtfsSnapshotter {
             LOG.info("done creating schedule exceptions");
             return tableLoadResult;
         }
+    }
+
+    /**
+     * Create (if needed) and extend range of dummy calendars that would need to be created if we are copying from a
+     * feed that doesn't have the calendar.txt file.
+     */
+    private void extendDummyCalendarRange(Map<String, Calendar> dummyCalendarsByServiceId, CalendarDate calendarDate) {
+        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+        calendar.service_id = calendarDate.service_id;
+        if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
+            calendar.start_date = calendarDate.date;
+        }
+        if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
+            calendar.end_date = calendarDate.date;
+        }
+        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
+    }
+
+    /**
+     * Populate schedule exception statement and add to batch tracker.
+     */
+    private void createScheduledExceptionStatement(
+        PreparedStatement scheduleExceptionsStatement,
+        BatchTracker scheduleExceptionsTracker,
+        String name,
+        String[] dates,
+        ScheduleException.ExemplarServiceDescriptor exemplarServiceDescriptor,
+        Object[] addedServicesForDate,
+        Object[] removedServicesForDate
+    ) throws SQLException {
+        scheduleExceptionsStatement.setString(1, name);
+        scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
+        scheduleExceptionsStatement.setInt(3, exemplarServiceDescriptor.getValue());
+        scheduleExceptionsStatement.setArray(
+            4,
+            connection.createArrayOf("text", addedServicesForDate)
+        );
+        scheduleExceptionsStatement.setArray(
+            5,
+            connection.createArrayOf("text", removedServicesForDate)
+        );
+        scheduleExceptionsTracker.addBatch();
     }
 
     /**

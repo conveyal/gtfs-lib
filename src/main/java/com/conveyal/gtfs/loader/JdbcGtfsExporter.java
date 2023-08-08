@@ -130,12 +130,10 @@ public class JdbcGtfsExporter {
                 JDBCTableReader<ScheduleException> exceptionsReader =
                     new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
                         EntityPopulator.SCHEDULE_EXCEPTION);
-                JDBCTableReader<Calendar> calendarsReader =
-                    new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
-                        EntityPopulator.CALENDAR);
-                Iterable<Calendar> calendars = calendarsReader.getAll();
+                JDBCTableReader<Calendar> calendarReader = JDBCTableReader.getCalendarTableReader(dataSource, feedIdToExport);
+                Iterable<Calendar> calendars = calendarReader.getAll();
                 Set<String> calendarServiceIds = new HashSet<>();
-                for (Calendar calendar : calendarsReader.getAll()) {
+                for (Calendar calendar : calendarReader.getAll()) {
                     calendarServiceIds.add(calendar.service_id);
                 }
                 Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
@@ -150,7 +148,7 @@ public class JdbcGtfsExporter {
                     }
                 }
 
-                int calendarDateCount = 0;
+                int calendarDateCount = calendarDateExceptions.size();
                 // Extract calendar date services, convert to calendar date and add to the feed. We are expect only one
                 // date which will be exported as a service on the specified date.
                 for (ScheduleException ex : calendarDateExceptions) {
@@ -165,11 +163,10 @@ public class JdbcGtfsExporter {
                     // If the calendar dates provided contain duplicates (e.g. two or more identical service ids that are
                     // NOT associated with a calendar) only the first entry will persist export.
                     feed.services.put(calendarDate.service_id, service);
-                    calendarDateCount++;
                 }
 
                 // check whether the feed is organized in a format with the calendars.txt file
-                if (calendarsReader.getRowCount() > 0) {
+                if (calendarReader.getRowCount() > 0) {
                     // feed does have calendars.txt file, continue export with strategy of matching exceptions
                     // to calendar to output calendar_dates.txt
                     for (Calendar cal : calendars) {
@@ -208,7 +205,7 @@ public class JdbcGtfsExporter {
                     new CalendarDate.Writer(feed).writeTable(zipOutputStream);
                 }
 
-                if (calendarsReader.getRowCount() == 0 && calendarDateExceptions.isEmpty()) {
+                if (calendarReader.getRowCount() == 0 && calendarDateExceptions.isEmpty()) {
                     // No calendar or calendar date service records exist, export calendar_dates as is and hope for the best.
                     // This situation will occur in at least 2 scenarios:
                     // 1.  A GTFS has been loaded into the editor that had only the calendar_dates.txt file

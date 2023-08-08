@@ -82,19 +82,8 @@ public class ReferenceTracker {
         // First, handle referential integrity check.
         boolean isOrderField = field.name.equals(orderField);
         if (field.isForeignReference()) {
-            // Check foreign references. If the foreign reference is present in one of the tables, there is no
-            // need to check the remainder. If no matching foreign reference is found, flag integrity error.
-            // Note: The reference table must be loaded before the table/value being currently checked.
-            boolean hasMatchingReference = false;
             TreeSet<String> badValues = new TreeSet<>();
-            for (Table referenceTable : field.referenceTables) {
-                String referenceField = referenceTable.getKeyFieldName();
-                if (checkReference(referenceField, value, badValues)) {
-                    hasMatchingReference = true;
-                    break;
-                }
-            }
-            if (!hasMatchingReference) {
+            if (!hasMatchingReference(field, value, badValues)) {
                 // If the reference tracker does not contain a match.
                 NewGTFSErrorType errorType = (field.referenceTables.size() > 1)
                     ? MISSING_FOREIGN_TABLE_REFERENCE
@@ -164,6 +153,20 @@ public class ReferenceTracker {
             listOfUniqueIds.add(uniqueId);
         }
         return errors;
+    }
+
+    /**
+     * Check foreign references. If the foreign reference is present in one of the tables, there is no
+     * need to check the remainder. If no matching foreign reference is found, flag integrity error.
+     * Note: The reference table must be loaded before the table/value being currently checked.
+     */
+    private boolean hasMatchingReference(Field field, String value, TreeSet<String> badValues) {
+        for (Table referenceTable : field.referenceTables) {
+            if (checkReference(referenceTable.getKeyFieldName(), value, badValues)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
