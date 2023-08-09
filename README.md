@@ -1,5 +1,5 @@
 # gtfs-lib [![Build Status](https://travis-ci.org/conveyal/gtfs-lib.svg?branch=master)](https://travis-ci.org/conveyal/gtfs-lib)
-[![Join the chat at https://matrix.to/#/#gtfs-lib:gitter.im](https://badges.gitter.im/repo.png)](https://matrix.to/#/#gtfs-lib:gitter.im)
+[![Join the chat at https://matrix.to/#/#transit-data-tools:gitter.im](https://badges.gitter.im/repo.png)](https://matrix.to/#/#gtfs-lib:gitter.im)
 
 
 A library for loading and saving GTFS feeds of arbitrary size with disk-backed storage.
