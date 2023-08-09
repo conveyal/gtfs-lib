@@ -61,5 +61,17 @@ public class PatternStopArea extends PatternHalt {
         setDoubleParameter(statement, oneBasedIndex++, safe_duration_factor);
         setDoubleParameter(statement, oneBasedIndex, safe_duration_offset);
     }
+
+    public int getTravelTime() {
+        return flex_default_travel_time == Entity.INT_MISSING ? 0 : flex_default_travel_time;
+    }
+
+    public int getDwellTime() {
+        return flex_default_zone_time == Entity.INT_MISSING ? 0 : flex_default_zone_time;
+    }
+
+    public boolean isFlex() {
+        return true;
+    }
 }
 

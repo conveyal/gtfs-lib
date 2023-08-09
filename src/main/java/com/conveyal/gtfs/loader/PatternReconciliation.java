@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.PatternStopArea;
@@ -146,7 +147,7 @@ public class PatternReconciliation {
     /**
      * Return pattern location matching the provided reference id.
      */
-    public PatternLocation getPatternLocation(String referenceId) {
+    public PatternHalt getPatternLocation(String referenceId) {
         return patternLocations
             .stream()
             .filter(pl -> pl.location_id.equals(referenceId))
@@ -157,7 +158,7 @@ public class PatternReconciliation {
     /**
      * Return pattern stop area matching the provided reference id.
      */
-    public PatternStopArea getPatternStopArea(String referenceId) {
+    public PatternHalt getPatternStopArea(String referenceId) {
         return patternStopAreas
             .stream()
             .filter(patternStopArea -> patternStopArea.area_id.equals(referenceId))
@@ -168,7 +169,7 @@ public class PatternReconciliation {
     /**
      * Return pattern stop matching the provided reference id.
      */
-    public PatternStop getPatternStop(String referenceId) {
+    public PatternHalt getPatternStop(String referenceId) {
         return patternStops
             .stream()
             .filter(ps -> ps.stop_id.equals(referenceId))

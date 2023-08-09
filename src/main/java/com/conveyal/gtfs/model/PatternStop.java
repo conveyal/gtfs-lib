@@ -51,4 +51,16 @@ public class PatternStop extends PatternHalt {
         statement.setString(oneBasedIndex++, pickup_booking_rule_id);
         statement.setString(oneBasedIndex, drop_off_booking_rule_id);
     }
+
+    public int getTravelTime() {
+        return default_travel_time == Entity.INT_MISSING ? 0 : default_travel_time;
+    }
+
+    public int getDwellTime() {
+        return default_dwell_time == Entity.INT_MISSING ? 0 : default_dwell_time;
+    }
+
+    public boolean isFlex() {
+        return false;
+    }
 }
