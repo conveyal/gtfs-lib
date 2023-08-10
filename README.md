@@ -18,7 +18,7 @@ A gtfs-lib GTFSFeed object should faithfully represent the contents of a single 
 
 ## Getting in touch
 
-We have a Gitter [space](https://matrix.to/#/#transit-data-tools:gitter.im) for the full TRANSIT-Data-Tools project where you can post questions and comments. This includes a room dedicated to GTFS-lib discussions.
+We have a [Gitter space](https://matrix.to/#/#transit-data-tools:gitter.im) for the full TRANSIT-Data-Tools project where you can post questions and comments. This includes a room dedicated to GTFS-lib discussions.
 
 ## Usage
 
