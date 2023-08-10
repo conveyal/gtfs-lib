@@ -26,37 +26,26 @@ public class GTFSFeedTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(GTFSFeedTest.class);
     private static String simpleGtfsZipFileName;
+    private static String simpleFlexGtfsZipFileName;
 
     @BeforeAll
     public static void setUpClass() {
         //executed only once, before the first test
         simpleGtfsZipFileName = null;
+        simpleFlexGtfsZipFileName = null;
         try {
             simpleGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency", true);
+            simpleFlexGtfsZipFileName = TestUtils.zipFolderFiles("fake-agency-with-flex", true);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
     /**
-     * Make sure a roundtrip of loading a GTFS zip file and then writing another zip file can be performed.
+     * Make sure a round-trip of loading a GTFS zip file and then writing another zip file can be performed.
      */
     @Test
     public void canDoRoundtripLoadAndWriteToZipFile() throws IOException {
-        // create a temp file for this test
-        File outZip = File.createTempFile("fake-agency-output", ".zip");
-
-        // delete file to make sure we can assert that this program created the file
-        outZip.delete();
-
-        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
-        feed.toFile(outZip.getAbsolutePath());
-        feed.close();
-        assertThat(outZip.exists(), is(true));
-
-        // assert that rows of data were written to files within the zipfile
-        ZipFile zip = new ZipFile(outZip);
-
         FileTestCase[] fileTestCases = {
             // agency.txt
             new FileTestCase(
@@ -107,6 +96,107 @@ public class GTFSFeedTest {
                 }
             )
         };
+        loadAndWriteToZipFile(simpleGtfsZipFileName, fileTestCases);
+
+    }
+
+    /**
+     * Make sure a round-trip of loading a GTFS flex zip file and then writing another zip file can be performed.
+     */
+    @Test
+    void canDoRoundTripLoadAndWriteToFlexZipFile() throws IOException {
+        FileTestCase[] fileTestCases = {
+            new FileTestCase(
+                "agency.txt",
+                new TestUtils.DataExpectation[]{
+                    new TestUtils.DataExpectation("agency_id", "1"),
+                    new TestUtils.DataExpectation("agency_name", "Fake Transit")
+                }
+            ),
+            new FileTestCase(
+                "areas.txt",
+                new TestUtils.DataExpectation[]{
+                    new TestUtils.DataExpectation("area_id", "1"),
+                    new TestUtils.DataExpectation("area_name", "Area referencing a stop")
+                }
+            ),
+            new FileTestCase(
+                "booking_rules.txt",
+                new TestUtils.DataExpectation[]{
+                    new TestUtils.DataExpectation("booking_rule_id", "1"),
+                    new TestUtils.DataExpectation("booking_type", "1"),
+                    new TestUtils.DataExpectation("pickup_message", "This is a pickup message")
+                }
+            ),
+            new FileTestCase(
+                "calendar.txt",
+                new DataExpectation[]{
+                    new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"),
+                    new DataExpectation("start_date", "20170915"),
+                    new DataExpectation("end_date", "20170917")
+                }
+            ),
+            new FileTestCase(
+                "routes.txt",
+                new DataExpectation[]{
+                    new DataExpectation("agency_id", "1"),
+                    new DataExpectation("route_id", "1"),
+                    new DataExpectation("route_long_name", "Route 1")
+                }
+            ),
+            new FileTestCase(
+                "shapes.txt",
+                new DataExpectation[]{
+                    new DataExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e"),
+                    new DataExpectation("shape_pt_lat", "37.0612132"),
+                    new DataExpectation("shape_pt_lon", "-122.0074332")
+                }
+            ),
+            new FileTestCase(
+                "stop_times.txt",
+                new DataExpectation[]{
+                    new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
+                    new DataExpectation("departure_time", "07:00:00"),
+                    new DataExpectation("stop_id", "4u6g")
+                }
+            ),
+            new FileTestCase(
+                "stop_areas.txt",
+                new DataExpectation[]{
+                    new DataExpectation("area_id", "2"),
+                    new DataExpectation("stop_id", "area-999")
+                }
+            ),
+            new FileTestCase(
+                "trips.txt",
+                new DataExpectation[]{
+                    new DataExpectation("route_id", "1"),
+                    new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
+                    new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57")
+                }
+            )
+        };
+        loadAndWriteToZipFile(simpleFlexGtfsZipFileName, fileTestCases);
+    }
+
+    /**
+     * Load feed and then write to zip file. Once complete, perform tests.
+     */
+    void loadAndWriteToZipFile(String zipFileName, FileTestCase[] fileTestCases) throws IOException {
+        // create a temp file for this test
+        File outZip = File.createTempFile(zipFileName, ".zip");
+
+        // delete file to make sure we can assert that this program created the file
+        outZip.delete();
+
+        GTFSFeed feed = GTFSFeed.fromFile(zipFileName);
+        feed.toFile(outZip.getAbsolutePath());
+        feed.close();
+        assertThat(outZip.exists(), is(true));
+
+        // assert that rows of data were written to files within the zip file.
+        ZipFile zip = new ZipFile(outZip);
+
         TestUtils.lookThroughFiles(fileTestCases, zip);
         // Close the zip file so it can be deleted.
         zip.close();

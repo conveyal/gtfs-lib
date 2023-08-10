@@ -1017,7 +1017,7 @@ public class JdbcTableWriter implements TableWriter {
             patternId,
             stopSequence
         );
-        LOG.info("{} stop_time flex service arrivals/departures updated", entitiesUpdated);
+        LOG.info("{} stop_time flex service start/end pickup drop off window updated.", entitiesUpdated);
         return travelTime + dwellTime;
     }
 

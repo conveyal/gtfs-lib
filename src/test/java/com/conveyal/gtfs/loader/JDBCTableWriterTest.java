@@ -1267,6 +1267,141 @@ public class JDBCTableWriterTest {
     }
 
     /**
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int)} can normalize stop times for flex
+     * patterns.
+     */
+    @Test
+    void canNormalizePatternStopTimesForFlex() throws IOException, SQLException, InvalidNamespaceException {
+        int startTime = 6 * 60 * 60; // 6AM
+        String patternId = newUUID();
+
+        StopDTO stopOne = createSimpleStop(newUUID(), "Stop One", 0.0, 0.0);
+        StopDTO stopTwo = createSimpleStop(newUUID(), "Stop Two", 0.0, 0.0);
+        LocationDTO locationOne = createSimpleTestLocation(newUUID());
+        LocationDTO locationTwo = createSimpleTestLocation(newUUID());
+        StopAreaDTO stopAreaOne = createSimpleTestStopArea(newUUID());
+        StopAreaDTO stopAreaTwo = createSimpleTestStopArea(newUUID());
+
+        PatternStopDTO[] patternStops = new PatternStopDTO[] {
+            new PatternStopDTO(patternId, stopOne.stop_id, 0),
+            new PatternStopDTO(patternId, stopTwo.stop_id, 1)
+        };
+        PatternLocationDTO[] patternLocations = new PatternLocationDTO[] {
+            new PatternLocationDTO(patternId, locationOne.location_id, 2),
+            new PatternLocationDTO(patternId, locationTwo.location_id, 3)
+        };
+        PatternStopAreaDTO[] patternStopAreas = new PatternStopAreaDTO[] {
+            new PatternStopAreaDTO(patternId, stopAreaOne.area_id, 4),
+            new PatternStopAreaDTO(patternId, stopAreaTwo.area_id, 5)
+        };
+
+        int travelTime = 60;
+        patternStops[0].default_travel_time = 0;
+        patternStops[1].default_travel_time = travelTime;
+        patternLocations[0].flex_default_travel_time = travelTime;
+        patternLocations[1].flex_default_travel_time = travelTime;
+        patternStopAreas[0].flex_default_travel_time = travelTime;
+        patternStopAreas[1].flex_default_travel_time = travelTime;
+        PatternDTO pattern = createRouteAndPattern(newUUID(),
+            patternId,
+            "Pattern A",
+            null,
+            new ShapePointDTO[] {},
+            patternStops,
+            patternLocations,
+            patternStopAreas,
+            0
+        );
+
+        int cumulativeTravelTime = startTime + travelTime;
+        StopTimeDTO[] stopTimes = new StopTimeDTO[] {
+            new StopTimeDTO(stopOne.stop_id, startTime, startTime, 0),
+            new StopTimeDTO(stopTwo.stop_id, startTime, startTime, 1),
+            StopTimeDTO.flexStopTime(locationOne.location_id, cumulativeTravelTime, cumulativeTravelTime, 2),
+            StopTimeDTO.flexStopTime(locationTwo.location_id, (cumulativeTravelTime += travelTime), cumulativeTravelTime, 3),
+            StopTimeDTO.flexStopTime(stopAreaOne.area_id, (cumulativeTravelTime += travelTime), cumulativeTravelTime, 4),
+            StopTimeDTO.flexStopTime(stopAreaTwo.area_id, (cumulativeTravelTime += travelTime), cumulativeTravelTime, 5)
+        };
+
+        // Create trip with travel times that match pattern stops.
+        TripDTO tripInput = new TripDTO();
+        tripInput.pattern_id = patternId;
+        tripInput.route_id = pattern.route_id;
+        tripInput.service_id = simpleServiceId;
+        tripInput.stop_times = stopTimes;
+        tripInput.frequencies = new FrequencyDTO[] {};
+        JdbcTableWriter createTripWriter = createTestTableWriter(Table.TRIPS);
+        String createTripOutput = createTripWriter.create(mapper.writeValueAsString(tripInput), true);
+        LOG.info(createTripOutput);
+        TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
+
+        checkStopArrivalAndDepartures(
+            createdTrip.trip_id,
+            startTime,
+            0,
+            travelTime,
+            patternStops.length + patternLocations.length + patternStopAreas.length
+        );
+
+        // Update pattern stop with new travel time.
+        JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
+        int updatedTravelTime = 3600; // one hour
+        pattern.pattern_stops[1].default_travel_time = updatedTravelTime;
+        String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
+        LOG.info("Updated pattern output: {}", updatedPatternOutput);
+        // Normalize stop times.
+        JdbcTableWriter updateTripWriter = createTestTableWriter(Table.TRIPS);
+        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
+        checkStopArrivalAndDepartures(
+            createdTrip.trip_id,
+            startTime,
+            updatedTravelTime,
+            travelTime,
+            patternStops.length + patternLocations.length + patternStopAreas.length
+        );
+    }
+
+    /**
+     * Read stop times from the database and check that the arrivals/departures have been set correctly.
+     */
+    private void checkStopArrivalAndDepartures(
+        String tripId,
+        int startTime,
+        int updatedTravelTime,
+        int travelTime,
+        int totalNumberOfPatterns
+    ) {
+        JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
+            testDataSource,
+            testNamespace + ".",
+            EntityPopulator.STOP_TIME
+        );
+        int index = 0;
+        for (StopTime stopTime : stopTimesTable.getOrdered(tripId)) {
+            if (stopTime.stop_sequence < 2) {
+                LOG.info("stop times i={} arrival={} departure={}",
+                    index,
+                    stopTime.arrival_time,
+                    stopTime.departure_time
+                );
+                assertEquals(stopTime.arrival_time, startTime + index * updatedTravelTime);
+                assertEquals(stopTime.departure_time, startTime + index * updatedTravelTime);
+            } else {
+                LOG.info("stop times i={} start_pickup_drop_off_window={} end_pickup_drop_off_window={}",
+                    index,
+                    stopTime.start_pickup_drop_off_window,
+                    stopTime.end_pickup_drop_off_window
+                );
+                assertEquals(stopTime.start_pickup_drop_off_window, startTime + updatedTravelTime + (index-1) * travelTime);
+                assertEquals(stopTime.end_pickup_drop_off_window, startTime + updatedTravelTime + (index-1) * travelTime);
+            }
+            index++;
+        }
+        // Ensure that updated stop times equals pattern stops length
+        assertEquals(index, totalNumberOfPatterns);
+    }
+
+    /**
      * This test makes sure that updated the service_id will properly update affected referenced entities properly.
      * This test case was initially developed to prove that https://github.com/conveyal/gtfs-lib/issues/203 is
      * happening.
@@ -1745,6 +1880,33 @@ public class JDBCTableWriterTest {
         PatternStopDTO[] patternStops,
         int useFrequency
     ) throws InvalidNamespaceException, SQLException, IOException {
+        return createRouteAndPattern(
+            routeId,
+            patternId,
+            name,
+            shapeId,
+            shapes,
+            patternStops,
+            null,
+            null,
+            useFrequency
+        );
+    }
+
+    /**
+     * Creates a pattern by first creating a route and then a pattern for that route.
+     */
+    private static PatternDTO createRouteAndPattern(
+        String routeId,
+        String patternId,
+        String name,
+        String shapeId,
+        ShapePointDTO[] shapes,
+        PatternStopDTO[] patternStops,
+        PatternLocationDTO[] patternLocations,
+        PatternStopAreaDTO[] patternStopAreas,
+        int useFrequency
+    ) throws InvalidNamespaceException, SQLException, IOException {
         // Create new route
         createSimpleTestRoute(routeId, "RTA", "500", "Hollingsworth", 3);
         // Create new pattern for route
@@ -1756,6 +1918,8 @@ public class JDBCTableWriterTest {
         input.shape_id = shapeId;
         input.shapes = shapes;
         input.pattern_stops = patternStops;
+        if (patternLocations != null) input.pattern_locations = patternLocations;
+        if (patternStopAreas != null) input.pattern_stop_areas = patternStopAreas;
         // Write the pattern to the database
         JdbcTableWriter createPatternWriter = createTestTableWriter(Table.PATTERNS);
         String output = createPatternWriter.create(mapper.writeValueAsString(input), true);
