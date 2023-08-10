@@ -106,7 +106,6 @@ public class GTFSFeedTest {
     @Test
     void canDoRoundTripLoadAndWriteToFlexZipFile() throws IOException {
         FileTestCase[] fileTestCases = {
-            // agency.txt
             new FileTestCase(
                 "agency.txt",
                 new TestUtils.DataExpectation[]{
