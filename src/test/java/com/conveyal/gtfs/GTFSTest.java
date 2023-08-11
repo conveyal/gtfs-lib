@@ -1203,13 +1203,28 @@ public class GTFSTest {
     /**
      * Persistence expectations for use with the GTFS contained within the "fake-agency" resources folder.
      */
-    private PersistenceExpectation[] fakeAgencyPersistenceExpectations = new PersistenceExpectation[]{
+    private final PersistenceExpectation[] fakeAgencyPersistenceExpectations = new PersistenceExpectation[]{
         new PersistenceExpectation(
             "agency",
             new RecordExpectation[]{
                 new RecordExpectation("agency_id", "1"),
                 new RecordExpectation("agency_name", "Fake Transit"),
                 new RecordExpectation("agency_timezone", "America/Los_Angeles")
+            }
+        ),
+        new PersistenceExpectation(
+            "areas",
+            new RecordExpectation[]{
+                new RecordExpectation("area_id", "area1"),
+                new RecordExpectation("area_name", "This is the area name")
+            }
+        ),
+        new PersistenceExpectation(
+            "booking_rules",
+            new RecordExpectation[]{
+                new RecordExpectation("booking_rule_id", "1"),
+                new RecordExpectation("booking_type", "1"),
+                new RecordExpectation("pickup_message", "This is a pickup message")
             }
         ),
         new PersistenceExpectation(
@@ -1313,6 +1328,13 @@ public class GTFSTest {
                 new RecordExpectation("stop_headsign", "Test stop headsign"),
                 new RecordExpectation("drop_off_type", 0),
                 new RecordExpectation("shape_dist_traveled", 0.0, 0.01)
+            }
+        ),
+        new PersistenceExpectation(
+            "stop_areas",
+            new RecordExpectation[]{
+                new RecordExpectation("area_id", "area1"),
+                new RecordExpectation("stop_id", "123")
             }
         ),
         new PersistenceExpectation(

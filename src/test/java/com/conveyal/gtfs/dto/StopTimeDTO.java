@@ -39,4 +39,13 @@ public class StopTimeDTO {
         departure_time = departureTime;
         stop_sequence = stopSequence;
     }
+
+    public static StopTimeDTO flexStopTime(String stopId, Integer startPickupDropOffWindow, Integer endPickupDropOffWindow, Integer stopSequence) {
+        StopTimeDTO stopTimeDTO = new StopTimeDTO();
+        stopTimeDTO.stop_id = stopId;
+        stopTimeDTO.start_pickup_drop_off_window = startPickupDropOffWindow;
+        stopTimeDTO.end_pickup_drop_off_window = endPickupDropOffWindow;
+        stopTimeDTO.stop_sequence = stopSequence;
+        return stopTimeDTO;
+    }
 }

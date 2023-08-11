@@ -81,8 +81,8 @@ public class JdbcGtfsExporter {
     public Boolean exceptionInvolvesService(ScheduleException ex, String serviceId) {
         return (
             ex.addedService.contains(serviceId) ||
-            ex.removedService.contains(serviceId) ||
-            ex.customSchedule.contains(serviceId)
+                ex.removedService.contains(serviceId) ||
+                ex.customSchedule.contains(serviceId)
         );
     }
 
@@ -114,6 +114,7 @@ public class JdbcGtfsExporter {
             String whereRouteIsApproved = String.format("where %s.%s.status = 2", feedIdToExport, Table.ROUTES.name);
             // Export each table in turn (by placing entry in zip output stream).
             result.agency = export(Table.AGENCY, connection);
+            result.area = export(Table.AREA, connection);
             result.bookingRules = export(Table.BOOKING_RULES, connection);
             result.stopAreas = exportStopAreas();
             if (fromEditor) {
@@ -135,11 +136,11 @@ public class JdbcGtfsExporter {
                 GTFSFeed feed = new GTFSFeed();
                 // FIXME: The below table readers should probably just share a connection with the exporter.
                 JDBCTableReader<ScheduleException> exceptionsReader =
-                        new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
-                                EntityPopulator.SCHEDULE_EXCEPTION);
+                    new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
+                        EntityPopulator.SCHEDULE_EXCEPTION);
                 JDBCTableReader<Calendar> calendarsReader =
-                        new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
-                                EntityPopulator.CALENDAR);
+                    new JDBCTableReader(Table.CALENDAR, dataSource, feedIdToExport + ".",
+                        EntityPopulator.CALENDAR);
                 Iterable<Calendar> calendars = calendarsReader.getAll();
                 Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
                 List<ScheduleException> exceptions = new ArrayList<>();
