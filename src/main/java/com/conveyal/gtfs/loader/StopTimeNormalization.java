@@ -199,7 +199,7 @@ public class StopTimeNormalization {
         // because we normalize stop sequence values for stop times during snapshotting for the editor.
         statement.setInt(oneBasedIndex, stopSequence);
         // Log query, execute statement, and log result.
-        LOG.info("Adding statement {} to tracker {}", statement, batchTracker);
+        LOG.debug("Adding statement {} to tracker {}", statement, batchTracker);
         batchTracker.addBatch();
     }
 
