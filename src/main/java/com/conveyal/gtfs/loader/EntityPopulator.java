@@ -60,6 +60,7 @@ public interface EntityPopulator<T> {
         patternStop.default_travel_time = getIntIfPresent(result, "default_travel_time", columnForName);
         patternStop.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
         patternStop.drop_off_type = getIntIfPresent(result, "drop_off_type", columnForName);
+        patternStop.stop_headsign = getStringIfPresent(result, "stop_headsign", columnForName);
         patternStop.pickup_type = getIntIfPresent(result, "pickup_type", columnForName);
         patternStop.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
         patternStop.timepoint = getIntIfPresent(result, "timepoint", columnForName);

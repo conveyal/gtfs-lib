@@ -14,6 +14,7 @@
           "id" : 1,
           "pattern_id" : "1",
           "pickup_type" : 0,
+          "stop_headsign" : "Test stop headsign",
           "shape_dist_traveled" : 0.0,
           "stop" : [ {
             "stop_id" : "4u6g"
@@ -28,6 +29,7 @@
           "id" : 2,
           "pattern_id" : "1",
           "pickup_type" : 0,
+          "stop_headsign" : "Test stop headsign 2",
           "shape_dist_traveled" : 341.4491961,
           "stop" : [ {
             "stop_id" : "johv"
@@ -113,6 +115,7 @@
           "id" : 3,
           "pattern_id" : "2",
           "pickup_type" : 0,
+          "stop_headsign" : "Test stop headsign frequency trip",
           "shape_dist_traveled" : 0.0,
           "stop" : [ {
             "stop_id" : "4u6g"
@@ -127,6 +130,7 @@
           "id" : 4,
           "pattern_id" : "2",
           "pickup_type" : 0,
+          "stop_headsign" : "Test stop headsign frequency trip 2",
           "shape_dist_traveled" : 341.4491961,
           "stop" : [ {
             "stop_id" : "1234"
