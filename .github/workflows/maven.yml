@@ -29,11 +29,11 @@ jobs:
       uses: actions/setup-java@v1
       with:
         java-version: 1.8
-    # Install node 14+ for running maven-semantic-release.
-    - name: Use Node.js 14.x
+    # Install node 18+ for running maven-semantic-release.
+    - name: Use Node.js 18.x
       uses: actions/setup-node@v1
       with:
-        node-version: 14.x
+        node-version: 18.x
     - name: Install maven-semantic-release
       # FIXME: Enable cache for node packages (add package.json?)
       run: |
