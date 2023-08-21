@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.model.PatternHalt;
 import com.conveyal.gtfs.model.PatternLocation;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.PatternStopArea;
@@ -115,21 +116,21 @@ public class PatternReconciliation {
     /**
      * Reconcile pattern stops and pattern locations.
      */
-    public void reconcile() throws SQLException {
+    public boolean reconcile() throws SQLException {
         if (patternLocations.isEmpty() && patternStops.isEmpty() && patternStopAreas.isEmpty()) {
             LOG.info("No pattern stops, locations nor stop areas provided. Pattern reconciliation not required.");
-            return;
+            return false;
         }
         tripsForPattern = getTripIdsForPatternId();
         if (tripsForPattern.isEmpty()) {
             LOG.info("No associated trips for pattern id {}. Pattern reconciliation not required.", patternId);
-            return;
+            return false;
         }
         newGenericStops = getGenericStops();
         ReconciliationOperation reconciliationOperation = getOperation(originalGenericStopIds, newGenericStops);
         if (reconciliationOperation == ReconciliationOperation.NONE) {
             LOG.info("Pattern stops not changed. Pattern reconciliation not required.");
-            return;
+            return false;
         }
         // Prepare SQL fragment to filter for all stop times for all trips on a certain pattern.
         joinToTrips = String.format(
@@ -140,12 +141,13 @@ public class PatternReconciliation {
             patternId
         );
         reconcilePattern(reconciliationOperation);
+        return true;
     }
 
     /**
      * Return pattern location matching the provided reference id.
      */
-    public PatternLocation getPatternLocation(String referenceId) {
+    public PatternHalt getPatternLocation(String referenceId) {
         return patternLocations
             .stream()
             .filter(pl -> pl.location_id.equals(referenceId))
@@ -156,7 +158,7 @@ public class PatternReconciliation {
     /**
      * Return pattern stop area matching the provided reference id.
      */
-    public PatternStopArea getPatternStopArea(String referenceId) {
+    public PatternHalt getPatternStopArea(String referenceId) {
         return patternStopAreas
             .stream()
             .filter(patternStopArea -> patternStopArea.area_id.equals(referenceId))
@@ -167,7 +169,7 @@ public class PatternReconciliation {
     /**
      * Return pattern stop matching the provided reference id.
      */
-    public PatternStop getPatternStop(String referenceId) {
+    public PatternHalt getPatternStop(String referenceId) {
         return patternStops
             .stream()
             .filter(ps -> ps.stop_id.equals(referenceId))

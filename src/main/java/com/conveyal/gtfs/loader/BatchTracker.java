@@ -54,4 +54,13 @@ public class BatchTracker {
             throw new RuntimeException("BUG: It looks like someone did not call executeRemaining on a BatchTracker.");
         }
     }
+
+    @Override
+    public String toString() {
+        return "BatchTracker{" +
+            "recordType='" + recordType + '\'' +
+            ", currentBatchSize=" + currentBatchSize +
+            ", totalRecordsProcessed=" + totalRecordsProcessed +
+            '}';
+    }
 }
