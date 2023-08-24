@@ -1,11 +1,14 @@
 package com.conveyal.gtfs.model;
 
+import com.conveyal.gtfs.GTFSFeed;
 import com.google.common.base.Joiner;
 import org.locationtech.jts.geom.LineString;
 
+import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -99,6 +102,33 @@ public class Pattern extends Entity {
         // TODO: Implement segmentIndex using JTS to segment out LineString by stops.
 
         // TODO: Implement segmentFraction using JTS to segment out LineString by stops.
+
+    }
+
+    public Pattern () {}
+
+    public static class Writer extends Entity.Writer<Pattern> {
+        public Writer (GTFSFeed feed) {
+            super(feed, "patterns");
+        }
+
+        @Override
+        protected void writeHeaders() throws IOException {
+            writer.writeRecord(new String[] {"pattern_id", "name"});
+        }
+
+        @Override
+        protected void writeOneRow(Pattern pattern) throws IOException {
+            writeStringField(pattern.pattern_id);
+            writeStringField(pattern.name);
+            endRecord();
+        }
+
+        @Override
+        protected Iterator<Pattern> iterator() {
+            return feed.patterns.values().iterator();
+        }
+
 
     }
 

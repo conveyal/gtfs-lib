@@ -324,6 +324,8 @@ public class JdbcGtfsExporter {
                 result.trips = export(Table.TRIPS, connection);
             }
 
+            result.patterns = export(Table.PATTERNS, connection);
+
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
             cleanUpZipFile();

@@ -158,6 +158,7 @@ public class JdbcGtfsLoader {
             result.routes = load(Table.ROUTES);
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
             result.feedInfo = load(Table.FEED_INFO);
+            result.patterns = load(Table.PATTERNS);
             result.shapes = load(Table.SHAPES);
             result.stops = load(Table.STOPS);
             result.fareRules = load(Table.FARE_RULES);
