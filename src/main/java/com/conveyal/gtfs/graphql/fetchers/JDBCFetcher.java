@@ -180,7 +180,7 @@ public class JDBCFetcher implements DataFetcher<List<Map<String, Object>>> {
      * Handle fetching functionality for a given namespace, set of join values, and arguments. This is broken out from
      * the standard get function so that it can be reused in other fetchers (i.e., NestedJdbcFetcher)
      */
-    List<Map<String, Object>> getResults (
+    public List<Map<String, Object>> getResults (
         String namespace,
         List<String> parentJoinValues,
         Map<String, Object> graphQLQueryArguments
