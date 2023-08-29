@@ -452,6 +452,26 @@ public class GTFSTest {
                 }
             ),
             new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-service-three"
+                    ),
+                    new RecordExpectation("date", 20170917),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-service-three"
+                    ),
+                    new RecordExpectation("date", 20170918),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
                 "stop_times",
                 new RecordExpectation[]{
                     new RecordExpectation(
@@ -528,7 +548,8 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
-            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
+            new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED)
         );
         assertThat(
             runIntegrationTestOnFolder(

@@ -234,7 +234,7 @@ public class JdbcGtfsSnapshotter {
                 // Iterate through calendar dates to build up appropriate service dates.
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
                 Multimap<String, String> addedServiceForDate = HashMultimap.create();
-                HashMap<String, String> calendarDateService = new HashMap<>();
+                HashMap<String, Set<String>> calendarDateService = new HashMap<>();
                 for (CalendarDate calendarDate : calendarDates) {
                     // Skip any null dates or service ids.
                     if (calendarDate.date == null || calendarDate.service_id == null) {
@@ -251,13 +251,20 @@ public class JdbcGtfsSnapshotter {
                             removedServiceForDate.put(date, calendarDate.service_id);
                         }
                     } else {
-                        // Calendar date is unique.
-                        calendarDateService.put(date, calendarDate.service_id);
+                        // Calendar date is not related to a calendar. Group calendar dates by service id.
+                        if (calendarDateService.containsKey(calendarDate.service_id)) {
+                            calendarDateService.get(calendarDate.service_id).add(date);
+                        } else {
+                            Set<String> dates = new HashSet<>();
+                            dates.add(date);
+                            calendarDateService.put(calendarDate.service_id, dates);
+                        }
+
                     }
                 }
 
                 String sql = String.format(
-                    "insert into %s (name, dates, exemplar, added_service, removed_service) values (?, ?, ?, ?, ?)",
+                    "insert into %s (name, dates, exemplar, custom_schedule, added_service, removed_service) values (?, ?, ?, ?, ?, ?)",
                     scheduleExceptionsTableName
                 );
                 PreparedStatement scheduleExceptionsStatement = connection.prepareStatement(sql);
@@ -276,17 +283,23 @@ public class JdbcGtfsSnapshotter {
                         date,
                         new String[] {date},
                         ScheduleException.ExemplarServiceDescriptor.SWAP,
+                        new String[] {},
                         addedServiceForDate.get(date).toArray(),
                         removedServiceForDate.get(date).toArray()
                     );
                 }
-                for (Map.Entry<String,String> entry : calendarDateService.entrySet()) {
+
+                for (Map.Entry<String,Set<String>> entry : calendarDateService.entrySet()) {
+                    String serviceId = entry.getKey();
+                    String[] dates = entry.getValue().toArray(new String[0]);
                     createScheduledExceptionStatement(
                         scheduleExceptionsStatement,
                         scheduleExceptionsTracker,
-                        entry.getValue(),
-                        new String[] {entry.getKey()},
+                        // Unique-ish schedule name that shouldn't conflict with existing service ids.
+                        String.format("%s-%s", serviceId, dates[0]),
+                        dates,
                         ScheduleException.ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE,
+                        new String[] {serviceId},
                         new String[] {},
                         new String[] {}
                     );
@@ -369,6 +382,7 @@ public class JdbcGtfsSnapshotter {
         String name,
         String[] dates,
         ScheduleException.ExemplarServiceDescriptor exemplarServiceDescriptor,
+        Object[] customSchedule,
         Object[] addedServicesForDate,
         Object[] removedServicesForDate
     ) throws SQLException {
@@ -377,10 +391,14 @@ public class JdbcGtfsSnapshotter {
         scheduleExceptionsStatement.setInt(3, exemplarServiceDescriptor.getValue());
         scheduleExceptionsStatement.setArray(
             4,
-            connection.createArrayOf("text", addedServicesForDate)
+            connection.createArrayOf("text", customSchedule)
         );
         scheduleExceptionsStatement.setArray(
             5,
+            connection.createArrayOf("text", addedServicesForDate)
+        );
+        scheduleExceptionsStatement.setArray(
+            6,
             connection.createArrayOf("text", removedServicesForDate)
         );
         scheduleExceptionsTracker.addBatch();

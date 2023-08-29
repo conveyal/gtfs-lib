@@ -23,6 +23,7 @@ import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -93,7 +94,7 @@ public class JdbcGtfsExporter {
         FeedLoadResult result = new FeedLoadResult();
 
         try {
-            zipOutputStream = new ZipOutputStream(new FileOutputStream(outFile));
+            zipOutputStream = new ZipOutputStream(Files.newOutputStream(Paths.get(outFile)));
             long startTime = System.currentTimeMillis();
             // We get a single connection object and share it across several different methods.
             // This ensures that actions taken in one method are visible to all subsequent SQL statements.
@@ -126,16 +127,14 @@ public class JdbcGtfsExporter {
             if (fromEditor) {
                 // Export schedule exceptions in place of calendar dates if exporting a feed/schema that represents an editor snapshot.
                 GTFSFeed feed = new GTFSFeed();
-                // FIXME: The below table readers should probably just share a connection with the exporter.
-                JDBCTableReader<ScheduleException> exceptionsReader =
-                    new JDBCTableReader(Table.SCHEDULE_EXCEPTIONS, dataSource, feedIdToExport + ".",
-                        EntityPopulator.SCHEDULE_EXCEPTION);
+                JDBCTableReader<ScheduleException> exceptionsReader =new JDBCTableReader(
+                    Table.SCHEDULE_EXCEPTIONS,
+                    dataSource,
+                    feedIdToExport + ".",
+                    EntityPopulator.SCHEDULE_EXCEPTION
+                );
                 JDBCTableReader<Calendar> calendarReader = JDBCTableReader.getCalendarTableReader(dataSource, feedIdToExport);
                 Iterable<Calendar> calendars = calendarReader.getAll();
-                Set<String> calendarServiceIds = new HashSet<>();
-                for (Calendar calendar : calendarReader.getAll()) {
-                    calendarServiceIds.add(calendar.service_id);
-                }
                 Iterable<ScheduleException> exceptionsIterator = exceptionsReader.getAll();
                 List<ScheduleException> calendarExceptions = new ArrayList<>();
                 List<ScheduleException> calendarDateExceptions = new ArrayList<>();
@@ -149,20 +148,21 @@ public class JdbcGtfsExporter {
                 }
 
                 int calendarDateCount = calendarDateExceptions.size();
-                // Extract calendar date services, convert to calendar date and add to the feed. We are expecting only one
-                // date which will be exported as a service on the specified date.
+                // Extract calendar date services, convert to calendar date and add to the feed.
                 for (ScheduleException ex : calendarDateExceptions) {
-                    // Only ever expecting one date here.
-                    LocalDate date = ex.dates.get(0);
-                    CalendarDate calendarDate = new CalendarDate();
-                    calendarDate.date = date;
-                    calendarDate.service_id = ex.name;
-                    calendarDate.exception_type = 1;
-                    Service service = new Service(calendarDate.service_id);
-                    service.calendar_dates.put(date, calendarDate);
-                    // If the calendar dates provided contain duplicates (e.g. two or more identical service ids that are
-                    // NOT associated with a calendar) only the first entry will persist export.
-                    feed.services.put(calendarDate.service_id, service);
+                    for (LocalDate date : ex.dates) {
+                        String serviceId = ex.customSchedule.get(0);
+                        CalendarDate calendarDate = new CalendarDate();
+                        calendarDate.date = date;
+                        calendarDate.service_id = serviceId;
+                        calendarDate.exception_type = 1;
+                        Service service = new Service(serviceId);
+                        service.calendar_dates.put(date, calendarDate);
+                        // If the calendar dates provided contain duplicates (e.g. two or more identical service ids
+                        // that are NOT associated with a calendar) only the first entry would persist export. To
+                        // resolve this a unique key consisting of service id and date is used.
+                        feed.services.put(String.format("%s-%s", calendarDate.service_id, calendarDate.date), service);
+                    }
                 }
 
                 // check whether the feed is organized in a format with the calendars.txt file
