@@ -109,6 +109,7 @@ public class GTFSTest {
         ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
             new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567")),
@@ -997,6 +998,15 @@ public class GTFSTest {
     }
 
     /**
+     * Proprietary table file names are prefix with "datatools_" to distinguish them from GTFS spec files.
+     */
+    private String getTableFileName(String tableName) {
+        return (tableName.equals("patterns"))
+            ? String.format("datatools_%s.txt", tableName)
+            : tableName + ".txt";
+    }
+
+    /**
      * Helper to assert that the GTFS that was exported to a zip file matches all data expectations defined in the
      * persistence expectations.
      */
@@ -1014,7 +1024,7 @@ public class GTFSTest {
             if (persistenceExpectation.appliesToEditorDatabaseOnly) continue;
             // No need to check that errors were exported because it is an internal table only.
             if ("errors".equals(persistenceExpectation.tableName)) continue;
-            final String tableFileName = persistenceExpectation.tableName + ".txt";
+            final String tableFileName = getTableFileName(persistenceExpectation.tableName);
             LOG.info(String.format("reading table: %s", tableFileName));
 
             ZipEntry entry = gtfsZipfile.getEntry(tableFileName);
@@ -1266,6 +1276,17 @@ public class GTFSTest {
                 new RecordExpectation("route_long_name", "Route 1"),
                 new RecordExpectation("route_type", 3),
                 new RecordExpectation("route_color", "7CE6E7")
+            }
+        ),
+        new PersistenceExpectation(
+            "patterns",
+            new RecordExpectation[]{
+                new RecordExpectation("pattern_id", "1"),
+                new RecordExpectation("route_id", "1"),
+                new RecordExpectation("name", "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips)"),
+                new RecordExpectation("direction_id", "0"),
+                new RecordExpectation("use_frequency", null),
+                new RecordExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e")
             }
         ),
         new PersistenceExpectation(

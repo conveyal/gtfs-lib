@@ -353,7 +353,13 @@ public class JdbcGtfsLoader {
         // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
         // We'll just literally prepend feed identifiers to table names when supplied.
         // Some databases require the table to exist before a statement can be prepared.
-        targetTable.createSqlTable(connection);
+        if (table.name.equals("patterns")) {
+            // When creating the patterns table the id field must be flagged as serial and not bigint. This then allows
+            // the addition of new patterns in PatternBuilder#processPatternAndPatternStops.
+            targetTable.createSqlTable(connection, true);
+        } else {
+            targetTable.createSqlTable(connection);
+        }
 
         // TODO are we loading with or without a header row in our Postgres text file?
         if (postgresText) {

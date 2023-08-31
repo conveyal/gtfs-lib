@@ -134,7 +134,7 @@ public class GTFSFeedTest {
                 new DataExpectation[]{
                     new DataExpectation("pattern_id", "1"),
                     new DataExpectation("route_id", "1"),
-                    new DataExpectation("name", "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (3 trips)"),
+                    new DataExpectation("name", "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips)"),
                     new DataExpectation("direction_id", "0"),
                     new DataExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e")
                 }

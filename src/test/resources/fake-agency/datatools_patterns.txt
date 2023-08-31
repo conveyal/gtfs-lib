@@ -1,2 +1,2 @@
 pattern_id,route_id,name,direction_id,use_frequency,shape_id
-1,1,2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (3 trips),0,,5820f377-f947-4728-ac29-ac0102cbc34e
+1,1,2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips),0,,5820f377-f947-4728-ac29-ac0102cbc34e

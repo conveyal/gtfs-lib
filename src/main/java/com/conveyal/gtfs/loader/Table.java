@@ -255,9 +255,9 @@ public class Table {
             new StringField("name", OPTIONAL),
             // Editor-specific fields.
             // direction_id and shape_id are exemplar fields applied to all trips for a pattern.
-            new ShortField("direction_id", EDITOR, 1),
-            new ShortField("use_frequency", EDITOR, 1),
-            new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
+            new ShortField("direction_id", OPTIONAL, 1),
+            new ShortField("use_frequency", OPTIONAL, 1),
+            new StringField("shape_id", OPTIONAL).isReferenceTo(SHAPES)
     )
     .addPrimaryKey()
     .addPrimaryKeyNames("pattern_id")
