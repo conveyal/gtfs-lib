@@ -103,6 +103,12 @@ public class Table {
     /** Key(s) that uniquely identify an entry in the respective table.*/
     private String[] primaryKeyNames;
 
+    /** Prefixed to exported tables/files that are not part of the GTFS spec. */
+    public static String proprietaryFilePrefix = "datatools_";
+
+    /** Identifies which tables on export are proprietary and should have the proprietary prefix applied. */
+    public boolean isProprietaryTable = false;
+
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
         this.name = name;
@@ -252,8 +258,10 @@ public class Table {
             new ShortField("direction_id", EDITOR, 1),
             new ShortField("use_frequency", EDITOR, 1),
             new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
-    ).addPrimaryKey()
-    .addPrimaryKeyNames("pattern_id");
+    )
+    .addPrimaryKey()
+    .addPrimaryKeyNames("pattern_id")
+    .hasProprietaryFilePrefix();
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id", REQUIRED),
@@ -488,6 +496,15 @@ public class Table {
     }
 
     /**
+     * Fluent method that defines tables that on export should have the proprietary prefixed value applied to the file
+     * name.
+     */
+    public Table hasProprietaryFilePrefix() {
+        this.isProprietaryTable = true;
+        return this;
+    }
+
+    /**
      * Get field names that are primary keys for a table.
      */
     public List<String> getPrimaryKeyNames () {
@@ -618,6 +635,13 @@ public class Table {
         );
     }
 
+    public String getFileName() {
+        String fileName = this.name + ".txt";
+        return this.isProprietaryTable
+            ? Table.proprietaryFilePrefix + fileName
+            : fileName;
+    }
+
     /**
      * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
      * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
@@ -625,7 +649,7 @@ public class Table {
      * It then creates a CSV reader for that table if it's found.
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
-        final String tableFileName = this.name + ".txt";
+        final String tableFileName = getFileName();
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.

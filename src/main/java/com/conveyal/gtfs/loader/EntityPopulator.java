@@ -74,7 +74,11 @@ public interface EntityPopulator<T> {
     EntityPopulator<Pattern> PATTERN = (result, columnForName) -> {
         Pattern pattern = new Pattern();
         pattern.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        pattern.route_id = getStringIfPresent(result, "route_id", columnForName);
         pattern.name = getStringIfPresent(result, "name", columnForName);
+        pattern.direction_id = getIntIfPresent(result, "direction_id", columnForName);
+        pattern.use_frequency = getIntIfPresent(result, "use_frequency", columnForName);
+        pattern.shape_id = getStringIfPresent(result, "shape_id", columnForName);
         return pattern;
     };
 

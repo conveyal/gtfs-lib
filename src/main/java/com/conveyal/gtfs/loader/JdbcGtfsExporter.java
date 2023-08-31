@@ -242,11 +242,7 @@ public class JdbcGtfsExporter {
                 result.routes = export(Table.ROUTES, connection);
             }
 
-            // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
-            // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
-            // frequency-based pattern travel times match stop time arrivals/departures?
-//            export(Table.PATTERNS);
-//            export(Table.PATTERN_STOP);
+            result.patterns = export(Table.PATTERNS, connection);
             // Only write shapes for "approved" routes using COPY TO with results of select query
             if (fromEditor) {
                 // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
@@ -323,8 +319,6 @@ public class JdbcGtfsExporter {
             } else {
                 result.trips = export(Table.TRIPS, connection);
             }
-
-            result.patterns = export(Table.PATTERNS, connection);
 
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
@@ -414,7 +408,7 @@ public class JdbcGtfsExporter {
             }
 
             // Create entry for table
-            String textFileName = table.name + ".txt";
+            String textFileName = table.getFileName();
             ZipEntry zipEntry = new ZipEntry(textFileName);
             zipOutputStream.putNextEntry(zipEntry);
 

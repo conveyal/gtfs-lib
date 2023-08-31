@@ -322,7 +322,7 @@ public class JdbcGtfsLoader {
     private int loadInternal(Table table) throws Exception {
         CsvReader csvReader = table.getCsvReader(zip, errorStorage);
         if (csvReader == null) {
-            LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
+            LOG.info("File {} not found in gtfs zip file.", table.getFileName());
             // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
             return 0;

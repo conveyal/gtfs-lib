@@ -39,7 +39,7 @@ public class Feed {
     public final TableReader<Stop>          stops;
     public final TableReader<Trip>          trips;
     public final TableReader<StopTime>      stopTimes;
-    public final TableReader<Pattern>      patterns;
+    public final TableReader<Pattern>       patterns;
 
     /**
      * Create a feed that reads tables over a JDBC connection. The connection should already be set to the right

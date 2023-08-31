@@ -169,6 +169,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.fares.putAll(fares);
         fares = null; // free memory
 
+        new Pattern.Loader(this).loadTable(zip);
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
