@@ -151,15 +151,16 @@ public class JdbcGtfsLoader {
                 // This allows everything to work even when there's no prefix.
                 this.tablePrefix += ".";
             }
-            // Load each table in turn, saving some summary information about what happened during each table load
+            // Load each table in turn, saving some summary information about what happened during each table load.
+            // The loading order is needed for referential integrity.
             result.agency = load(Table.AGENCY);
             result.calendar = load(Table.CALENDAR);
             result.calendarDates = load(Table.CALENDAR_DATES);
             result.routes = load(Table.ROUTES);
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
             result.feedInfo = load(Table.FEED_INFO);
-            result.patterns = load(Table.PATTERNS);
             result.shapes = load(Table.SHAPES);
+            result.patterns = load(Table.PATTERNS); // refs shapes and routes.
             result.stops = load(Table.STOPS);
             result.fareRules = load(Table.FARE_RULES);
             result.transfers = load(Table.TRANSFERS);
