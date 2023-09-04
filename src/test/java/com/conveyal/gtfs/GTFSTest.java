@@ -5,6 +5,7 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.SnapshotResult;
+import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.storage.ErrorExpectation;
 import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
@@ -998,15 +999,6 @@ public class GTFSTest {
     }
 
     /**
-     * Proprietary table file names are prefix with "datatools_" to distinguish them from GTFS spec files.
-     */
-    private String getTableFileName(String tableName) {
-        return (tableName.equals("patterns"))
-            ? String.format("datatools_%s.txt", tableName)
-            : tableName + ".txt";
-    }
-
-    /**
      * Helper to assert that the GTFS that was exported to a zip file matches all data expectations defined in the
      * persistence expectations.
      */
@@ -1024,7 +1016,7 @@ public class GTFSTest {
             if (persistenceExpectation.appliesToEditorDatabaseOnly) continue;
             // No need to check that errors were exported because it is an internal table only.
             if ("errors".equals(persistenceExpectation.tableName)) continue;
-            final String tableFileName = getTableFileName(persistenceExpectation.tableName);
+            final String tableFileName = Table.getTableFileName(persistenceExpectation.tableName);
             LOG.info(String.format("reading table: %s", tableFileName));
 
             ZipEntry entry = gtfsZipfile.getEntry(tableFileName);

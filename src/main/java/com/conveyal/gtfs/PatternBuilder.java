@@ -40,14 +40,10 @@ public class PatternBuilder {
         connection = feed.getConnection();
     }
 
-    private String getTableName(String tableName) {
-        return feed.tablePrefix + tableName;
-    }
-
     public void create(Map<TripPatternKey, Pattern> patterns, Set<String> patternIdsLoadedFromFile) {
-        String patternsTableName = getTableName("patterns");
-        String tripsTableName = getTableName("trips");
-        String patternStopsTableName = getTableName("pattern_stops");
+        String patternsTableName = feed.getTableName("patterns");
+        String tripsTableName = feed.getTableName("trips");
+        String patternStopsTableName = feed.getTableName("pattern_stops");
 
         Table patternsTable = new Table(patternsTableName, Pattern.class, Requirement.EDITOR, Table.PATTERNS.fields);
         Table patternStopsTable = new Table(patternStopsTableName, PatternStop.class, Requirement.EDITOR, Table.PATTERN_STOP.fields);
@@ -62,9 +58,10 @@ public class PatternBuilder {
                 patternsTable.createSqlTable(connection, null, true);
             }
             patternStopsTable.createSqlTable(connection, null, true);
-            PrintStream patternForTripsFileStream = createTempPatternForTripsTable(tempPatternForTripsTextFile, statement);
-            processPatternAndPatternStops(patternsTable, patternStopsTable, patternForTripsFileStream, patterns, patternIdsLoadedFromFile);
-            updateTripPatternIds(tempPatternForTripsTextFile, patternForTripsFileStream, statement, tripsTableName);
+            try (PrintStream patternForTripsFileStream = createTempPatternForTripsTable(tempPatternForTripsTextFile, statement)) {
+                processPatternAndPatternStops(patternsTable, patternStopsTable, patternForTripsFileStream, patterns, patternIdsLoadedFromFile);
+            }
+            updateTripPatternIds(tempPatternForTripsTextFile, statement, tripsTableName);
             createIndexes(statement, patternsTableName, patternStopsTableName, tripsTableName);
             connection.commit();
         } catch (SQLException | IOException e) {
@@ -143,13 +140,11 @@ public class PatternBuilder {
      */
     private void updateTripPatternIds(
         File tempPatternForTripsTextFile,
-        PrintStream patternForTripsFileStream,
         Statement statement,
         String tripsTableName
     ) throws SQLException, IOException {
 
         LOG.info("Updating trips with pattern IDs.");
-        patternForTripsFileStream.close();
         // Copy file contents into temp pattern for trips table.
         copyFromFile(connection, tempPatternForTripsTextFile, TEMP_FILE_NAME);
         // Before updating the trips with pattern IDs, index the table on trip_id.

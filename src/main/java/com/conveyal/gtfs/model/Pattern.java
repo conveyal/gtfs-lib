@@ -1,7 +1,6 @@
 package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.error.NoAgencyInFeedError;
 import com.conveyal.gtfs.loader.Table;
 import com.google.common.base.Joiner;
 import org.locationtech.jts.geom.LineString;
@@ -114,7 +113,7 @@ public class Pattern extends Entity {
     public static class Loader extends Entity.Loader<Pattern> {
 
         public Loader(GTFSFeed feed) {
-            super(feed, Table.proprietaryFilePrefix + "patterns");
+            super(feed, Table.PROPRIETARY_FILE_PREFIX + "patterns");
         }
 
         @Override
@@ -142,7 +141,7 @@ public class Pattern extends Entity {
 
     public static class Writer extends Entity.Writer<Pattern> {
         public Writer (GTFSFeed feed) {
-            super(feed, Table.proprietaryFilePrefix + "patterns");
+            super(feed, Table.PROPRIETARY_FILE_PREFIX + "patterns");
         }
 
         @Override

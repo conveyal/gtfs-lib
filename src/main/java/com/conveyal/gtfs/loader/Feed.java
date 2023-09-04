@@ -26,9 +26,9 @@ public class Feed {
 
     private final DataSource dataSource;
 
-    // The unique database schema name for this particular feed, including the separator charater (dot).
+    // The unique database schema name for this particular feed, including the separator character (dot).
     // This may be the empty string if the feed is stored in the root ("public") schema.
-    public final String tablePrefix;
+    private final String tablePrefix;
 
     public final TableReader<Agency>        agencies;
     public final TableReader<Calendar>      calendars;
@@ -154,4 +154,10 @@ public class Feed {
         return dataSource.getConnection();
     }
 
+    /**
+     * @return the table name prefixed with this feed's database schema.
+     */
+    public String getTableName(String tableName) {
+        return tablePrefix + tableName;
+    }
 }

@@ -104,10 +104,7 @@ public class Table {
     private String[] primaryKeyNames;
 
     /** Prefixed to exported tables/files that are not part of the GTFS spec. */
-    public static String proprietaryFilePrefix = "datatools_";
-
-    /** Identifies which tables on export are proprietary and should have the proprietary prefix applied. */
-    public boolean isProprietaryTable = false;
+    public static final String PROPRIETARY_FILE_PREFIX = "datatools_";
 
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
@@ -260,8 +257,7 @@ public class Table {
             new StringField("shape_id", OPTIONAL).isReferenceTo(SHAPES)
     )
     .addPrimaryKey()
-    .addPrimaryKeyNames("pattern_id")
-    .hasProprietaryFilePrefix();
+    .addPrimaryKeyNames("pattern_id");
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
         new StringField("stop_id", REQUIRED),
@@ -496,15 +492,6 @@ public class Table {
     }
 
     /**
-     * Fluent method that defines tables that on export should have the proprietary prefixed value applied to the file
-     * name.
-     */
-    public Table hasProprietaryFilePrefix() {
-        this.isProprietaryTable = true;
-        return this;
-    }
-
-    /**
      * Get field names that are primary keys for a table.
      */
     public List<String> getPrimaryKeyNames () {
@@ -635,11 +622,13 @@ public class Table {
         );
     }
 
-    public String getFileName() {
-        String fileName = this.name + ".txt";
-        return this.isProprietaryTable
-            ? Table.proprietaryFilePrefix + fileName
-            : fileName;
+    /**
+     * Proprietary table file names are prefix with "datatools_" to distinguish them from GTFS spec files.
+     */
+    public static String getTableFileName(String tableName) {
+        return (tableName.equals("patterns"))
+            ? String.format("%s%s.txt", PROPRIETARY_FILE_PREFIX, tableName)
+            : tableName + ".txt";
     }
 
     /**
@@ -649,7 +638,7 @@ public class Table {
      * It then creates a CSV reader for that table if it's found.
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
-        final String tableFileName = getFileName();
+        final String tableFileName = getTableFileName(this.name);
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.
