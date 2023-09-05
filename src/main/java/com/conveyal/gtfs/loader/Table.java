@@ -622,13 +622,21 @@ public class Table {
         );
     }
 
+    public static String getTableFileNameWithExtension(String tableName) {
+        return getTableFileName(tableName, ".txt");
+    }
+
+    public static String getTableFileName(String tableName) {
+        return getTableFileName(tableName, "");
+    }
+
     /**
      * Proprietary table file names are prefix with "datatools_" to distinguish them from GTFS spec files.
      */
-    public static String getTableFileName(String tableName) {
+    private static String getTableFileName(String tableName, String fileExtension) {
         return (tableName.equals("patterns"))
-            ? String.format("%s%s.txt", PROPRIETARY_FILE_PREFIX, tableName)
-            : tableName + ".txt";
+            ? String.format("%s%s%s", PROPRIETARY_FILE_PREFIX, tableName, fileExtension)
+            : String.format("%s%s", tableName, fileExtension);
     }
 
     /**
@@ -638,7 +646,7 @@ public class Table {
      * It then creates a CSV reader for that table if it's found.
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
-        final String tableFileName = getTableFileName(this.name);
+        final String tableFileName = getTableFileNameWithExtension(this.name);
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.

@@ -41,9 +41,9 @@ public class PatternBuilder {
     }
 
     public void create(Map<TripPatternKey, Pattern> patterns, Set<String> patternIdsLoadedFromFile) {
-        String patternsTableName = feed.getTableName("patterns");
-        String tripsTableName = feed.getTableName("trips");
-        String patternStopsTableName = feed.getTableName("pattern_stops");
+        String patternsTableName = feed.getTableNameWithSchemaPrefix("patterns");
+        String tripsTableName = feed.getTableNameWithSchemaPrefix("trips");
+        String patternStopsTableName = feed.getTableNameWithSchemaPrefix("pattern_stops");
 
         Table patternsTable = new Table(patternsTableName, Pattern.class, Requirement.EDITOR, Table.PATTERNS.fields);
         Table patternStopsTable = new Table(patternStopsTableName, PatternStop.class, Requirement.EDITOR, Table.PATTERN_STOP.fields);

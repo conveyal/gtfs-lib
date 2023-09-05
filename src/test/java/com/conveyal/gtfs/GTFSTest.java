@@ -1016,7 +1016,7 @@ public class GTFSTest {
             if (persistenceExpectation.appliesToEditorDatabaseOnly) continue;
             // No need to check that errors were exported because it is an internal table only.
             if ("errors".equals(persistenceExpectation.tableName)) continue;
-            final String tableFileName = Table.getTableFileName(persistenceExpectation.tableName);
+            final String tableFileName = Table.getTableFileNameWithExtension(persistenceExpectation.tableName);
             LOG.info(String.format("reading table: %s", tableFileName));
 
             ZipEntry entry = gtfsZipfile.getEntry(tableFileName);

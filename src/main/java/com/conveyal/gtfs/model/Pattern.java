@@ -113,7 +113,7 @@ public class Pattern extends Entity {
     public static class Loader extends Entity.Loader<Pattern> {
 
         public Loader(GTFSFeed feed) {
-            super(feed, Table.PROPRIETARY_FILE_PREFIX + "patterns");
+            super(feed, Table.getTableFileName("patterns"));
         }
 
         @Override
@@ -141,7 +141,7 @@ public class Pattern extends Entity {
 
     public static class Writer extends Entity.Writer<Pattern> {
         public Writer (GTFSFeed feed) {
-            super(feed, Table.PROPRIETARY_FILE_PREFIX + "patterns");
+            super(feed, Table.getTableFileName("patterns"));
         }
 
         @Override

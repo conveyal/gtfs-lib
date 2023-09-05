@@ -408,7 +408,7 @@ public class JdbcGtfsExporter {
             }
 
             // Create entry for table
-            String textFileName = Table.getTableFileName(table.name);
+            String textFileName = Table.getTableFileNameWithExtension(table.name);
             ZipEntry zipEntry = new ZipEntry(textFileName);
             zipOutputStream.putNextEntry(zipEntry);
 
