@@ -1483,6 +1483,10 @@ public class JdbcTableWriter implements TableWriter {
         return parsedString.replaceAll("[{}]", "").split("[,]", 0);
     }
 
+    private String getResultSetString(int column, ResultSet resultSet) throws java.sql.SQLException {
+        return resultSet.getString(column) == null ? "" : resultSet.getString(resultSet.getString(1) == null ? "" : resultSet.getString(1));
+    }
+
     /**
      * Delete all entries in calendar dates associated with a schedule exception.
      */
@@ -1599,7 +1603,7 @@ public class JdbcTableWriter implements TableWriter {
                                             ResultSet resultSet = patternStopSelectStatement.getResultSet();
                                             while (resultSet.next()) {
                                                 patternAndRouteIds.add(
-                                                    "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "-" + resultSet.getString(3) + "-" + resultSet.getString(3) + "}"
+                                                    "{" + getResultSetString(1, resultSet) + "-" + getResultSetString(2, resultSet) + "-" + getResultSetString(3, resultSet)+ "-" + getResultSetString(4, resultSet) + "}"
                                                 );
                                             }
                                         }
