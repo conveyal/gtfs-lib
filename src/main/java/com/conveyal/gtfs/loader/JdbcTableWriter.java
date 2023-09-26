@@ -1484,7 +1484,8 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     private String getResultSetString(int column, ResultSet resultSet) throws java.sql.SQLException {
-        return resultSet.getString(column) == null ? "" : resultSet.getString(resultSet.getString(1) == null ? "" : resultSet.getString(1));
+        String resultSetString = resultSet.getString(column);
+        return resultSetString == null ? "" : resultSetString;
     }
 
     /**
