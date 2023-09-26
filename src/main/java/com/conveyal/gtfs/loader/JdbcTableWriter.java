@@ -1579,7 +1579,7 @@ public class JdbcTableWriter implements TableWriter {
                                     connection.rollback();
                                     if (entityClass.getSimpleName().equals("Stop")) {
                                         String patternStopLookup = String.format(
-                                            "select distinct p.id, r.id, r.route_short_name " +
+                                            "select distinct p.id, r.id, r.route_short_name, r.route_id " +
                                             "from %s.pattern_stops ps " +
                                             "inner join " +
                                             "%s.patterns p " +
@@ -1599,7 +1599,7 @@ public class JdbcTableWriter implements TableWriter {
                                             ResultSet resultSet = patternStopSelectStatement.getResultSet();
                                             while (resultSet.next()) {
                                                 patternAndRouteIds.add(
-                                                    "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "-" + resultSet.getString(3) + "}"
+                                                    "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "-" + resultSet.getString(3) + "-" + resultSet.getString(3) + "}"
                                                 );
                                             }
                                         }
