@@ -1604,7 +1604,12 @@ public class JdbcTableWriter implements TableWriter {
                                             ResultSet resultSet = patternStopSelectStatement.getResultSet();
                                             while (resultSet.next()) {
                                                 patternAndRouteIds.add(
-                                                    "{" + getResultSetString(1, resultSet) + "-" + getResultSetString(2, resultSet) + "-" + getResultSetString(3, resultSet)+ "-" + getResultSetString(4, resultSet) + "}"
+                                                    String.format("{%s-%s-%s-%s}",
+                                                        getResultSetString(1, resultSet),
+                                                        getResultSetString(2, resultSet),
+                                                        getResultSetString(3, resultSet),
+                                                        getResultSetString(4, resultSet)
+                                                    )
                                                 );
                                             }
                                         }
