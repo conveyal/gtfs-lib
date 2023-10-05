@@ -44,6 +44,9 @@ public class JdbcGtfsExporter {
     private final DataSource dataSource;
     private final boolean fromEditor;
 
+    /** If this is true will export tables prefixed with {@link Table#PROPRIETARY_FILE_PREFIX} **/
+    private final boolean exportProprietaryFiles;
+
     // These fields will be filled in once feed snapshot begins.
     private Connection connection;
     private ZipOutputStream zipOutputStream;
@@ -66,6 +69,15 @@ public class JdbcGtfsExporter {
         this.outFile = outFile;
         this.dataSource = dataSource;
         this.fromEditor = fromEditor;
+        this.exportProprietaryFiles = true;
+    }
+
+    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor, boolean exportProprietaryFiles) {
+        this.feedIdToExport = feedId;
+        this.outFile = outFile;
+        this.dataSource = dataSource;
+        this.fromEditor = fromEditor;
+        this.exportProprietaryFiles = exportProprietaryFiles;
     }
 
     /**
@@ -242,7 +254,9 @@ public class JdbcGtfsExporter {
                 result.routes = export(Table.ROUTES, connection);
             }
 
-            result.patterns = export(Table.PATTERNS, connection);
+            if (exportProprietaryFiles) {
+                result.patterns = export(Table.PATTERNS, connection);
+            }
             // Only write shapes for "approved" routes using COPY TO with results of select query
             if (fromEditor) {
                 // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
