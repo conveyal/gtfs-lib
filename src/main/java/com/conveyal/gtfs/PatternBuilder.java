@@ -143,7 +143,6 @@ public class PatternBuilder {
         Statement statement,
         String tripsTableName
     ) throws SQLException, IOException {
-
         LOG.info("Updating trips with pattern IDs.");
         // Copy file contents into temp pattern for trips table.
         copyFromFile(connection, tempPatternForTripsTextFile, TEMP_FILE_NAME);
@@ -190,7 +189,6 @@ public class PatternBuilder {
      * Construct pattern stops based on values in trip pattern key.
      */
     private void createPatternStops(TripPatternKey key, String patternId, Table patternStopsTable) throws SQLException {
-
         String insertPatternStopSql = patternStopsTable.generateInsertSql(true);
         PreparedStatement insertPatternStopStatement = connection.prepareStatement(insertPatternStopSql);
         BatchTracker patternStopTracker = new BatchTracker("pattern stop", insertPatternStopStatement);
