@@ -45,7 +45,7 @@ public class JdbcGtfsExporter {
     private final boolean fromEditor;
 
     /** If this is true will export tables prefixed with {@link Table#PROPRIETARY_FILE_PREFIX} **/
-    private final boolean exportProprietaryFiles;
+    private final boolean publishProprietaryFiles;
 
     // These fields will be filled in once feed snapshot begins.
     private Connection connection;
@@ -63,21 +63,17 @@ public class JdbcGtfsExporter {
         Table.TRIPS.fileName
     );
 
+    public static final List<String> proprietaryFileList = Lists.newArrayList(
+        String.format("%s%s", Table.PROPRIETARY_FILE_PREFIX, Table.PATTERNS.fileName)
+    );
 
-    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
+
+    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor, boolean publishProprietaryFiles) {
         this.feedIdToExport = feedId;
         this.outFile = outFile;
         this.dataSource = dataSource;
         this.fromEditor = fromEditor;
-        this.exportProprietaryFiles = true;
-    }
-
-    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor, boolean exportProprietaryFiles) {
-        this.feedIdToExport = feedId;
-        this.outFile = outFile;
-        this.dataSource = dataSource;
-        this.fromEditor = fromEditor;
-        this.exportProprietaryFiles = exportProprietaryFiles;
+        this.publishProprietaryFiles = publishProprietaryFiles;
     }
 
     /**
@@ -254,9 +250,6 @@ public class JdbcGtfsExporter {
                 result.routes = export(Table.ROUTES, connection);
             }
 
-            if (exportProprietaryFiles) {
-                result.patterns = export(Table.PATTERNS, connection);
-            }
             // Only write shapes for "approved" routes using COPY TO with results of select query
             if (fromEditor) {
                 // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
@@ -334,6 +327,8 @@ public class JdbcGtfsExporter {
                 result.trips = export(Table.TRIPS, connection);
             }
 
+            exportProprietaryFiles(result);
+
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
             cleanUpZipFile();
@@ -352,6 +347,15 @@ public class JdbcGtfsExporter {
             if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
+    }
+
+    /**
+     * Export proprietary files, if they are required.
+     */
+    private void exportProprietaryFiles(FeedLoadResult result) {
+        if (publishProprietaryFiles) {
+            result.patterns = export(Table.PATTERNS, connection);
+        }
     }
 
     /**
