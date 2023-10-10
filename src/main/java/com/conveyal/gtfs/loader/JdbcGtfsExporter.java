@@ -354,7 +354,10 @@ public class JdbcGtfsExporter {
      */
     private void exportProprietaryFiles(FeedLoadResult result) {
         if (publishProprietaryFiles) {
+            LOG.info("Exporting proprietary files.");
             result.patterns = export(Table.PATTERNS, connection);
+        } else {
+            LOG.info("Proprietary files not exported.");
         }
     }
 
