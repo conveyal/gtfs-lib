@@ -161,8 +161,8 @@ public class JdbcGtfsLoader {
             result.shapes = load(Table.SHAPES);
             result.stops = load(Table.STOPS);
             result.fareRules = load(Table.FARE_RULES);
-            result.transfers = load(Table.TRANSFERS);
             result.trips = load(Table.TRIPS); // refs routes
+            result.transfers = load(Table.TRANSFERS); // refs trips.
             result.frequencies = load(Table.FREQUENCIES); // refs trips
             result.stopTimes = load(Table.STOP_TIMES);
             result.translations = load(Table.TRANSLATIONS);

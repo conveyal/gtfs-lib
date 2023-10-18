@@ -16,7 +16,6 @@ import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.io.Files;
 import graphql.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
@@ -34,6 +33,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -246,12 +246,12 @@ public class GTFSTest {
      * Tests whether or not "fake-agency" GTFS can be placed in a zipped subdirectory and loaded/exported successfully.
      */
     @Test
-    public void canLoadAndExportSimpleAgencyInSubDirectory() {
+    public void canLoadAndExportSimpleAgencyInSubDirectory() throws IOException {
         String zipFileName = null;
         // Get filename for fake-agency resource
         String resourceFolder = TestUtils.getResourceFileName("fake-agency");
         // Recursively copy folder into temp directory, which we zip up and run the integration test on.
-        File tempDir = Files.createTempDir();
+        File tempDir = Files.createTempDirectory("").toFile();
         tempDir.deleteOnExit();
         File nestedDir = new File(TestUtils.fileNameWithDir(tempDir.getAbsolutePath(), "fake-agency"));
         LOG.info("Creating temp folder with nested subdirectory at {}", tempDir.getAbsolutePath());
@@ -1312,6 +1312,19 @@ public class GTFSTest {
                 ),
                 new RecordExpectation("bikes_allowed", 0),
                 new RecordExpectation("wheelchair_accessible", 0)
+            }
+        ),
+        new PersistenceExpectation(
+            "transfers",
+            new RecordExpectation[]{
+                new RecordExpectation("from_stop_id", "4u6g"),
+                new RecordExpectation("to_stop_id", "johv"),
+                new RecordExpectation("from_trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
+                new RecordExpectation("to_trip_id", "frequency-trip"),
+                new RecordExpectation("from_route_id", "1"),
+                new RecordExpectation("to_route_id", "1"),
+                new RecordExpectation("transfer_type", "1"),
+                new RecordExpectation("min_transfer_time", "60")
             }
         )
     };
