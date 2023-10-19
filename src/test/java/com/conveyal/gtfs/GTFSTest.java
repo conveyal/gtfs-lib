@@ -37,6 +37,7 @@ import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -108,7 +109,6 @@ public class GTFSTest {
     public void canLoadAndExportSimpleAgency() {
         ErrorExpectation[] fakeAgencyErrorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
-            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
             new ErrorExpectation(NewGTFSErrorType.GEO_JSON_PARSING),
@@ -121,11 +121,22 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED),
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED, equalTo("1234567"))
         );
+        PersistenceExpectation[] specialCasePersistenceExpectations = new PersistenceExpectation[] {
+            new PersistenceExpectation(
+                "stop_areas",
+                new RecordExpectation[] {
+                    new RecordExpectation("area_id", "area1"),
+                    new RecordExpectation("stop_id", "123,4u6g")
+                }
+            )
+        };
+
         assertThat(
             runIntegrationTestOnFolder(
                 "fake-agency",
                 nullValue(),
                 fakeAgencyPersistenceExpectations,
+                specialCasePersistenceExpectations,
                 fakeAgencyErrorExpectations
             ),
             equalTo(true)
@@ -273,7 +284,6 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
-            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
@@ -305,7 +315,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.STOP_UNUSED)
         );
         assertThat(
-            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, errorExpectations),
+            runIntegrationTestOnZipFile(zipFileName, nullValue(), fakeAgencyPersistenceExpectations, null, errorExpectations),
             equalTo(true)
         );
     }
@@ -598,6 +608,26 @@ public class GTFSTest {
     }
 
     /**
+     * Overload method to cover tests that don't specify special case persistence expectations.
+     */
+    private boolean runIntegrationTestOnFolder(
+        String folderName,
+        Matcher<Object> fatalExceptionExpectation,
+        PersistenceExpectation[] persistenceExpectations,
+        ErrorExpectation[] errorExpectations,
+        FeedValidatorCreator... customValidators
+    ) {
+        return runIntegrationTestOnFolder(
+            folderName,
+            fatalExceptionExpectation,
+            persistenceExpectations,
+            null,
+            errorExpectations,
+            customValidators
+        );
+    }
+
+    /**
      * A helper method that will zip a specified folder in test/main/resources and call
      * {@link #runIntegrationTestOnZipFile} on that file.
      */
@@ -605,6 +635,7 @@ public class GTFSTest {
         String folderName,
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
+        PersistenceExpectation[] specialCasePersistenceExpectations,
         ErrorExpectation[] errorExpectations,
         FeedValidatorCreator... customValidators
     ) {
@@ -621,6 +652,7 @@ public class GTFSTest {
             zipFileName,
             fatalExceptionExpectation,
             persistenceExpectations,
+            specialCasePersistenceExpectations,
             errorExpectations,
             customValidators
         );
@@ -678,6 +710,7 @@ public class GTFSTest {
         String zipFileName,
         Matcher<Object> fatalExceptionExpectation,
         PersistenceExpectation[] persistenceExpectations,
+        PersistenceExpectation[] specialCasePersistenceExpectations,
         ErrorExpectation[] errorExpectations,
         FeedValidatorCreator... customValidators
     ) {
@@ -704,6 +737,7 @@ public class GTFSTest {
                 connection,
                 namespace,
                 persistenceExpectations,
+                specialCasePersistenceExpectations,
                 errorExpectations,
                 false
             );
@@ -847,6 +881,7 @@ public class GTFSTest {
                 copyResult.uniqueIdentifier,
                 persistenceExpectations,
                 null,
+                null,
                 true
             );
             LOG.info("export GTFS from copied namespace");
@@ -871,6 +906,7 @@ public class GTFSTest {
         Connection connection,
         String namespace,
         PersistenceExpectation[] persistenceExpectations,
+        PersistenceExpectation[] specialCasePersistenceExpectations,
         ErrorExpectation[] errorExpectations,
         boolean isEditorDatabase
     ) throws SQLException {
@@ -887,7 +923,11 @@ public class GTFSTest {
         }
         // run through testing expectations
         LOG.info("testing expectations of record storage in the database");
-        for (PersistenceExpectation persistenceExpectation : persistenceExpectations) {
+        ArrayList<PersistenceExpectation> allPersistenceExpectations = new ArrayList<>(new ArrayList<>(Arrays.asList(persistenceExpectations)));
+        if (specialCasePersistenceExpectations != null) {
+            allPersistenceExpectations.addAll(new ArrayList<>(Arrays.asList(specialCasePersistenceExpectations)));
+        }
+        for (PersistenceExpectation persistenceExpectation : allPersistenceExpectations) {
             if (persistenceExpectation.appliesToEditorDatabaseOnly && !isEditorDatabase) continue;
             // select all entries from a table
             String sql = String.format(
@@ -1334,7 +1374,6 @@ public class GTFSTest {
             "stop_areas",
             new RecordExpectation[]{
                 new RecordExpectation("area_id", "area1"),
-                new RecordExpectation("stop_id", "123")
             }
         ),
         new PersistenceExpectation(

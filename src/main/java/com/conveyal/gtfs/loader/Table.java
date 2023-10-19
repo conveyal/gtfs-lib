@@ -376,19 +376,25 @@ public class Table {
         new StringField("zone_id", OPTIONAL),
         new URLField("stop_url", OPTIONAL),
         new StringField("geometry_type", REQUIRED)
-    ).addPrimaryKey();
-
-    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_areastxt-file-modified
-    public static final Table STOP_AREAS = new Table("stop_areas", StopArea.class, OPTIONAL,
-        new StringField("area_id", REQUIRED),
-        new StringField("stop_id", REQUIRED).isReferenceTo(STOPS).isReferenceTo(LOCATIONS)
-    ).keyFieldIsNotUnique();
+    )
+    .addPrimaryKey()
+    .addPrimaryKeyNames("location_id");
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#areastxt-no-change
     public static final Table AREA = new Table("areas", Area.class, OPTIONAL,
-        new StringField("area_id", REQUIRED).isReferenceTo(STOP_AREAS),
+        new StringField("area_id", REQUIRED),
         new StringField("area_name", OPTIONAL)
-    );
+    )
+    .addPrimaryKeyNames("area_id");
+
+
+    // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#stop_areastxt-file-modified
+    public static final Table STOP_AREAS = new Table("stop_areas", StopArea.class, OPTIONAL,
+        new StringField("area_id", REQUIRED).isReferenceTo(AREA),
+        new StringField("stop_id", REQUIRED).isReferenceTo(STOPS).isReferenceTo(LOCATIONS)
+    )
+    .keyFieldIsNotUnique()
+    .addPrimaryKeyNames("area_id", "stop_id");
 
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
@@ -494,7 +500,8 @@ public class Table {
             new StringField("phone_number", OPTIONAL),
             new URLField("info_url", OPTIONAL),
             new URLField("booking_url", OPTIONAL)
-    );
+    )
+    .addPrimaryKeyNames("booking_rule_id");
 
     // https://github.com/MobilityData/gtfs-flex/blob/master/spec/reference.md#locationsgeojson-file-added
     public static final Table LOCATION_SHAPES = new Table("location_shapes", LocationShape.class, OPTIONAL,
@@ -504,7 +511,8 @@ public class Table {
         new DoubleField("geometry_pt_lon", REQUIRED, -180, 180, 6)
     )
     .keyFieldIsNotUnique()
-    .withParentTable(LOCATIONS);
+    .withParentTable(LOCATIONS)
+    .addPrimaryKeyNames("location_id", "geometry_id", "geometry_pt_lat", "geometry_pt_lon");
 
     public static final Table PATTERN_LOCATION = new Table("pattern_locations", PatternLocation.class, OPTIONAL,
             new StringField("pattern_id", REQUIRED).isReferenceTo(PATTERNS),

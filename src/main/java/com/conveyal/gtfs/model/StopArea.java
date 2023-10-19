@@ -44,7 +44,7 @@ public class StopArea extends Entity {
 
     @Override
     public String getId() {
-        return area_id;
+        return createId(area_id, stop_id);
     }
 
     /**
@@ -77,8 +77,8 @@ public class StopArea extends Entity {
             stopArea.area_id = getStringField("area_id", true);
             stopArea.stop_id = getStringField("stop_id", true);
             // Attempting to put a null key or value will cause an NPE in BTreeMap
-            if (stopArea.area_id != null) {
-                feed.stopAreas.put(stopArea.area_id, stopArea);
+            if (stopArea.area_id != null && stopArea.stop_id != null) {
+                feed.stopAreas.put(createId(stopArea.area_id, stopArea.stop_id), stopArea);
             }
         }
     }
@@ -217,6 +217,11 @@ public class StopArea extends Entity {
         });
         return csvContent.toString();
     }
+
+    private static String createId(String areaId, String stopId) {
+        return String.format("%s_%s", areaId, stopId);
+    }
+
 
     @Override
     public boolean equals(Object o) {

@@ -166,7 +166,7 @@ public class JdbcGtfsLoader {
             result.trips = load(Table.TRIPS); // refs routes
             result.frequencies = load(Table.FREQUENCIES); // refs trips
             result.locations = load(Table.LOCATIONS);
-            result.stopAreas = load(Table.STOP_AREAS);
+            result.stopAreas = load(Table.STOP_AREAS);  // refs areas.
             result.stopTimes = load(Table.STOP_TIMES); // refs stop areas, locations and stops
             result.translations = load(Table.TRANSLATIONS);
             result.attributions = load(Table.ATTRIBUTIONS);
