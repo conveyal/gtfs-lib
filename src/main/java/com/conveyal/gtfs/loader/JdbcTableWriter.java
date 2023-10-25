@@ -1214,6 +1214,11 @@ public class JdbcTableWriter implements TableWriter {
         return parsedString.replaceAll("[{}]", "").split("[,]", 0);
     }
 
+    private String getResultSetString(int column, ResultSet resultSet) throws java.sql.SQLException {
+        String resultSetString = resultSet.getString(column);
+        return resultSetString == null ? "" : resultSetString;
+    }
+
     /**
      * Delete all entries in calendar dates associated with a schedule exception.
      */
