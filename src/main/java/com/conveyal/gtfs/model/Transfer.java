@@ -74,10 +74,7 @@ public class Transfer extends Entity {
             getRefField("to_trip_id", false, feed.trips);
 
             tr.feed = feed;
-            feed.transfers.put(
-                createId(tr.from_stop_id, tr.to_stop_id, tr.from_trip_id, tr.to_trip_id, tr.from_route_id, tr.to_route_id),
-                tr
-            );
+            feed.transfers.put(tr.getId(), tr);
         }
 
     }
@@ -133,5 +130,4 @@ public class Transfer extends Entity {
     ) {
         return String.format("%s_%s_%s_%s_%s_%s", fromStopId, toStopId, fromTripId, toTripId, fromRouteId, toRouteId);
     }
-
 }
