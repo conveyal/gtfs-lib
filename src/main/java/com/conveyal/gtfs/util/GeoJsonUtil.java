@@ -25,6 +25,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -61,20 +62,18 @@ public class GeoJsonUtil {
      * Takes the content of a zip file entry and converts it into a {@link FeatureCollection} which is a class
      * representation of features held in the locations file.
      */
-    public static FeatureCollection getLocations(ZipFile zipFile, ZipEntry entry) {
+    public static FeatureCollection getFeatureCollection(ZipFile zipFile, ZipEntry entry) {
         try (InputStream zipInputStream = zipFile.getInputStream(entry)) {
             String content;
             try (InputStream bomInputStream = new BOMInputStream(zipInputStream)) {
                 content = new BufferedReader(
                     new InputStreamReader(bomInputStream, StandardCharsets.UTF_8))
                     .lines()
-                    .collect(Collectors.joining("\n")
-                    );
+                    .collect(Collectors.joining("\n"));
             }
             return FeatureConverter.toFeatureCollection(content);
         } catch (IOException e) {
             LOG.error("Exception while opening zip entry: ", e);
-            e.printStackTrace();
             return null;
         }
     }
@@ -275,11 +274,8 @@ public class GeoJsonUtil {
         ZipEntry entry,
         List<String> errors
     ) {
-        FeatureCollection features = GeoJsonUtil.getLocations(zipFile, entry);
-        if (features == null || features.numFeatures() == 0) {
-            String message = "Unable to extract GeoJson features (or none are available) from " + entry.getName();
-            LOG.warn(message);
-            if (errors != null) errors.add(message);
+        FeatureCollection features = getFeaturesFromGeoJson(zipFile, entry, errors);
+        if (features == null) {
             return null;
         }
         StringBuilder csvContent = new StringBuilder();
@@ -293,6 +289,42 @@ public class GeoJsonUtil {
             locationShapes.forEach(locationShape -> csvContent.append(locationShape.toCsvRow()));
         }
         return new CsvReader(new StringReader(csvContent.toString()));
+    }
+
+    /**
+     * Extract the locations from Geo Json.
+     */
+    public static List<Location> getLocationsFromGeoJson(ZipFile zipFile, ZipEntry entry, List<String> errors) {
+        FeatureCollection features = getFeaturesFromGeoJson(zipFile, entry, errors);
+        if (features == null) {
+            return Collections.emptyList();
+        }
+        return GeoJsonUtil.unpackLocations(features, errors);
+    }
+
+    /**
+     * Extract the location shapes from Geo Json.
+     */
+    public static List<LocationShape> getLocationShapesFromGeoJson(ZipFile zipFile, ZipEntry entry, List<String> errors) {
+        FeatureCollection features = getFeaturesFromGeoJson(zipFile, entry, errors);
+        if (features == null) {
+            return Collections.emptyList();
+        }
+        return GeoJsonUtil.unpackLocationShapes(features, errors);
+    }
+
+    /**
+     * Extract the Geo Json features from file.
+     */
+    private static FeatureCollection getFeaturesFromGeoJson(ZipFile zipFile, ZipEntry entry, List<String> errors) {
+        FeatureCollection features = GeoJsonUtil.getFeatureCollection(zipFile, entry);
+        if (features == null || features.numFeatures() == 0) {
+            String message = "Unable to extract GeoJson features (or none are available) from " + entry.getName();
+            LOG.warn(message);
+            if (errors != null) errors.add(message);
+            return null;
+        }
+        return features;
     }
 
     /**

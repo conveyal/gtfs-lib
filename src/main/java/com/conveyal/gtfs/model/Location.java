@@ -112,12 +112,12 @@ public class Location extends Entity {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Location that = (Location) o;
-        return stop_name == that.stop_name &&
-                zone_id == that.zone_id &&
-                stop_desc == that.stop_desc &&
+        return Objects.equals(stop_name, that.stop_name) &&
+            Objects.equals(zone_id, that.zone_id) &&
+            Objects.equals(stop_desc, that.stop_desc) &&
                 Objects.equals(stop_url, that.stop_url) &&
                 Objects.equals(location_id, that.location_id) &&
-                geometry_type == that.geometry_type;
+            Objects.equals(geometry_type, that.geometry_type);
     }
 
     @Override

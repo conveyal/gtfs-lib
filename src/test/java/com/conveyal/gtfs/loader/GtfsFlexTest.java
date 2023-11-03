@@ -175,7 +175,7 @@ public class GtfsFlexTest {
         // assert that rows of data were written to files within the zipfile
         try (ZipFile zip = new ZipFile(outZip)) {
             ZipEntry entry = zip.getEntry("locations.geojson");
-            FeatureCollection featureCollection = GeoJsonUtil.getLocations(zip, entry);
+            FeatureCollection featureCollection = GeoJsonUtil.getFeatureCollection(zip, entry);
             List<Feature> features = featureCollection.getFeatures();
             assertEquals(features.get(0).getId(),"area_275");
             assertEquals(features.get(1).getId(),"area_276");
