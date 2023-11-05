@@ -262,7 +262,7 @@ public class JdbcTableWriter implements TableWriter {
      *
      * @return number of stop times updated
      */
-    public int normalizeStopTimesForPattern(int id, int beginWithSequence) throws SQLException {
+    public int normalizeStopTimesForPattern(int id, int beginWithSequence, boolean interpolateStopTimes) throws SQLException {
         try {
             JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
                 Table.PATTERN_STOP,
@@ -279,7 +279,7 @@ public class JdbcTableWriter implements TableWriter {
                     patternStopsToNormalize.add(patternStop);
                 }
             }
-            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize);
+            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize, interpolateStopTimes);
             connection.commit();
             return stopTimesUpdated;
         } catch (Exception e) {
@@ -755,8 +755,9 @@ public class JdbcTableWriter implements TableWriter {
      *
      * TODO? add param Set<String> serviceIdFilters service_id values to filter trips on
      */
-    private int updateStopTimesForPatternStops(List<PatternStop> patternStops) throws SQLException {
+    private int updateStopTimesForPatternStops(List<PatternStop> patternStops, boolean interpolateStopTimes) throws SQLException {
         PatternStop firstPatternStop = patternStops.iterator().next();
+        List<PatternStop> timepoints = patternStops.stream().filter(ps -> ps.timepoint == 1).collect(Collectors.toList());
         int firstStopSequence = firstPatternStop.stop_sequence;
         // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
         int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
@@ -789,9 +790,25 @@ public class JdbcTableWriter implements TableWriter {
         for (String tripId : timesForTripIds.keySet()) {
             // Initialize travel time with previous stop time value.
             int cumulativeTravelTime = timesForTripIds.get(tripId);
+            int timepointNumber = 0;
+            double timepointSpeed = 0;
+            double previousShapeDistTraveled = 0;
+            PatternStop currentTimepoint = patternStops.get(0); // First stop must be a timepoint
             for (PatternStop patternStop : patternStops) {
+                boolean isTimepoint = patternStop.timepoint == 1;
+                // If we have reached a timepoint (which is not the last), we calculate the speed between it and the next timepoint.
+                if (isTimepoint && interpolateStopTimes && timepointNumber < timepoints.size()-1){
+                    timepointNumber++;
+                    previousShapeDistTraveled = currentTimepoint.shape_dist_traveled;
+                    PatternStop nextTimePoint = timepoints.get(timepointNumber);
+                    timepointSpeed = (nextTimePoint.shape_dist_traveled - currentTimepoint.shape_dist_traveled) / nextTimePoint.default_travel_time;
+                }
                 // Gather travel/dwell time for pattern stop (being sure to check for missing values).
                 int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+                if (!isTimepoint && interpolateStopTimes) {
+                    travelTime = (int) Math.round((patternStop.shape_dist_traveled - previousShapeDistTraveled) / timepointSpeed);
+                    previousShapeDistTraveled += patternStop.shape_dist_traveled;
+                }
                 int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
                 int oneBasedIndex = 1;
                 // Increase travel time by current pattern stop's travel and dwell times (and set values for update).
