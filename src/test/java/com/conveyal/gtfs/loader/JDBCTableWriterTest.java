@@ -839,7 +839,7 @@ public class JDBCTableWriterTest {
     }
 
     /**
-     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int)} can normalize stop times to a pattern's
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int, boolean)} can normalize stop times to a pattern's
      * default travel times.
      */
     @Test
@@ -875,7 +875,7 @@ public class JDBCTableWriterTest {
         LOG.info("Updated pattern output: {}", updatedPatternOutput);
         // Normalize stop times.
         JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
-        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0);
+        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0, false);
         // Read pattern stops from database and check that the arrivals/departures have been updated.
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
                                                                        testDataSource,
