@@ -169,6 +169,7 @@ public class GTFSFeed implements Cloneable, Closeable {
         this.fares.putAll(fares);
         fares = null; // free memory
 
+        new Pattern.Loader(this).loadTable(zip);
         new Route.Loader(this).loadTable(zip);
         new ShapePoint.Loader(this).loadTable(zip);
         new Stop.Loader(this).loadTable(zip);
@@ -216,6 +217,7 @@ public class GTFSFeed implements Cloneable, Closeable {
             new Transfer.Writer(this).writeTable(zip);
             new Trip.Writer(this).writeTable(zip);
             new StopTime.Writer(this).writeTable(zip);
+            new Pattern.Writer(this).writeTable(zip);
 
             zip.close();
 
@@ -341,27 +343,6 @@ public class GTFSFeed implements Cloneable, Closeable {
     public Shape getShape (String shape_id) {
         Shape shape = new Shape(this, shape_id);
         return shape.shape_dist_traveled.length > 0 ? shape : null;
-    }
-
-    /**
-     * MapDB-based implementation to find patterns.
-     *
-     * FIXME: Remove and make pattern finding happen during validation? We want to share the pattern finder between the
-     * two implementations (MapDB and RDBMS), apply the same validation process to both kinds of storage, and produce
-     * Patterns in the same way in both cases, during validation. This prevents us from iterating over every stopTime
-     * twice, since we're already iterating over all of them in validation. However, in this case it might not be costly
-     * to simply retrieve the stop times from the stop_times map.
-     */
-    public void findPatterns () {
-        PatternFinder patternFinder = new PatternFinder();
-        // Iterate over trips and process each trip and its stop times.
-        for (Trip trip : this.trips.values()) {
-            Iterable<StopTime> orderedStopTimesForTrip = this.getOrderedStopTimesForTrip(trip.trip_id);
-            patternFinder.processTrip(trip, orderedStopTimesForTrip);
-        }
-        Map<TripPatternKey, Pattern> patternObjects = patternFinder.createPatternObjects(this.stops, null);
-        this.patterns.putAll(patternObjects.values().stream()
-                .collect(Collectors.toMap(Pattern::getId, pattern -> pattern)));
     }
 
     /**

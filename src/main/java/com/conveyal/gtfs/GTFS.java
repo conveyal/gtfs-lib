@@ -46,10 +46,9 @@ public abstract class GTFS {
     /**
      * Export a feed ID from the database to a zipped GTFS file in the specified export directory.
      */
-    public static FeedLoadResult export (String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
-        JdbcGtfsExporter exporter = new JdbcGtfsExporter(feedId, outFile, dataSource, fromEditor);
-        FeedLoadResult result = exporter.exportTables();
-        return result;
+    public static FeedLoadResult export (String feedId, String outFile, DataSource dataSource, boolean fromEditor, boolean publishProprietaryFiles) {
+        JdbcGtfsExporter exporter = new JdbcGtfsExporter(feedId, outFile, dataSource, fromEditor, publishProprietaryFiles);
+        return exporter.exportTables();
     }
 
     /**
@@ -299,13 +298,16 @@ public abstract class GTFS {
 
         if (cmd.hasOption("export")) {
             String namespaceToExport = cmd.getOptionValue("export");
+            boolean exportProprietaryFiles = (cmd.getOptionValue("exportProprietaryFiles") != null)
+                && Boolean.parseBoolean(cmd.getOptionValue("exportProprietaryFiles"));
+
             String outFile = cmd.getOptionValue("outFile");
             if (namespaceToExport == null && loadResult != null) {
                 namespaceToExport = loadResult.uniqueIdentifier;
             }
             if (namespaceToExport != null) {
                 LOG.info("Exporting feed with unique identifier {}", namespaceToExport);
-                FeedLoadResult exportResult = export(namespaceToExport, outFile, dataSource, true);
+                export(namespaceToExport, outFile, dataSource, true, exportProprietaryFiles);
                 LOG.info("Done exporting.");
             } else {
                 LOG.error("No feed to export. Specify one, or load a feed in the same command.");

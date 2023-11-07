@@ -6,6 +6,7 @@ import com.conveyal.gtfs.model.CalendarDate;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.ScheduleException;
@@ -68,6 +69,17 @@ public interface EntityPopulator<T> {
         patternStop.continuous_pickup   = getIntIfPresent   (result, "continuous_pickup",   columnForName);
         patternStop.continuous_drop_off = getIntIfPresent   (result, "continuous_drop_off", columnForName);
         return patternStop;
+    };
+
+    EntityPopulator<Pattern> PATTERN = (result, columnForName) -> {
+        Pattern pattern = new Pattern();
+        pattern.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        pattern.route_id = getStringIfPresent(result, "route_id", columnForName);
+        pattern.name = getStringIfPresent(result, "name", columnForName);
+        pattern.direction_id = getIntIfPresent(result, "direction_id", columnForName);
+        pattern.use_frequency = getIntIfPresent(result, "use_frequency", columnForName);
+        pattern.shape_id = getStringIfPresent(result, "shape_id", columnForName);
+        return pattern;
     };
 
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;

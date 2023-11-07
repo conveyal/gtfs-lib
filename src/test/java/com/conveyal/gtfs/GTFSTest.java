@@ -5,6 +5,7 @@ import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.loader.FeedLoadResult;
 import com.conveyal.gtfs.loader.JdbcGtfsExporter;
 import com.conveyal.gtfs.loader.SnapshotResult;
+import com.conveyal.gtfs.loader.Table;
 import com.conveyal.gtfs.storage.ErrorExpectation;
 import com.conveyal.gtfs.storage.ExpectedFieldType;
 import com.conveyal.gtfs.storage.PersistenceExpectation;
@@ -16,7 +17,6 @@ import com.conveyal.gtfs.validator.ValidationResult;
 import com.csvreader.CsvReader;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
-import com.google.common.io.Files;
 import graphql.Assert;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.input.BOMInputStream;
@@ -34,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -246,12 +247,12 @@ public class GTFSTest {
      * Tests whether or not "fake-agency" GTFS can be placed in a zipped subdirectory and loaded/exported successfully.
      */
     @Test
-    public void canLoadAndExportSimpleAgencyInSubDirectory() {
+    public void canLoadAndExportSimpleAgencyInSubDirectory() throws IOException {
         String zipFileName = null;
         // Get filename for fake-agency resource
         String resourceFolder = TestUtils.getResourceFileName("fake-agency");
         // Recursively copy folder into temp directory, which we zip up and run the integration test on.
-        File tempDir = Files.createTempDir();
+        File tempDir = Files.createTempDirectory("").toFile();
         tempDir.deleteOnExit();
         File nestedDir = new File(TestUtils.fileNameWithDir(tempDir.getAbsolutePath(), "fake-agency"));
         LOG.info("Creating temp folder with nested subdirectory at {}", tempDir.getAbsolutePath());
@@ -265,6 +266,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
+            new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
             new ErrorExpectation(NewGTFSErrorType.TABLE_IN_SUBDIRECTORY),
@@ -633,13 +635,40 @@ public class GTFSTest {
             }
 
             // Confirm that the mandatory files are present in the zip file.
-            tempFile = exportGtfs(namespace, dataSource, false);
+            tempFile = exportGtfs(namespace, dataSource, false, true);
             ZipFile gtfsZipFile = new ZipFile(tempFile.getAbsolutePath());
             for (String fileName : JdbcGtfsExporter.mandatoryFileList) {
                 Assert.assertNotNull(gtfsZipFile.getEntry(fileName));
             }
         } catch (IOException | SQLException e) {
             LOG.error("An error occurred while attempting to test exporting of mandatory files.", e);
+        } finally {
+            TestUtils.dropDB(testDBName);
+            if (tempFile != null) tempFile.deleteOnExit();
+        }
+    }
+    /**
+     * Load a feed and then export minus proprietary files. Confirm proprietary files are not present in export.
+     */
+    @Test
+    void canOmitProprietaryFiles() {
+        String testDBName = TestUtils.generateNewDB();
+        File tempFile = null;
+        try {
+            String zipFileName = TestUtils.zipFolderFiles("fake-agency", true);
+            String dbConnectionUrl = String.join("/", JDBC_URL, testDBName);
+            DataSource dataSource = TestUtils.createTestDataSource(dbConnectionUrl);
+            FeedLoadResult loadResult = GTFS.load(zipFileName, dataSource);
+            String namespace = loadResult.uniqueIdentifier;
+
+            // Confirm that the proprietary files are not present in the zip file.
+            tempFile = exportGtfs(namespace, dataSource, false, false);
+            ZipFile gtfsZipFile = new ZipFile(tempFile.getAbsolutePath());
+            for (String fileName : JdbcGtfsExporter.proprietaryFileList) {
+                Assert.assertNull(gtfsZipFile.getEntry(fileName));
+            }
+        } catch (IOException e) {
+            LOG.error("An error occurred while attempting to test exporting of proprietary files.", e);
         } finally {
             TestUtils.dropDB(testDBName);
             if (tempFile != null) tempFile.deleteOnExit();
@@ -691,7 +720,7 @@ public class GTFSTest {
 
             // Verify that exporting the feed (in non-editor mode) completes and data is outputted properly
             LOG.info("export GTFS from created namespace");
-            File tempFile = exportGtfs(namespace, dataSource, false);
+            File tempFile = exportGtfs(namespace, dataSource, false, true);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, false);
 
             // Verify that making a snapshot from an existing feed database, then exporting that snapshot to a GTFS zip
@@ -792,9 +821,14 @@ public class GTFSTest {
     /**
      * Helper function to export a GTFS from the database to a temporary zip file.
      */
-    private File exportGtfs(String namespace, DataSource dataSource, boolean fromEditor) throws IOException {
+//    private File exportGtfs(String namespace, DataSource dataSource, boolean fromEditor) throws IOException {
+//        File tempFile = File.createTempFile("snapshot", ".zip");
+//        GTFS.export(namespace, tempFile.getAbsolutePath(), dataSource, fromEditor, false);
+//        return tempFile;
+//    }
+    private File exportGtfs(String namespace, DataSource dataSource, boolean fromEditor, boolean publishProprietaryFiles) throws IOException {
         File tempFile = File.createTempFile("snapshot", ".zip");
-        GTFS.export(namespace, tempFile.getAbsolutePath(), dataSource, fromEditor);
+        GTFS.export(namespace, tempFile.getAbsolutePath(), dataSource, fromEditor, publishProprietaryFiles);
         return tempFile;
     }
 
@@ -831,7 +865,7 @@ public class GTFSTest {
                 true
             );
             LOG.info("export GTFS from copied namespace");
-            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true);
+            File tempFile = exportGtfs(copyResult.uniqueIdentifier, dataSource, true, true);
             assertThatExportedGtfsMeetsExpectations(tempFile, persistenceExpectations, true);
         } catch (IOException | SQLException e) {
             e.printStackTrace();
@@ -1014,7 +1048,7 @@ public class GTFSTest {
             if (persistenceExpectation.appliesToEditorDatabaseOnly) continue;
             // No need to check that errors were exported because it is an internal table only.
             if ("errors".equals(persistenceExpectation.tableName)) continue;
-            final String tableFileName = persistenceExpectation.tableName + ".txt";
+            final String tableFileName = Table.getTableFileNameWithExtension(persistenceExpectation.tableName);
             LOG.info(String.format("reading table: %s", tableFileName));
 
             ZipEntry entry = gtfsZipfile.getEntry(tableFileName);
@@ -1266,6 +1300,17 @@ public class GTFSTest {
                 new RecordExpectation("route_long_name", "Route 1"),
                 new RecordExpectation("route_type", 3),
                 new RecordExpectation("route_color", "7CE6E7")
+            }
+        ),
+        new PersistenceExpectation(
+            "patterns",
+            new RecordExpectation[]{
+                new RecordExpectation("pattern_id", "1"),
+                new RecordExpectation("route_id", "1"),
+                new RecordExpectation("name", "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips)"),
+                new RecordExpectation("direction_id", "0"),
+                new RecordExpectation("use_frequency", null),
+                new RecordExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e")
             }
         ),
         new PersistenceExpectation(

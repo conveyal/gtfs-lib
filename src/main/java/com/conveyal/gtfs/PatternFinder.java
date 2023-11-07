@@ -4,18 +4,12 @@ import com.conveyal.gtfs.error.NewGTFSError;
 import com.conveyal.gtfs.error.NewGTFSErrorType;
 import com.conveyal.gtfs.error.SQLErrorStorage;
 import com.conveyal.gtfs.model.Pattern;
-import com.conveyal.gtfs.model.PatternStop;
-import com.conveyal.gtfs.model.ShapePoint;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.LinkedHashMultimap;
 import com.google.common.collect.Multimap;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateList;
-import org.locationtech.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,7 +23,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.conveyal.gtfs.util.Util.human;
 
@@ -49,21 +42,6 @@ public class PatternFinder {
     private Multimap<TripPatternKey, Trip> tripsForPattern = LinkedHashMultimap.create();
 
     private int nTripsProcessed = 0;
-
-    /**
-     * Bin all trips by the sequence of stops they visit.
-     * @return A map from a list of stop IDs to a list of Trip IDs that visit those stops in that sequence.
-     */
-//    public void findPatterns(Feed feed) {
-//
-//        for (Trip trip : trips) {
-//        }
-//        feed.patterns.stream().forEach(p -> {
-//            feed.patterns.put(p.pattern_id, p);
-//            p.associatedTrips.stream().forEach(t -> feed.tripPatternMap.put(t, p.pattern_id));
-//        });
-//
-//    }
 
     public void processTrip(Trip trip, Iterable<StopTime> orderedStopTimes) {
         if (++nTripsProcessed % 100000 == 0) {
@@ -121,7 +99,7 @@ public class PatternFinder {
      * This process requires access to all the stops in the feed.
      * Some validators already cache a map of all the stops. There's probably a cleaner way to do this.
      */
-    public static void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
+    private static void renamePatterns(Collection<Pattern> patterns, Map<String, Stop> stopById) {
         LOG.info("Generating unique names for patterns");
 
         Map<String, PatternNamingInfo> namingInfoForRoute = new HashMap<>();

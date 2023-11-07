@@ -268,7 +268,7 @@ public class ServiceValidator extends TripValidator {
             // Except that some service IDs may have no trips on them, or may not be referenced in any calendar or
             // calendar exception, which would keep them from appearing in either of those tables. So we just create
             // this somewhat redundant materialized view to serve as a master list of all services.
-            String servicesTableName = feed.tablePrefix + "services";
+            String servicesTableName = feed.getTableNameWithSchemaPrefix("services");
             String sql = String.format("create table %s (service_id varchar, n_days_active integer, duration_seconds integer, n_trips integer)", servicesTableName);
             LOG.info(sql);
             statement.execute(sql);
@@ -285,7 +285,7 @@ public class ServiceValidator extends TripValidator {
             serviceTracker.executeRemaining();
 
             // Create a table that shows on which dates each service is active.
-            String serviceDatesTableName = feed.tablePrefix + "service_dates";
+            String serviceDatesTableName = feed.getTableNameWithSchemaPrefix("service_dates");
             sql = String.format("create table %s (service_date varchar, service_id varchar)", serviceDatesTableName);
             LOG.info(sql);
             statement.execute(sql);
@@ -318,7 +318,7 @@ public class ServiceValidator extends TripValidator {
             // where dates.service_id = durations.service_id
             // group by service_date, route_type order by service_date, route_type;
 
-            String serviceDurationsTableName = feed.tablePrefix + "service_durations";
+            String serviceDurationsTableName = feed.getTableNameWithSchemaPrefix("service_durations");
             sql = String.format("create table %s (service_id varchar, route_type integer, " +
                                     "duration_seconds integer, primary key (service_id, route_type))", serviceDurationsTableName);
             LOG.info(sql);
