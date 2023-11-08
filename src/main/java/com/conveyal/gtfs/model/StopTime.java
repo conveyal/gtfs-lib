@@ -2,6 +2,7 @@ package com.conveyal.gtfs.model;
 
 import com.conveyal.gtfs.GTFSFeed;
 
+import org.apache.commons.dbutils.DbUtils;
 import org.mapdb.Fun;
 
 import java.io.IOException;
@@ -240,44 +241,49 @@ public class StopTime extends Entity implements Cloneable, Serializable {
      * and DOUBLE_MISSING respectively.
      */
     public static List<StopTime> getFlexStopTimesForValidation(Connection connection, String tablePrefix) throws SQLException {
-        List<StopTime> stopTimes = new ArrayList<>();
-        if (!flexColumnExist(connection, tablePrefix)) {
-            return stopTimes;
-        }
-        String sql = String.format(
-            "select id, trip_id, stop_id, arrival_time, departure_time, pickup_type, drop_off_type, " +
-            "start_pickup_drop_off_window, end_pickup_drop_off_window, mean_duration_factor, mean_duration_offset, " +
-            "safe_duration_factor, safe_duration_offset " +
-            "from %sstop_times where " +
-            "start_pickup_drop_off_window IS NOT NULL " +
-            "or end_pickup_drop_off_window IS NOT NULL " +
-            "or mean_duration_factor IS NOT NULL " +
-            "or mean_duration_offset IS NOT NULL " +
-            "or safe_duration_factor IS NOT NULL " +
-            "or safe_duration_offset IS NOT NULL ",
-            tablePrefix
-        );
-        try (PreparedStatement statement = connection.prepareStatement(sql)) {
-            ResultSet resultSet = statement.executeQuery();
-            while (resultSet.next()) {
-                StopTime stopTime = new StopTime();
-                stopTime.id = resultSet.getInt(1);
-                stopTime.trip_id  = resultSet.getString(2);
-                stopTime.stop_id  = resultSet.getString(3);
-                stopTime.arrival_time  = getIntValue(resultSet.getString(4));
-                stopTime.departure_time  = getIntValue(resultSet.getString(5));
-                stopTime.pickup_type  = resultSet.getInt(6);
-                stopTime.drop_off_type  = resultSet.getInt(7);
-                stopTime.start_pickup_drop_off_window  = getIntValue(resultSet.getString(8));
-                stopTime.end_pickup_drop_off_window  = getIntValue(resultSet.getString(9));
-                stopTime.mean_duration_factor  = getDoubleValue(resultSet.getString(10));
-                stopTime.mean_duration_offset  = getDoubleValue(resultSet.getString(11));
-                stopTime.safe_duration_factor  = getDoubleValue(resultSet.getString(12));
-                stopTime.safe_duration_offset  = getDoubleValue(resultSet.getString(13));
-                stopTimes.add(stopTime);
+        try {
+            List<StopTime> stopTimes = new ArrayList<>();
+            if (!flexColumnExist(connection, tablePrefix)) {
+                return stopTimes;
             }
+            String sql = String.format(
+                "select id, trip_id, stop_id, arrival_time, departure_time, pickup_type, drop_off_type, " +
+                "start_pickup_drop_off_window, end_pickup_drop_off_window, mean_duration_factor, mean_duration_offset, " +
+                "safe_duration_factor, safe_duration_offset " +
+                "from %sstop_times where " +
+                "start_pickup_drop_off_window IS NOT NULL " +
+                "or end_pickup_drop_off_window IS NOT NULL " +
+                "or mean_duration_factor IS NOT NULL " +
+                "or mean_duration_offset IS NOT NULL " +
+                "or safe_duration_factor IS NOT NULL " +
+                "or safe_duration_offset IS NOT NULL ",
+                tablePrefix
+            );
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                ResultSet resultSet = statement.executeQuery();
+                while (resultSet.next()) {
+                    StopTime stopTime = new StopTime();
+                    stopTime.id = resultSet.getInt(1);
+                    stopTime.trip_id  = resultSet.getString(2);
+                    stopTime.stop_id  = resultSet.getString(3);
+                    stopTime.arrival_time  = getIntValue(resultSet.getString(4));
+                    stopTime.departure_time  = getIntValue(resultSet.getString(5));
+                    stopTime.pickup_type  = resultSet.getInt(6);
+                    stopTime.drop_off_type  = resultSet.getInt(7);
+                    stopTime.start_pickup_drop_off_window  = getIntValue(resultSet.getString(8));
+                    stopTime.end_pickup_drop_off_window  = getIntValue(resultSet.getString(9));
+                    stopTime.mean_duration_factor  = getDoubleValue(resultSet.getString(10));
+                    stopTime.mean_duration_offset  = getDoubleValue(resultSet.getString(11));
+                    stopTime.safe_duration_factor  = getDoubleValue(resultSet.getString(12));
+                    stopTime.safe_duration_offset  = getDoubleValue(resultSet.getString(13));
+                    stopTimes.add(stopTime);
+                }
+            }
+            return stopTimes;
+        } finally {
+            // Close transaction finally.
+            if (connection != null) DbUtils.closeQuietly(connection);
         }
-        return stopTimes;
     }
 
     @Override
