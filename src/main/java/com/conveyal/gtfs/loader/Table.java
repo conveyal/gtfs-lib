@@ -103,6 +103,9 @@ public class Table {
     /** Key(s) that uniquely identify an entry in the respective table.*/
     private String[] primaryKeyNames;
 
+    /** Prefixed to exported tables/files that are not part of the GTFS spec. */
+    public static final String PROPRIETARY_FILE_PREFIX = "datatools_";
+
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
         this.name = name;
@@ -248,10 +251,11 @@ public class Table {
             new StringField("name", OPTIONAL),
             // Editor-specific fields.
             // direction_id and shape_id are exemplar fields applied to all trips for a pattern.
-            new ShortField("direction_id", EDITOR, 1),
-            new ShortField("use_frequency", EDITOR, 1),
-            new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
-    ).addPrimaryKey()
+            new ShortField("direction_id", OPTIONAL, 1),
+            new ShortField("use_frequency", OPTIONAL, 1),
+            new StringField("shape_id", OPTIONAL).isReferenceTo(SHAPES)
+    )
+    .addPrimaryKey()
     .addPrimaryKeyNames("pattern_id");
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
@@ -616,6 +620,23 @@ public class Table {
         );
     }
 
+    public static String getTableFileNameWithExtension(String tableName) {
+        return getTableFileName(tableName, ".txt");
+    }
+
+    public static String getTableFileName(String tableName) {
+        return getTableFileName(tableName, "");
+    }
+
+    /**
+     * Proprietary table file names are prefix with "datatools_" to distinguish them from GTFS spec files.
+     */
+    private static String getTableFileName(String tableName, String fileExtension) {
+        return (tableName.equals("patterns"))
+            ? String.format("%s%s%s", PROPRIETARY_FILE_PREFIX, tableName, fileExtension)
+            : String.format("%s%s", tableName, fileExtension);
+    }
+
     /**
      * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
      * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
@@ -623,7 +644,7 @@ public class Table {
      * It then creates a CSV reader for that table if it's found.
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
-        final String tableFileName = this.name + ".txt";
+        final String tableFileName = getTableFileNameWithExtension(this.name);
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.

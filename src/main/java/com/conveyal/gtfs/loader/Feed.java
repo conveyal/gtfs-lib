@@ -26,9 +26,9 @@ public class Feed {
 
     private final DataSource dataSource;
 
-    // The unique database schema name for this particular feed, including the separator charater (dot).
+    // The unique database schema name for this particular feed, including the separator character (dot).
     // This may be the empty string if the feed is stored in the root ("public") schema.
-    public final String tablePrefix;
+    private final String databaseSchemaPrefix;
 
     public final TableReader<Agency>        agencies;
     public final TableReader<Calendar>      calendars;
@@ -39,26 +39,28 @@ public class Feed {
     public final TableReader<Stop>          stops;
     public final TableReader<Trip>          trips;
     public final TableReader<StopTime>      stopTimes;
+    public final TableReader<Pattern>       patterns;
 
     /**
      * Create a feed that reads tables over a JDBC connection. The connection should already be set to the right
      * schema within the database.
-     * @param tablePrefix the unique prefix for the table (may be null for no prefix)
+     * @param databaseSchemaPrefix the unique prefix for the table (may be null for no prefix)
      */
-    public Feed (DataSource dataSource, String tablePrefix) {
+    public Feed (DataSource dataSource, String databaseSchemaPrefix) {
         this.dataSource = dataSource;
         // Ensure separator dot is present
-        if (tablePrefix != null && !tablePrefix.endsWith(".")) tablePrefix += ".";
-        this.tablePrefix = tablePrefix == null ? "" : tablePrefix;
-        agencies = new JDBCTableReader(Table.AGENCY, dataSource, tablePrefix, EntityPopulator.AGENCY);
-        fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, tablePrefix, EntityPopulator.FARE_ATTRIBUTE);
-        frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, tablePrefix, EntityPopulator.FREQUENCY);
-        calendars = new JDBCTableReader(Table.CALENDAR, dataSource, tablePrefix, EntityPopulator.CALENDAR);
-        calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, tablePrefix, EntityPopulator.CALENDAR_DATE);
-        routes = new JDBCTableReader(Table.ROUTES, dataSource, tablePrefix, EntityPopulator.ROUTE);
-        stops = new JDBCTableReader(Table.STOPS, dataSource, tablePrefix, EntityPopulator.STOP);
-        trips = new JDBCTableReader(Table.TRIPS, dataSource, tablePrefix, EntityPopulator.TRIP);
-        stopTimes = new JDBCTableReader(Table.STOP_TIMES, dataSource, tablePrefix, EntityPopulator.STOP_TIME);
+        if (databaseSchemaPrefix != null && !databaseSchemaPrefix.endsWith(".")) databaseSchemaPrefix += ".";
+        this.databaseSchemaPrefix = databaseSchemaPrefix == null ? "" : databaseSchemaPrefix;
+        agencies = new JDBCTableReader(Table.AGENCY, dataSource, databaseSchemaPrefix, EntityPopulator.AGENCY);
+        fareAttributes = new JDBCTableReader(Table.FARE_ATTRIBUTES, dataSource, databaseSchemaPrefix, EntityPopulator.FARE_ATTRIBUTE);
+        frequencies = new JDBCTableReader(Table.FREQUENCIES, dataSource, databaseSchemaPrefix, EntityPopulator.FREQUENCY);
+        calendars = new JDBCTableReader(Table.CALENDAR, dataSource, databaseSchemaPrefix, EntityPopulator.CALENDAR);
+        calendarDates = new JDBCTableReader(Table.CALENDAR_DATES, dataSource, databaseSchemaPrefix, EntityPopulator.CALENDAR_DATE);
+        routes = new JDBCTableReader(Table.ROUTES, dataSource, databaseSchemaPrefix, EntityPopulator.ROUTE);
+        stops = new JDBCTableReader(Table.STOPS, dataSource, databaseSchemaPrefix, EntityPopulator.STOP);
+        trips = new JDBCTableReader(Table.TRIPS, dataSource, databaseSchemaPrefix, EntityPopulator.TRIP);
+        stopTimes = new JDBCTableReader(Table.STOP_TIMES, dataSource, databaseSchemaPrefix, EntityPopulator.STOP_TIME);
+        patterns = new JDBCTableReader(Table.PATTERNS, dataSource, databaseSchemaPrefix, EntityPopulator.PATTERN);
     }
 
     /**
@@ -78,7 +80,7 @@ public class Feed {
         // Reconnect to the existing error tables.
         SQLErrorStorage errorStorage;
         try {
-            errorStorage = new SQLErrorStorage(dataSource.getConnection(), tablePrefix, false);
+            errorStorage = new SQLErrorStorage(dataSource.getConnection(), databaseSchemaPrefix, false);
         } catch (SQLException | InvalidNamespaceException ex) {
             throw new StorageException(ex);
         }
@@ -152,4 +154,10 @@ public class Feed {
         return dataSource.getConnection();
     }
 
+    /**
+     * @return the table name prefixed with this feed's database schema.
+     */
+    public String getTableNameWithSchemaPrefix(String tableName) {
+        return databaseSchemaPrefix + tableName;
+    }
 }

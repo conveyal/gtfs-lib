@@ -136,6 +136,16 @@ public class GTFSFeedTest {
                     new DataExpectation("trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
                     new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57")
                 }
+            ),
+            new FileTestCase(
+                "datatools_patterns.txt",
+                new DataExpectation[]{
+                    new DataExpectation("pattern_id", "1"),
+                    new DataExpectation("route_id", "1"),
+                    new DataExpectation("name", "2 stops from Butler Ln to Scotts Valley Dr & Victor Sq (1 trips)"),
+                    new DataExpectation("direction_id", "0"),
+                    new DataExpectation("shape_id", "5820f377-f947-4728-ac29-ac0102cbc34e")
+                }
             )
         };
 

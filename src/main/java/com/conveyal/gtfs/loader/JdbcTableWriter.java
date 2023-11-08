@@ -1511,6 +1511,11 @@ public class JdbcTableWriter implements TableWriter {
         return parsedString.replaceAll("[{}]", "").split("[,]", 0);
     }
 
+    private String getResultSetString(int column, ResultSet resultSet) throws java.sql.SQLException {
+        String resultSetString = resultSet.getString(column);
+        return resultSetString == null ? "" : resultSetString;
+    }
+
     /**
      * Delete all entries in calendar dates associated with a schedule exception.
      */
@@ -1629,7 +1634,12 @@ public class JdbcTableWriter implements TableWriter {
                                                     ResultSet resultSet = patternStopSelectStatement.getResultSet();
                                                     while (resultSet.next()) {
                                                         patternAndRouteIds.add(
-                                                            "{" + resultSet.getString(1) + "-" + resultSet.getString(2) + "}"
+                                                            String.format("{%s-%s-%s-%s}",
+                                                                getResultSetString(1, resultSet),
+                                                                getResultSetString(2, resultSet),
+                                                                getResultSetString(3, resultSet),
+                                                                getResultSetString(4, resultSet)
+                                                            )
                                                         );
                                                     }
                                                 }
@@ -1646,7 +1656,7 @@ public class JdbcTableWriter implements TableWriter {
                                             if (patternAndRouteIds.size() > 0) {
                                                 // Append referenced patterns data to the end of the error.
                                                 message = String.format(
-                                                    "%s\nReferenced patterns: [%s]",
+                                                    "%s%nReferenced patterns: [%s]",
                                                     message,
                                                     StringUtils.join(patternAndRouteIds, ",")
                                                 );
