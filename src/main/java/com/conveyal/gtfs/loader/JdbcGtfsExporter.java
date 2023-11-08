@@ -51,6 +51,9 @@ public class JdbcGtfsExporter {
     private final DataSource dataSource;
     private final boolean fromEditor;
 
+    /** If this is true will export tables prefixed with {@link Table#PROPRIETARY_FILE_PREFIX} **/
+    private final boolean publishProprietaryFiles;
+
     // These fields will be filled in once feed snapshot begins.
     private Connection connection;
     private ZipOutputStream zipOutputStream;
@@ -67,12 +70,17 @@ public class JdbcGtfsExporter {
         Table.TRIPS.fileName
     );
 
+    public static final List<String> proprietaryFileList = Lists.newArrayList(
+        String.format("%s%s", Table.PROPRIETARY_FILE_PREFIX, Table.PATTERNS.fileName)
+    );
 
-    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor) {
+
+    public JdbcGtfsExporter(String feedId, String outFile, DataSource dataSource, boolean fromEditor, boolean publishProprietaryFiles) {
         this.feedIdToExport = feedId;
         this.outFile = outFile;
         this.dataSource = dataSource;
         this.fromEditor = fromEditor;
+        this.publishProprietaryFiles = publishProprietaryFiles;
     }
 
     /**
@@ -252,11 +260,6 @@ public class JdbcGtfsExporter {
                 result.routes = export(Table.ROUTES, connection);
             }
 
-            // FIXME: Find some place to store errors encountered on export for patterns and pattern stops.
-            // FIXME: Is there a need to export patterns or pattern stops? Should these be iterated over to ensure that
-            // frequency-based pattern travel times match stop time arrivals/departures?
-//            export(Table.PATTERNS);
-//            export(Table.PATTERN_STOP);
             // Only write shapes for "approved" routes using COPY TO with results of select query
             if (fromEditor) {
                 // Generate filter SQL for shapes if exporting a feed/schema that represents an editor snapshot.
@@ -337,6 +340,8 @@ public class JdbcGtfsExporter {
             result.locations = exportLocationsAndShapes();
             result.locationShapes = result.locations;
 
+            exportProprietaryFiles(result);
+
             zipOutputStream.close();
             // Run clean up on the resulting zip file.
             cleanUpZipFile();
@@ -355,6 +360,18 @@ public class JdbcGtfsExporter {
             if (connection != null) DbUtils.closeQuietly(connection);
         }
         return result;
+    }
+
+    /**
+     * Export proprietary files, if they are required.
+     */
+    private void exportProprietaryFiles(FeedLoadResult result) {
+        if (publishProprietaryFiles) {
+            LOG.info("Exporting proprietary files.");
+            result.patterns = export(Table.PATTERNS, connection);
+        } else {
+            LOG.info("Proprietary files not exported.");
+        }
     }
 
     /**
@@ -425,7 +442,7 @@ public class JdbcGtfsExporter {
             }
 
             // Create entry for table
-            String textFileName = table.name + ".txt";
+            String textFileName = Table.getTableFileNameWithExtension(table.name);
             ZipEntry zipEntry = new ZipEntry(textFileName);
             zipOutputStream.putNextEntry(zipEntry);
 

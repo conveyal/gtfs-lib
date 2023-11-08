@@ -1,6 +1,7 @@
 package com.conveyal.gtfs.validator;
 
 import com.beust.jcommander.internal.Lists;
+import com.conveyal.gtfs.PatternBuilder;
 import com.conveyal.gtfs.TripPatternKey;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.StopTime;
@@ -16,7 +17,11 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class CalculatePreviousDepartureTimeTest {
-    private final PatternFinderValidator patternFinderValidator = new PatternFinderValidator(null, null);
+    private final PatternBuilder patternBuilder;
+
+    CalculatePreviousDepartureTimeTest() {
+        patternBuilder = new PatternBuilder();
+    }
 
     @ParameterizedTest
     @MethodSource("createTrips")
@@ -25,7 +30,7 @@ class CalculatePreviousDepartureTimeTest {
         List<Integer> expectedDepartureTimes,
         Map<String, Location> locationById
     ) {
-        List<Integer> actualDepartureTimes = patternFinderValidator.calculatePreviousDepartureTimes(
+        List<Integer> actualDepartureTimes = patternBuilder.calculatePreviousDepartureTimes(
             key,
             locationById,
             new HashMap<>()
