@@ -151,7 +151,8 @@ public class JdbcGtfsLoader {
                 // This allows everything to work even when there's no prefix.
                 this.tablePrefix += ".";
             }
-            // Load each table in turn, saving some summary information about what happened during each table load
+            // Load each table in turn, saving some summary information about what happened during each table load.
+            // The loading order is needed for referential integrity.
             result.agency = load(Table.AGENCY);
             result.area = load(Table.AREA);
             result.calendar = load(Table.CALENDAR);
@@ -160,6 +161,7 @@ public class JdbcGtfsLoader {
             result.fareAttributes = load(Table.FARE_ATTRIBUTES);
             result.feedInfo = load(Table.FEED_INFO);
             result.shapes = load(Table.SHAPES);
+            result.patterns = load(Table.PATTERNS); // refs shapes and routes.
             result.stops = load(Table.STOPS);
             result.fareRules = load(Table.FARE_RULES);
             result.transfers = load(Table.TRANSFERS);
@@ -327,7 +329,7 @@ public class JdbcGtfsLoader {
     private int loadInternal(Table table) throws Exception {
         CsvReader csvReader = table.getCsvReader(zip, errorStorage);
         if (csvReader == null) {
-            LOG.info(String.format("file %s.txt not found in gtfs zipfile", table.name));
+            LOG.info("File {} not found in gtfs zip file.", Table.getTableFileNameWithExtension(table.name));
             // This GTFS table could not be opened in the zip, even in a subdirectory.
             if (table.isRequired()) errorStorage.storeError(NewGTFSError.forTable(table, MISSING_TABLE));
             return 0;
@@ -358,7 +360,13 @@ public class JdbcGtfsLoader {
         // SQLite also doesn't support schemas, but you can attach additional database files with schema-like naming.
         // We'll just literally prepend feed identifiers to table names when supplied.
         // Some databases require the table to exist before a statement can be prepared.
-        targetTable.createSqlTable(connection);
+        if (table.name.equals("patterns")) {
+            // When creating the patterns table the id field must be flagged as serial and not bigint. This then allows
+            // the addition of new patterns in PatternBuilder#processPatternAndPatternStops.
+            targetTable.createSqlTable(connection, true);
+        } else {
+            targetTable.createSqlTable(connection);
+        }
 
         // TODO are we loading with or without a header row in our Postgres text file?
         if (postgresText) {

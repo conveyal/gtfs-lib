@@ -32,6 +32,7 @@ public class FeedLoadResult implements Serializable {
     public TableLoadResult frequencies;
     public TableLoadResult locations;
     public TableLoadResult locationShapes;
+    public TableLoadResult patterns;
     public TableLoadResult routes;
     public TableLoadResult shapes;
     public TableLoadResult stopAreas;

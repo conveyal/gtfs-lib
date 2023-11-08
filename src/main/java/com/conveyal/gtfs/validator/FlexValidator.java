@@ -53,7 +53,7 @@ public class FlexValidator extends FeedValidator {
         if (isFlexFeed(bookingRules, stopAreas, locations)) {
             List<NewGTFSError> errors = new ArrayList<>();
             try {
-                List<StopTime> stopTimes = getFlexStopTimesForValidation(dataSource.getConnection(), feed.tablePrefix);
+                List<StopTime> stopTimes = getFlexStopTimesForValidation(dataSource.getConnection(), feed.databaseSchemaPrefix);
                 stopTimes.forEach(stopTime -> errors.addAll(validateStopTime(stopTime, stopAreas, locations)));
                 feed.trips.forEach(trip -> errors.addAll(validateTrip(trip, stopTimes, stopAreas, locations)));
             } catch (SQLException e) {

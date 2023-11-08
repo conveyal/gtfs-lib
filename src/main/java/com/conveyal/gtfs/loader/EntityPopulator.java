@@ -12,6 +12,7 @@ import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.PatternLocation;
+import com.conveyal.gtfs.model.Pattern;
 import com.conveyal.gtfs.model.PatternStop;
 import com.conveyal.gtfs.model.PatternStopArea;
 import com.conveyal.gtfs.model.Route;
@@ -110,7 +111,7 @@ public interface EntityPopulator<T> {
         patternStopArea.pickup_type = getIntIfPresent(result, "pickup_type", columnForName);
         patternStopArea.stop_sequence = getIntIfPresent(result, "stop_sequence", columnForName);
         patternStopArea.timepoint = getIntIfPresent(result, "timepoint", columnForName);
-        patternStopArea.continuous_pickup   = getIntIfPresent(result, "continuous_pickup",   columnForName);
+        patternStopArea.continuous_pickup = getIntIfPresent(result, "continuous_pickup", columnForName);
         patternStopArea.continuous_drop_off = getIntIfPresent(result, "continuous_drop_off", columnForName);
 
         patternStopArea.pickup_booking_rule_id = getStringIfPresent(result, "pickup_booking_rule_id", columnForName);
@@ -122,6 +123,17 @@ public interface EntityPopulator<T> {
         patternStopArea.safe_duration_factor = getDoubleIfPresent(result, "safe_duration_factor", columnForName);
         patternStopArea.safe_duration_offset = getDoubleIfPresent(result, "safe_duration_offset", columnForName);
         return patternStopArea;
+    };
+
+    EntityPopulator<Pattern> PATTERN = (result, columnForName) -> {
+        Pattern pattern = new Pattern();
+        pattern.pattern_id = getStringIfPresent(result, "pattern_id", columnForName);
+        pattern.route_id = getStringIfPresent(result, "route_id", columnForName);
+        pattern.name = getStringIfPresent(result, "name", columnForName);
+        pattern.direction_id = getIntIfPresent(result, "direction_id", columnForName);
+        pattern.use_frequency = getIntIfPresent(result, "use_frequency", columnForName);
+        pattern.shape_id = getStringIfPresent(result, "shape_id", columnForName);
+        return pattern;
     };
 
     T populate (ResultSet results, TObjectIntMap<String> columnForName) throws SQLException;

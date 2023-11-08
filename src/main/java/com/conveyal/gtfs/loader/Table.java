@@ -118,6 +118,9 @@ public class Table {
     /** Key(s) that uniquely identify an entry in the respective table.*/
     private String[] primaryKeyNames;
 
+    /** Prefixed to exported tables/files that are not part of the GTFS spec. */
+    public static final String PROPRIETARY_FILE_PREFIX = "datatools_";
+
     public Table (String name, Class<? extends Entity> entityClass, Requirement required, Field... fields) {
         // TODO: verify table name is OK for use in constructing dynamic SQL queries
         this.name = name;
@@ -263,10 +266,11 @@ public class Table {
             new StringField("name", OPTIONAL),
             // Editor-specific fields.
             // direction_id and shape_id are exemplar fields applied to all trips for a pattern.
-            new ShortField("direction_id", EDITOR, 1),
-            new ShortField("use_frequency", EDITOR, 1),
-            new StringField("shape_id", EDITOR).isReferenceTo(SHAPES)
-    ).addPrimaryKey()
+            new ShortField("direction_id", OPTIONAL, 1),
+            new ShortField("use_frequency", OPTIONAL, 1),
+            new StringField("shape_id", OPTIONAL).isReferenceTo(SHAPES)
+    )
+    .addPrimaryKey()
     .addPrimaryKeyNames("pattern_id");
 
     public static final Table STOPS = new Table("stops", Stop.class, REQUIRED,
@@ -761,17 +765,39 @@ public class Table {
     }
 
     /**
+     * If working with the locations or location shapes return the fixed location geo json file name. For all other
+     * tables return the table name with the .txt file extension.
+     */
+    public static String getTableFileNameWithExtension(String tableName) {
+        if (tableName.equals(Table.LOCATIONS.name) || tableName.equals(Table.LOCATION_SHAPES.name)) {
+            LOG.info("Loading data for {}, into supporting table {}", LOCATION_GEO_JSON_FILE_NAME, tableName);
+            return LOCATION_GEO_JSON_FILE_NAME;
+        } else {
+            return getTableFileName(tableName, ".txt");
+        }
+    }
+
+    public static String getTableFileName(String tableName) {
+        return getTableFileName(tableName, "");
+    }
+
+    /**
+     * Proprietary table file names are prefix with "datatools_" to distinguish them from GTFS spec files.
+     */
+    private static String getTableFileName(String tableName, String fileExtension) {
+        return (tableName.equals("patterns"))
+            ? String.format("%s%s%s", PROPRIETARY_FILE_PREFIX, tableName, fileExtension)
+            : String.format("%s%s", tableName, fileExtension);
+    }
+
+    /**
      * In GTFS feeds, all files are supposed to be in the root of the zip file, but feed producers often put them
      * in a subdirectory. This function will search subdirectories if the entry is not found in the root.
      * It records an error if the entry is in a subdirectory (as long as errorStorage is not null).
      * It then creates a CSV reader for that table if it's found.
      */
     public CsvReader getCsvReader(ZipFile zipFile, SQLErrorStorage sqlErrorStorage) {
-        String tableFileName = this.name + ".txt";
-        if (name.equals(Table.LOCATIONS.name) || name.equals(Table.LOCATION_SHAPES.name)) {
-            tableFileName = LOCATION_GEO_JSON_FILE_NAME;
-            LOG.info("Loading data for {}, into supporting table {}", tableFileName, name);
-        }
+        final String tableFileName = getTableFileNameWithExtension(this.name);
         ZipEntry entry = zipFile.getEntry(tableFileName);
         if (entry == null) {
             // Table was not found, check if it is in a subdirectory.
