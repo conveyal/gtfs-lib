@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.PatternStop;
+import com.conveyal.gtfs.model.ScheduleException.ExemplarServiceDescriptor;
 import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
@@ -1328,6 +1329,58 @@ public class JdbcTableWriter implements TableWriter {
         }
     }
 
+    private void checkUniqueIdsAndUpdateReferencingTables(
+        TIntSet uniqueIds,
+        Integer id,
+        String namespace,
+        Table table,
+        String keyValue,
+        Boolean isCreating,
+        Field keyField
+    ) throws SQLException {
+        int size = uniqueIds.size();
+        if (size == 0 || (size == 1 && id != null && uniqueIds.contains(id))) {
+            // OK.
+            if (size == 0 && !isCreating) {
+                // FIXME: Need to update referencing tables because entity has changed ID.
+                // Entity key value is being changed to an entirely new one.  If there are entities that
+                // reference this value, we need to update them.
+                updateReferencingTables(namespace, table, id, keyValue, keyField);
+            }
+        } else {
+            // Conflict. The different conflict conditions are outlined below.
+            if (size == 1) {
+                // There was one match found.
+                if (isCreating) {
+                    // Under no circumstance should a new entity have a conflict with existing key field.
+                    throw new SQLException(
+                            String.format("New %s's %s value (%s) conflicts with an existing record in table.",
+                                    table.entityClass.getSimpleName(),
+                                    keyField.name,
+                                    keyValue)
+                    );
+                }
+                if (!uniqueIds.contains(id)) {
+                    // There are two circumstances we could encounter here.
+                    // 1. The key value for this entity has been updated to match some other entity's key value (conflict).
+                    // 2. The int ID provided in the request parameter does not match any rows in the table.
+                    throw new SQLException("Key field must be unique and request parameter ID must exist.");
+                }
+            } else if (size > 1) {
+                // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
+                // attempt to rectify bad data.
+                String message = String.format(
+                        "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
+                        size,
+                        table.name,
+                        keyField.name,
+                        keyValue);
+                LOG.error(message);
+                throw new SQLException(message);
+            }
+        }
+    }
+
     /**
      * Checks for modification of GTFS key field (e.g., stop_id, route_id) in supplied JSON object and ensures
      * both uniqueness and that referencing tables are appropriately updated.
@@ -1369,46 +1422,15 @@ public class JdbcTableWriter implements TableWriter {
         String keyValue = jsonObject.get(keyField).asText();
         // If updating key field, check that there is no ID conflict on value (e.g., stop_id or route_id)
         TIntSet uniqueIds = getIdsForCondition(tableName, keyField, keyValue, connection);
-        int size = uniqueIds.size();
-        if (size == 0 || (size == 1 && id != null && uniqueIds.contains(id))) {
-            // OK.
-            if (size == 0 && !isCreating) {
-                // FIXME: Need to update referencing tables because entity has changed ID.
-                // Entity key value is being changed to an entirely new one.  If there are entities that
-                // reference this value, we need to update them.
-                updateReferencingTables(namespace, table, id, keyValue);
-            }
-        } else {
-            // Conflict. The different conflict conditions are outlined below.
-            if (size == 1) {
-                // There was one match found.
-                if (isCreating) {
-                    // Under no circumstance should a new entity have a conflict with existing key field.
-                    throw new SQLException(
-                        String.format("New %s's %s value (%s) conflicts with an existing record in table.",
-                            table.entityClass.getSimpleName(),
-                            keyField,
-                            keyValue)
-                    );
-                }
-                if (!uniqueIds.contains(id)) {
-                    // There are two circumstances we could encounter here.
-                    // 1. The key value for this entity has been updated to match some other entity's key value (conflict).
-                    // 2. The int ID provided in the request parameter does not match any rows in the table.
-                    throw new SQLException("Key field must be unique and request parameter ID must exist.");
-                }
-            } else if (size > 1) {
-                // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
-                // attempt to rectify bad data.
-                String message = String.format(
-                    "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
-                    size,
-                    table.name,
-                    keyField,
-                    keyValue);
-                LOG.error(message);
-                throw new SQLException(message);
-            }
+        checkUniqueIdsAndUpdateReferencingTables(uniqueIds, id, namespace, table, keyValue, isCreating, table.getFieldForName(table.getKeyFieldName()));
+
+        // Special case for schedule_exceptions where for exception type 10, service_id is also a key
+        if (table.name.equals("schedule_exceptions") && jsonObject.has("exemplar") && jsonObject.get("exemplar").asInt() == ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE.getValue()) {
+            String calendarDateServiceKey = "custom_schedule";
+            Field calendarDateServiceKeyField = table.getFieldForName(calendarDateServiceKey);
+            String calendarDateServiceKeyVal = jsonObject.get(calendarDateServiceKey).asText();
+            TIntSet calendarDateServiceUniqueIds = getIdsForCondition (tableName, calendarDateServiceKey, calendarDateServiceKeyVal, connection);
+            checkUniqueIdsAndUpdateReferencingTables(calendarDateServiceUniqueIds, id, namespace, table, calendarDateServiceKeyVal, isCreating, calendarDateServiceKeyField);
         }
     }
 
@@ -1434,7 +1456,13 @@ public class JdbcTableWriter implements TableWriter {
         String keyValue,
         Connection connection
     ) throws SQLException {
-        String idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
+        String idCheckSql = "";
+        // The custom_schedule field of an exception based service contains an array and requires an "any" query
+        if (keyField == "custom_schedule") {
+            idCheckSql = String.format("select id from %s where ? = any (%s)", tableName, keyField);
+        } else {
+            idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
+        }
         // Create statement for counting rows selected
         PreparedStatement statement = connection.prepareStatement(idCheckSql);
         statement.setString(1, keyValue);
@@ -1563,16 +1591,18 @@ public class JdbcTableWriter implements TableWriter {
         String namespace,
         Table table,
         int id,
-        String newKeyValue
+        String newKeyValue,
+        Field keyField
     ) throws SQLException {
-        Field keyField = table.getFieldForName(table.getKeyFieldName());
         Class<? extends Entity> entityClass = table.getEntityClass();
         // Determine method (update vs. delete) depending on presence of newKeyValue field.
         SqlMethod sqlMethod = newKeyValue != null ? SqlMethod.UPDATE : SqlMethod.DELETE;
         Set<Table> referencingTables = getReferencingTables(table);
         // If there are no referencing tables, there is no need to update any values (e.g., .
         if (referencingTables.size() == 0) return;
-        String keyValue = getValueForId(id, keyField.name, namespace, table, connection);
+        // Exception based service contains a single service ID in custom_schedule
+        String sqlKeyFieldName = keyField.name == "custom_schedule" ? "custom_schedule[1]" : keyField.name;
+        String keyValue = getValueForId(id, sqlKeyFieldName, namespace, table, connection);
         if (keyValue == null) {
             // FIXME: should we still check referencing tables for null value?
             LOG.warn("Entity {} to {} has null value for {}. Skipping references check.", id, sqlMethod, keyField);
@@ -1675,6 +1705,25 @@ public class JdbcTableWriter implements TableWriter {
                 }
             }
         }
+    }
+
+    /**
+     * Traditional method signature for updateReferencingTables, updating exception based service requires
+     * passing the keyField.
+     * @param namespace
+     * @param table
+     * @param id
+     * @param newKeyValue
+     * @throws SQLException
+     */
+    private void updateReferencingTables(
+        String namespace,
+        Table table,
+        int id,
+        String newKeyValue
+    ) throws SQLException {
+        Field keyField = table.getFieldForName(table.getKeyFieldName());
+        updateReferencingTables(namespace, table, id, newKeyValue, keyField);
     }
 
     /**

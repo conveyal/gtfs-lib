@@ -340,7 +340,7 @@ public class Table {
         new StringField("trip_id", REQUIRED),
         new StringField("route_id", REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
         // FIXME: Do we need an index on service_id
-        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR).isReferenceTo(CALENDAR_DATES),
+        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR).isReferenceTo(CALENDAR_DATES).isReferenceTo(SCHEDULE_EXCEPTIONS),
         new StringField("trip_headsign", OPTIONAL),
         new StringField("trip_short_name", OPTIONAL),
         new ShortField("direction_id", OPTIONAL, 1),
