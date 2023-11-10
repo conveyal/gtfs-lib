@@ -1358,6 +1358,19 @@ public class GTFSTest {
                 new RecordExpectation("bikes_allowed", 0),
                 new RecordExpectation("wheelchair_accessible", 0)
             }
+        ),
+        new PersistenceExpectation(
+            "transfers",
+            new RecordExpectation[]{
+                new RecordExpectation("from_stop_id", "4u6g"),
+                new RecordExpectation("to_stop_id", "johv"),
+                new RecordExpectation("from_trip_id", "a30277f8-e50a-4a85-9141-b1e0da9d429d"),
+                new RecordExpectation("to_trip_id", "frequency-trip"),
+                new RecordExpectation("from_route_id", "1"),
+                new RecordExpectation("to_route_id", "1"),
+                new RecordExpectation("transfer_type", "1"),
+                new RecordExpectation("min_transfer_time", "60")
+            }
         )
     };
 
