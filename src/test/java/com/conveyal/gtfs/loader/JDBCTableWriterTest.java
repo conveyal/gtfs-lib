@@ -66,7 +66,6 @@ public class JDBCTableWriterTest {
     private static String firstStopId = "1";
     private static String secondStopId= "1.5";
     private static String lastStopId = "2";
-    private static String patternId = "123456";
     private static double firstStopLat = 34.2222;
     private static double firstStopLon = -87.333;
     private static double secondStopLat = 34.2227;
@@ -843,7 +842,7 @@ public class JDBCTableWriterTest {
             ));
     }
 
-    private static String normalizeStopsForPattern(PatternStopDTO[] patternStops, int updatedStopSequence, boolean interpolateStopTimes, int initialTravelTime, int updatedTravelTime, int startTime) throws SQLException, InvalidNamespaceException, IOException {
+    private static String normalizeStopsForPattern(PatternStopDTO[] patternStops, int updatedStopSequence, boolean interpolateStopTimes, int initialTravelTime, int updatedTravelTime, int startTime, String patternId) throws SQLException, InvalidNamespaceException, IOException {
         final Table tripsTable = Table.TRIPS;
 
         PatternDTO pattern = createRouteAndPattern(newUUID(),
@@ -881,6 +880,7 @@ public class JDBCTableWriterTest {
         int startTime = 6 * 60 * 60; // 6AM
         int initialTravelTime = 60; // seconds
         int updatedTravelTime = 600; // ten minutes
+        String patternId = "123456-interpolated";
         double[] shapeDistTraveledValues = new double[] {0.0, 300.0, 600.0};
         double timepointTravelTime = (shapeDistTraveledValues[2] - shapeDistTraveledValues[0]) / updatedTravelTime; // 1 m/s
 
@@ -894,7 +894,7 @@ public class JDBCTableWriterTest {
         patternStops[2].default_travel_time = initialTravelTime;
 
         // Pass the array of patterns to the body method with param
-        String createdTripId = normalizeStopsForPattern(patternStops, 2, true, initialTravelTime, updatedTravelTime, startTime);
+        String createdTripId = normalizeStopsForPattern(patternStops, 2, true, initialTravelTime, updatedTravelTime, startTime, patternId);
 
         // Read pattern stops from database and check that the arrivals/departures have been updated.
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
@@ -920,13 +920,14 @@ public class JDBCTableWriterTest {
         int initialTravelTime = 60; // one minute
         int startTime = 6 * 60 * 60; // 6AM
         int updatedTravelTime = 3600;
+        String patternId = "123456";
 
         PatternStopDTO[] patternStops = new PatternStopDTO[]{
             new PatternStopDTO(patternId, firstStopId, 0),
             new PatternStopDTO(patternId, lastStopId, 1)
         };
 
-        String createdTripId = normalizeStopsForPattern(patternStops, 1, false, initialTravelTime, updatedTravelTime, startTime);
+        String createdTripId = normalizeStopsForPattern(patternStops, 1, false, initialTravelTime, updatedTravelTime, startTime, patternId);
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
             testDataSource,
             testNamespace + ".",
