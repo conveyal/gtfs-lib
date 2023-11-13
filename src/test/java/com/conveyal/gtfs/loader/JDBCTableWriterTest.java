@@ -64,9 +64,13 @@ public class JDBCTableWriterTest {
     private static String testGtfsGLSnapshotNamespace;
     private static String simpleServiceId = "1";
     private static String firstStopId = "1";
+    private static String secondStopId= "1.5";
     private static String lastStopId = "2";
+    private static String patternId = "123456";
     private static double firstStopLat = 34.2222;
     private static double firstStopLon = -87.333;
+    private static double secondStopLat = 34.2227;
+    private static double secondStopLon = -87.3335;
     private static double lastStopLat = 34.2233;
     private static double lastStopLon = -87.334;
     private static String sharedShapeId = "shared_shape_id";
@@ -93,6 +97,7 @@ public class JDBCTableWriterTest {
         // Create a service calendar and two stops, both of which are necessary to perform pattern and trip tests.
         createWeekdayCalendar(simpleServiceId, "20180103", "20180104");
         createSimpleStop(firstStopId, "First Stop", firstStopLat, firstStopLon);
+        createSimpleStop(secondStopId, "Second Stop", secondStopLat, secondStopLon);
         createSimpleStop(lastStopId, "Last Stop", lastStopLat, lastStopLon);
 
         /** Load the following real-life GTFS for use with {@link JDBCTableWriterTest#canUpdateServiceId()}  **/
@@ -838,29 +843,17 @@ public class JDBCTableWriterTest {
             ));
     }
 
-    /**
-     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int, boolean)} can normalize stop times to a pattern's
-     * default travel times.
-     */
-    @Test
-    public void canNormalizePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
-        // Store Table and Class values for use in test.
+    private static String normalizeStopsForPattern(PatternStopDTO[] patternStops, int updatedStopSequence, boolean interpolateStopTimes, int initialTravelTime, int updatedTravelTime, int startTime) throws SQLException, InvalidNamespaceException, IOException {
         final Table tripsTable = Table.TRIPS;
-        int initialTravelTime = 60; // one minute
-        int startTime = 6 * 60 * 60; // 6AM
-        String patternId = "123456";
-        PatternStopDTO[] patternStops = new PatternStopDTO[]{
-            new PatternStopDTO(patternId, firstStopId, 0),
-            new PatternStopDTO(patternId, lastStopId, 1)
-        };
-        patternStops[1].default_travel_time = initialTravelTime;
+
         PatternDTO pattern = createRouteAndPattern(newUUID(),
-                                                   patternId,
-                                                   "Pattern A",
-                                                   null,
-                                                   new ShapePointDTO[]{},
-                                                   patternStops,
-                                                   0);
+            patternId,
+            "Pattern A",
+            null,
+            new ShapePointDTO[]{},
+            patternStops,
+            0);
+
         // Create trip with travel times that match pattern stops.
         TripDTO tripInput = constructTimetableTrip(pattern.pattern_id, pattern.route_id, startTime, initialTravelTime);
         JdbcTableWriter createTripWriter = createTestTableWriter(tripsTable);
@@ -869,20 +862,77 @@ public class JDBCTableWriterTest {
         TripDTO createdTrip = mapper.readValue(createTripOutput, TripDTO.class);
         // Update pattern stop with new travel time.
         JdbcTableWriter patternUpdater = createTestTableWriter(Table.PATTERNS);
-        int updatedTravelTime = 3600; // one hour
-        pattern.pattern_stops[1].default_travel_time = updatedTravelTime;
+        pattern.pattern_stops[updatedStopSequence].default_travel_time = updatedTravelTime;
         String updatedPatternOutput = patternUpdater.update(pattern.id, mapper.writeValueAsString(pattern), true);
         LOG.info("Updated pattern output: {}", updatedPatternOutput);
         // Normalize stop times.
         JdbcTableWriter updateTripWriter = createTestTableWriter(tripsTable);
-        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0, false);
+        updateTripWriter.normalizeStopTimesForPattern(pattern.id, 0, interpolateStopTimes);
+
+        return createdTrip.trip_id;
+    }
+
+    /**
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int, boolean)} can interpolate stop times between timepoints.
+     */
+    @Test
+    public void canInterpolatePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+        // Parameters are shared with canNormalizePatternStopTimes, but maintained for test flexibility.
+        int startTime = 6 * 60 * 60; // 6AM
+        int initialTravelTime = 60; // seconds
+        int updatedTravelTime = 600; // ten minutes
+        double[] shapeDistTraveledValues = new double[] {0.0, 300.0, 600.0};
+        double timepointTravelTime = (shapeDistTraveledValues[2] - shapeDistTraveledValues[0]) / updatedTravelTime; // 1 m/s
+
+        // Create the array of patterns, set the timepoints properly.
+        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, firstStopId, 0, 1, shapeDistTraveledValues[0]),
+            new PatternStopDTO(patternId, secondStopId, 1, 0, shapeDistTraveledValues[1]),
+            new PatternStopDTO(patternId, lastStopId, 2, 1, shapeDistTraveledValues[2]),
+        };
+
+        patternStops[2].default_travel_time = initialTravelTime;
+
+        // Pass the array of patterns to the body method with param
+        String createdTripId = normalizeStopsForPattern(patternStops, 2, true, initialTravelTime, updatedTravelTime, startTime);
+
         // Read pattern stops from database and check that the arrivals/departures have been updated.
         JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
-                                                                       testDataSource,
-                                                                       testNamespace + ".",
-                                                                       EntityPopulator.STOP_TIME);
+            testDataSource,
+            testNamespace + ".",
+            EntityPopulator.STOP_TIME);
         int index = 0;
-        for (StopTime stopTime : stopTimesTable.getOrdered(createdTrip.trip_id)) {
+        for (StopTime stopTime : stopTimesTable.getOrdered(createdTripId)) {
+            LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
+            int calculatedArrivalTime = (int) (startTime + shapeDistTraveledValues[index] * timepointTravelTime);
+            assertThat(stopTime.arrival_time, equalTo(calculatedArrivalTime));
+            index++;
+        }
+    }
+
+    /**
+     * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int, boolean)} can normalize stop times to a pattern's
+     * default travel times.
+     */
+    @Test
+    public void canNormalizePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+        // Parameters are shared with canNormalizePatternStopTimes, but maintained for test flexibility.
+        int initialTravelTime = 60; // one minute
+        int startTime = 6 * 60 * 60; // 6AM
+        int updatedTravelTime = 3600;
+
+        PatternStopDTO[] patternStops = new PatternStopDTO[]{
+            new PatternStopDTO(patternId, firstStopId, 0),
+            new PatternStopDTO(patternId, lastStopId, 1)
+        };
+
+        String createdTripId = normalizeStopsForPattern(patternStops, 1, false, initialTravelTime, updatedTravelTime, startTime);
+        JDBCTableReader<StopTime> stopTimesTable = new JDBCTableReader(Table.STOP_TIMES,
+            testDataSource,
+            testNamespace + ".",
+            EntityPopulator.STOP_TIME);
+        int index = 0;
+        for (StopTime stopTime : stopTimesTable.getOrdered(createdTripId)) {
             LOG.info("stop times i={} arrival={} departure={}", index, stopTime.arrival_time, stopTime.departure_time);
             assertThat(stopTime.arrival_time, equalTo(startTime + index * updatedTravelTime));
             index++;
@@ -990,7 +1040,7 @@ public class JDBCTableWriterTest {
     /**
      * Construct (without writing to the database) a timetable trip.
      */
-    private TripDTO constructTimetableTrip(String patternId, String routeId, int startTime, int travelTime) {
+    private static TripDTO constructTimetableTrip(String patternId, String routeId, int startTime, int travelTime) {
         TripDTO tripInput = new TripDTO();
         tripInput.pattern_id = patternId;
         tripInput.route_id = routeId;

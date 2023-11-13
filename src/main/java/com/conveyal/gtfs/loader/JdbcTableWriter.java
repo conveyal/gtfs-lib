@@ -789,19 +789,21 @@ public class JdbcTableWriter implements TableWriter {
         final BatchTracker stopTimesTracker = new BatchTracker("stop_times", updateStopTimeStatement);
         for (String tripId : timesForTripIds.keySet()) {
             // Initialize travel time with previous stop time value.
-            int cumulativeTravelTime = timesForTripIds.get(tripId);
-            int timepointNumber = 0;
-            double timepointSpeed = 0;
-            double previousShapeDistTraveled = 0;
+            int cumulativeTravelTime = timesForTripIds.get(tripId), timepointNumber = 0;
+            double timepointSpeed = 0, previousShapeDistTraveled = 0;
             PatternStop currentTimepoint = patternStops.get(0); // First stop must be a timepoint
+            if (currentTimepoint.timepoint != 1 && interpolateStopTimes) {
+                throw new IllegalStateException("First pattern stop must be a timepoint to perform interpolation");
+            }
             for (PatternStop patternStop : patternStops) {
                 boolean isTimepoint = patternStop.timepoint == 1;
                 // If we have reached a timepoint (which is not the last), we calculate the speed between it and the next timepoint.
-                if (isTimepoint && interpolateStopTimes && timepointNumber < timepoints.size()-1){
-                    timepointNumber++;
+                if (isTimepoint && interpolateStopTimes && timepointNumber++ < timepoints.size()-1){
                     previousShapeDistTraveled = currentTimepoint.shape_dist_traveled;
                     PatternStop nextTimePoint = timepoints.get(timepointNumber);
-                    timepointSpeed = (nextTimePoint.shape_dist_traveled - currentTimepoint.shape_dist_traveled) / nextTimePoint.default_travel_time;
+                    if (nextTimePoint == null) throw new IllegalStateException("Stop time interpolation is not possible with null timepoints.");
+                    timepointSpeed = nextTimePoint.default_travel_time == Entity.INT_MISSING ? 0
+                        : (nextTimePoint.shape_dist_traveled - currentTimepoint.shape_dist_traveled) / nextTimePoint.default_travel_time;
                 }
                 // Gather travel/dwell time for pattern stop (being sure to check for missing values).
                 int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
