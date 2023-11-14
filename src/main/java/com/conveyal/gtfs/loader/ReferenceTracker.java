@@ -177,6 +177,22 @@ public class ReferenceTracker {
     }
 
     /**
+<<<<<<< HEAD
+=======
+     * Check foreign references. If the foreign reference is present in one of the tables, there is no
+     * need to check the remainder. If no matching foreign reference is found, flag integrity error.
+     * Note: The reference table must be loaded before the table/value being currently checked.
+     */
+    private boolean hasMatchingReference(Field field, String value, TreeSet<String> badValues) {
+        for (Table referenceTable : field.referenceTables) {
+            if (checkReference(referenceTable.getKeyFieldName(), value, badValues)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * Check that a reference is valid.
      */
     private boolean checkReference(String referenceField, String reference, TreeSet<String> badValues) {
@@ -188,7 +204,6 @@ public class ReferenceTracker {
         }
         return false;
     }
-
 
     /**
      * Work through each conditionally required check assigned to fields within a table. First check the reference field

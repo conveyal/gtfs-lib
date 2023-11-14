@@ -18,7 +18,7 @@
         "stop_lat" : 37.0612132,
         "stop_lon" : -122.0074332,
         "stop_name" : "Butler Ln",
-        "stop_time_count" : 2,
+        "stop_time_count" : 3,
         "stop_times" : [ {
           "stop_id" : "4u6g",
           "stop_sequence" : 1,
@@ -27,6 +27,10 @@
           "stop_id" : "4u6g",
           "stop_sequence" : 1,
           "trip_id" : "frequency-trip"
+        }, {
+          "stop_id" : "4u6g",
+          "stop_sequence" : 1,
+          "trip_id" : "calendar-date-trip"
         } ],
         "stop_timezone" : null,
         "stop_url" : null,
@@ -92,11 +96,15 @@
         "stop_lat" : 37.06662,
         "stop_lon" : -122.07772,
         "stop_name" : "Child Stop",
-        "stop_time_count" : 1,
+        "stop_time_count" : 2,
         "stop_times" : [ {
           "stop_id" : "1234",
           "stop_sequence" : 2,
           "trip_id" : "frequency-trip"
+        }, {
+          "stop_id" : "1234",
+          "stop_sequence" : 2,
+          "trip_id" : "calendar-date-trip"
         } ],
         "stop_timezone" : null,
         "stop_url" : null,

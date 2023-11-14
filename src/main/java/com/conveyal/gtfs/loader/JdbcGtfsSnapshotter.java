@@ -2,6 +2,7 @@ package com.conveyal.gtfs.loader;
 
 import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.CalendarDate;
+import com.conveyal.gtfs.model.ScheduleException;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
@@ -217,15 +218,14 @@ public class JdbcGtfsSnapshotter {
                     tablePrefix.replace(".", ""),
                     true
                 );
-                String sql = String.format(
-                    "insert into %s (name, dates, exemplar, added_service, removed_service) values (?, ?, ?, ?, ?)",
-                    scheduleExceptionsTableName
-                );
-                PreparedStatement scheduleExceptionsStatement = connection.prepareStatement(sql);
-                final BatchTracker scheduleExceptionsTracker = new BatchTracker(
-                    "schedule_exceptions",
-                    scheduleExceptionsStatement
-                );
+
+                // Fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
+                // table.
+                JDBCTableReader<Calendar> calendarReader = JDBCTableReader.getCalendarTableReader(dataSource, feedIdToSnapshot);
+                Set<String> calendarServiceIds = new HashSet<>();
+                for (Calendar calendar : calendarReader.getAll()) {
+                    calendarServiceIds.add(calendar.service_id);
+                }
 
                 JDBCTableReader<CalendarDate> calendarDatesReader = new JDBCTableReader(
                     Table.CALENDAR_DATES,
@@ -238,65 +238,80 @@ public class JdbcGtfsSnapshotter {
                 // Keep track of calendars by service id in case we need to add dummy calendar entries.
                 Map<String, Calendar> dummyCalendarsByServiceId = new HashMap<>();
 
-                // Iterate through calendar dates to build up to get maps from exceptions to their dates.
+                // Iterate through calendar dates to build up appropriate service dates.
                 Multimap<String, String> removedServiceForDate = HashMultimap.create();
                 Multimap<String, String> addedServiceForDate = HashMultimap.create();
+                HashMap<String, Set<String>> calendarDateService = new HashMap<>();
                 for (CalendarDate calendarDate : calendarDates) {
-                    // Skip any null dates
-                    if (calendarDate.date == null) {
-                        LOG.warn("Encountered calendar date record with null value for date field. Skipping.");
+                    // Skip any null dates or service ids.
+                    if (calendarDate.date == null || calendarDate.service_id == null) {
+                        LOG.warn("Encountered calendar date record with null value for date/service_id field. Skipping.");
                         continue;
                     }
                     String date = calendarDate.date.format(DateTimeFormatter.BASIC_ISO_DATE);
-                    if (calendarDate.exception_type == 1) {
-                        addedServiceForDate.put(date, calendarDate.service_id);
-                        // create (if needed) and extend range of dummy calendar that would need to be created if we are
-                        // copying from a feed that doesn't have the calendar.txt file
-                        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
-                        calendar.service_id = calendarDate.service_id;
-                        if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
-                            calendar.start_date = calendarDate.date;
+                    if (calendarServiceIds.contains(calendarDate.service_id)) {
+                        // Calendar date is related to a calendar.
+                        if (calendarDate.exception_type == 1) {
+                            addedServiceForDate.put(date, calendarDate.service_id);
+                            extendDummyCalendarRange(dummyCalendarsByServiceId, calendarDate);
+                        } else {
+                            removedServiceForDate.put(date, calendarDate.service_id);
                         }
-                        if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
-                            calendar.end_date = calendarDate.date;
-                        }
-                        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
                     } else {
-                        removedServiceForDate.put(date, calendarDate.service_id);
+                        // Calendar date is not related to a calendar. Group calendar dates by service id.
+                        if (calendarDateService.containsKey(calendarDate.service_id)) {
+                            calendarDateService.get(calendarDate.service_id).add(date);
+                        } else {
+                            Set<String> dates = new HashSet<>();
+                            dates.add(date);
+                            calendarDateService.put(calendarDate.service_id, dates);
+                        }
+
                     }
                 }
+
+                String sql = String.format(
+                    "insert into %s (name, dates, exemplar, custom_schedule, added_service, removed_service) values (?, ?, ?, ?, ?, ?)",
+                    scheduleExceptionsTableName
+                );
+                PreparedStatement scheduleExceptionsStatement = connection.prepareStatement(sql);
+                final BatchTracker scheduleExceptionsTracker = new BatchTracker(
+                    "schedule_exceptions",
+                    scheduleExceptionsStatement
+                );
+
                 // Iterate through dates with added or removed service and add to database.
                 // For usability and simplicity of code, don't attempt to find all dates with similar
                 // added and removed services, but simply create an entry for each found date.
                 for (String date : Sets.union(removedServiceForDate.keySet(), addedServiceForDate.keySet())) {
-                    scheduleExceptionsStatement.setString(1, date);
-                    String[] dates = {date};
-                    scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
-                    scheduleExceptionsStatement.setInt(3, 9); // FIXME use better static type
-                    scheduleExceptionsStatement.setArray(
-                        4,
-                        connection.createArrayOf("text", addedServiceForDate.get(date).toArray())
+                    createScheduledExceptionStatement(
+                        scheduleExceptionsStatement,
+                        scheduleExceptionsTracker,
+                        date,
+                        new String[] {date},
+                        ScheduleException.ExemplarServiceDescriptor.SWAP,
+                        new String[] {},
+                        addedServiceForDate.get(date).toArray(),
+                        removedServiceForDate.get(date).toArray()
                     );
-                    scheduleExceptionsStatement.setArray(
-                        5,
-                        connection.createArrayOf("text", removedServiceForDate.get(date).toArray())
+                }
+
+                for (Map.Entry<String,Set<String>> entry : calendarDateService.entrySet()) {
+                    String serviceId = entry.getKey();
+                    String[] dates = entry.getValue().toArray(new String[0]);
+                    createScheduledExceptionStatement(
+                        scheduleExceptionsStatement,
+                        scheduleExceptionsTracker,
+                        // Unique-ish schedule name that shouldn't conflict with existing service ids.
+                        String.format("%s-%s", serviceId, dates[0]),
+                        dates,
+                        ScheduleException.ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE,
+                        new String[] {serviceId},
+                        new String[] {},
+                        new String[] {}
                     );
-                    scheduleExceptionsTracker.addBatch();
                 }
                 scheduleExceptionsTracker.executeRemaining();
-
-                // fetch all entries in the calendar table to generate set of serviceIds that exist in the calendar
-                // table.
-                JDBCTableReader<Calendar> calendarReader = new JDBCTableReader(
-                    Table.CALENDAR,
-                    dataSource,
-                    feedIdToSnapshot + ".",
-                    EntityPopulator.CALENDAR
-                );
-                Set<String> calendarServiceIds = new HashSet<>();
-                for (Calendar calendar : calendarReader.getAll()) {
-                    calendarServiceIds.add(calendar.service_id);
-                }
 
                 // For service_ids that only existed in the calendar_dates table, insert auto-generated, "blank"
                 // (no days of week specified) calendar entries.
@@ -347,6 +362,53 @@ public class JdbcGtfsSnapshotter {
             LOG.info("done creating schedule exceptions");
             return tableLoadResult;
         }
+    }
+
+    /**
+     * Create (if needed) and extend range of dummy calendars that would need to be created if we are copying from a
+     * feed that doesn't have the calendar.txt file.
+     */
+    private void extendDummyCalendarRange(Map<String, Calendar> dummyCalendarsByServiceId, CalendarDate calendarDate) {
+        Calendar calendar = dummyCalendarsByServiceId.getOrDefault(calendarDate.service_id, new Calendar());
+        calendar.service_id = calendarDate.service_id;
+        if (calendar.start_date == null || calendar.start_date.isAfter(calendarDate.date)) {
+            calendar.start_date = calendarDate.date;
+        }
+        if (calendar.end_date == null || calendar.end_date.isBefore(calendarDate.date)) {
+            calendar.end_date = calendarDate.date;
+        }
+        dummyCalendarsByServiceId.put(calendarDate.service_id, calendar);
+    }
+
+    /**
+     * Populate schedule exception statement and add to batch tracker.
+     */
+    private void createScheduledExceptionStatement(
+        PreparedStatement scheduleExceptionsStatement,
+        BatchTracker scheduleExceptionsTracker,
+        String name,
+        String[] dates,
+        ScheduleException.ExemplarServiceDescriptor exemplarServiceDescriptor,
+        Object[] customSchedule,
+        Object[] addedServicesForDate,
+        Object[] removedServicesForDate
+    ) throws SQLException {
+        scheduleExceptionsStatement.setString(1, name);
+        scheduleExceptionsStatement.setArray(2, connection.createArrayOf("text", dates));
+        scheduleExceptionsStatement.setInt(3, exemplarServiceDescriptor.getValue());
+        scheduleExceptionsStatement.setArray(
+            4,
+            connection.createArrayOf("text", customSchedule)
+        );
+        scheduleExceptionsStatement.setArray(
+            5,
+            connection.createArrayOf("text", addedServicesForDate)
+        );
+        scheduleExceptionsStatement.setArray(
+            6,
+            connection.createArrayOf("text", removedServicesForDate)
+        );
+        scheduleExceptionsTracker.addBatch();
     }
 
     /**

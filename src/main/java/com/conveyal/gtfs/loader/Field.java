@@ -8,7 +8,7 @@ import com.google.common.collect.ImmutableSet;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.SQLType;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
@@ -47,7 +47,7 @@ public abstract class Field {
      * Indicates that this field acts as a foreign key to this referenced table. This is used when checking referential
      * integrity when loading a feed.
      * */
-    public HashSet<Table> referenceTables = new HashSet<>();
+    public Set<Table> referenceTables = new LinkedHashSet<>();
     private boolean shouldBeIndexed;
     private boolean emptyValuePermitted;
     private boolean isConditionallyRequired;

@@ -144,12 +144,7 @@ public class Calendar extends Entity implements Serializable {
         @Override
         protected Iterator<Calendar> iterator() {
             // wrap an iterator over services
-            Iterator<Calendar> calIt = Iterators.transform(feed.services.values().iterator(), new Function<Service, Calendar> () {
-                @Override
-                public Calendar apply (Service s) {
-                    return s.calendar;
-                }
-            });
+            Iterator<Calendar> calIt = Iterators.transform(feed.services.values().iterator(), s -> s.calendar);
             
             // not every service has a calendar (e.g. TriMet has no calendars, just calendar dates).
             // This is legal GTFS, so skip services with no calendar

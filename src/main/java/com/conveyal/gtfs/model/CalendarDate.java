@@ -109,12 +109,7 @@ public class CalendarDate extends Entity implements Cloneable, Serializable {
         @Override
         protected Iterator<CalendarDate> iterator() {
             Iterator<Service> serviceIterator = feed.services.values().iterator();
-            return Iterators.concat(Iterators.transform(serviceIterator, new Function<Service, Iterator<CalendarDate>> () {
-                @Override
-                public Iterator<CalendarDate> apply(Service service) {
-                    return service.calendar_dates.values().iterator();
-                }
-            }));
+            return Iterators.concat(Iterators.transform(serviceIterator, service -> service.calendar_dates.values().iterator()));
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.conveyal.gtfs.loader;
 
+import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.storage.StorageException;
 import gnu.trove.map.TObjectIntMap;
@@ -144,6 +145,18 @@ public class JDBCTableReader<T extends Entity> implements TableReader<T> {
                 throw new StorageException(ex);
             }
         }
+    }
+
+    /**
+     * Provide reader for calendar table.
+     */
+    public static JDBCTableReader<Calendar> getCalendarTableReader(DataSource dataSource, String tablePrefix) {
+        return new JDBCTableReader(
+            Table.CALENDAR,
+            dataSource,
+            tablePrefix + ".",
+            EntityPopulator.CALENDAR
+        );
     }
 
     private class EntityIterator implements Iterator<T> {

@@ -45,7 +45,21 @@ public class GTFSFeedTest {
      * Make sure a round-trip of loading a GTFS zip file and then writing another zip file can be performed.
      */
     @Test
-    public void canDoRoundtripLoadAndWriteToZipFile() throws IOException {
+    public void canDoRoundTripLoadAndWriteToZipFile() throws IOException {
+        // create a temp file for this test
+        File outZip = File.createTempFile("fake-agency-output", ".zip");
+
+        // delete file to make sure we can assert that this program created the file
+        outZip.delete();
+
+        GTFSFeed feed = GTFSFeed.fromFile(simpleGtfsZipFileName);
+        feed.toFile(outZip.getAbsolutePath());
+        feed.close();
+        assertThat(outZip.exists(), is(true));
+
+        // assert that rows of data were written to files within the zipfile
+        ZipFile zip = new ZipFile(outZip);
+
         FileTestCase[] fileTestCases = {
             // agency.txt
             new FileTestCase(
@@ -61,6 +75,14 @@ public class GTFSFeedTest {
                     new DataExpectation("service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"),
                     new DataExpectation("start_date", "20170915"),
                     new DataExpectation("end_date", "20170917")
+                }
+            ),
+            new FileTestCase(
+                "calendar_dates.txt",
+                new DataExpectation[]{
+                    new DataExpectation("service_id", "calendar-date-service"),
+                    new DataExpectation("date", "20170917"),
+                    new DataExpectation("exception_type", "1")
                 }
             ),
             new FileTestCase(
