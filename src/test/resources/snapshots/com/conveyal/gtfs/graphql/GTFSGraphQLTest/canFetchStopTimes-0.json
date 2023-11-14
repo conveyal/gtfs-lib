@@ -41,7 +41,7 @@
         "drop_off_type" : 0,
         "pickup_type" : 0,
         "shape_dist_traveled" : 341.4491961,
-        "stop_headsign" : "Test stop headsign frequency trip",
+        "stop_headsign" : "Test stop headsign frequency trip 2",
         "stop_id" : "1234",
         "stop_sequence" : 2,
         "timepoint" : 1,
@@ -68,6 +68,28 @@
         "stop_sequence" : 4,
         "timepoint" : 1,
         "trip_id" : "frequency-trip"
+      }, {
+        "arrival_time" : 28800,
+        "departure_time" : 28800,
+        "drop_off_type" : 0,
+        "pickup_type" : 0,
+        "shape_dist_traveled" : 0.0,
+        "stop_headsign" : "Test stop headsign calendar date trip",
+        "stop_id" : "4u6g",
+        "stop_sequence" : 1,
+        "timepoint" : null,
+        "trip_id" : "calendar-date-trip"
+      }, {
+        "arrival_time" : 30540,
+        "departure_time" : 30540,
+        "drop_off_type" : 0,
+        "pickup_type" : 0,
+        "shape_dist_traveled" : 341.4491961,
+        "stop_headsign" : "Test stop headsign calendar date trip 2",
+        "stop_id" : "1234",
+        "stop_sequence" : 2,
+        "timepoint" : null,
+        "trip_id" : "calendar-date-trip"
       } ]
     }
   }

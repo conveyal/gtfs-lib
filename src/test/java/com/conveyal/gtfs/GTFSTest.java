@@ -137,12 +137,20 @@ public class GTFSTest {
      * Tests that a GTFS feed with bad date values in calendars.txt and calendar_dates.txt can pass the integration test.
      */
     @Test
-    public void canLoadFeedWithBadDates () {
+    void canLoadFeedWithBadDates () {
         PersistenceExpectation[] expectations = PersistenceExpectation.list(
             new PersistenceExpectation(
                 "calendar",
                 new RecordExpectation[]{
                     new RecordExpectation("start_date", null)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation("service_id", "123_ID_NOT_EXISTS"),
+                    new RecordExpectation("date", "20190301"),
+                    new RecordExpectation("exception_type", "1")
                 }
             )
         );
@@ -151,7 +159,6 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
-            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             new ErrorExpectation(NewGTFSErrorType.DATE_FORMAT),
             // The below "wrong number of fields" errors are for empty new lines
@@ -161,7 +168,7 @@ public class GTFSTest {
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
             new ErrorExpectation(NewGTFSErrorType.WRONG_NUMBER_OF_FIELDS),
-            new ErrorExpectation(NewGTFSErrorType.REFERENTIAL_INTEGRITY),
+            new ErrorExpectation(NewGTFSErrorType.MISSING_FOREIGN_TABLE_REFERENCE),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
             new ErrorExpectation(NewGTFSErrorType.SERVICE_NEVER_ACTIVE),
             new ErrorExpectation(NewGTFSErrorType.TRIP_NEVER_ACTIVE),
@@ -435,18 +442,6 @@ public class GTFSTest {
                     new RecordExpectation("exception_type", 2)
                 }
             ),
-            // calendar-dates.txt-only expectation
-            new PersistenceExpectation(
-                "calendar",
-                new RecordExpectation[]{
-                    new RecordExpectation(
-                        "service_id", "only-in-calendar-dates-txt"
-                    ),
-                    new RecordExpectation("start_date", 20170916),
-                    new RecordExpectation("end_date", 20170916)
-                },
-                true
-            ),
             new PersistenceExpectation(
                 "calendar_dates",
                 new RecordExpectation[]{
@@ -454,6 +449,46 @@ public class GTFSTest {
                         "service_id", "only-in-calendar-dates-txt"
                     ),
                     new RecordExpectation("date", 20170916),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-service-one"
+                    ),
+                    new RecordExpectation("date", 20170917),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-service-two"
+                    ),
+                    new RecordExpectation("date", 20170918),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-service-three"
+                    ),
+                    new RecordExpectation("date", 20170917),
+                    new RecordExpectation("exception_type", 1)
+                }
+            ),
+            new PersistenceExpectation(
+                "calendar_dates",
+                new RecordExpectation[]{
+                    new RecordExpectation(
+                        "service_id", "calendar-dates-txt-service-three"
+                    ),
+                    new RecordExpectation("date", 20170918),
                     new RecordExpectation("exception_type", 1)
                 }
             ),
@@ -533,6 +568,8 @@ public class GTFSTest {
         ErrorExpectation[] errorExpectations = ErrorExpectation.list(
             new ErrorExpectation(NewGTFSErrorType.MISSING_FIELD),
             new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.ROUTE_LONG_NAME_CONTAINS_SHORT_NAME),
+            new ErrorExpectation(NewGTFSErrorType.SERVICE_UNUSED),
             new ErrorExpectation(NewGTFSErrorType.FEED_TRAVEL_TIMES_ROUNDED)
         );
         assertThat(
@@ -1276,16 +1313,6 @@ public class GTFSTest {
                 new RecordExpectation("sunday", 1),
                 new RecordExpectation("start_date", "20170915"),
                 new RecordExpectation("end_date", "20170917")
-            }
-        ),
-        new PersistenceExpectation(
-            "calendar_dates",
-            new RecordExpectation[]{
-                new RecordExpectation(
-                    "service_id", "04100312-8fe1-46a5-a9f2-556f39478f57"
-                ),
-                new RecordExpectation("date", 20170916),
-                new RecordExpectation("exception_type", 2)
             }
         ),
         new PersistenceExpectation(

@@ -10,7 +10,7 @@
         "routes" : 1,
         "stop_times" : 6,
         "stops" : 5,
-        "trips" : 2
+        "trips" : 3
       },
       "snapshot_of" : null
     }

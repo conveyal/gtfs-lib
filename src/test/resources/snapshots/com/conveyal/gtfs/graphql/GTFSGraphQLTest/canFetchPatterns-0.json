@@ -237,9 +237,11 @@
         }, {
           "stop_id" : "1234567"
         } ],
-        "trip_count" : 1,
+        "trip_count" : 2,
         "trips" : [ {
           "trip_id" : "frequency-trip"
+        }, {
+          "trip_id" : "calendar-date-trip"
         } ],
         "use_frequency" : null
       } ]

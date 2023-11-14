@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Entity;
 import com.conveyal.gtfs.model.Location;
 import com.conveyal.gtfs.model.LocationShape;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.ScheduleException.ExemplarServiceDescriptor;
 import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.storage.StorageException;
@@ -20,6 +21,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.dbutils.DbUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -726,10 +728,16 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+<<<<<<< HEAD
      * Check any references the sub entity might have. For example, this checks that stop_id values on
      * pattern_stops refer to entities that actually exist in the stops table. NOTE: This skips the "specTable",
      * i.e., for pattern stops it will not check pattern_id references. This is enforced above with the put key
      * field statement above.
+=======
+     * Check any references the sub entity might have. For example, this checks that a service_id defined in a trip
+     * refers to a calendar or calendar date. NOTE: This skips the "specTable", i.e., for pattern stops it will not
+     * check pattern_id references. This is enforced above with the put key field statement above.
+>>>>>>> dev
      */
     private void checkTableReferences(
         Multimap<Table, Multimap<Table, String>> foreignReferencesPerTable,
@@ -1031,6 +1039,58 @@ public class JdbcTableWriter implements TableWriter {
         }
     }
 
+    private void checkUniqueIdsAndUpdateReferencingTables(
+        TIntSet uniqueIds,
+        Integer id,
+        String namespace,
+        Table table,
+        String keyValue,
+        Boolean isCreating,
+        Field keyField
+    ) throws SQLException {
+        int size = uniqueIds.size();
+        if (size == 0 || (size == 1 && id != null && uniqueIds.contains(id))) {
+            // OK.
+            if (size == 0 && !isCreating) {
+                // FIXME: Need to update referencing tables because entity has changed ID.
+                // Entity key value is being changed to an entirely new one.  If there are entities that
+                // reference this value, we need to update them.
+                updateReferencingTables(namespace, table, id, keyValue, keyField);
+            }
+        } else {
+            // Conflict. The different conflict conditions are outlined below.
+            if (size == 1) {
+                // There was one match found.
+                if (isCreating) {
+                    // Under no circumstance should a new entity have a conflict with existing key field.
+                    throw new SQLException(
+                            String.format("New %s's %s value (%s) conflicts with an existing record in table.",
+                                    table.entityClass.getSimpleName(),
+                                    keyField.name,
+                                    keyValue)
+                    );
+                }
+                if (!uniqueIds.contains(id)) {
+                    // There are two circumstances we could encounter here.
+                    // 1. The key value for this entity has been updated to match some other entity's key value (conflict).
+                    // 2. The int ID provided in the request parameter does not match any rows in the table.
+                    throw new SQLException("Key field must be unique and request parameter ID must exist.");
+                }
+            } else if (size > 1) {
+                // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
+                // attempt to rectify bad data.
+                String message = String.format(
+                        "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
+                        size,
+                        table.name,
+                        keyField.name,
+                        keyValue);
+                LOG.error(message);
+                throw new SQLException(message);
+            }
+        }
+    }
+
     /**
      * Checks for modification of GTFS key field (e.g., stop_id, route_id) in supplied JSON object and ensures
      * both uniqueness and that referencing tables are appropriately updated.
@@ -1072,46 +1132,34 @@ public class JdbcTableWriter implements TableWriter {
         String keyValue = jsonObject.get(keyField).asText();
         // If updating key field, check that there is no ID conflict on value (e.g., stop_id or route_id)
         TIntSet uniqueIds = getIdsForCondition(tableName, keyField, keyValue, connection);
-        int size = uniqueIds.size();
-        if (size == 0 || (size == 1 && id != null && uniqueIds.contains(id))) {
-            // OK.
-            if (size == 0 && !isCreating) {
-                // FIXME: Need to update referencing tables because entity has changed ID.
-                // Entity key value is being changed to an entirely new one.  If there are entities that
-                // reference this value, we need to update them.
-                updateReferencingTables(namespace, table, id, keyValue);
-            }
-        } else {
-            // Conflict. The different conflict conditions are outlined below.
-            if (size == 1) {
-                // There was one match found.
-                if (isCreating) {
-                    // Under no circumstance should a new entity have a conflict with existing key field.
-                    throw new SQLException(
-                        String.format("New %s's %s value (%s) conflicts with an existing record in table.",
-                            table.entityClass.getSimpleName(),
-                            keyField,
-                            keyValue)
-                    );
-                }
-                if (!uniqueIds.contains(id)) {
-                    // There are two circumstances we could encounter here.
-                    // 1. The key value for this entity has been updated to match some other entity's key value (conflict).
-                    // 2. The int ID provided in the request parameter does not match any rows in the table.
-                    throw new SQLException("Key field must be unique and request parameter ID must exist.");
-                }
-            } else if (size > 1) {
-                // FIXME: Handle edge case where original data set contains duplicate values for key field and this is an
-                // attempt to rectify bad data.
-                String message = String.format(
-                    "%d %s entities shares the same key field (%s=%s)! Key field must be unique.",
-                    size,
-                    table.name,
-                    keyField,
-                    keyValue);
-                LOG.error(message);
-                throw new SQLException(message);
-            }
+        checkUniqueIdsAndUpdateReferencingTables(
+            uniqueIds,
+            id,
+            namespace,
+            table,
+            keyValue,
+            isCreating,
+            table.getFieldForName(table.getKeyFieldName())
+        );
+
+        if (table.name.equals("schedule_exceptions") &&
+            jsonObject.has("exemplar") &&
+            jsonObject.get("exemplar").asInt() == ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE.getValue()
+        ) {
+            // Special case for schedule_exceptions where for exception type 10 and service_id is also a key.
+            String calendarDateServiceKey = "custom_schedule";
+            Field calendarDateServiceKeyField = table.getFieldForName(calendarDateServiceKey);
+            String calendarDateServiceKeyVal = jsonObject.get(calendarDateServiceKey).asText();
+            TIntSet calendarDateServiceUniqueIds = getIdsForCondition(tableName, calendarDateServiceKey, calendarDateServiceKeyVal, connection);
+            checkUniqueIdsAndUpdateReferencingTables(
+                calendarDateServiceUniqueIds,
+                id,
+                namespace,
+                table,
+                calendarDateServiceKeyVal,
+                isCreating,
+                calendarDateServiceKeyField
+            );
         }
     }
 
@@ -1137,7 +1185,13 @@ public class JdbcTableWriter implements TableWriter {
         String keyValue,
         Connection connection
     ) throws SQLException {
-        String idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
+        String idCheckSql;
+        if (keyField.equals("custom_schedule")) {
+            // The custom_schedule field of an exception based service contains an array and requires an "any" query.
+            idCheckSql = String.format("select id from %s where ? = any (%s)", tableName, keyField);
+        } else {
+            idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
+        }
         // Create statement for counting rows selected
         PreparedStatement statement = connection.prepareStatement(idCheckSql);
         statement.setString(1, keyValue);
@@ -1266,16 +1320,18 @@ public class JdbcTableWriter implements TableWriter {
         String namespace,
         Table table,
         int id,
-        String newKeyValue
+        String newKeyValue,
+        Field keyField
     ) throws SQLException {
-        Field keyField = table.getFieldForName(table.getKeyFieldName());
         Class<? extends Entity> entityClass = table.getEntityClass();
         // Determine method (update vs. delete) depending on presence of newKeyValue field.
         SqlMethod sqlMethod = newKeyValue != null ? SqlMethod.UPDATE : SqlMethod.DELETE;
         Set<Table> referencingTables = getReferencingTables(table);
         // If there are no referencing tables, there is no need to update any values (e.g., .
         if (referencingTables.isEmpty()) return;
-        String keyValue = getValueForId(id, keyField.name, namespace, table, connection);
+        // Exception based service contains a single service ID in custom_schedule
+        String sqlKeyFieldName = keyField.name == "custom_schedule" ? "custom_schedule[1]" : keyField.name;
+        String keyValue = getValueForId(id, sqlKeyFieldName, namespace, table, connection);
         if (keyValue == null) {
             // FIXME: should we still check referencing tables for null value?
             LOG.warn("Entity {} to {} has null value for {}. Skipping references check.", id, sqlMethod, keyField);
@@ -1291,9 +1347,10 @@ public class JdbcTableWriter implements TableWriter {
         for (Table referencingTable : referencingTables) {
             // Update/delete foreign references that match the key value.
             String refTableName = String.join(".", namespace, referencingTable.name);
+            int result;
             if (table.name.equals("schedule_exceptions") && referencingTable.name.equals("calendar_dates")) {
                 // Custom logic for calendar dates because schedule_exceptions does not reference calendar dates right now.
-                int result = deleteCalendarDatesForException(id, namespace, table, refTableName);
+                result = deleteCalendarDatesForException(id, namespace, table, refTableName);
                 LOG.info("Deleted {} entries in calendar dates associated with schedule exception {}", result, id);
             } else {
                 for (Field field : referencingTable.editorFields()) {
@@ -1302,26 +1359,69 @@ public class JdbcTableWriter implements TableWriter {
                             if (refTable.name.equals(table.name)) {
                                 // Get statement to update or delete entities that reference the key value.
                                 PreparedStatement updateStatement = getUpdateReferencesStatement(sqlMethod, refTableName, field, keyValue, newKeyValue);
-                                LOG.info("{}", updateStatement);
-                                int result = updateStatement.executeUpdate();
+                                LOG.info(updateStatement.toString());
+                                result = updateStatement.executeUpdate();
                                 if (result > 0) {
                                     // FIXME: is this where a delete hook should go? (E.g., CalendarController subclass would override
                                     //  deleteEntityHook).
-                                    if (sqlMethod.equals(SqlMethod.DELETE) && table.isCascadeDeleteRestricted()) {
-                                        // Check for restrictions on delete. The entity must not have any referencing
-                                        // entities in order to delete it.
-                                        connection.rollback();
-                                        String message = String.format(
-                                            "Cannot delete %s %s=%s. %d %s reference this %s.",
-                                            entityClass.getSimpleName(),
-                                            keyField.name,
-                                            keyValue,
-                                            result,
-                                            referencingTable.name,
-                                            entityClass.getSimpleName()
-                                        );
-                                        LOG.warn(message);
-                                        throw new SQLException(message);
+                                    if (sqlMethod.equals(SqlMethod.DELETE)) {
+                                        ArrayList<String> patternAndRouteIds = new ArrayList<>();
+                                        // Check for restrictions on delete.
+                                        if (table.isCascadeDeleteRestricted()) {
+                                            // The entity must not have any referencing entities in order to delete it.
+                                            connection.rollback();
+                                            if (entityClass.getSimpleName().equals("Stop")) {
+                                                String patternStopLookup = String.format(
+                                                    "select distinct p.id, r.id " +
+                                                        "from %s.pattern_stops ps " +
+                                                        "inner join " +
+                                                        "%s.patterns p " +
+                                                        "on p.pattern_id = ps.pattern_id " +
+                                                        "inner join " +
+                                                        "%s.routes r " +
+                                                        "on p.route_id = r.route_id " +
+                                                        "where %s = '%s'",
+                                                    namespace,
+                                                    namespace,
+                                                    namespace,
+                                                    keyField.name,
+                                                    keyValue
+                                                );
+                                                PreparedStatement patternStopSelectStatement = connection.prepareStatement(patternStopLookup);
+                                                if (patternStopSelectStatement.execute()) {
+                                                    ResultSet resultSet = patternStopSelectStatement.getResultSet();
+                                                    while (resultSet.next()) {
+                                                        patternAndRouteIds.add(
+                                                            String.format("{%s-%s-%s-%s}",
+                                                                getResultSetString(1, resultSet),
+                                                                getResultSetString(2, resultSet),
+                                                                getResultSetString(3, resultSet),
+                                                                getResultSetString(4, resultSet)
+                                                            )
+                                                        );
+                                                    }
+                                                }
+                                            }
+                                            String message = String.format(
+                                                "Cannot delete %s %s=%s. %d %s reference this %s.",
+                                                entityClass.getSimpleName(),
+                                                keyField.name,
+                                                keyValue,
+                                                result,
+                                                referencingTable.name,
+                                                entityClass.getSimpleName()
+                                            );
+                                            if (patternAndRouteIds.size() > 0) {
+                                                // Append referenced patterns data to the end of the error.
+                                                message = String.format(
+                                                    "%s%nReferenced patterns: [%s]",
+                                                    message,
+                                                    StringUtils.join(patternAndRouteIds, ",")
+                                                );
+                                            }
+                                            LOG.warn(message);
+                                            throw new SQLException(message);
+                                        }
                                     }
                                     LOG.info("{} reference(s) in {} {}D!", result, refTableName, sqlMethod);
                                 } else {
@@ -1336,6 +1436,25 @@ public class JdbcTableWriter implements TableWriter {
                 }
             }
         }
+    }
+
+    /**
+     * Traditional method signature for updateReferencingTables, updating exception based service requires
+     * passing the keyField.
+     * @param namespace
+     * @param table
+     * @param id
+     * @param newKeyValue
+     * @throws SQLException
+     */
+    private void updateReferencingTables(
+        String namespace,
+        Table table,
+        int id,
+        String newKeyValue
+    ) throws SQLException {
+        Field keyField = table.getFieldForName(table.getKeyFieldName());
+        updateReferencingTables(namespace, table, id, newKeyValue, keyField);
     }
 
     /**

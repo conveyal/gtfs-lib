@@ -158,6 +158,79 @@
         "trip_id" : "frequency-trip",
         "trip_short_name" : null,
         "wheelchair_accessible" : 0
+      }, {
+        "bikes_allowed" : 0,
+        "block_id" : null,
+        "direction_id" : 0,
+        "frequencies" : [ ],
+        "id" : 4,
+        "pattern_id" : "2",
+        "route_id" : "1",
+        "service_id" : "calendar-date-service",
+        "shape" : [ {
+          "point_type" : null,
+          "shape_dist_traveled" : 0.0,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.0612132,
+          "shape_pt_lon" : -122.0074332,
+          "shape_pt_sequence" : 1
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 7.4997067,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.061172,
+          "shape_pt_lon" : -122.0075,
+          "shape_pt_sequence" : 2
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 33.8739075,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.061359,
+          "shape_pt_lon" : -122.007683,
+          "shape_pt_sequence" : 3
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 109.0402932,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.060878,
+          "shape_pt_lon" : -122.008278,
+          "shape_pt_sequence" : 4
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 184.6078298,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.060359,
+          "shape_pt_lon" : -122.008828,
+          "shape_pt_sequence" : 5
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 265.8053023,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.059761,
+          "shape_pt_lon" : -122.009354,
+          "shape_pt_sequence" : 6
+        }, {
+          "point_type" : null,
+          "shape_dist_traveled" : 357.8617018,
+          "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+          "shape_pt_lat" : 37.059066,
+          "shape_pt_lon" : -122.009919,
+          "shape_pt_sequence" : 7
+        } ],
+        "shape_id" : "5820f377-f947-4728-ac29-ac0102cbc34e",
+        "stop_times" : [ {
+          "stop_id" : "4u6g",
+          "stop_sequence" : 1,
+          "trip_id" : "calendar-date-trip"
+        }, {
+          "stop_id" : "1234",
+          "stop_sequence" : 2,
+          "trip_id" : "calendar-date-trip"
+        } ],
+        "trip_headsign" : null,
+        "trip_id" : "calendar-date-trip",
+        "trip_short_name" : null,
+        "wheelchair_accessible" : 0
       } ]
     }
   }
