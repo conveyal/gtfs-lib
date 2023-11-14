@@ -14,11 +14,11 @@
           "id" : 1,
           "pattern_id" : "1",
           "pickup_type" : 0,
-          "stop_headsign" : "Test stop headsign",
           "shape_dist_traveled" : 0.0,
           "stop" : [ {
             "stop_id" : "4u6g"
           } ],
+          "stop_headsign" : "Test stop headsign",
           "stop_id" : "4u6g",
           "stop_sequence" : 0,
           "timepoint" : null
@@ -29,11 +29,11 @@
           "id" : 2,
           "pattern_id" : "1",
           "pickup_type" : 0,
-          "stop_headsign" : "Test stop headsign 2",
           "shape_dist_traveled" : 341.4491961,
           "stop" : [ {
             "stop_id" : "johv"
           } ],
+          "stop_headsign" : "Test stop headsign 2",
           "stop_id" : "johv",
           "stop_sequence" : 1,
           "timepoint" : null
@@ -106,7 +106,7 @@
       }, {
         "direction_id" : 0,
         "id" : 2,
-        "name" : "2 stops from Butler Ln to Child Stop (1 trips)",
+        "name" : "2 stops from Butler Ln to Child Stop (2 trips)",
         "pattern_id" : "2",
         "pattern_stops" : [ {
           "default_dwell_time" : 0,
@@ -115,11 +115,11 @@
           "id" : 3,
           "pattern_id" : "2",
           "pickup_type" : 0,
-          "stop_headsign" : "Test stop headsign frequency trip",
           "shape_dist_traveled" : 0.0,
           "stop" : [ {
             "stop_id" : "4u6g"
           } ],
+          "stop_headsign" : "Test stop headsign calendar date trip",
           "stop_id" : "4u6g",
           "stop_sequence" : 0,
           "timepoint" : null
@@ -130,11 +130,11 @@
           "id" : 4,
           "pattern_id" : "2",
           "pickup_type" : 0,
-          "stop_headsign" : "Test stop headsign frequency trip 2",
           "shape_dist_traveled" : 341.4491961,
           "stop" : [ {
             "stop_id" : "1234"
           } ],
+          "stop_headsign" : "Test stop headsign calendar date trip 2",
           "stop_id" : "1234",
           "stop_sequence" : 1,
           "timepoint" : null
@@ -199,9 +199,11 @@
         }, {
           "stop_id" : "1234"
         } ],
-        "trip_count" : 1,
+        "trip_count" : 2,
         "trips" : [ {
           "trip_id" : "frequency-trip"
+        }, {
+          "trip_id" : "calendar-date-trip"
         } ],
         "use_frequency" : null
       } ]

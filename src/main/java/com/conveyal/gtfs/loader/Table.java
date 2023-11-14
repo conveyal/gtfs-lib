@@ -153,7 +153,6 @@ public class Table {
 
     public static final Table SCHEDULE_EXCEPTIONS = new Table("schedule_exceptions", ScheduleException.class, EDITOR,
             new StringField("name", REQUIRED), // FIXME: This makes name the key field...
-            // FIXME: Change to DateListField
             new DateListField("dates", REQUIRED),
             new ShortField("exemplar", REQUIRED, 9),
             new StringListField("custom_schedule", OPTIONAL).isReferenceTo(CALENDAR),
@@ -162,7 +161,7 @@ public class Table {
     );
 
     public static final Table CALENDAR_DATES = new Table("calendar_dates", CalendarDate.class, OPTIONAL,
-        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR),
+        new StringField("service_id", REQUIRED),
         new DateField("date", REQUIRED),
         new IntegerField("exception_type", REQUIRED, 1, 2)
     ).keyFieldIsNotUnique()
@@ -329,9 +328,8 @@ public class Table {
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id", REQUIRED),
         new StringField("route_id", REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
-        // FIXME: Should this also optionally reference CALENDAR_DATES?
         // FIXME: Do we need an index on service_id
-        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR),
+        new StringField("service_id", REQUIRED).isReferenceTo(CALENDAR).isReferenceTo(CALENDAR_DATES).isReferenceTo(SCHEDULE_EXCEPTIONS),
         new StringField("trip_headsign", OPTIONAL),
         new StringField("trip_short_name", OPTIONAL),
         new ShortField("direction_id", OPTIONAL, 1),

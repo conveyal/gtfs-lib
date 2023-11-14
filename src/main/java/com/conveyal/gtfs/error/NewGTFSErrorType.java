@@ -32,6 +32,7 @@ public enum NewGTFSErrorType {
     MISSING_ARRIVAL_OR_DEPARTURE(Priority.MEDIUM, "First and last stop times are required to have both an arrival and departure time."),
     MISSING_COLUMN(Priority.MEDIUM, "A required column was missing from a table."),
     MISSING_FIELD(Priority.MEDIUM, "A required field was missing or empty in a particular row."),
+    MISSING_FOREIGN_TABLE_REFERENCE(Priority.HIGH, "This line references an ID that must exist in a single foreign table."),
     MISSING_SHAPE(Priority.MEDIUM, "???"),
     MISSING_TABLE(Priority.MEDIUM, "This table is required by the GTFS specification but is missing."),
     MULTIPLE_SHAPES_FOR_PATTERN(Priority.MEDIUM, "Multiple shapes found for a single unique sequence of stops (i.e, trip pattern)."),

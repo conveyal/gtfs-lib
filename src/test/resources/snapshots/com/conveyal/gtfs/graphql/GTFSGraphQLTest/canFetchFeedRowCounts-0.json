@@ -5,12 +5,11 @@
       "row_counts" : {
         "agency" : 1,
         "calendar" : 1,
-        "calendar_dates" : 1,
         "errors" : 6,
         "routes" : 1,
-        "stop_times" : 4,
+        "stop_times" : 6,
         "stops" : 5,
-        "trips" : 2
+        "trips" : 3
       },
       "snapshot_of" : null
     }

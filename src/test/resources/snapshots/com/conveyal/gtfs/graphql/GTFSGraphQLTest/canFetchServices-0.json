@@ -16,6 +16,18 @@
         }, {
           "trip_id" : "frequency-trip"
         } ]
+      }, {
+        "dates" : [ "20170917" ],
+        "duration_seconds" : "1740",
+        "durations" : [ {
+          "duration_seconds" : 1740,
+          "route_type" : 3
+        } ],
+        "n_days_active" : "1",
+        "service_id" : "calendar-date-service",
+        "trips" : [ {
+          "trip_id" : "calendar-date-trip"
+        } ]
       } ]
     }
   }
