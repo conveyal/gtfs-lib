@@ -29,15 +29,18 @@ public class Transfer extends Entity {
         if (!setDefaultId) statement.setInt(oneBasedIndex++, id);
         statement.setString(oneBasedIndex++, from_stop_id);
         statement.setString(oneBasedIndex++, to_stop_id);
+        statement.setString(oneBasedIndex++, from_trip_id);
+        statement.setString(oneBasedIndex++, to_trip_id);
+        statement.setString(oneBasedIndex++, from_route_id);
+        statement.setString(oneBasedIndex++, to_route_id);
         setIntParameter(statement, oneBasedIndex++, transfer_type);
-        setIntParameter(statement, oneBasedIndex++, min_transfer_time);
+        setIntParameter(statement, oneBasedIndex, min_transfer_time);
     }
 
-    // TODO: Add id method for Transfer.
-//    @Override
-//    public String getId() {
-////        return trip_id;
-//    }
+    @Override
+    public String getId() {
+        return createId(from_stop_id, to_stop_id, from_trip_id, to_trip_id, from_route_id, to_route_id);
+    }
 
     public static class Loader extends Entity.Loader<Transfer> {
 
@@ -54,24 +57,24 @@ public class Transfer extends Entity {
         public void loadOneRow() throws IOException {
             Transfer tr = new Transfer();
             tr.id = row + 1; // offset line number by 1 to account for 0-based row index
-            tr.from_stop_id      = getStringField("from_stop_id", true);
-            tr.to_stop_id        = getStringField("to_stop_id", true);
-            tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
-            tr.min_transfer_time = getIntField("min_transfer_time", false, 0, Integer.MAX_VALUE);
+            tr.from_stop_id      = getStringField("from_stop_id", false);
+            tr.to_stop_id        = getStringField("to_stop_id", false);
             tr.from_route_id     = getStringField("from_route_id", false);
             tr.to_route_id       = getStringField("to_route_id", false);
             tr.from_trip_id      = getStringField("from_trip_id", false);
             tr.to_trip_id        = getStringField("to_trip_id", false);
+            tr.transfer_type     = getIntField("transfer_type", true, 0, 3);
+            tr.min_transfer_time = getIntField("min_transfer_time", false, 0, Integer.MAX_VALUE);
 
-            getRefField("from_stop_id", true, feed.stops);
-            getRefField("to_stop_id", true, feed.stops);
+            getRefField("from_stop_id", false, feed.stops);
+            getRefField("to_stop_id", false, feed.stops);
             getRefField("from_route_id", false, feed.routes);
             getRefField("to_route_id", false, feed.routes);
             getRefField("from_trip_id", false, feed.trips);
             getRefField("to_trip_id", false, feed.trips);
 
             tr.feed = feed;
-            feed.transfers.put(Long.toString(row), tr);
+            feed.transfers.put(tr.getId(), tr);
         }
 
     }
@@ -83,13 +86,26 @@ public class Transfer extends Entity {
 
         @Override
         protected void writeHeaders() throws IOException {
-            writer.writeRecord(new String[] {"from_stop_id", "to_stop_id", "transfer_type", "min_transfer_time"});
+            writer.writeRecord(new String[] {
+                "from_stop_id",
+                "to_stop_id",
+                "from_trip_id",
+                "to_trip_id",
+                "from_route_id",
+                "to_route_id",
+                "transfer_type",
+                "min_transfer_time"
+            });
         }
 
         @Override
         protected void writeOneRow(Transfer t) throws IOException {
             writeStringField(t.from_stop_id);
             writeStringField(t.to_stop_id);
+            writeStringField(t.from_trip_id);
+            writeStringField(t.to_trip_id);
+            writeStringField(t.from_route_id);
+            writeStringField(t.to_route_id);
             writeIntField(t.transfer_type);
             writeIntField(t.min_transfer_time);
             endRecord();
@@ -99,7 +115,19 @@ public class Transfer extends Entity {
         protected Iterator<Transfer> iterator() {
             return feed.transfers.values().iterator();
         }
+    }
 
-
+    /**
+     * Transfer entries have no ID in GTFS so we define one based on the fields in the transfer entry.
+     */
+    private static String createId(
+        String fromStopId,
+        String toStopId,
+        String fromTripId,
+        String toTripId,
+        String fromRouteId,
+        String toRouteId
+    ) {
+        return String.format("%s_%s_%s_%s_%s_%s", fromStopId, toStopId, fromTripId, toTripId, fromRouteId, toRouteId);
     }
 }

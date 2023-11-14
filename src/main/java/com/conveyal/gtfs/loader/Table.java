@@ -342,18 +342,6 @@ public class Table {
     ).withParentTable(PATTERNS)
     .addPrimaryKeyNames("pattern_id", "stop_sequence");
 
-
-    public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
-            // FIXME: Do we need an index on from_ and to_stop_id
-            new StringField("from_stop_id", REQUIRED).isReferenceTo(STOPS),
-            new StringField("to_stop_id", REQUIRED).isReferenceTo(STOPS),
-            new ShortField("transfer_type", REQUIRED, 3),
-            new StringField("min_transfer_time", OPTIONAL)
-    ).addPrimaryKey()
-    .keyFieldIsNotUnique()
-    .hasCompoundKey()
-    .addPrimaryKeyNames("from_stop_id", "to_stop_id");
-
     public static final Table TRIPS = new Table("trips", Trip.class, REQUIRED,
         new StringField("trip_id", REQUIRED),
         new StringField("route_id", REQUIRED).isReferenceTo(ROUTES).indexThisColumn(),
@@ -393,6 +381,24 @@ public class Table {
         new StringField("area_id", REQUIRED).isReferenceTo(STOP_AREAS),
         new StringField("area_name", OPTIONAL)
     );
+    // Must come after TRIPS table to which it has references.
+    public static final Table TRANSFERS = new Table("transfers", Transfer.class, OPTIONAL,
+        // Conditionally required fields (from_stop_id, to_stop_id, from_trip_id and to_trip_id) are defined here as
+        // optional so as not to trigger required field checks as part of GTFS-lib validation. Correct validation of
+        // these fields will be managed by the MobilityData validator.
+        new StringField("from_stop_id", OPTIONAL).isReferenceTo(STOPS),
+        new StringField("to_stop_id", OPTIONAL).isReferenceTo(STOPS),
+        new StringField("from_route_id", OPTIONAL).isReferenceTo(ROUTES),
+        new StringField("to_route_id", OPTIONAL).isReferenceTo(ROUTES),
+        new StringField("from_trip_id", OPTIONAL).isReferenceTo(TRIPS),
+        new StringField("to_trip_id", OPTIONAL).isReferenceTo(TRIPS),
+        new ShortField("transfer_type", REQUIRED, 3),
+        new StringField("min_transfer_time", OPTIONAL)
+    )
+    .addPrimaryKey()
+    .keyFieldIsNotUnique()
+    .hasCompoundKey()
+    .addPrimaryKeyNames("from_stop_id", "to_stop_id", "from_trip_id", "to_trip_id", "from_route_id", "to_route_id");
 
     // Must come after TRIPS and STOPS table to which it has references
     public static final Table STOP_TIMES = new Table("stop_times", StopTime.class, REQUIRED,
