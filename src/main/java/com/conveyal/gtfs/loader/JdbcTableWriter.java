@@ -1422,15 +1422,34 @@ public class JdbcTableWriter implements TableWriter {
         String keyValue = jsonObject.get(keyField).asText();
         // If updating key field, check that there is no ID conflict on value (e.g., stop_id or route_id)
         TIntSet uniqueIds = getIdsForCondition(tableName, keyField, keyValue, connection);
-        checkUniqueIdsAndUpdateReferencingTables(uniqueIds, id, namespace, table, keyValue, isCreating, table.getFieldForName(table.getKeyFieldName()));
+        checkUniqueIdsAndUpdateReferencingTables(
+            uniqueIds,
+            id,
+            namespace,
+            table,
+            keyValue,
+            isCreating,
+            table.getFieldForName(table.getKeyFieldName())
+        );
 
-        // Special case for schedule_exceptions where for exception type 10, service_id is also a key
-        if (table.name.equals("schedule_exceptions") && jsonObject.has("exemplar") && jsonObject.get("exemplar").asInt() == ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE.getValue()) {
+        if (table.name.equals("schedule_exceptions") &&
+            jsonObject.has("exemplar") &&
+            jsonObject.get("exemplar").asInt() == ExemplarServiceDescriptor.CALENDAR_DATE_SERVICE.getValue()
+        ) {
+            // Special case for schedule_exceptions where for exception type 10 and service_id is also a key.
             String calendarDateServiceKey = "custom_schedule";
             Field calendarDateServiceKeyField = table.getFieldForName(calendarDateServiceKey);
             String calendarDateServiceKeyVal = jsonObject.get(calendarDateServiceKey).asText();
-            TIntSet calendarDateServiceUniqueIds = getIdsForCondition (tableName, calendarDateServiceKey, calendarDateServiceKeyVal, connection);
-            checkUniqueIdsAndUpdateReferencingTables(calendarDateServiceUniqueIds, id, namespace, table, calendarDateServiceKeyVal, isCreating, calendarDateServiceKeyField);
+            TIntSet calendarDateServiceUniqueIds = getIdsForCondition(tableName, calendarDateServiceKey, calendarDateServiceKeyVal, connection);
+            checkUniqueIdsAndUpdateReferencingTables(
+                calendarDateServiceUniqueIds,
+                id,
+                namespace,
+                table,
+                calendarDateServiceKeyVal,
+                isCreating,
+                calendarDateServiceKeyField
+            );
         }
     }
 
@@ -1456,9 +1475,9 @@ public class JdbcTableWriter implements TableWriter {
         String keyValue,
         Connection connection
     ) throws SQLException {
-        String idCheckSql = "";
-        // The custom_schedule field of an exception based service contains an array and requires an "any" query
-        if (keyField == "custom_schedule") {
+        String idCheckSql;
+        if (keyField.equals("custom_schedule")) {
+            // The custom_schedule field of an exception based service contains an array and requires an "any" query.
             idCheckSql = String.format("select id from %s where ? = any (%s)", tableName, keyField);
         } else {
             idCheckSql = String.format("select id from %s where %s = ?", tableName, keyField);
