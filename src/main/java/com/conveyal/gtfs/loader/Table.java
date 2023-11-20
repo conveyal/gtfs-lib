@@ -587,6 +587,7 @@ public class Table {
         PATTERNS,
         SHAPES,
         STOPS,
+        LOCATIONS,
         STOP_AREAS,
         FARE_RULES,
         PATTERN_STOP,
@@ -599,8 +600,7 @@ public class Table {
         TRANSLATIONS,
         ATTRIBUTIONS,
         BOOKING_RULES,
-        LOCATION_SHAPES,
-        LOCATIONS
+        LOCATION_SHAPES
     };
 
     /**
