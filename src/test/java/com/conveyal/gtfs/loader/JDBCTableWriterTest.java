@@ -842,7 +842,15 @@ public class JDBCTableWriterTest {
             ));
     }
 
-    private static String normalizeStopsForPattern(PatternStopDTO[] patternStops, int updatedStopSequence, boolean interpolateStopTimes, int initialTravelTime, int updatedTravelTime, int startTime, String patternId) throws SQLException, InvalidNamespaceException, IOException {
+    private static String normalizeStopsForPattern(
+        PatternStopDTO[] patternStops,
+        int updatedStopSequence,
+        boolean interpolateStopTimes,
+        int initialTravelTime,
+        int updatedTravelTime,
+        int startTime,
+        String patternId
+    ) throws SQLException, InvalidNamespaceException, IOException {
         final Table tripsTable = Table.TRIPS;
 
         PatternDTO pattern = createRouteAndPattern(newUUID(),
@@ -875,7 +883,7 @@ public class JDBCTableWriterTest {
      * Checks that {@link JdbcTableWriter#normalizeStopTimesForPattern(int, int, boolean)} can interpolate stop times between timepoints.
      */
     @Test
-    public void canInterpolatePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
+    private void canInterpolatePatternStopTimes() throws IOException, SQLException, InvalidNamespaceException {
         // Parameters are shared with canNormalizePatternStopTimes, but maintained for test flexibility.
         int startTime = 6 * 60 * 60; // 6AM
         int initialTravelTime = 60; // seconds
