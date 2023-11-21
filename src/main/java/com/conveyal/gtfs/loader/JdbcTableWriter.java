@@ -764,30 +764,24 @@ public class JdbcTableWriter implements TableWriter {
      * @return
      */
     private int interpolateTimesFromTimepoints(
-            PatternStop patternStop,
-            List<PatternStop> timepoints,
-            Integer timepointNumber,
-            double previousShapeDistTraveled
+        PatternStop patternStop,
+        List<PatternStop> timepoints,
+        Integer timepointNumber,
+        double previousShapeDistTraveled
     ) {
-        if (timepointNumber == 0) {
-            throw new IllegalStateException("First pattern stop must be a timepoint to perform interpolation");
-        } else if (timepoints.size() == 1) {
-            throw new IllegalStateException("Pattern must have more than one timepoint to perform interpolation");
-        } else if (timepointNumber >= timepoints.size()) {
-            throw new IllegalStateException("Last stop must be a timepoint to perform interpolation");
+        if (timepointNumber == 0 || timepoints.size() == 1 || timepointNumber >= timepoints.size()) {
+            throw new IllegalStateException("Issue in pattern stops which prevents interpolation (e.g. less than 2 timepoints)");
         }
         PatternStop nextTimepoint = timepoints.get(timepointNumber);
         PatternStop lastTimepoint = timepoints.get(timepointNumber-1);
 
-        if (nextTimepoint == null) {
-            throw new IllegalStateException("Stop time interpolation is not possible with null timepoints.");
-        } else if (nextTimepoint.default_travel_time == Entity.INT_MISSING) {
-            throw new IllegalStateException("All timepoints must have a default travel time specified.");
-        } else if (
+        if (
+            nextTimepoint == null ||
+            nextTimepoint.default_travel_time == Entity.INT_MISSING ||
             nextTimepoint.shape_dist_traveled == Entity.DOUBLE_MISSING ||
             lastTimepoint.shape_dist_traveled == Entity.DOUBLE_MISSING
         ) {
-            throw new IllegalStateException("Shape_dist_traveled must be defined in order to perform interpolation.");
+            throw new IllegalStateException("Error with stop time interpolation: timepoint or shape_dist_traveled is null");
         }
 
         double timepointSpeed = (nextTimepoint.shape_dist_traveled - lastTimepoint.shape_dist_traveled) / nextTimepoint.default_travel_time;
