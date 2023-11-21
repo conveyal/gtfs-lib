@@ -23,4 +23,12 @@ public class PatternStopDTO {
         stop_id = stopId;
         stop_sequence = stopSequence;
     }
+
+    public PatternStopDTO (String patternId, String stopId, int stopSequence, int timepointValue, double shape_dist_traveledValue) {
+        timepoint = timepointValue;
+        pattern_id = patternId;
+        stop_id = stopId;
+        stop_sequence = stopSequence;
+        shape_dist_traveled = shape_dist_traveledValue;
+    }
 }
