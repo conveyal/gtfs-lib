@@ -757,11 +757,6 @@ public class JdbcTableWriter implements TableWriter {
      * Updates the non-timepoint stop times between two timepoints using the speed implied  by
      * the travel time between them. Ignores any existing default_travel_time or default_dwell_time
      * entered for the non-timepoint stops.
-     * @param patternStop
-     * @param timepoints
-     * @param timepointNumber
-     * @param previousShapeDistTraveled
-     * @return
      */
     private int interpolateTimesFromTimepoints(
         PatternStop patternStop,
