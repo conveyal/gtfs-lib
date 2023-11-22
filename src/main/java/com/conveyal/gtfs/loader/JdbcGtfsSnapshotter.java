@@ -490,7 +490,7 @@ public class JdbcGtfsSnapshotter {
             );
             LOG.info(avoidDuplicateDescriptionSql);
             int duplicatesAvoided = statement.executeUpdate(avoidDuplicateDescriptionSql);
-            LOG.info("Updated description for {} calendars to avoid duplicates", duplicatesAvoided);
+            LOG.info("Updated duplicate descriptions for {} calendars", duplicatesAvoided);
         }
         if (Table.TRIPS.name.equals(table.name)) {
             // Update use_frequency field for patterns. This sets all patterns that have a frequency trip to use
