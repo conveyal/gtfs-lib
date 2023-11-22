@@ -258,12 +258,20 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+     * Deprecated method to normalize stop times before stop time interpolation. Defaults to
+     * false for interpolation.
+     */
+    public int normalizeStopTimesForPattern(int id, int beginWithSequence) throws SQLException {
+        return normalizeStopTimesForPattern(id, beginWithSequence, false);
+    }
+
+    /**
      * For a given pattern id and starting stop sequence (inclusive), normalize all stop times to match the pattern
      * stops' travel times.
      *
      * @return number of stop times updated
      */
-    public int normalizeStopTimesForPattern(int id, int beginWithSequence) throws SQLException {
+    public int normalizeStopTimesForPattern(int id, int beginWithSequence, boolean interpolateStopTimes) throws SQLException {
         try {
             JDBCTableReader<PatternStop> patternStops = new JDBCTableReader(
                 Table.PATTERN_STOP,
@@ -280,7 +288,7 @@ public class JdbcTableWriter implements TableWriter {
                     patternStopsToNormalize.add(patternStop);
                 }
             }
-            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize);
+            int stopTimesUpdated = updateStopTimesForPatternStops(patternStopsToNormalize, interpolateStopTimes);
             connection.commit();
             return stopTimesUpdated;
         } catch (Exception e) {
@@ -772,6 +780,36 @@ public class JdbcTableWriter implements TableWriter {
     }
 
     /**
+     * Updates the non-timepoint stop times between two timepoints using the speed implied  by
+     * the travel time between them. Ignores any existing default_travel_time or default_dwell_time
+     * entered for the non-timepoint stops.
+     */
+    private int interpolateTimesFromTimepoints(
+        PatternStop patternStop,
+        List<PatternStop> timepoints,
+        Integer timepointNumber,
+        double previousShapeDistTraveled
+    ) {
+        if (timepointNumber == 0 || timepoints.size() == 1 || timepointNumber >= timepoints.size()) {
+            throw new IllegalStateException("Issue in pattern stops which prevents interpolation (e.g. less than 2 timepoints)");
+        }
+        PatternStop nextTimepoint = timepoints.get(timepointNumber);
+        PatternStop lastTimepoint = timepoints.get(timepointNumber-1);
+
+        if (
+            nextTimepoint == null ||
+            nextTimepoint.default_travel_time == Entity.INT_MISSING ||
+            nextTimepoint.shape_dist_traveled == Entity.DOUBLE_MISSING ||
+            lastTimepoint.shape_dist_traveled == Entity.DOUBLE_MISSING
+        ) {
+            throw new IllegalStateException("Error with stop time interpolation: timepoint or shape_dist_traveled is null");
+        }
+
+        double timepointSpeed = (nextTimepoint.shape_dist_traveled - lastTimepoint.shape_dist_traveled) / nextTimepoint.default_travel_time;
+        return (int) Math.round((patternStop.shape_dist_traveled - previousShapeDistTraveled) / timepointSpeed);
+    }
+
+    /**
      * Normalizes all stop times' arrivals and departures for an ordered set of pattern stops. This set can be the full
      * set of stops for a pattern or just a subset. Typical usage for this method would be to overwrite the arrival and
      * departure times for existing trips after a pattern stop has been added or inserted into a pattern or if a
@@ -781,8 +819,9 @@ public class JdbcTableWriter implements TableWriter {
      *
      * TODO? add param Set<String> serviceIdFilters service_id values to filter trips on
      */
-    private int updateStopTimesForPatternStops(List<PatternStop> patternStops) throws SQLException {
+    private int updateStopTimesForPatternStops(List<PatternStop> patternStops, boolean interpolateStopTimes) throws SQLException {
         PatternStop firstPatternStop = patternStops.iterator().next();
+        List<PatternStop> timepoints = patternStops.stream().filter(ps -> ps.timepoint == 1).collect(Collectors.toList());
         int firstStopSequence = firstPatternStop.stop_sequence;
         // Prepare SQL query to determine the time that should form the basis for adding the travel time values.
         int previousStopSequence = firstStopSequence > 0 ? firstStopSequence - 1 : 0;
@@ -815,16 +854,40 @@ public class JdbcTableWriter implements TableWriter {
         for (String tripId : timesForTripIds.keySet()) {
             // Initialize travel time with previous stop time value.
             int cumulativeTravelTime = timesForTripIds.get(tripId);
+            int cumulativeInterpolatedTime = cumulativeTravelTime;
+            int timepointNumber = 0;
+            double previousShapeDistTraveled = 0; // Used for calculating timepoint speed for interpolation
             for (PatternStop patternStop : patternStops) {
+                boolean isTimepoint = patternStop.timepoint == 1;
+                if (isTimepoint) timepointNumber++;
                 // Gather travel/dwell time for pattern stop (being sure to check for missing values).
                 int travelTime = patternStop.default_travel_time == Entity.INT_MISSING ? 0 : patternStop.default_travel_time;
+                if (interpolateStopTimes) {
+                    if (patternStop.shape_dist_traveled == Entity.DOUBLE_MISSING) {
+                        throw new IllegalStateException("Shape_dist_traveled must be defined for all stops in order to perform interpolation");
+                    }
+                    // Override travel time if we're interpolating between timepoints.
+                    if (!isTimepoint) travelTime = interpolateTimesFromTimepoints(patternStop, timepoints, timepointNumber, previousShapeDistTraveled);
+                    previousShapeDistTraveled += patternStop.shape_dist_traveled;
+                }
                 int dwellTime = patternStop.default_dwell_time == Entity.INT_MISSING ? 0 : patternStop.default_dwell_time;
                 int oneBasedIndex = 1;
                 // Increase travel time by current pattern stop's travel and dwell times (and set values for update).
-                cumulativeTravelTime += travelTime;
-                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
-                cumulativeTravelTime += dwellTime;
-                updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
+                if (!isTimepoint && interpolateStopTimes) {
+                    // We don't want to increment the true cumulative travel time because that adjusts the timepoint
+                    // times later in the pattern.
+                    // Dwell times are ignored right now as they do not fit the typical use case for interpolation.
+                    // They may be incorporated by accounting for all dwell times in intermediate stops when calculating
+                    // the timepoint speed.
+                    cumulativeInterpolatedTime += travelTime;
+                    updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeInterpolatedTime);
+                    updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeInterpolatedTime);
+                } else {
+                    cumulativeTravelTime += travelTime;
+                    updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
+                    cumulativeTravelTime += dwellTime;
+                    updateStopTimeStatement.setInt(oneBasedIndex++, cumulativeTravelTime);
+                }
                 updateStopTimeStatement.setString(oneBasedIndex++, tripId);
                 updateStopTimeStatement.setInt(oneBasedIndex++, patternStop.stop_sequence);
                 stopTimesTracker.addBatch();
