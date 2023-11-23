@@ -480,6 +480,17 @@ public class JdbcGtfsSnapshotter {
             LOG.info(updateOtherSql);
             int calendarsUpdated = statement.executeUpdate(updateOtherSql);
             LOG.info("Updated description for {} calendars", calendarsUpdated);
+
+            // Check if there are duplicate descriptions, in which case set the description to be the service_id which is unique
+            String avoidDuplicateDescriptionSql = String.format(
+                    "update %1$scalendar set description = service_id " +
+                    "from (select description, count(*) as duplicate_count from %1$scalendar group by description) as duplicate_descriptions " +
+                    "where %1$scalendar.description = duplicate_descriptions.description and duplicate_descriptions.duplicate_count > 1",
+                    tablePrefix
+            );
+            LOG.info(avoidDuplicateDescriptionSql);
+            int duplicatesAvoided = statement.executeUpdate(avoidDuplicateDescriptionSql);
+            LOG.info("Updated duplicate descriptions for {} calendars", duplicatesAvoided);
         }
         if (Table.TRIPS.name.equals(table.name)) {
             // Update use_frequency field for patterns. This sets all patterns that have a frequency trip to use
