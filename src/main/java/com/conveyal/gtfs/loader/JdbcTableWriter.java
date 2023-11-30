@@ -1502,7 +1502,7 @@ public class JdbcTableWriter implements TableWriter {
             // Special case for schedule_exceptions where for exception type 10 and service_id is also a key.
             String calendarDateServiceKey = "custom_schedule";
             Field calendarDateServiceKeyField = table.getFieldForName(calendarDateServiceKey);
-            String calendarDateServiceKeyVal = jsonObject.get(calendarDateServiceKey).asText();
+            String calendarDateServiceKeyVal = jsonObject.get(calendarDateServiceKey).get(0).asText();
             TIntSet calendarDateServiceUniqueIds = getIdsForCondition(tableName, calendarDateServiceKey, calendarDateServiceKeyVal, connection);
             checkUniqueIdsAndUpdateReferencingTables(
                 calendarDateServiceUniqueIds,
