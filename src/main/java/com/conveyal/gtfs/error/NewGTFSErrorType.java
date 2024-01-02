@@ -87,9 +87,9 @@ public enum NewGTFSErrorType {
     FIELD_VALUE_TOO_LONG(Priority.MEDIUM, "Field value has too many characters."),
 
     // Shared Stops-specifc errors.
-    MULTIPLE_SHARED_STOPS_GROUPS(Priority.HIGH, "A GTFS stop belongs to more than one shared-stop group."),
-    SHARED_STOP_GROUP_MUTLIPLE_PRIMARY_STOPS(Priority.HIGH, "A Shared-stop group has multiple primary stops."),
-    SHARED_STOP_GROUP_ENTITY_DOES_NOT_EXIST(Priority.MEDIUM, "The stop referenced by a shared-stop does not exist."),
+    MULTIPLE_SHARED_STOPS_GROUPS(Priority.HIGH, "A GTFS stop belongs to more than one shared-stop group, or belongs to the same shared-stop group twice."),
+    SHARED_STOP_GROUP_MULTIPLE_PRIMARY_STOPS(Priority.HIGH, "A shared-stop group has multiple primary stops."),
+    SHARED_STOP_GROUP_ENTITY_DOES_NOT_EXIST(Priority.MEDIUM, "The stop referenced by a shared-stop does not exist in the feed it was said to exist in."),
 
     // Unknown errors.
     OTHER(Priority.LOW, "Other errors.");
