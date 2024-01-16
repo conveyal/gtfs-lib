@@ -27,6 +27,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -72,9 +73,9 @@ public class PatternFinderValidator extends TripValidator {
      */
     @Override
     public void complete(ValidationResult validationResult) {
-        Set<String> patternIds = new HashSet<>();
+        List<Pattern> patternsFromFeed = new ArrayList<>();
         for(Pattern pattern :  feed.patterns) {
-            patternIds.add(pattern.pattern_id);
+            patternsFromFeed.add(pattern);
         }
         LOG.info("Finding patterns...");
         Map<String, Stop> stopById = new HashMap<>();
@@ -82,9 +83,8 @@ public class PatternFinderValidator extends TripValidator {
             stopById.put(stop.stop_id, stop);
         }
         // Although patterns may have already been loaded from file, the trip patterns are still required.
-        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, errorStorage);
-        patternBuilder.create(patterns, patternIds);
+        Map<TripPatternKey, Pattern> patterns = patternFinder.createPatternObjects(stopById, patternsFromFeed, errorStorage);
+        patternBuilder.create(patterns, !patternsFromFeed.isEmpty());
     }
-
 }
 

@@ -1,0 +1,19 @@
+route_id,agency_id,route_short_name,route_long_name,route_desc,route_type,route_url,route_branding_url,route_color,route_text_color,route_sort_order,continuous_pickup,continuous_drop_off
+151,25,1,Route 1,,3,http://www.cityofredding.org/home/showdocument?id=9868,,55d1b0,000000,0,1,1
+1887,25,2E,Route 2 East,,3,http://www.cityofredding.org/home/showdocument?id=9874,,f7cf82,000000,1,1,1
+159,25,11,Route 11,,3,http://www.cityofredding.org/home/showdocument?id=9870,,93ea5f,000000,10,1,1
+160,25,14,Route 14,,3,http://www.cityofredding.org/home/showdocument?id=9872,,8c08b1,ffffff,11,1,1
+161,25,299X,Route 299X,,3,http://www.rabaride.com/routes/burneyexpress.html,,00dffb,ffffff,13,1,1
+15,25,15,Churn Creek/Knightson/Airport,,3,,,bf4aea,FFFFFF,,,
+6790,25,18,Crosstown,,3,http://www.cityofredding.org/home/showdocument?id=9866,,049919,ffffff,14,1,1
+1885,25,17,Shasta View/Shasta College,,3,http://www.cityofredding.org/home/showdocument?id=10306,,fbef00,0e0e0e,15,1,1
+1886,25,2W,Route 2 West,,3,http://www.cityofredding.org/home/showdocument?id=9874,,f3732a,000000,2,1,1
+153,25,3,Route 3,,3,http://www.cityofredding.org/home/showdocument?id=9876,,1bb1f6,ffffff,3,1,1
+154,25,4,Route 4,,3,http://www.cityofredding.org/home/showdocument?id=9878,,bdadd1,ffffff,4,1,1
+155,25,5,Route 5,,3,http://www.cityofredding.org/home/showdocument?id=9880,,f7ced5,000000,5,1,1
+1889,25,6S,Route 6 South,,3,http://www.cityofredding.org/home/showdocument?id=9882,,9e5e3d,ffffff,6,1,1
+1888,25,6N,Route 6 North,,3,http://www.cityofredding.org/home/showdocument?id=9882,,d0c5ac,000000,7,1,1
+157,25,7,Route 7,,3,http://www.cityofredding.org/home/showdocument?id=9884,,1886c7,ffffff,8,1,1
+6446,25,9,Route 9,,3,http://www.cityofredding.org/home/showdocument?id=11007,,ec191c,000000,9,1,1
+6460,25,12X,Anderson Commuter,,3,http://www.cityofredding.org/home/showdocument?id=11052,,204315,ffffff,12,1,1
+3779,25,19,Route 19,,3,,,2738ec,ffffff,16,1,1

@@ -61,10 +61,20 @@ public class PatternFinder {
      * Once all trips have been processed, call this method to produce the final Pattern objects representing all the
      * unique sequences of stops encountered. Returns map of patterns to their keys so that downstream functions can
      * make use of trip pattern keys for constructing pattern stops or other derivative objects.
+     *
+     * There is no viable relationship between patterns that are loaded from a feed (patternsFromFeed) and patterns
+     * generated here. Process ordering is used to update the pattern id and name if patterns from a feed are available.
+     * E.g. The first pattern loaded from a feed will be used to updated the first pattern created here.
      */
-    public Map<TripPatternKey, Pattern> createPatternObjects(Map<String, Stop> stopById, SQLErrorStorage errorStorage) {
+    public Map<TripPatternKey, Pattern> createPatternObjects(
+        Map<String, Stop> stopById,
+        List<Pattern> patternsFromFeed,
+        SQLErrorStorage errorStorage
+    ) {
         // Make pattern ID one-based to avoid any JS type confusion between an ID of zero vs. null value.
         int nextPatternId = 1;
+        int patternsFromFeedIndex = 0;
+        boolean usePatternsFromFeed = canUsePatternsFromFeed(patternsFromFeed);
         // Create an in-memory list of Patterns because we will later rename them before inserting them into storage.
         // Use a LinkedHashMap so we can retrieve the entrySets later in the order of insertion.
         Map<TripPatternKey, Pattern> patterns = new LinkedHashMap<>();
@@ -72,8 +82,13 @@ public class PatternFinder {
         for (TripPatternKey key : tripsForPattern.keySet()) {
             Collection<Trip> trips = tripsForPattern.get(key);
             Pattern pattern = new Pattern(key.stops, trips, null);
-            // Overwrite long UUID with sequential integer pattern ID
-            pattern.pattern_id = Integer.toString(nextPatternId++);
+            if (usePatternsFromFeed) {
+                pattern.pattern_id = patternsFromFeed.get(patternsFromFeedIndex).pattern_id;
+                pattern.name = patternsFromFeed.get(patternsFromFeedIndex).name;
+            } else {
+                // Overwrite long UUID with sequential integer pattern ID
+                pattern.pattern_id = Integer.toString(nextPatternId++);
+            }
             // FIXME: Should associated shapes be a single entry?
             pattern.associatedShapes = new HashSet<>();
             trips.stream().forEach(trip -> pattern.associatedShapes.add(trip.shape_id));
@@ -87,11 +102,24 @@ public class PatternFinder {
                             .setBadValue(pattern.associatedShapes.toString()));
             }
             patterns.put(key, pattern);
+            patternsFromFeedIndex++;
         }
-        // Name patterns before storing in SQL database.
-        renamePatterns(patterns.values(), stopById);
+        if (!usePatternsFromFeed) {
+            // Name patterns before storing in SQL database if they have not already been provided by via a feed.
+            renamePatterns(patterns.values(), stopById);
+        }
         LOG.info("Total patterns: {}", tripsForPattern.keySet().size());
         return patterns;
+    }
+
+    /**
+     * If there is a difference in the number of patterns provided by a feed and the number of patterns generated here,
+     * the patterns provided by the feed are rejected.
+     */
+    private boolean canUsePatternsFromFeed(List<Pattern> patternsFromFeed) {
+        boolean usePatternsFromFeed = patternsFromFeed.size() == tripsForPattern.keySet().size();
+        LOG.info("Using patterns from feed: {}",  usePatternsFromFeed);
+        return usePatternsFromFeed;
     }
 
     /**

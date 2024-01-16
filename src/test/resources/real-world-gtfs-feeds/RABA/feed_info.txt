@@ -1,0 +1,2 @@
+feed_publisher_name,feed_id,feed_publisher_url,feed_lang,feed_start_date,feed_end_date,feed_version,default_lang,feed_contact_email,feed_contact_url
+"Trillium Solutions, Inc.",redding-ca-us,http://www.trilliumtransit.com,en,20230328,20231001,UTC: 28-Mar-2023 16:35,,support+test+redding-ca-us@trilliumtransit.com,http://support.trilliumtransit.com

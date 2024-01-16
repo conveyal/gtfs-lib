@@ -1,0 +1,39 @@
+pattern_id,route_id,name,direction_id,use_frequency,shape_id
+2,151,52 stops from Masonic Transfer Center to Masonic Transfer Center (25 trips),0,,p_899986
+4,3779,10 stops from Downtown Transit Center to Downtown Transit Center (5 trips),0,,p_9209
+5,161,6 stops from Burney (@ Burney Sporting Goods) to Downtown Transit Center (3 trips),1,,p_2671
+6,161,6 stops from Downtown Transit Center to Burney (@ Burney Sporting Goods) (3 trips),0,,p_2639
+9,1887,15 stops from Downtown Transit Center to Downtown Transit Center (23 trips),1,,p_2631
+10,160,31 stops from Downtown Transit Center to Downtown Transit Center (23 trips),0,,p_2637
+11,159,26 stops from Canby Transfer Center to Canby Transfer Center (23 trips),1,,p_2644
+12,1886,24 stops from Downtown Transit Center to Downtown Transit Center via 2510 Airpark Dr (11 trips),1,,p_2638
+13,1886,24 stops from Downtown Transit Center to Downtown Transit Center via Court St at Butte St (12 trips),0,,p_2628
+14,153,25 stops from Downtown Transit Center to SR 273 (frontage rd) at Happy Valley Rd (23 trips),1,,p_787964
+15,153,16 stops from SR 273 (frontage rd) at Happy Valley Rd to Downtown Transit Center (23 trips),0,,p_787963
+16,154,23 stops from Canby Transfer Center to Bechelli Ln at Knollcrest Dr (23 trips),1,,p_788072
+17,154,21 stops from Bechelli Ln at Knollcrest Dr to Canby Transfer Center (23 trips),0,,p_788073
+18,155,17 stops from Downtown Transit Center to Hartnell Ave at Shasta View Dr (23 trips),0,,p_788074
+19,155,22 stops from Hartnell Ave at Shasta View Dr to Downtown Transit Center (23 trips),1,,p_788075
+20,1889,12 stops from Canby Transfer Center to Victor Ave at El Vista St (23 trips),1,,p_788078
+21,1889,13 stops from Victor Ave at El Vista St to Canby Transfer Center (23 trips),0,,p_788079
+22,1888,13 stops from Canby Transfer Center to Shasta College (21 trips),0,,p_788076
+23,1888,12 stops from Shasta College to Canby Transfer Center (21 trips),1,,p_788077
+24,157,9 stops from Downtown Transit Center to Shasta College (21 trips),0,,p_788080
+25,157,16 stops from Shasta College to Downtown Transit Center (21 trips),1,,p_788081
+28,6460,3 stops from SR 273 (frontage rd) at Happy Valley Rd to Downtown Transit Center (1 trips),0,,p_788093
+29,6460,25 stops from Downtown Transit Center to 5000 Rhonda Rd (1 trips),1,,p_788094
+1,6446,21 stops from 5000 Rhonda Rd to SR 273 (frontage rd) at Happy Valley Rd (8 trips),0,,p_110998
+2k3j,15,Southbound-5stops,,0,c69d
+sfe0,15,Northbound-5:07pm,,0,80g2
+ir25,15,Southbound-6:37pm,,0,y7ol
+v7wd,6790,Westbound-6:02am,,0,s30y
+3,6446,18 stops from SR 273 (frontage rd) at Happy Valley Rd to 5000 Rhonda Rd (7 trips),1,,p_111010
+27,6790,3 stops from Downtown Transit Center to Canby Transfer Center (16 trips),0,,p_788089
+aioj,6790,Eastbound-4:58am,,0,ce8e
+26,6790,3 stops from Canby Transfer Center to Downtown Transit Center (16 trips),1,,p_788088
+fm1k,15,Southbound-5:10am,,0,ygd9
+0smf,15,Southbound-5:37pm,,0,lt05
+mo18,15,Northbound-5stops,,0,nk8m
+xadh,15,Northbound-5:35am,,0,qy7v
+8,1885,Westbound to Downtown Passenger Terminal,1,,p_4556
+5ske,1885,Eastbound to Shasta College,0,,c2ml

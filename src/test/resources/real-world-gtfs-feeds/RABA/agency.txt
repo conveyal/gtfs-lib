@@ -1,0 +1,2 @@
+agency_id,agency_name,agency_url,agency_timezone,agency_lang,agency_phone,agency_branding_url,agency_fare_url,agency_email
+25,Redding Area Bus Authority,http://www.rabaride.com/,America/Los_Angeles,en,530-241-2877,,,
