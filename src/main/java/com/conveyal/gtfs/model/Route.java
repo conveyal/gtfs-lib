@@ -21,6 +21,8 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     public static final int CABLE_CAR = 5;
     public static final int GONDOLA = 6;
     public static final int FUNICULAR = 7;
+    public static final int TROLLEY_BUS = 11;
+    public static final int MONORAIL = 12;
 
     public String route_id;
     public String agency_id;
@@ -40,6 +42,71 @@ public class Route extends Entity { // implements Entity.Factory<Route>
     @Override
     public String getId () {
         return route_id;
+    }
+
+    /**
+     * Maps this route's type to its corresponding standard route type (0-7).
+     * If already a standard type (0-7), returns it unchanged.
+     * Extended types (100+) are mapped to their standard equivalents.
+     *
+     * @return The standard route type (0-7) corresponding to this route's type
+     */
+    public int getStandardRouteType() {
+        return RouteTypeUtil.getStandardRouteType(route_type);
+    }
+
+    /**
+     * Returns the standard RouteType enum for this route, or null if not a standard type.
+     * Only returns a value if route_type is 0-7, 11, or 12.
+     *
+     * @return The RouteType enum, or null if this route uses an extended type
+     */
+    public RouteType getRouteTypeEnum() {
+        try {
+            return RouteType.fromCode(route_type);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Returns the ExtendedRouteType enum for this route, or null if not found.
+     * Returns a value only if the route_type matches a defined ExtendedRouteType.
+     *
+     * @return The ExtendedRouteType enum, or null if not found or if using a standard type
+     */
+    public ExtendedRouteType getExtendedRouteTypeEnum() {
+        return ExtendedRouteType.fromCode(route_type);
+    }
+
+    /**
+     * Returns true if this route uses an extended route type (100+).
+     *
+     * @return true if route_type >= 100, false otherwise
+     */
+    public boolean hasExtendedRouteType() {
+        return RouteTypeUtil.isExtendedRouteType(route_type);
+    }
+
+    /**
+     * Returns a human-readable description of this route's type.
+     * For extended types, returns the detailed description.
+     * For standard types, returns the enum name.
+     *
+     * @return A string description of the route type
+     */
+    public String getRouteTypeDescription() {
+        ExtendedRouteType extended = getExtendedRouteTypeEnum();
+        if (extended != null) {
+            return extended.getDescription();
+        }
+
+        RouteType standard = getRouteTypeEnum();
+        if (standard != null) {
+            return standard.name();
+        }
+
+        return "Unknown route type: " + route_type;
     }
 
     /**
@@ -102,7 +169,7 @@ public class Route extends Entity { // implements Entity.Factory<Route>
             r.route_short_name = getStringField("route_short_name", false); // one or the other required, needs a special validator
             r.route_long_name = getStringField("route_long_name", false);
             r.route_desc = getStringField("route_desc", false);
-            r.route_type = getIntField("route_type", true, 0, 7);
+            r.route_type = getIntField("route_type", true, 0, 1799);
             r.route_sort_order = getIntField("route_sort_order", false, 0, Integer.MAX_VALUE);
             r.route_url = getUrlField("route_url", false);
             r.route_color = getStringField("route_color", false);

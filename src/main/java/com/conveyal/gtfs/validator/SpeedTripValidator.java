@@ -165,7 +165,10 @@ public class SpeedTripValidator extends TripValidator {
      */
     private static double getMaxSpeedKph (Route route) {
         int type = -1;
-        if (route != null) type = route.route_type;
+        // Use standard route type to handle extended route types (100+)
+        if (route != null) {
+            type = route.getStandardRouteType();
+        }
         switch (type) {
             case Route.SUBWAY:
                 return 140; // Speed of HK airport line.
