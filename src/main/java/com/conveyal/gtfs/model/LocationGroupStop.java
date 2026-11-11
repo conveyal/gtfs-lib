@@ -136,6 +136,8 @@ public class LocationGroupStop extends Entity {
         int stopIdIndex = 1;
         SortedMap<String, LocationGroupStop> multiLocationGroupStops = new TreeMap<>();
 
+        csvReader.setSafetySwitch(false);
+
         try {
             while (csvReader.readRecord()) {
                 if (!hasExpectedNumberOfColumns(csvReader, errors, NUMBER_OF_COLUMNS)) {

@@ -331,6 +331,7 @@ public abstract class Entity implements Serializable {
             List<String> errors = new ArrayList<>();
             try {
                 this.reader = CsvReaderUtil.getCsvReaderAccordingToFileName(tableFileName, tableName, zip, entry, errors);
+                reader.setSafetySwitch(false);
                 if (!errors.isEmpty()) {
                     // Error processing locations, location groups or location group stops.
                     errors.forEach(error -> feed.errors.add(new LocationParseError(tableName, error)));
